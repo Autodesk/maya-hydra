@@ -114,6 +114,17 @@ def _copy_scene_and_usd(scene_path, work_dir):
     return scene_copy
 
 
+def _dump_render_capture(result, label="Render"):
+    """Echo a captured Render subprocess result to stderr for CTest logs."""
+    print(f"{label} exit code: {result.returncode}", file=sys.stderr)
+    if result.stdout:
+        print(f"{label} stdout:", file=sys.stderr)
+        print(result.stdout, file=sys.stderr)
+    if result.stderr:
+        print(f"{label} stderr:", file=sys.stderr)
+        print(result.stderr, file=sys.stderr)
+
+
 def _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args=None):
     # render_exe has been validated by _validate_executable() in main(): it
     # is an absolute path to an existing executable regular file. Combined
@@ -126,6 +137,7 @@ def _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args=
         cmd.extend(shlex.split(extra_renderer_args))
     # Scene file must be last; Render expects: Render -renderer Plugin [OPTIONS] sceneFile
     cmd.append(str(scene_copy))
+    print(f"Render command: {cmd}", file=sys.stderr)
     result = subprocess.run(  # nosec B603
         cmd,
         cwd=str(work_dir),
@@ -134,9 +146,8 @@ def _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args=
     )
     if result.returncode != 0:
         print("Render failed:", file=sys.stderr)
-        print(result.stdout, file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
-    return result.returncode == 0
+        _dump_render_capture(result)
+    return result
 
 
 def _find_output_match(expected_path, output_dir):
@@ -264,30 +275,46 @@ def main(argv):
     work_dir = base_dir / "projects" / "default"
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    print(f"MAYA_APP_DIR={base_dir}", file=sys.stderr)
+    maya_render_desc_path = os.environ.get("MAYA_RENDER_DESC_PATH")
+    if maya_render_desc_path:
+        print(f"MAYA_RENDER_DESC_PATH={maya_render_desc_path}", file=sys.stderr)
+
     scene_copy = _copy_scene_and_usd(scene_path, work_dir)
     _prepare_output_dir(base_dir, rendered_subdir)
 
-    render_succeeded = _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args)
-    if not render_succeeded:
+    render_result = _run_render(
+        render_exe, renderer, scene_copy, work_dir, extra_renderer_args
+    )
+    if render_result.returncode != 0:
         _dump_base_dir_listing(base_dir)
         return 1
 
     output_dir = _find_output_dir(base_dir, rendered_subdir)
     if not output_dir.exists():
         print(f"Output Images directory not found: {output_dir}", file=sys.stderr)
+        _dump_render_capture(render_result)
+        _dump_base_dir_listing(base_dir)
         return 1
 
-    return (
-        0
-        if _compare_images(
-            idiff,
-            fail,
-            failpercent,
-            expected_dir,
-            output_dir,
-        )
-        else 1
+    if _compare_images(
+        idiff,
+        fail,
+        failpercent,
+        expected_dir,
+        output_dir,
+    ):
+        return 0
+
+    # Render can exit 0 while writing no images (HYDRA-2506). Echo the
+    # captured batch output and temp-dir listing so CTest logs stay actionable.
+    print(
+        "Render completed successfully but image comparison failed:",
+        file=sys.stderr,
     )
+    _dump_render_capture(render_result)
+    _dump_base_dir_listing(base_dir)
+    return 1
 
 
 if __name__ == "__main__":
