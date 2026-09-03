@@ -427,46 +427,24 @@ function(_mayaHydra_setup_test_plugins)
              "${MTOA_LOCATION}")
         # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as
         # HdArnoldRendererPlugin and mtoaSIP to be registered so that maya-hydra can
-        # find them during startup. Register the bundle via MAYA_PXR_PLUGINPATH_NAME
-        # only (not PXR_PLUGINPATH_NAME): third-party bundles are discovered through
-        # registerVersionedPlugins() + mayaUsdPlugInfo.json. Putting the bundle root
-        # on PXR_PLUGINPATH exposes the entire tree to Plug's recursive plugInfo.json
-        # scan (including hdGp/usdImaging), causing TfType duplicate registration
-        # when scene-index mode is enabled (HYDRA-2506).
-        set(_MTOA_PLUGIN_PATH "")
-        set(_MTOA_USD_ROOT "${MTOA_LOCATION}/usd")
-
-        # registerVersionedPlugins() expects each MAYA_PXR_PLUGINPATH_NAME entry to
-        # be a directory containing mayaUsdPlugInfo.json. Relative PlugPath entries
-        # in that file (e.g. hydra/2511, bundle/2511) resolve from this directory.
-        if(EXISTS "${_MTOA_USD_ROOT}/mayaUsdPlugInfo.json")
-            set(_MTOA_PLUGIN_PATH "${_MTOA_USD_ROOT}")
-        elseif(DEFINED PXR_VERSION)
-            set(_MTOA_USD_BUNDLE "${_MTOA_USD_ROOT}/bundle/${PXR_VERSION}")
-            if(EXISTS "${_MTOA_USD_BUNDLE}/mayaUsdPlugInfo.json")
-                set(_MTOA_PLUGIN_PATH "${_MTOA_USD_BUNDLE}")
-            endif()
-        endif()
-
-        # Fallback for older/versioned layouts (usd/bundle/<ver> or usd/hydra/<ver>).
-        if("${_MTOA_PLUGIN_PATH}" STREQUAL "" AND DEFINED USD_VERSION)
-            string(REGEX REPLACE "^0\\.([0-9]+)\\.([0-9]+)$" "\\1\\2" _MTOA_USD_VERSION_HYDRA "${USD_VERSION}")
-            set(_MTOA_HYDRA_BUNDLE "${_MTOA_USD_ROOT}/bundle/${_MTOA_USD_VERSION_HYDRA}")
-            set(_MTOA_HYDRA_LEGACY "${_MTOA_USD_ROOT}/hydra/${_MTOA_USD_VERSION_HYDRA}")
-            if(EXISTS "${_MTOA_HYDRA_BUNDLE}/mayaUsdPlugInfo.json")
-                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_BUNDLE}")
-            elseif(EXISTS "${_MTOA_HYDRA_LEGACY}/mayaUsdPlugInfo.json")
-                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_LEGACY}")
-            elseif(EXISTS "${_MTOA_HYDRA_BUNDLE}/plugInfo.json")
-                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_BUNDLE}")
-            elseif(EXISTS "${_MTOA_HYDRA_LEGACY}/plugInfo.json")
-                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_LEGACY}")
-            endif()
-        endif()
-        if(NOT "${_MTOA_PLUGIN_PATH}" STREQUAL "")
-            list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME
-                 "${_MTOA_PLUGIN_PATH}")
-            message(STATUS "MTOA MAYA_PXR_PLUGINPATH_NAME entry: ${_MTOA_PLUGIN_PATH}")
+        # find them during startup. mtoa.mod already does this itself:
+        #
+        #     MAYA_PXR_PLUGINPATH_NAME +:= usd
+        #
+        # and Maya applies module env edits during its first startup phase, before
+        # any plugin loads and therefore before registerVersionedPlugins() runs.
+        # Adding ${MTOA_LOCATION}/usd here as well only duplicates that entry, so
+        # discovery is left entirely to the module file (HYDRA-2506).
+        #
+        # Note this relies on the mtoa cut shipping usd/mayaUsdPlugInfo.json, which
+        # is what registerVersionedPlugins() looks for on each entry. Cuts predating
+        # that layout are not discoverable through MAYA_PXR_PLUGINPATH_NAME at all.
+        if(EXISTS "${MTOA_LOCATION}/usd/mayaUsdPlugInfo.json")
+            message(STATUS "MTOA USD plugins discovered via mtoa.mod: ${MTOA_LOCATION}/usd")
+        else()
+            message(WARNING
+                "MTOA_LOCATION has no usd/mayaUsdPlugInfo.json (${MTOA_LOCATION}); "
+                "mtoa USD plugins may not register for tests")
         endif()
     endif()
 
@@ -672,10 +650,11 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # added above where applicable; there is no need to also inherit ambient env.
 
     # Maya USD's registerVersionedPlugins() reads MAYA_PXR_PLUGINPATH_NAME for
-    # versioned third-party bundles that ship mayaUsdPlugInfo.json (e.g. mtoa).
-    # Core paths (mayaHydra, mayaUSD) live on PXR_PLUGINPATH_NAME only; combine
-    # them here so registerVersionedPlugins() finds both without putting bundle
-    # roots that only have plugInfo.json on MAYA_PXR_PLUGINPATH_NAME (HYDRA-2506).
+    # versioned third-party bundles that ship mayaUsdPlugInfo.json. mtoa adds its
+    # own entry through mtoa.mod, so nothing is appended for it above. Core paths
+    # (mayaHydra, mayaUSD) live on PXR_PLUGINPATH_NAME only; combine them here so
+    # registerVersionedPlugins() sees them too, without putting bundle roots that
+    # only have plugInfo.json on MAYA_PXR_PLUGINPATH_NAME (HYDRA-2506).
     set(_maya_pxr_third_party ${MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME})
     set(MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
     list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${_maya_pxr_third_party})

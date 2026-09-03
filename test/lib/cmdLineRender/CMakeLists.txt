@@ -41,6 +41,43 @@ if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
             "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
     )
 
+    # HYDRA-2506 TEMPORARY A/B arm: same scene, same two env vars as the test
+    # above, but with Arnold's procedural search path redirected to an empty
+    # directory so that ${MTOA_LOCATION}/plugins/usd_proc.dylib is not loaded.
+    #
+    # usd_proc.dylib is a ~147MB monolithic Arnold procedural with a complete
+    # second copy of USD statically linked into it, including
+    # HdGpGenerativeProceduralPlugin, HdGpSceneIndexPlugin and the
+    # HDGP_INCLUDE_DEFAULT_RESOLVER TfEnvSetting. Arnold core dlopens it on
+    # every render ("loading plugins from .../bin/../plugins"), and its static
+    # initializers then collide with the USD Maya has already loaded, which is
+    # the source of the TfType redefinition / duplicate TfEnvSetting errors.
+    #
+    # This arm answers one question: are those collisions what breaks the
+    # render, or are they loud-but-harmless noise that is also present when
+    # Arnold renders successfully? If this test produces the expected PNG while
+    # frameNbResolution_Arnold above does not, usd_proc.dylib is the cause.
+    # Neither procedural shipped in that directory (usd_proc, alembic_proc) is
+    # needed to render these scenes: the USD content reaches Arnold through
+    # Hydra, not through Arnold's own USD procedural.
+    set(HYDRA2506_EMPTY_ARNOLD_PLUGIN_DIR
+        "${CMAKE_BINARY_DIR}/test/HYDRA2506_noArnoldProcedurals")
+    file(MAKE_DIRECTORY "${HYDRA2506_EMPTY_ARNOLD_PLUGIN_DIR}")
+    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/frameNbResolution.ma
+        RENDERER HdArnoldRendererPlugin
+        EXPECTED_IMAGES_DIR renderSettings/arnold/images/frameNbResolution
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX ArnoldNoUsdProc
+        FAIL 0.05
+        FAILPERCENT 1.0
+        RENDERER_ARGS "-s 9 -e 9"
+        ENV
+            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+            "ARNOLD_PLUGIN_PATH=${HYDRA2506_EMPTY_ARNOLD_PLUGIN_DIR}"
+            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
+    )
+
     # HYDRA-2506 TEMPORARY bisection: AnimCubeRenderSettings.ma (arnold) is
     # already known to pass on this same macOS/Maya-2027 configuration
     # without Hydra V2 render settings (see HYDRA-2518). Re-render it here

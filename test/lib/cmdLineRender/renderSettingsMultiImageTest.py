@@ -231,7 +231,11 @@ def _find_output_dir(base_dir, rendered_subdir):
 
 def _dump_plugin_path_env():
     """Echo USD plugin discovery env vars for CTest logs (HYDRA-2506)."""
-    for name in ("PXR_PLUGINPATH_NAME", "MAYA_PXR_PLUGINPATH_NAME"):
+    for name in (
+        "PXR_PLUGINPATH_NAME",
+        "MAYA_PXR_PLUGINPATH_NAME",
+        "ARNOLD_PLUGIN_PATH",
+    ):
         value = os.environ.get(name)
         print(f"{name}={value or ''}", file=sys.stderr)
 
