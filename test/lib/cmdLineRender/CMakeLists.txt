@@ -39,16 +39,6 @@ if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
             "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
             "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
             "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
-            # HYDRA-2506: PLUG_REGISTRATION/PLUG_INFO_SEARCH produced no output at
-            # all, which means the "TfType ... already has a defined C++ type"
-            # errors are not coming from Plug's own plugInfo.json-driven load
-            # path. The likelier cause is dyld loading two different on-disk
-            # copies of the same USD imaging library (e.g. one from mtoa's
-            # bundled USD, one from MayaHydra's own USD) into the same process,
-            # each running its static TfType registration. DYLD_PRINT_LIBRARIES
-            # dumps every loaded image and its real path so we can see the two
-            # colliding paths directly.
-            "DYLD_PRINT_LIBRARIES=1"
     )
 
     # HYDRA-2506 TEMPORARY bisection: AnimCubeRenderSettings.ma (arnold) is
@@ -70,7 +60,6 @@ if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
             "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
             "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
             "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
-            "DYLD_PRINT_LIBRARIES=1"
     )
     return()
 endif()
