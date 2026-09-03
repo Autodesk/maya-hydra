@@ -178,7 +178,8 @@ TEST(CameraPrimvars, ParamAttributesMatchGetLogic)
         "nearClipPlane", "farClipPlane", "shutterAngle", "focusDistance", "focalLength",
         "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
         "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
-        "verticalShake", "filmFit", "depthOfField", "orthographic",
+        "verticalShake", "filmFit", "depthOfField", "aiEnableDOF", "aiFocusDistance",
+        "orthographic",
     };
 
     const auto& paramAttrs = MayaHydraCameraAdapter::GetCameraParamAttributeNamesForTest();
