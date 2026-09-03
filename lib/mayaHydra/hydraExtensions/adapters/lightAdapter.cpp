@@ -91,6 +91,8 @@ static const char* const kLightParamAttributeNames[] = {
     "dmapFarClipPlane", "dmapNearClipPlane", "coneAngle", "dropoff", "lightAngle",
     "aiExposure", "aiDiffuse", "aiSpecular", "aiNormalize", "aiEnableTemperature",
     "aiColorTemperature", "format", "aiCastVolumetricShadows", "aiVolumeSamples", "aiCastShadows",
+    // Read by GetShadowsEnabled for shadowEnable, so toggling either must re-pull params.
+    "useDepthMapShadows", "useRayTraceShadows",
 };
 
 // Shadow-map quality parameters. Not part of the core UsdLux schema, so delegates query

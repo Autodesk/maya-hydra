@@ -370,6 +370,7 @@ TEST(LightPrimvars, ParamAttributesMatchGetLogic)
         "format",
         // Shadow-related Arnold attrs (affect GetShadowsEnabled / light behavior)
         "aiCastVolumetricShadows", "aiVolumeSamples", "aiCastShadows",
+        "useDepthMapShadows", "useRayTraceShadows",
     };
 
     const auto& paramAttrs = MayaHydraLightAdapter::GetLightParamAttributeNamesForTest();
