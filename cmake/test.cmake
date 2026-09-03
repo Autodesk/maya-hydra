@@ -244,6 +244,7 @@ function(_mayaHydra_setup_test_common_path_vars)
         MAYA_SCRIPT_PATH
         XBMLANGPATH
         ${PXR_OVERRIDE_PLUGINPATH_NAME}
+        MAYA_PXR_PLUGINPATH_NAME
         PXR_MTLX_STDLIB_SEARCH_PATHS
         MATERIALX_SEARCH_PATH
     )
@@ -422,18 +423,16 @@ function(_mayaHydra_setup_test_plugins)
         # calling loadPlugin, but some of its extensions will fail to initialize,
         # leading to incorrect behavior and test failures. In those cases, it seems
         # like having a locally installed MtoA fixed it, but we can't rely on that.
-        # NOTE: an earlier attempt guarded this (and the plugin-path addition below)
-        # behind `NOT IS_MACOSX` to work around a suspected duplicate HdGp TfType
-        # registration on macOS (HYDRA-2383). A verified green macOS preflight run
-        # (build #700) with this guard removed showed mtoa loading and all tests
-        # passing, so the guard was a red herring for that failure mode; keep this
-        # unconditional on all platforms and let Maya's native .mod-based module
-        # resolution handle mtoa consistently everywhere.
         list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
              "${MTOA_LOCATION}")
         # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as
         # HdArnoldRendererPlugin and mtoaSIP to be registered so that maya-hydra can
-        # find them during startup.
+        # find them during startup. Register the bundle via MAYA_PXR_PLUGINPATH_NAME
+        # only (not PXR_PLUGINPATH_NAME): third-party bundles are discovered through
+        # registerVersionedPlugins() + mayaUsdPlugInfo.json. Putting the bundle root
+        # on PXR_PLUGINPATH exposes the entire tree to Plug's recursive plugInfo.json
+        # scan (including hdGp/usdImaging), causing TfType duplicate registration
+        # when scene-index mode is enabled (HYDRA-2506).
         set(_MTOA_PLUGIN_PATH "")
         if(DEFINED PXR_VERSION)
             set(_MTOA_USD_BUNDLE "${MTOA_LOCATION}/usd/bundle/${PXR_VERSION}")
@@ -453,7 +452,7 @@ function(_mayaHydra_setup_test_plugins)
             endif()
         endif()
         if(NOT "${_MTOA_PLUGIN_PATH}" STREQUAL "")
-            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+            list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME
                  "${_MTOA_PLUGIN_PATH}")
         endif()
     endif()
@@ -478,7 +477,7 @@ function(_mayaHydra_setup_test_plugins)
     # (UsdSkelImaging* already defined) due to conflicting USD plugin loads.
     if(IS_WINDOWS)
         if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
-            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+            list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME
                  "${PRMAN_DELEGATE_PLUGIN_PATH}")
             list(APPEND ALL_TEST_VARS PRMAN_DELEGATE_PLUGIN_PATH)
             set(MAYAHYDRA_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "${PRMAN_DELEGATE_PLUGIN_PATH}")
@@ -576,6 +575,7 @@ function(_mayaHydra_setup_test_plugins)
         MAYA_SCRIPT_PATH
         XBMLANGPATH
         ${PXR_OVERRIDE_PLUGINPATH_NAME}
+        MAYA_PXR_PLUGINPATH_NAME
         PXR_MTLX_STDLIB_SEARCH_PATHS
         MATERIALX_SEARCH_PATH
     )
@@ -632,11 +632,14 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # explicit paths (MTOA_LOCATION, PRMAN_DELEGATE_PLUGIN_PATH, etc.) are already
     # added above where applicable; there is no need to also inherit ambient env.
 
-    # Maya USD's Plug may read MAYA_PXR_PLUGINPATH_NAME (when built with
-    # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
-    # value so HdArnold and other Hydra plugins are discovered regardless.
-    list(APPEND ALL_PATH_VARS MAYA_PXR_PLUGINPATH_NAME)
+    # Maya USD's registerVersionedPlugins() reads MAYA_PXR_PLUGINPATH_NAME for
+    # versioned third-party bundles (mtoa, PRMan). Core paths (mayaHydra, mayaUSD)
+    # live on PXR_PLUGINPATH_NAME only; combine them here so registerVersionedPlugins()
+    # finds both core and third-party mayaUsdPlugInfo.json without putting bundle
+    # roots on PXR_PLUGINPATH_NAME (HYDRA-2506).
+    set(_maya_pxr_third_party ${MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME})
     set(MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${_maya_pxr_third_party})
 
     # convert the internally-processed envs from cmake list
     foreach(pathvar ${ALL_PATH_VARS})
