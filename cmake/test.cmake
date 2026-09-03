@@ -57,6 +57,46 @@ if(MayaUsd_FOUND)
     endif()
 endif()
 
+# -----------------------------------------------------------------------------
+# HYDRA-2506: strip Arnold's usd_proc.dylib from the extracted mtoa cut (macOS).
+#
+# usd_proc.dylib statically embeds a *private* copy of USD. When Arnold loads it
+# as a procedural into a Maya process that already has USD loaded, its static
+# initializers re-run USD's TF_REGISTRY_FUNCTIONs and collide with Maya's Tf
+# registry (duplicate HdGp* TfType registration). That corrupts the scene-index
+# plugin factories, leaves HdCustomNodeTranslationSceneIndexPlugin uninstantiated
+# and the render with no output. ArnoldUsdBundle.dylib supersedes usd_proc.dylib
+# and links against the *shared* USD, so per MtoA guidance we remove usd_proc.dylib
+# (and any plugInfo.json reference to it) from the extracted cut. Arnold loads
+# usd_proc.dylib itself via bin/../plugins - not through USD's plugInfo - so
+# deleting the binary (not just scrubbing JSON) is required to stop the load.
+if(IS_MACOSX AND DEFINED MTOA_LOCATION AND EXISTS "${MTOA_LOCATION}")
+    if(DEFINED Python_EXECUTABLE AND EXISTS "${Python_EXECUTABLE}")
+        set(_mayaHydra_python_for_cleanup "${Python_EXECUTABLE}")
+    else()
+        set(_mayaHydra_python_for_cleanup "${Python3_EXECUTABLE}")
+    endif()
+    message(STATUS "HYDRA-2506: stripping usd_proc.dylib from mtoa cut at ${MTOA_LOCATION}")
+    execute_process(
+        COMMAND "${_mayaHydra_python_for_cleanup}"
+                "${CMAKE_CURRENT_LIST_DIR}/scripts/strip_mtoa_usd_proc.py"
+                "${MTOA_LOCATION}"
+        RESULT_VARIABLE _mayaHydra_strip_usd_proc_result
+        OUTPUT_VARIABLE _mayaHydra_strip_usd_proc_output
+        ERROR_VARIABLE  _mayaHydra_strip_usd_proc_output
+    )
+    if(_mayaHydra_strip_usd_proc_output)
+        message(STATUS "${_mayaHydra_strip_usd_proc_output}")
+    endif()
+    if(NOT _mayaHydra_strip_usd_proc_result EQUAL 0)
+        message(WARNING
+            "HYDRA-2506: strip_mtoa_usd_proc.py failed (exit "
+            "${_mayaHydra_strip_usd_proc_result}); usd_proc.dylib may still load "
+            "and cause duplicate USD registration on macOS.")
+    endif()
+    unset(_mayaHydra_python_for_cleanup)
+endif()
+
 function(find_labels label_set label_list)
     string(REPLACE ":" ";" split_labels ${label_set})
     list(LENGTH split_labels len)
