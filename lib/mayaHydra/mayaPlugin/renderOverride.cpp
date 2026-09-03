@@ -539,6 +539,10 @@ void MtohRenderOverride::UpdateRenderGlobals(
         // rebuild. Flag every instance to clear and reinitialize on its next render; Render() must
         // issue the VP2 render-item re-send ("ogs -reset") only after that rebuild completes. Other
         // mayaHydra* toggles are read per-frame and need no rebuild.
+        //
+        // mayaHydraForceDisableSelectionHighlight matches this same substring, which is what it wants:
+        // it decides which highlight scene indices get installed, so it is consumed at
+        // resource-init time too.
         if (attrName.GetString().find("SelectionHighlight") != std::string::npos) {
             std::lock_guard<std::mutex> lock(_allInstancesMutex);
             for (auto* instance : _allInstances) {
@@ -553,10 +557,13 @@ void MtohRenderOverride::UpdateRenderGlobals(
                 instance->_outlineStyleDirty = true;
             }
         }
-        else if (attrName.GetString().find("HoverHighlighting") != std::string::npos) {
+        else if (attrName.GetString().find("HoverHighlighting") != std::string::npos
+                 || attrName.GetString().find("InteractiveHitTest") != std::string::npos) {
             // Turning hover off has to push inputs once more so the manager drops the last hover
             // path. Nothing else would flag a push, so the outline would stay on screen until the
-            // next mouse move or selection change.
+            // next mouse move or selection change. The hit-test toggle is handled here too: with
+            // hover on it changes nothing, but with hover off it starts/stops the per-frame push,
+            // and the stop must leave the manager with no stale hover path.
             std::lock_guard<std::mutex> lock(_allInstancesMutex);
             for (auto* instance : _allInstances) {
                 instance->_outlineInputsDirty = true;
@@ -1353,7 +1360,7 @@ MStatus MtohRenderOverride::Render(
     const bool usingBBoxMode = (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox) != 0;
     _bboxSceneIndex->Enable(usingBBoxMode);
     
-    renderItemOptions.legacyMayaNativeHighlightEnabled = !_UseOutlineSelectionHighlighting();
+    renderItemOptions.legacyMayaNativeHighlightEnabled = !_SuppressLegacySelectionHighlight();
     renderItemOptions.viewportDrawsWireframes = viewportDrawsWireframes(currentDisplayStyle);
 
     // A prim's wireframe color is pulled once and only re-pulled when the prim is dirtied, so a
@@ -1604,7 +1611,7 @@ MStatus MtohRenderOverride::Render(
         // the hover too, instead of leaving the outline on the prim that used to be under the
         // cursor. Only while genuinely hovering, so a non-hovering viewport pays nothing.
         HoverState* hover = _GetHoverState(_currentPanelName.asChar());
-        if (hover && hover->active.load() && _HoverEnabled()) {
+        if (hover && hover->active.load() && _HitTestEnabled()) {
             const MMatrix viewProjMatrix
                 = drawContext.getMatrix(MHWRender::MFrameContext::kViewProjMtx);
             if (viewProjMatrix != hover->lastViewProjMatrix) {
@@ -1622,8 +1629,12 @@ MStatus MtohRenderOverride::Render(
         // pushed -- so while hover is on, each panel must push its own inputs every frame or it
         // draws the previous panel's hover. The dirty-flag optimisation stays valid for the
         // selection-only case, since selection is global and every panel wants the same paths.
-        const bool hoverEnabled = _HoverEnabled();
-        if (outlineLive && (selectionChanged || hoverChanged || hoverEnabled)) {
+        //
+        // Gated on the hit test rather than on hover: with the pick on and the draw off, the pick
+        // must still run every frame so its cost is what separates that configuration from the
+        // no-pick one. The resolved path is simply not pushed -- see below.
+        const bool hitTestEnabled = _HitTestEnabled();
+        if (outlineLive && (selectionChanged || hoverChanged || hitTestEnabled)) {
             HVT_NS::Outline::OutlineInputs inputs;
             inputs.selectedPaths = _selection->GetFullySelectedPaths();
             // Set the lead (last-selected) object
@@ -1641,9 +1652,13 @@ MStatus MtohRenderOverride::Render(
             // The prim under the cursor is fed in as a hover path so it is outlined across its
             // whole visible silhouette, occlusion-aware, exactly like a host-supplied one. See
             // _ResolveHoverPath().
-            if (hover && hover->active.load() && _HoverEnabled()) {
+            //
+            // The pick runs whenever the hit test is on; only pushing the result is conditional on
+            // hover highlighting. That split is what makes "pick, draw nothing" a distinct
+            // configuration from "pick and draw".
+            if (hover && hover->active.load() && _HitTestEnabled()) {
                 const SdfPath hoverPath = _ResolveHoverPath(drawContext);
-                if (!hoverPath.IsEmpty()) {
+                if (!hoverPath.IsEmpty() && _OutlineHoverHightlingtingEnabled()) {
                     inputs.hoverPaths = { hoverPath };
                     // A hovered prim already in the selection uses the selected-hover color.
                     inputs.isHoverSelected =
@@ -1688,10 +1703,26 @@ MtohRenderOverride* MtohRenderOverride::GetByName(TfToken rendererName)
 
 bool MtohRenderOverride::_UseOutlineSelectionHighlighting() const
 {
-    return _isUsingHdSt && _globals.outlineSelectionHighlight;
+    return _isUsingHdSt && _globals.outlineSelectionHighlight
+        && !_globals.forceDisableSelectionHighlight;
 }
 
-bool MtohRenderOverride::_HoverEnabled() const
+bool MtohRenderOverride::_SuppressLegacySelectionHighlight() const
+{
+    return _UseOutlineSelectionHighlighting() || _globals.forceDisableSelectionHighlight;
+}
+
+bool MtohRenderOverride::_HitTestEnabled() const
+{
+    // Hover implies the pick: the resolved path is what hover draws, so enabling hover must enable
+    // the hit test on its own. mayaHydraForceEnableInteractiveHitTest only adds the pick on top for
+    // the instrumentation configuration that runs the pick and draws nothing. It must never be able
+    // to be switched from the UI and defaults to false.
+    return _OutlineHoverHightlingtingEnabled()
+        || (_globals.forceEnableInteractiveHitTest && _UseOutlineSelectionHighlighting());
+}
+
+bool MtohRenderOverride::_OutlineHoverHightlingtingEnabled() const
 {
     return _globals.outlineHoverHighlighting && _UseOutlineSelectionHighlighting();
 }
@@ -1759,12 +1790,14 @@ void MtohRenderOverride::_SetHoverPosition(
         return;
     }
 
-    // Nothing consumes hover state when hover is off or the outline is not the highlight mechanism,
-    // and scheduling a refresh for it would redraw continuously to produce no visible change.
+    // Nothing consumes hover state when the hit test is off or the outline is not the highlight
+    // mechanism, and scheduling a refresh for it would redraw continuously to produce no visible
+    // change. Gated on the hit test, not on hover: Render() runs the pick on that same global, so
+    // the position has to keep being tracked even when the resolved path is not drawn.
     //
     // The event filter stays installed either way, so enabling hover takes effect on the next mouse
     // move without having to reinstall anything.
-    if (!_HoverEnabled()) {
+    if (!_HitTestEnabled()) {
         // Drop any state left over from when it was enabled, so re-enabling does not briefly
         // resolve a hover at a stale cursor position. Only acts on the disabling transition.
         if (hover->active.exchange(false)) {
@@ -2384,8 +2417,9 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
     // Setup selection highlight scene indices
     //
-    // These are only used when the pixel outline is not the highlight mechanism.
-    if (!_UseOutlineSelectionHighlighting()) {
+    // These are only used when the highlight mechanism is not in outline mode (i.e. legacy), and never when
+    // selection highlighting is suppressed outright (the no-highlight floor).
+    if (!_SuppressLegacySelectionHighlight()) {
         //// At time of writing, wireframe selection highlighting of Maya native data
         //// is done by Maya at render item creation time, so avoid double wireframe
         //// selection highlighting by excluding MAYA_NATIVE_ROOT.

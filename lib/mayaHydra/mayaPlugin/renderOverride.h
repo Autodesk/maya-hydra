@@ -241,9 +241,18 @@ private:
     /// same as the render global: a non-Storm delegate cannot host the outline tasks.
     bool _UseOutlineSelectionHighlighting() const;
 
-    /// Whether hover highlighting is active for this override. The outline condition is what stops
-    /// mouse movement in Legacy mode scheduling a refresh per event for a hover nothing can draw.
-    bool _HoverEnabled() const;
+    /// Whether no selection highlight at all is drawn: neither the outline manager nor the legacy
+    /// wireframe scene indices are installed, while the selection itself is still tracked. The
+    /// no-highlight floor a highlight cost is measured against.
+    bool _SuppressLegacySelectionHighlight() const;
+
+    /// Whether the per-mouse-move pick runs. Implied by hover highlighting, which consumes the
+    /// resolved path, and additionally forced on by mayaHydraForceEnableInteractiveHitTest, so
+    /// the pick cost is measurable with the draw off. Never gates hover off.
+    bool _HitTestEnabled() const;
+
+    /// Whether the resolved hover path is drawn using outlines.
+    bool _OutlineHoverHightlingtingEnabled() const;
 
     /// Viewport hover state, kept per panel: one MtohRenderOverride serves every panel using the
     /// renderer, as do _outline and the frame passes, so a single shared state would highlight

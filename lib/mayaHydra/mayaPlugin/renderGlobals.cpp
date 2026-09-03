@@ -1001,11 +1001,36 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             return mayaObject;
         }
     }
+    // Script-only: deliberately absent from BuildOptionsMenu. Additive only --
+    // mayaHydraOutlineHoverHighlighting on its own still runs the pick and draws the hover, exactly
+    // as shipped. This attribute force the interactive hit test even if outline drawing is disabled,
+    // so the two costs can be split for performance profiling purposes.
+    if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.forceEnableInteractiveHitTest,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
     if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
         _CreateBoolAttribute(
             node,
             filter.mayaString(),
             defGlobals.outlineHoverHighlighting,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only: deliberately absent from BuildOptionsMenu.
+    if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.forceDisableSelectionHighlight,
             userDefaults);
         if (filter.attributeFilter()) {
             return mayaObject;
@@ -1231,7 +1256,11 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
 #else
         TfToken mode("Outline Selection");
 #endif
-        _GetAttribute(node, filter.mayaString(), mode, storeUserSetting);
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            mode,
+            storeUserSetting);
         globals.outlineSelectionHighlight = (mode == TfToken("Outline Selection"));
         if (filter.attributeFilter()) {
             return globals;
@@ -1239,14 +1268,40 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
     }
     if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
         _GetAttribute(
-            node, filter.mayaString(), globals.outlineHoverHighlighting, storeUserSetting);
+            node,
+            filter.mayaString(),
+            globals.outlineHoverHighlighting,
+            storeUserSetting);
         if (filter.attributeFilter()) {
             return globals;
         }
     }
     if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
         _GetAttribute(
-            node, filter.mayaString(), globals.enableDefaultOutlines, storeUserSetting);
+            node,
+            filter.mayaString(),
+            globals.enableDefaultOutlines,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.forceEnableInteractiveHitTest,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.forceDisableSelectionHighlight,
+            storeUserSetting);
         if (filter.attributeFilter()) {
             return globals;
         }

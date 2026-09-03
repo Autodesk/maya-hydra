@@ -104,9 +104,18 @@ public:
     // The pixel outline replaces the legacy wireframe highlighting rather than adding to it.
     bool            outlineSelectionHighlight = true;
     bool            outlineHoverHighlighting = false;
-    // Forces the outline manager's whole-scene prim-id pass every frame, so its cost scales with the
-    // scene. Not exposed in the UI.
+    // Forces the outline manager's whole-scene prim-id pass every frame so that default
+    // outlines may be drawn for unselected and non-hovered prims. This cost scales with
+    // scene complexity. Not exposed in the UI.
     bool            enableDefaultOutlines = false;
+    // Forces the per-mouse-move HdxPickTask ("hit test") that resolves the prim under the cursor
+    // to run even when nothing draws the result. Purely additive: outlineHoverHighlighting already
+    // implies the pick, so this only enables the pick-without-draw configuration that isolates the
+    // pick cost from the draw cost. Not exposed in the UI.
+    bool            forceEnableInteractiveHitTest = false;
+    // Force the disabling of selection highlighting, but lets selection be tracked. This allows to
+    // capture a no-highlight cost that highlight cost is measured against. Not exposed in the UI.
+    bool            forceDisableSelectionHighlight = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

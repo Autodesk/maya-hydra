@@ -28,6 +28,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     (mayaHydraRefinementLevel) \
     (mayaHydraSelectionHighlightMode) \
     (mayaHydraOutlineHoverHighlighting) \
+    (mayaHydraForceEnableInteractiveHitTest) \
+    (mayaHydraForceDisableSelectionHighlight) \
     (mayaHydraEnableDefaultOutlines)
 // clang-format on
 
