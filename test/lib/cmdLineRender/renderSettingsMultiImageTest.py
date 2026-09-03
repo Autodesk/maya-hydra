@@ -229,6 +229,13 @@ def _find_output_dir(base_dir, rendered_subdir):
     return output_dir
 
 
+def _dump_plugin_path_env():
+    """Echo USD plugin discovery env vars for CTest logs (HYDRA-2506)."""
+    for name in ("PXR_PLUGINPATH_NAME", "MAYA_PXR_PLUGINPATH_NAME"):
+        value = os.environ.get(name)
+        print(f"{name}={value or ''}", file=sys.stderr)
+
+
 def _dump_base_dir_listing(base_dir):
     """Recursively list base_dir with file sizes.
 
@@ -279,6 +286,7 @@ def main(argv):
     maya_render_desc_path = os.environ.get("MAYA_RENDER_DESC_PATH")
     if maya_render_desc_path:
         print(f"MAYA_RENDER_DESC_PATH={maya_render_desc_path}", file=sys.stderr)
+    _dump_plugin_path_env()
 
     scene_copy = _copy_scene_and_usd(scene_path, work_dir)
     _prepare_output_dir(base_dir, rendered_subdir)

@@ -434,26 +434,39 @@ function(_mayaHydra_setup_test_plugins)
         # scan (including hdGp/usdImaging), causing TfType duplicate registration
         # when scene-index mode is enabled (HYDRA-2506).
         set(_MTOA_PLUGIN_PATH "")
-        if(DEFINED PXR_VERSION)
-            set(_MTOA_USD_BUNDLE "${MTOA_LOCATION}/usd/bundle/${PXR_VERSION}")
-            if(EXISTS "${_MTOA_USD_BUNDLE}")
+        set(_MTOA_USD_ROOT "${MTOA_LOCATION}/usd")
+
+        # registerVersionedPlugins() expects each MAYA_PXR_PLUGINPATH_NAME entry to
+        # be a directory containing mayaUsdPlugInfo.json. Relative PlugPath entries
+        # in that file (e.g. hydra/2511, bundle/2511) resolve from this directory.
+        if(EXISTS "${_MTOA_USD_ROOT}/mayaUsdPlugInfo.json")
+            set(_MTOA_PLUGIN_PATH "${_MTOA_USD_ROOT}")
+        elseif(DEFINED PXR_VERSION)
+            set(_MTOA_USD_BUNDLE "${_MTOA_USD_ROOT}/bundle/${PXR_VERSION}")
+            if(EXISTS "${_MTOA_USD_BUNDLE}/mayaUsdPlugInfo.json")
                 set(_MTOA_PLUGIN_PATH "${_MTOA_USD_BUNDLE}")
             endif()
         endif()
-        # Fallback for legacy layouts using USD_VERSION (e.g. usd/hydra/<version>).
-        if("${_MTOA_PLUGIN_PATH}" STREQUAL "" AND IS_WINDOWS AND DEFINED USD_VERSION)
-            string(REGEX REPLACE "^0\\.([0-9]+)\\.([0-9]+)$" "\\1\\2" MTOA_USD_VERSION_HYDRA "${USD_VERSION}")
-            set(MTOA_HYDRA_BUNDLE "${MTOA_LOCATION}/usd/bundle/${MTOA_USD_VERSION_HYDRA}")
-            set(MTOA_HYDRA_LEGACY "${MTOA_LOCATION}/usd/hydra/${MTOA_USD_VERSION_HYDRA}")
-            if(EXISTS "${MTOA_HYDRA_BUNDLE}/plugInfo.json")
-                set(_MTOA_PLUGIN_PATH "${MTOA_HYDRA_BUNDLE}")
-            elseif(EXISTS "${MTOA_HYDRA_LEGACY}/plugInfo.json")
-                set(_MTOA_PLUGIN_PATH "${MTOA_HYDRA_LEGACY}")
+
+        # Fallback for older/versioned layouts (usd/bundle/<ver> or usd/hydra/<ver>).
+        if("${_MTOA_PLUGIN_PATH}" STREQUAL "" AND DEFINED USD_VERSION)
+            string(REGEX REPLACE "^0\\.([0-9]+)\\.([0-9]+)$" "\\1\\2" _MTOA_USD_VERSION_HYDRA "${USD_VERSION}")
+            set(_MTOA_HYDRA_BUNDLE "${_MTOA_USD_ROOT}/bundle/${_MTOA_USD_VERSION_HYDRA}")
+            set(_MTOA_HYDRA_LEGACY "${_MTOA_USD_ROOT}/hydra/${_MTOA_USD_VERSION_HYDRA}")
+            if(EXISTS "${_MTOA_HYDRA_BUNDLE}/mayaUsdPlugInfo.json")
+                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_BUNDLE}")
+            elseif(EXISTS "${_MTOA_HYDRA_LEGACY}/mayaUsdPlugInfo.json")
+                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_LEGACY}")
+            elseif(EXISTS "${_MTOA_HYDRA_BUNDLE}/plugInfo.json")
+                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_BUNDLE}")
+            elseif(EXISTS "${_MTOA_HYDRA_LEGACY}/plugInfo.json")
+                set(_MTOA_PLUGIN_PATH "${_MTOA_HYDRA_LEGACY}")
             endif()
         endif()
         if(NOT "${_MTOA_PLUGIN_PATH}" STREQUAL "")
             list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME
                  "${_MTOA_PLUGIN_PATH}")
+            message(STATUS "MTOA MAYA_PXR_PLUGINPATH_NAME entry: ${_MTOA_PLUGIN_PATH}")
         endif()
     endif()
 
@@ -477,7 +490,9 @@ function(_mayaHydra_setup_test_plugins)
     # (UsdSkelImaging* already defined) due to conflicting USD plugin loads.
     if(IS_WINDOWS)
         if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
-            list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME
+            # PRMan ships plugInfo.json only (no mayaUsdPlugInfo.json), so discovery
+            # stays on PXR_PLUGINPATH_NAME rather than MAYA_PXR_PLUGINPATH_NAME.
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PRMAN_DELEGATE_PLUGIN_PATH}")
             list(APPEND ALL_TEST_VARS PRMAN_DELEGATE_PLUGIN_PATH)
             set(MAYAHYDRA_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "${PRMAN_DELEGATE_PLUGIN_PATH}")
@@ -611,6 +626,30 @@ function(_mayaHydra_setup_test_USD_paths)
     endforeach()
 endfunction()
 
+# On macOS Jenkins agents the workspace is reachable as both /local/... and
+# /Volumes/DATA/local/... . CMake configure often records the former while
+# Maya resolves the latter at runtime, so mayaUsdPlugInfo.json open() fails in
+# registerVersionedPlugins() (HYDRA-2506). REALPATH each existing list entry
+# before writing test env vars.
+function(mayaHydra_canonicalize_path_list list_var)
+    if(NOT IS_MACOSX)
+        return()
+    endif()
+    set(_canonicalized "")
+    foreach(_entry IN LISTS ${list_var})
+        if("${_entry}" STREQUAL "")
+            continue()
+        endif()
+        if(EXISTS "${_entry}")
+            get_filename_component(_resolved "${_entry}" REALPATH)
+            list(APPEND _canonicalized "${_resolved}")
+        else()
+            list(APPEND _canonicalized "${_entry}")
+        endif()
+    endforeach()
+    set(${list_var} "${_canonicalized}" PARENT_SCOPE)
+endfunction()
+
 function(_mayaHydra_setup_test_finalize_env test_name)
     # NOTE: this should come after any setting of PATH/PYTHONPATH so
     #       that our entries will come first.
@@ -633,13 +672,19 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # added above where applicable; there is no need to also inherit ambient env.
 
     # Maya USD's registerVersionedPlugins() reads MAYA_PXR_PLUGINPATH_NAME for
-    # versioned third-party bundles (mtoa, PRMan). Core paths (mayaHydra, mayaUSD)
-    # live on PXR_PLUGINPATH_NAME only; combine them here so registerVersionedPlugins()
-    # finds both core and third-party mayaUsdPlugInfo.json without putting bundle
-    # roots on PXR_PLUGINPATH_NAME (HYDRA-2506).
+    # versioned third-party bundles that ship mayaUsdPlugInfo.json (e.g. mtoa).
+    # Core paths (mayaHydra, mayaUSD) live on PXR_PLUGINPATH_NAME only; combine
+    # them here so registerVersionedPlugins() finds both without putting bundle
+    # roots that only have plugInfo.json on MAYA_PXR_PLUGINPATH_NAME (HYDRA-2506).
     set(_maya_pxr_third_party ${MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME})
     set(MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
     list(APPEND MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${_maya_pxr_third_party})
+
+    if(IS_MACOSX)
+        foreach(pathvar ${ALL_PATH_VARS})
+            mayaHydra_canonicalize_path_list(MAYAHYDRA_VARNAME_${pathvar})
+        endforeach()
+    endif()
 
     # convert the internally-processed envs from cmake list
     foreach(pathvar ${ALL_PATH_VARS})
@@ -685,13 +730,16 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # Note: replace bad chars in test_name with _.
     string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
     set(MAYA_APP_TEMP_DIR "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}")
+    file(MAKE_DIRECTORY ${MAYA_APP_TEMP_DIR})
+    if(IS_MACOSX AND EXISTS "${MAYA_APP_TEMP_DIR}")
+        get_filename_component(MAYA_APP_TEMP_DIR "${MAYA_APP_TEMP_DIR}" REALPATH)
+    endif()
     # Note: ${WORKING_DIR} can point to the source folder, so don't use it
     #       in any env var that will write files (such as MAYA_APP_DIR).
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "TMP=${MAYA_APP_TEMP_DIR}"
         "TEMP=${MAYA_APP_TEMP_DIR}"
         "MAYA_APP_DIR=${MAYA_APP_TEMP_DIR}")
-    file(MAKE_DIRECTORY ${MAYA_APP_TEMP_DIR})
 
     # Set the Python major version in MAYA_PYTHON_VERSION. Maya 2020 and
     # earlier that are Python 2 only will simply ignore it.
