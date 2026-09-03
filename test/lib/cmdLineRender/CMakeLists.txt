@@ -27,6 +27,31 @@ set(TEST_OUTPUT_ROOT ${CMAKE_BINARY_DIR}/test/Temporary)
 # it for 2028, since nothing on that combination runs anyway. Remove this
 # whole block (and the return() below) once HYDRA-2506 is diagnosed.
 if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
+    # HYDRA-2506 diagnostic TF_DEBUG set. IMPORTANT: TF_DEBUG is parsed by
+    # OpenUSD with TfStringTokenize(), which splits on WHITESPACE only -- commas
+    # are NOT separators (see pxr/base/tf/debug.cpp). A comma-joined value is
+    # therefore one invalid token that enables nothing, which is why earlier
+    # isolation runs (#807-#811) never actually had these symbols on. Keep the
+    # values space-separated.
+    #
+    # The flags below are chosen to pinpoint what registers the USD plugins a
+    # second time (the source of the "TfType 'HdGpGenerativeProceduralPlugin'
+    # already has a defined C++ type" / "Cannot change the factory" errors that
+    # ultimately leave HdCustomNodeTranslationSceneIndexPlugin without a factory
+    # and produce an empty render):
+    #   TF_DISCOVERY_TERSE  - prints "TfRegistryManager: Library <path>" right
+    #                         before running that library's TF_REGISTRY_FUNCTIONs,
+    #                         so the library line immediately preceding the
+    #                         duplicate-define error names the culprit binary
+    #                         (expected: mtoa's usd_proc.dylib's embedded USD).
+    #   TF_DLOPEN/TF_DLCLOSE - every TfDlopen/TfDlclose path, to see a second USD
+    #                         being opened.
+    #   PLUG_REGISTRATION / PLUG_INFO_SEARCH - which plugInfo.json files are found
+    #                         and which plugins get registered, from where.
+    # These are verbose; that is acceptable for this one-shot isolated run.
+    set(HYDRA2506_DIAG_TF_DEBUG
+        "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS HDST_DUMP_FAILING_SHADER_SOURCEFILE TF_DISCOVERY_TERSE TF_DLOPEN TF_DLCLOSE PLUG_REGISTRATION PLUG_INFO_SEARCH")
+
     mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/frameNbResolution.ma
         RENDERER HdArnoldRendererPlugin
         EXPECTED_IMAGES_DIR renderSettings/arnold/images/frameNbResolution
@@ -38,45 +63,17 @@ if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
         ENV
             "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
             "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
-            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
+            "${HYDRA2506_DIAG_TF_DEBUG}"
     )
 
-    # HYDRA-2506 TEMPORARY A/B arm: same scene, same two env vars as the test
-    # above, but with Arnold's procedural search path redirected to an empty
-    # directory so that ${MTOA_LOCATION}/plugins/usd_proc.dylib is not loaded.
-    #
-    # usd_proc.dylib is a ~147MB monolithic Arnold procedural with a complete
-    # second copy of USD statically linked into it, including
-    # HdGpGenerativeProceduralPlugin, HdGpSceneIndexPlugin and the
-    # HDGP_INCLUDE_DEFAULT_RESOLVER TfEnvSetting. Arnold core dlopens it on
-    # every render ("loading plugins from .../bin/../plugins"), and its static
-    # initializers then collide with the USD Maya has already loaded, which is
-    # the source of the TfType redefinition / duplicate TfEnvSetting errors.
-    #
-    # This arm answers one question: are those collisions what breaks the
-    # render, or are they loud-but-harmless noise that is also present when
-    # Arnold renders successfully? If this test produces the expected PNG while
-    # frameNbResolution_Arnold above does not, usd_proc.dylib is the cause.
-    # Neither procedural shipped in that directory (usd_proc, alembic_proc) is
-    # needed to render these scenes: the USD content reaches Arnold through
-    # Hydra, not through Arnold's own USD procedural.
-    set(HYDRA2506_EMPTY_ARNOLD_PLUGIN_DIR
-        "${CMAKE_BINARY_DIR}/test/HYDRA2506_noArnoldProcedurals")
-    file(MAKE_DIRECTORY "${HYDRA2506_EMPTY_ARNOLD_PLUGIN_DIR}")
-    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/frameNbResolution.ma
-        RENDERER HdArnoldRendererPlugin
-        EXPECTED_IMAGES_DIR renderSettings/arnold/images/frameNbResolution
-        IMAGE_EXTENSION png
-        TEST_NAME_SUFFIX ArnoldNoUsdProc
-        FAIL 0.05
-        FAILPERCENT 1.0
-        RENDERER_ARGS "-s 9 -e 9"
-        ENV
-            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
-            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
-            "ARNOLD_PLUGIN_PATH=${HYDRA2506_EMPTY_ARNOLD_PLUGIN_DIR}"
-            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
-    )
+    # HYDRA-2506 NOTE: the earlier "ArnoldNoUsdProc" A/B arm (ARNOLD_PLUGIN_PATH
+    # pointed at an empty directory) has been removed. Preflight #811 proved it
+    # could not isolate usd_proc.dylib: ARNOLD_PLUGIN_PATH is an *additional*
+    # search path, not a replacement, so Arnold still loaded usd_proc.dylib from
+    # its built-in "bin/../plugins" directory ("no plugins loaded" from the empty
+    # dir, then "usd_proc.dylib: usd uses Arnold 7.5.3.0" from the default dir).
+    # Both arms failed identically. The TF_DEBUG flags above are the replacement
+    # experiment: they name which binary re-registers the USD plugins.
 
     # HYDRA-2506 TEMPORARY bisection: AnimCubeRenderSettings.ma (arnold) is
     # already known to pass on this same macOS/Maya-2027 configuration
@@ -96,7 +93,7 @@ if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
         ENV
             "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
             "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
-            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
+            "${HYDRA2506_DIAG_TF_DEBUG}"
     )
     return()
 endif()
