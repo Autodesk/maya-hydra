@@ -1351,9 +1351,9 @@ MStatus MtohRenderOverride::Render(
     // the picking. So for Storm we mark the camera path empty to intentionally use
     // the previous behaviour.
     //
-    // Other delegates resolve their view matrix from a camera prim, and HVT's free camera
-    // is not published as one, so they fall back to an identity view (rendering from the
-    // world origin) unless the viewport camera prim is bound here.
+    // Other delegates may take camera data from a camera prim rather than the render pass
+    // state. The matrices are available either way, but the shutter interval and depth of
+    // field attributes travel only on the prim, so bind the viewport camera for those.
     const bool needsCameraPrim = !_isUsingHdSt;
 
     SdfPath cameraPath;
