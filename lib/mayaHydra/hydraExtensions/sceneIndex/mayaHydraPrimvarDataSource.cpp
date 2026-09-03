@@ -91,36 +91,45 @@ void MayaHydraPrimvarValueDataSource::_EnsureSamples()
     // back to the single live value, so no SamplePrimvar work is done.
     MayaHydraSceneIndex* sceneIndex = _adapter ? _adapter->GetMayaHydraSceneIndex() : nullptr;
     if (!sceneIndex || !sceneIndex->GetParams().motionSamplesEnabled()) {
-        _count = 0;
         return;
     }
 
     // Only shape adapters can multi-sample primvars, e.g. deforming mesh points.
     MayaHydraShapeAdapter* shapeAdapter = dynamic_cast<MayaHydraShapeAdapter*>(_adapter);
     if (!shapeAdapter) {
-        _count = 0;
         return;
     }
-    _count = shapeAdapter->SamplePrimvar(_primvarName, kMotionKeys, _times, _samples);
+
+    float   times[kMotionKeys] {};
+    VtValue values[kMotionKeys];
+    const size_t count = shapeAdapter->SamplePrimvar(_primvarName, kMotionKeys, times, values);
+    if (count == 0) {
+        return;
+    }
+
+    _samples.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        _samples.emplace_back(times[i], std::move(values[i]));
+    }
 }
 
 VtValue MayaHydraPrimvarValueDataSource::GetValue(Time shutterOffset)
 {
     _EnsureSamples();
-    if (_count <= 1) {
+    if (_samples.size() <= 1) {
         return _adapter->Get(_primvarName);
     }
     // Consumers query at exactly the contributing times reported below.
     size_t best = 0;
     float  bestDist = std::numeric_limits<float>::max();
-    for (size_t i = 0; i < _count; ++i) {
-        const float d = std::abs(_times[i] - static_cast<float>(shutterOffset));
+    for (size_t i = 0; i < _samples.size(); ++i) {
+        const float d = std::abs(_samples[i].first - static_cast<float>(shutterOffset));
         if (d < bestDist) {
             bestDist = d;
             best = i;
         }
     }
-    return _samples[best];
+    return _samples[best].second;
 }
 
 bool MayaHydraPrimvarValueDataSource::GetContributingSampleTimesForInterval(
@@ -128,14 +137,14 @@ bool MayaHydraPrimvarValueDataSource::GetContributingSampleTimesForInterval(
     std::vector<Time>* outSampleTimes)
 {
     _EnsureSamples();
-    if (_count <= 1) {
+    if (_samples.size() <= 1) {
         return false;
     }
     if (outSampleTimes) {
         outSampleTimes->clear();
-        outSampleTimes->reserve(_count);
-        for (size_t i = 0; i < _count; ++i) {
-            outSampleTimes->push_back(_times[i]);
+        outSampleTimes->reserve(_samples.size());
+        for (const auto& sample : _samples) {
+            outSampleTimes->push_back(sample.first);
         }
     }
     return true;

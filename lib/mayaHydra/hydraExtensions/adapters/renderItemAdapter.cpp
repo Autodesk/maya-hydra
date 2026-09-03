@@ -133,8 +133,9 @@ void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
     MMatrix matrix;
     if (ri.getMatrix(matrix) == MStatus::kSuccess) {
         _transform[0] = GetGfMatrixFromMaya(matrix);
-        _transform[1] = _transform[0];
-        _transform[2] = _transform[0];
+        
+        // _transform[1] and _transform[2] are used only when motion samples are enabled
+        // so no reason to spend cycles on setting them otherwise.
 
         if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
             // MRenderItem::getMatrix() is a Viewport 2.0 snapshot of the current frame

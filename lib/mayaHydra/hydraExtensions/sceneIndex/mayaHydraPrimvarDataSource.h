@@ -94,9 +94,7 @@ private:
     MayaHydraAdapter* _adapter;
 
     bool    _sampled { false };
-    size_t  _count { 0 };
-    float   _times[kMotionKeys] {};
-    VtValue _samples[kMotionKeys];
+    std::vector<std::pair<float, VtValue>> _samples;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
