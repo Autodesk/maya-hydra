@@ -624,17 +624,21 @@ if(IS_WINDOWS)
     _mayaHydra_add_relpath_variant(prman)
 endif()
 
-if(NOT IS_MACOSX)
-# HYDRA-2031 this test fails only on macOS.
+if(IS_WINDOWS)
+  # Render -listRenderers returns 200 on Windows (Maya convention for this flag).
+  set(_registeredRenderRenderers_exit_code 200)
+else()
+  # Render -listRenderers returns 0 on Linux and macOS.
+  set(_registeredRenderRenderers_exit_code 0)
+endif()
+
 add_test(
   NAME registeredRenderRenderers
   COMMAND ${Python3_EXECUTABLE}
           ${CMAKE_CURRENT_SOURCE_DIR}/registeredRenderRenderers.py
           ${RENDER_EXECUTABLE}
           -listRenderers
-          # As per Maya source code, the expected exit code for Render
-          # when using the -listRenderers argument is 200.
-          200
+          ${_registeredRenderRenderers_exit_code}
 )
 
 set(RENDER_DESC_PATH "${CMAKE_INSTALL_PREFIX}/renderDesc")
@@ -644,7 +648,6 @@ set_tests_properties(
   PROPERTIES
     LABELS      "cmdLineRender"
     ENVIRONMENT "MAYA_RENDER_DESC_PATH=${RENDER_DESC_PATH}")
-endif()
 
 # Production rendering tests that require a Maya executable (mayabatch).
 # cmdLineRender is only registered for Maya > 2026 (see test/lib/CMakeLists.txt)
