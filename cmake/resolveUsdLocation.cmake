@@ -24,3 +24,49 @@ function(mayaHydra_resolve_usd_location outputVariable pxrUsdLocation mayaUsdLoc
 
     set(${outputVariable} "${_resolved_usd_location}" PARENT_SCOPE)
 endfunction()
+
+function(mayaHydra_retarget_usd_imported_libraries usdLocation)
+    get_property(_imported_targets DIRECTORY PROPERTY IMPORTED_TARGETS)
+    set(_retargeted_count 0)
+
+    foreach(_target IN LISTS _imported_targets)
+        set(_location_properties IMPORTED_LOCATION)
+        get_target_property(_configurations "${_target}" IMPORTED_CONFIGURATIONS)
+        if(_configurations)
+            foreach(_configuration IN LISTS _configurations)
+                string(TOUPPER "${_configuration}" _configuration_upper)
+                list(APPEND
+                    _location_properties
+                    "IMPORTED_LOCATION_${_configuration_upper}"
+                )
+            endforeach()
+        endif()
+
+        foreach(_property IN LISTS _location_properties)
+            get_target_property(_location "${_target}" "${_property}")
+            if(NOT _location OR _location MATCHES "-NOTFOUND$")
+                continue()
+            endif()
+
+            get_filename_component(_library_name "${_location}" NAME)
+            set(_bundled_location "${usdLocation}/lib/${_library_name}")
+            if(EXISTS "${_bundled_location}")
+                set_property(
+                    TARGET "${_target}"
+                    PROPERTY "${_property}" "${_bundled_location}"
+                )
+                math(EXPR _retargeted_count "${_retargeted_count} + 1")
+            endif()
+        endforeach()
+    endforeach()
+
+    if(_retargeted_count EQUAL 0)
+        message(FATAL_ERROR
+            "MayaUSD's OpenUSD bundle contains no libraries matching the "
+            "imported OpenUSD targets")
+    endif()
+
+    message(STATUS
+        "Retargeted ${_retargeted_count} OpenUSD imported library locations "
+        "to MayaUSD's bundle")
+endfunction()

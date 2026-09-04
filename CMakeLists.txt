@@ -143,26 +143,36 @@ mayaHydra_resolve_usd_location(
     "${PXR_USD_LOCATION}"
     "${MAYAUSD_LOCATION}"
 )
+
+# Load CMake targets from the developer OpenUSD package. MayaUSD's runtime
+# bundle intentionally omits pxrTargets.cmake and cannot configure consumers.
+find_package(USD 0.22.11 REQUIRED)
+
 if(NOT "${MAYAHYDRA_RESOLVED_USD_LOCATION}" STREQUAL "${PXR_USD_LOCATION}")
     message(STATUS
-        "Using MayaUSD's bundled OpenUSD: ${MAYAHYDRA_RESOLVED_USD_LOCATION}")
+        "Using MayaUSD's bundled OpenUSD libraries: "
+        "${MAYAHYDRA_RESOLVED_USD_LOCATION}")
+    mayaHydra_retarget_usd_imported_libraries(
+        "${MAYAHYDRA_RESOLVED_USD_LOCATION}"
+    )
+
+    # Downstream rpath and test setup must refer to the same libraries.
     set(
         PXR_USD_LOCATION
         "${MAYAHYDRA_RESOLVED_USD_LOCATION}"
         CACHE PATH
-        "OpenUSD installation used to build MayaHydra"
+        "OpenUSD runtime installation used by MayaHydra"
         FORCE
     )
-    list(PREPEND CMAKE_PREFIX_PATH "${PXR_USD_LOCATION}")
-
-    # Ensure a reconfigure does not retain results from another USD root.
-    unset(USD_INCLUDE_DIR CACHE)
-    unset(USD_GENSCHEMA CACHE)
-    unset(USD_CONFIG_FILE CACHE)
-    unset(USD_LIBRARY CACHE)
+    set(
+        USD_LIBRARY_DIR
+        "${PXR_USD_LOCATION}/lib"
+        CACHE PATH
+        "OpenUSD runtime library directory"
+        FORCE
+    )
 endif()
 
-find_package(USD 0.22.11 REQUIRED)
 if (CMAKE_WANT_MATERIALX_BUILD)
     # Requires at least USD 22.11 for hdMtlx module and USD must have been built with MaterialX:
     if(NOT TARGET hdMtlx)
