@@ -55,6 +55,7 @@
     <sep desc="Frame numbering options"/>
     <mel n="s" p="1" t="float" s="mayaHydraSetStartFrame(%1)" h="Starting frame for an animation sequence"/>
     <mel n="e" p="1" t="float" s="mayaHydraSetEndFrame(%1)" h="End frame for an animation sequence"/>
+    <mel n="b" p="1" t="float" s="mayaHydraSetStep(%1)" h="By frame (or step) for an animation sequence"/>
     <sep/>
     <!-- ______________________________________________________________ -->
     <sep desc="General purpose flags:"/>

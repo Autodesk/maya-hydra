@@ -297,6 +297,14 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
             TEST_NAME_SUFFIX ${suffix}
             ${multi_fail_args}
         )
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/stepFrames
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}Step
+            ${multi_fail_args}
+            RENDERER_ARGS "-b 2"
+        )
     endif()
 
     # Test frame range (5-9).  Failure with HdStorm on macOS entered as HYDRA-2139.

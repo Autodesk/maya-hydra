@@ -22,6 +22,7 @@ from .utils import getRenderSettingsPrim
 _log = logging.getLogger(__name__)
 
 _FRAMES_ATTR = "adsk:frames"
+_STEP_ATTR = "adsk:step"
 
 
 def _getFramesPair(prim):
@@ -101,3 +102,27 @@ def setEndFrame(frame):
         _setFramesPair(prim, frame_val, frame_val)
 
     _log.info("Set end frame to %.4g", frame_val)
+
+
+def setStep(step):
+    """Set the frame step on the active render settings prim's adsk:step.
+
+    Raises RuntimeError if step is non-numeric or less than or equal to 0."""
+    try:
+        step_val = float(step)
+    except (TypeError, ValueError):
+        raise RuntimeError(
+            "Step must be numeric, got: %s" % step)
+
+    if step_val <= 0:
+        raise RuntimeError(
+            "Step must be greater than 0, got: %s" % step_val)
+
+    prim = getRenderSettingsPrim()
+    attr = prim.GetAttribute(_STEP_ATTR)
+    if not attr:
+        attr = prim.CreateAttribute(
+            _STEP_ATTR, Sdf.ValueTypeNames.Float, custom=True)
+    attr.Set(step_val)
+
+    _log.info("Set step to %.4g", step_val)
