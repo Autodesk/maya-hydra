@@ -344,8 +344,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
     # As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
     # render settings mode (-s 9 -e 11); single-frame (-s 9 -e 9) is used instead.
     set(_add_frame_nb_resolution FALSE)
-    # HYDRA-2506: skip on macOS for Maya 2027.
-    if(folder STREQUAL "arnold" AND NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
+    if(folder STREQUAL "arnold")
         set(_add_frame_nb_resolution TRUE)
     elseif(folder STREQUAL "prman" AND IS_WINDOWS)
         set(_add_frame_nb_resolution TRUE)
@@ -361,7 +360,9 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
                 TEST_NAME_SUFFIX ${suffix}
                 FAIL 0.05
                 FAILPERCENT 1.0
-                RENDERER_ARGS "-s 9 -e 9"
+                # Hydra v2 does not resolve relative render product paths.
+                RENDERER_ARGS
+                    "-s 9 -e 9 -rd \"${TEST_OUTPUT_ROOT}/frameNbResolution_${suffix}/projects/default/images\""
                 ENV
                     "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
                     "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
