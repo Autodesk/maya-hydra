@@ -30,7 +30,7 @@ def setRenderDirectory(rd):
     cmds.workspace(fr=['images', rd])
 
     # Given an input product name, map it to our argument directory.
-    def setRenderProductName(productName):
+    def setRenderProductName(productName, _):
         return str(Path(rd) / Path(productName).name)
 
     # Set the directory on every USD render product picked by the shared
@@ -38,12 +38,13 @@ def setRenderDirectory(rd):
     renderProducts.applyToProductName(setRenderProductName)
 
 def setImageName(im):
-    # Set the Maya render setting.
-    cmds.setAttr('defaultRenderGlobals.imageFilePrefix', im, type='string')
 
-    def setRenderProductName(productName):
+    def setRenderProductName(productName, frame):
         p = Path(productName)
-        return str(p.with_name(im + p.suffix))
+        # Provide frame suffix to avoid overwriting the same file multiple times.
+        # e.g. "./images/mainCamFrame2.png" -> "./images/testing2.png".
+        frameSuffix = '' if frame is None else str(int(frame))
+        return str(p.with_name(im + frameSuffix + p.suffix))
 
     # Set the file name on every USD render product picked by the shared
     # selector.
@@ -70,7 +71,7 @@ def setOutputFormat(of):
     for hook in _MAYA_FORMAT_HOOKS:
         hook(of)
 
-    def setRenderProductName(productName):
+    def setRenderProductName(productName, _):
         return str(Path(productName).with_suffix('.' + of))
 
     # Set the output format on every USD render product picked by the shared
