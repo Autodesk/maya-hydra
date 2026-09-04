@@ -280,7 +280,7 @@ if (BUILD_TESTS)
     add_test(
         NAME mayaHydra_resolveUsdLocation
         COMMAND ${CMAKE_COMMAND}
-            -P "${CMAKE_SOURCE_DIR}/cmake/tests/resolveUsdLocation.cmake"
+            -P "${CMAKE_SOURCE_DIR}/cmake/tests/testResolveUsdLocation.cmake"
     )
     add_subdirectory(test)
 endif()
