@@ -81,7 +81,7 @@ bool IsPrmanRenderSettingsDriveRenderPassEnabled(const TfToken& rendererName)
     return TfGetenvBool("HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS", false);
 }
 
-static UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
+UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
 {
     constexpr const char* attrName = "activeRenderDescriptionPath";
 
@@ -408,11 +408,19 @@ RenderTimes GetRenderTimes()
                 const double startFrame = framesArray[0][0];
                 const double endFrame   = framesArray[0][1];
                 const bool isAnimated = (startFrame != endFrame);
+                float timeIncr = 1.0f;
+                const UsdAttribute stepAttr = rsPrim.GetAttribute(TfToken("adsk:step"));
+                if (stepAttr) {
+                    float stepVal = 0.0f;
+                    if (stepAttr.Get(&stepVal) && stepVal > 0.0f) {
+                        timeIncr = stepVal;
+                    }
+                }
                 return RenderTimes(
                     isAnimated,
                     MTime(startFrame, MTime::uiUnit()),
                     MTime(endFrame, MTime::uiUnit()),
-                    1.0f);
+                    timeIncr);
             }
         }
     }
