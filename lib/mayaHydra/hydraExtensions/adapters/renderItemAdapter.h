@@ -125,6 +125,14 @@ public:
     MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override { return _transform[0]; }
 
+    /// Shutter transform keys captured in UpdateTransform. Both equal GetTransform()
+    /// when motion samples are off, which the matrix data source reads as no motion.
+    MAYAHYDRALIB_API
+    GfMatrix4d GetOpenTransform() const { return _transform[2]; }
+
+    MAYAHYDRALIB_API
+    GfMatrix4d GetCloseTransform() const { return _transform[1]; }
+
     MAYAHYDRALIB_API
     void InvalidateTransform() { }
 
@@ -216,7 +224,10 @@ private:
     VtVec2fArray                _uvs = {}; //Are face varying
     MGeometry::Primitive        _primitive;
     MString                     _name;
-    GfMatrix4d                  _transform[2];
+    // [0] = shutter centre (current frame), [1] = shutter close, [2] = shutter open.
+    // Identity-initialised: UpdateTransform only writes the keys when getMatrix()
+    // succeeds, and comparing uninitialised keys would publish a bogus motion span.
+    GfMatrix4d _transform[3] = { GfMatrix4d(1.0), GfMatrix4d(1.0), GfMatrix4d(1.0) };
     int                         _fastId = 0;
     bool                        _visible = false;
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
