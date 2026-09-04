@@ -344,6 +344,16 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
         RENDERER_ARGS "-rd images/aSubDirectory"
     )
 
+    # Test -im with an animated scene.
+    mayaHydra_add_cmd_line_render_multi_image_test(${singlecam_scene}${dep_label}
+        RENDERER ${renderer}
+        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/imageNameAnimated
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX ${suffix}ImageNameAnimated
+        ${singlecam_fail_args}
+        RENDERER_ARGS "-s 5 -e 7 -im ${new_image_name}"
+    )
+
     # Frame number resolution in render product names (frame 9).  Token expansion
     # in productName requires Hydra v2 render settings (Arnold env or PRMan production
     # render env).  Storm uses Hydra v1 here and does not resolve # tokens, so it is
