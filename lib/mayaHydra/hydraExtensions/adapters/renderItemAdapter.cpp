@@ -133,11 +133,40 @@ void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
     MMatrix matrix;
     if (ri.getMatrix(matrix) == MStatus::kSuccess) {
         _transform[0] = GetGfMatrixFromMaya(matrix);
+        
+        // _transform[1] and _transform[2] are used only when motion samples are enabled
+        // so no reason to spend cycles on setting them otherwise.
+
         if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
-            MDGContextGuard guard(MAnimControl::currentTime() + 1.0);
-            _transform[1] = GetGfMatrixFromMaya(matrix);
-        } else {
-            _transform[1] = _transform[0];
+            // MRenderItem::getMatrix() is a Viewport 2.0 snapshot of the current frame
+            // and does not re-evaluate under MDGContextGuard, so sample the source DAG
+            // node's world transform instead and apply those deltas to the item's matrix.
+            MDagPath dag = ri.sourceDagPath();
+            if (!dag.isValid()) {
+                dag = _dagPath;
+            }
+            if (dag.isValid()) {
+                const GfMatrix4d centerDag    = GetGfMatrixFromMaya(dag.inclusiveMatrix());
+                const GfMatrix4d centerDagInv = centerDag.GetInverse();
+                const GfInterval shutter
+                    = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
+                const MTime now = MAnimControl::currentTime();
+
+                GfMatrix4d openDag;
+                {
+                    MDGContextGuard guard(now + shutter.GetMin());
+                    openDag = GetGfMatrixFromMaya(dag.inclusiveMatrix());
+                }
+                GfMatrix4d closeDag;
+                {
+                    MDGContextGuard guard(now + shutter.GetMax());
+                    closeDag = GetGfMatrixFromMaya(dag.inclusiveMatrix());
+                }
+                // World-space deltas, row-vector convention matching Gf and Maya:
+                // worldKey = worldCentre * (centreDag^-1 * keyDag).
+                _transform[1] = _transform[0] * centerDagInv * closeDag;
+                _transform[2] = _transform[0] * centerDagInv * openDag;
+            }
         }
     }
 }
