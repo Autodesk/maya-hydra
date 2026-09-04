@@ -7,3 +7,4 @@ add_subdirectory(simpleHydraGenerativeProceduralPlugin)
 # built or installed. Its Arnold implementation now lives in arnold-usd's
 # MTOA_BUILD-only HdArnoldMtoaSceneIndexPlugin; loading both would register two
 # Arnold scene-index translators for the same Maya custom nodes.
+# add_subdirectory(customNodeTranslationSceneIndex)

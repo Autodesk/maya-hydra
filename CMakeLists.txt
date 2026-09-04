@@ -138,6 +138,7 @@ message(STATUS "   PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
 message(STATUS "   PYTHON_LIBRARIES    = ${PYTHON_LIBRARIES}")
 message(STATUS "   Python_EXECUTABLE   = ${Python_EXECUTABLE}")
 
+# On macOS, use MayaUSD's OpenUSD runtime to avoid duplicate Tf registration.
 mayaHydra_resolve_usd_location(
     MAYAHYDRA_RESOLVED_USD_LOCATION
     "${PXR_USD_LOCATION}"

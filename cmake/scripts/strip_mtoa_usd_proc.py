@@ -20,6 +20,10 @@
 # extracted mtoa cut avoids the duplicate-USD collision without losing the
 # Arnold USD-imaging plugins provided by the bundle.
 #
+# WARNING: Removing usd_proc.dylib breaks MtoA workflows that still use this
+# procedural, including loading USD files into an aiStandin in Maya and calls
+# to AiSceneLoad or AiSceneWrite, such as Arnold-USD export and related paths.
+#
 # This script is a build-time developer/CI tool. Its single argument is the
 # root of an *already extracted* mtoa cut, supplied by the build system
 # (MTOA_LOCATION). It is validated below before any filesystem operation

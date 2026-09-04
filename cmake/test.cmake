@@ -455,6 +455,13 @@ function(_mayaHydra_setup_test_plugins)
         # calling loadPlugin, but some of its extensions will fail to initialize,
         # leading to incorrect behavior and test failures. In those cases, it seems
         # like having a locally installed MtoA fixed it, but we can't rely on that.
+        # NOTE: an earlier attempt guarded this (and the plugin-path addition below)
+        # behind `NOT IS_MACOSX` to work around a suspected duplicate HdGp TfType
+        # registration on macOS (HYDRA-2383). A verified green macOS preflight run
+        # (build #700) with this guard removed showed mtoa loading and all tests
+        # passing, so the guard was a red herring for that failure mode; keep this
+        # unconditional on all platforms and let Maya's native .mod-based module
+        # resolution handle mtoa consistently everywhere.
         list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
              "${MTOA_LOCATION}")
         # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as

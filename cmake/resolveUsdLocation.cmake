@@ -1,3 +1,8 @@
+# HYDRA-2506: MayaHydra and MayaUSD must use the same OpenUSD runtime on macOS.
+# Loading separate copies runs Tf registry initializers twice. This module
+# selects MayaUSD's bundled runtime and retargets imported USD libraries to it.
+# Keeping this logic separate also allows testing it in CMake script mode.
+
 function(mayaHydra_resolve_usd_location outputVariable pxrUsdLocation mayaUsdLocation)
     set(_resolved_usd_location "${pxrUsdLocation}")
 

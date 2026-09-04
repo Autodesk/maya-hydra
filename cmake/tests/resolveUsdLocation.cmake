@@ -1,3 +1,8 @@
+# HYDRA-2506 regression test. It verifies that macOS builds select MayaUSD's
+# bundled OpenUSD, retain the standalone fallback elsewhere, and retarget
+# imported USD libraries. This prevents two OpenUSD copies from loading and
+# registering the same Tf types in one Maya process.
+
 include("${CMAKE_CURRENT_LIST_DIR}/../resolveUsdLocation.cmake")
 
 set(IS_MACOSX TRUE)
