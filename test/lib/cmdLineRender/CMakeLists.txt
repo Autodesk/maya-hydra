@@ -59,7 +59,8 @@ if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
         TEST_NAME_SUFFIX Arnold
         FAIL 0.05
         FAILPERCENT 1.0
-        RENDERER_ARGS "-s 9 -e 9"
+        RENDERER_ARGS
+            "-s 9 -e 9 -rd \"${TEST_OUTPUT_ROOT}/frameNbResolution_Arnold/projects/default/images\""
         ENV
             "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
             "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
