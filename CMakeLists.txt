@@ -94,6 +94,7 @@ endif()
 # modules and definitions
 #------------------------------------------------------------------------------
 include(cmake/utils.cmake)
+include(cmake/resolveUsdLocation.cmake)
 find_package(Maya 2024 REQUIRED)
 
 if(Maya_FOUND AND APPLE)
@@ -136,6 +137,30 @@ message(STATUS "Build mayaHydra with Python3 = " ${BUILD_WITH_PYTHON_3_VERSION})
 message(STATUS "   PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
 message(STATUS "   PYTHON_LIBRARIES    = ${PYTHON_LIBRARIES}")
 message(STATUS "   Python_EXECUTABLE   = ${Python_EXECUTABLE}")
+
+mayaHydra_resolve_usd_location(
+    MAYAHYDRA_RESOLVED_USD_LOCATION
+    "${PXR_USD_LOCATION}"
+    "${MAYAUSD_LOCATION}"
+)
+if(NOT "${MAYAHYDRA_RESOLVED_USD_LOCATION}" STREQUAL "${PXR_USD_LOCATION}")
+    message(STATUS
+        "Using MayaUSD's bundled OpenUSD: ${MAYAHYDRA_RESOLVED_USD_LOCATION}")
+    set(
+        PXR_USD_LOCATION
+        "${MAYAHYDRA_RESOLVED_USD_LOCATION}"
+        CACHE PATH
+        "OpenUSD installation used to build MayaHydra"
+        FORCE
+    )
+    list(PREPEND CMAKE_PREFIX_PATH "${PXR_USD_LOCATION}")
+
+    # Ensure a reconfigure does not retain results from another USD root.
+    unset(USD_INCLUDE_DIR CACHE)
+    unset(USD_GENSCHEMA CACHE)
+    unset(USD_CONFIG_FILE CACHE)
+    unset(USD_LIBRARY CACHE)
+endif()
 
 find_package(USD 0.22.11 REQUIRED)
 if (CMAKE_WANT_MATERIALX_BUILD)
@@ -241,6 +266,11 @@ if (BUILD_TESTS)
     include(cmake/test.cmake)
     fetch_googletest()
     enable_testing()
+    add_test(
+        NAME mayaHydra_resolveUsdLocation
+        COMMAND ${CMAKE_COMMAND}
+            -P "${CMAKE_SOURCE_DIR}/cmake/tests/resolveUsdLocation.cmake"
+    )
     add_subdirectory(test)
 endif()
 
