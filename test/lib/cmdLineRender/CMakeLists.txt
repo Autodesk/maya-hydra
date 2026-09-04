@@ -15,90 +15,6 @@
 
 set(TEST_OUTPUT_ROOT ${CMAKE_BINARY_DIR}/test/Temporary)
 
-# HYDRA-2506 TEMPORARY: isolate the macOS preflight down to a single test
-# (frameNbResolution's Arnold variant) so a blind preflight run returns
-# focused evidence for the test currently excluded on macOS Maya 2027 (see
-# the folder STREQUAL "arnold" condition further down in this file). This is
-# registered directly here, bypassing that exclusion and every other test in
-# this file, rather than changing the exclusion itself, so the exclusion's
-# own logic is untouched and the rest of the suite cannot mask the result.
-# All OSX Maya 2028 unit tests are already disabled elsewhere, so this
-# scaffold only needs to fire for Maya 2027 -- there is no point registering
-# it for 2028, since nothing on that combination runs anyway. Remove this
-# whole block (and the return() below) once HYDRA-2506 is diagnosed.
-if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
-    # HYDRA-2506 diagnostic TF_DEBUG set. IMPORTANT: TF_DEBUG is parsed by
-    # OpenUSD with TfStringTokenize(), which splits on WHITESPACE only -- commas
-    # are NOT separators (see pxr/base/tf/debug.cpp). A comma-joined value is
-    # therefore one invalid token that enables nothing, which is why earlier
-    # isolation runs (#807-#811) never actually had these symbols on. Keep the
-    # values space-separated.
-    #
-    # The flags below are chosen to pinpoint what registers the USD plugins a
-    # second time (the source of the "TfType 'HdGpGenerativeProceduralPlugin'
-    # already has a defined C++ type" / "Cannot change the factory" errors that
-    # ultimately leave HdCustomNodeTranslationSceneIndexPlugin without a factory
-    # and produce an empty render):
-    #   TF_DISCOVERY_TERSE  - prints "TfRegistryManager: Library <path>" right
-    #                         before running that library's TF_REGISTRY_FUNCTIONs,
-    #                         so the library line immediately preceding the
-    #                         duplicate-define error names the culprit binary
-    #                         (expected: mtoa's usd_proc.dylib's embedded USD).
-    #   TF_DLOPEN/TF_DLCLOSE - every TfDlopen/TfDlclose path, to see a second USD
-    #                         being opened.
-    #   PLUG_REGISTRATION / PLUG_INFO_SEARCH - which plugInfo.json files are found
-    #                         and which plugins get registered, from where.
-    # These are verbose; that is acceptable for this one-shot isolated run.
-    set(HYDRA2506_DIAG_TF_DEBUG
-        "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS HDST_DUMP_FAILING_SHADER_SOURCEFILE TF_DISCOVERY_TERSE TF_DLOPEN TF_DLCLOSE PLUG_REGISTRATION PLUG_INFO_SEARCH")
-
-    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/frameNbResolution.ma
-        RENDERER HdArnoldRendererPlugin
-        EXPECTED_IMAGES_DIR renderSettings/arnold/images/frameNbResolution
-        IMAGE_EXTENSION png
-        TEST_NAME_SUFFIX Arnold
-        FAIL 0.05
-        FAILPERCENT 1.0
-        RENDERER_ARGS
-            "-s 9 -e 9 -rd \"${TEST_OUTPUT_ROOT}/frameNbResolution_Arnold/projects/default/images\""
-        ENV
-            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
-            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
-            "${HYDRA2506_DIAG_TF_DEBUG}"
-    )
-
-    # HYDRA-2506 NOTE: the earlier "ArnoldNoUsdProc" A/B arm (ARNOLD_PLUGIN_PATH
-    # pointed at an empty directory) has been removed. Preflight #811 proved it
-    # could not isolate usd_proc.dylib: ARNOLD_PLUGIN_PATH is an *additional*
-    # search path, not a replacement, so Arnold still loaded usd_proc.dylib from
-    # its built-in "bin/../plugins" directory ("no plugins loaded" from the empty
-    # dir, then "usd_proc.dylib: usd uses Arnold 7.5.3.0" from the default dir).
-    # Both arms failed identically. The TF_DEBUG flags above are the replacement
-    # experiment: they name which binary re-registers the USD plugins.
-
-    # HYDRA-2506 TEMPORARY bisection: AnimCubeRenderSettings.ma (arnold) is
-    # already known to pass on this same macOS/Maya-2027 configuration
-    # without Hydra V2 render settings (see HYDRA-2518). Re-render it here
-    # with the same two env vars that frameNbResolution_Arnold uses to turn
-    # on the Hydra V2 render-settings/scene-index path, to determine whether
-    # the failure above is specific to frameNbResolution.ma or is a general
-    # "Arnold + Hydra V2 render settings" problem on macOS. Remove this test
-    # once that question is answered.
-    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/AnimCubeRenderSettings.ma
-        RENDERER HdArnoldRendererPlugin
-        EXPECTED_IMAGES_DIR renderSettings/arnold/images
-        IMAGE_EXTENSION png
-        TEST_NAME_SUFFIX ArnoldV2RSBisect
-        FAIL 0.05
-        FAILPERCENT 1.0
-        ENV
-            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
-            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
-            "${HYDRA2506_DIAG_TF_DEBUG}"
-    )
-    return()
-endif()
-
 # The command line render tests come in per-renderer variants that share the
 # same body but differ in a couple of arguments (resolution, image name).  Each
 # variant is emitted by calling a small _mayaHydra_add_*_variant() function once
@@ -428,8 +344,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
     # As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
     # render settings mode (-s 9 -e 11); single-frame (-s 9 -e 9) is used instead.
     set(_add_frame_nb_resolution FALSE)
-    # HYDRA-2506: skip on macOS for Maya 2027.
-    if(folder STREQUAL "arnold" AND NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
+    if(folder STREQUAL "arnold")
         set(_add_frame_nb_resolution TRUE)
     elseif(folder STREQUAL "prman" AND IS_WINDOWS)
         set(_add_frame_nb_resolution TRUE)
@@ -445,7 +360,9 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
                 TEST_NAME_SUFFIX ${suffix}
                 FAIL 0.05
                 FAILPERCENT 1.0
-                RENDERER_ARGS "-s 9 -e 9"
+                # Hydra v2 does not resolve relative render product paths.
+                RENDERER_ARGS
+                    "-s 9 -e 9 -rd \"${TEST_OUTPUT_ROOT}/frameNbResolution_${suffix}/projects/default/images\""
                 ENV
                     "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
                     "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
