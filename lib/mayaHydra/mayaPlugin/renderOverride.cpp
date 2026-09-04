@@ -1342,20 +1342,44 @@ MStatus MtohRenderOverride::Render(
         currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
     }
     
-    // Leave renderParams.camera empty so HVT renders through its free camera
+    // For Storm, leave renderParams.camera empty so HVT renders through its free camera
     // (rebuilt each frame from params().viewInfo matrices). We used to supply
     // a custom camera path to HVT here, but HVT ignored it up until PR #173 :
     // https://github.com/Autodesk/hydra-viewport-toolbox/pull/173
     // When that PR came into effect, our custom camera path was now used, but 
     // it turns out it provided the wrong values, and desynced the render from
-    // the picking. So we now mark the camera path empty to intentionally use
+    // the picking. So for Storm we mark the camera path empty to intentionally use
     // the previous behaviour.
+    //
+    // Other delegates may take camera data from a camera prim rather than the render pass
+    // state. The matrices are available either way, but the shutter interval and depth of
+    // field attributes travel only on the prim, so bind the viewport camera for those.
+    const bool needsCameraPrim = !_isUsingHdSt;
+
+    SdfPath cameraPath;
+    if (needsCameraPrim) {
+        MStatus        status;
+        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+        if (status == MStatus::kSuccess) {
+            const MString ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+            const Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
+            // TODO: Support USD cameras.
+            if (ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
+                MFnCamera camera(camPath, &status);
+                // TODO: Support orthographic cameras.
+                if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
+                    cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+                }
+            }
+        }
+    }
+
     for (int i = 0; i < numFramePasses; ++i) {
         const hvt::FramePassPtr& currentPass = _GetFramePass(i);
         if (!currentPass) {
             continue;
         }
-        currentPass->params().renderParams.camera = SdfPath();
+        currentPass->params().renderParams.camera = cameraPath;
     }
 
     // Update all registered plugin before render.
@@ -2402,6 +2426,12 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
 
     // Update frame in Hydra scene globals scene index
     instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+
+    // A delegate bound to a camera prim is driven by that prim, and Maya's world-matrix
+    // callbacks don't fire reliably under the Evaluation Manager during playback.
+    if (instance->_mayaHydraSceneIndex) {
+        instance->_mayaHydraSceneIndex->RefreshCamerasOnTimeChange();
+    }
 }
 
 void MtohRenderOverride::_RendererChangedCallback(
