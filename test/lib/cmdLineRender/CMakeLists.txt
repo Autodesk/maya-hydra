@@ -624,22 +624,28 @@ if(IS_WINDOWS)
     _mayaHydra_add_relpath_variant(prman)
 endif()
 
-if(IS_WINDOWS)
-  # Render -listRenderers returns 200 on Windows (Maya convention for this flag).
-  set(_registeredRenderRenderers_exit_code 200)
+if(IS_MACOSX)
+    # On macOS, Maya.app/Contents/bin/Render is not a binary, but rather a
+    # shell script wrapper that incorrectly does not return the exit code
+    # of the real executable Contents/MacOS/Render.  The wrapper is 
+    # Apps/UtilityApps/Render_mac.sh, installed under the name Render into bin.
+    set(_registeredRenderRenderers_exit_code 0)
 else()
-  # Render -listRenderers returns 0 on Linux and macOS.
-  set(_registeredRenderRenderers_exit_code 0)
+    # Render -listRenderers returns 200 (Maya convention for this flag).
+    set(_registeredRenderRenderers_exit_code 200)
 endif()
 
-add_test(
-  NAME registeredRenderRenderers
-  COMMAND ${Python3_EXECUTABLE}
-          ${CMAKE_CURRENT_SOURCE_DIR}/registeredRenderRenderers.py
-          ${RENDER_EXECUTABLE}
-          -listRenderers
-          ${_registeredRenderRenderers_exit_code}
-)
+# -listRenderers failure on Linux entered as HYDRA-2531.
+if(NOT IS_LINUX)
+    add_test(
+      NAME registeredRenderRenderers
+      COMMAND ${Python3_EXECUTABLE}
+              ${CMAKE_CURRENT_SOURCE_DIR}/registeredRenderRenderers.py
+              ${RENDER_EXECUTABLE}
+              -listRenderers
+              ${_registeredRenderRenderers_exit_code}
+    )
+endif()
 
 set(RENDER_DESC_PATH "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
