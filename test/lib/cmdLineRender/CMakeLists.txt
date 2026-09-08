@@ -635,17 +635,14 @@ else()
     set(_registeredRenderRenderers_exit_code 200)
 endif()
 
-# -listRenderers failure on Linux entered as HYDRA-2531.
-if(NOT IS_LINUX)
-    add_test(
-      NAME registeredRenderRenderers
-      COMMAND ${Python3_EXECUTABLE}
-              ${CMAKE_CURRENT_SOURCE_DIR}/registeredRenderRenderers.py
-              ${RENDER_EXECUTABLE}
-              -listRenderers
-              ${_registeredRenderRenderers_exit_code}
-    )
-endif()
+add_test(
+  NAME registeredRenderRenderers
+  COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/registeredRenderRenderers.py
+          ${RENDER_EXECUTABLE}
+          -listRenderers
+          ${_registeredRenderRenderers_exit_code}
+)
 
 set(RENDER_DESC_PATH "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
