@@ -21,6 +21,7 @@
 
 namespace MAYAHYDRA_NS_DEF {
     bool useSingleFramePass();
+    bool useCameraPrim();
 }
 
 #endif // MAYAHYDRA_ENV_SETTINGS_H

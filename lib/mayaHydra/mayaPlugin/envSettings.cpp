@@ -24,6 +24,12 @@ TF_DEFINE_ENV_SETTING(
     false,
     "Use single frame pass when using the same renderer for all passes.");
 
+TF_DEFINE_ENV_SETTING(
+    MAYA_HYDRA_USE_CAMERA_PRIM,
+    false,
+    "Pass camera prim to Hydra instead of populating the free camera parameters."
+    "Camera prim may expose additional render parameters but its usage must be well tested before we can enable it by default.");
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -33,6 +39,13 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
+    }
+
+    bool useCameraPrim()
+    {
+        static const bool _useCameraPrim
+            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_USE_CAMERA_PRIM);
+        return _useCameraPrim;
     }
 
 } // namespace MAYAHYDRA_NS_DEF

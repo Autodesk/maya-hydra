@@ -1341,23 +1341,9 @@ MStatus MtohRenderOverride::Render(
         }
         currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
     }
-    
-    // For Storm, leave renderParams.camera empty so HVT renders through its free camera
-    // (rebuilt each frame from params().viewInfo matrices). We used to supply
-    // a custom camera path to HVT here, but HVT ignored it up until PR #173 :
-    // https://github.com/Autodesk/hydra-viewport-toolbox/pull/173
-    // When that PR came into effect, our custom camera path was now used, but 
-    // it turns out it provided the wrong values, and desynced the render from
-    // the picking. So for Storm we mark the camera path empty to intentionally use
-    // the previous behaviour.
-    //
-    // Other delegates may take camera data from a camera prim rather than the render pass
-    // state. The matrices are available either way, but the shutter interval and depth of
-    // field attributes travel only on the prim, so bind the viewport camera for those.
-    const bool needsCameraPrim = !_isUsingHdSt;
 
     SdfPath cameraPath;
-    if (needsCameraPrim) {
+    if (useCameraPrim()) {
         MStatus        status;
         const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
         if (status == MStatus::kSuccess) {
