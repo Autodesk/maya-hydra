@@ -60,6 +60,16 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.ParamAttributesMatchGetLogic")
 
+    # What: depth-of-field attributes must reach the camera prim's schema fields.
+    # How: build the scene, then run the C++ test that toggles depthOfField and
+    # edits focusDistance and fStop.
+    # Expect: focusDistance and fStop round-trip while DOF is on, and fStop
+    # reports 0 once DOF is turned off.
+    def test_depthOfFieldSchemaFieldsRoundTrip(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CameraPrimvars.DepthOfFieldSchemaFieldsRoundTrip")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
