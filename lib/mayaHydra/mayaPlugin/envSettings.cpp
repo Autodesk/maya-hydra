@@ -26,7 +26,7 @@ TF_DEFINE_ENV_SETTING(
 
 TF_DEFINE_ENV_SETTING(
     MAYA_HYDRA_USE_CAMERA_PRIM,
-    false,
+    true,
     "Pass camera prim to Hydra instead of populating the free camera parameters."
     "Camera prim may expose additional render parameters but its usage must be well tested before we can enable it by default.");
 

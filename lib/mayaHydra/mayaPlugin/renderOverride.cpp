@@ -1366,6 +1366,11 @@ MStatus MtohRenderOverride::Render(
             continue;
         }
         currentPass->params().renderParams.camera = cameraPath;
+        // A bound camera prim carries its own window policy, translated from 
+        // the Maya film fit. Disable the override in that case.
+        if (!cameraPath.IsEmpty()) {
+            currentPass->params().renderParams.overrideWindowPolicy = std::nullopt;
+        }
     }
 
     // Update all registered plugin before render.
