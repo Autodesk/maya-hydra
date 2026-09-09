@@ -718,6 +718,24 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
 }
 
+void MayaHydraSceneIndex::RefreshCamerasOnTimeChange()
+{
+    _MapAdapter<MayaHydraCameraAdapter>(
+        [](MayaHydraCameraAdapter* a) {
+            if (a->UpdateTransformIfChanged()) {
+                MayaHydra::DirtyNotifier(a).dirtyTransform();
+            }
+        },
+        _cameraAdapters);
+}
+
+SdfPath MayaHydraSceneIndex::GetCameraPrimPath(const MDagPath& camPath) const
+{
+    const SdfPath camID = GetPrimPath(camPath, true);
+    // Only report a published path, or the caller would bind a non-existent prim.
+    return TfMapLookupPtr(_cameraAdapters, camID) ? camID : SdfPath();
+}
+
 SdfPath MayaHydraSceneIndex::GetDelegateID(TfToken name) { return _ID; }
 
 MayaHydraSceneIndex::LightDagPathMap MayaHydraSceneIndex::GetGlobalLightPaths() const
