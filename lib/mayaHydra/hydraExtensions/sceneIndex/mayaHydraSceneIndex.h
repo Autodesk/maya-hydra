@@ -203,6 +203,14 @@ public:
 
     SdfPath GetDelegateID(TfToken name);
 
+    /// Dirty the cameras that moved. Maya's per-node world-matrix callbacks do not fire
+    /// reliably under the Evaluation Manager during playback.
+    void RefreshCamerasOnTimeChange();
+
+    /// Scene index path of the camera prim for \p camPath, or an empty path if none is
+    /// published.
+    SdfPath GetCameraPrimPath(const MDagPath& camPath) const;
+
     HdMeshTopology GetMeshTopology(const SdfPath& id);
 
     HdBasisCurvesTopology GetBasisCurvesTopology(const SdfPath& id);

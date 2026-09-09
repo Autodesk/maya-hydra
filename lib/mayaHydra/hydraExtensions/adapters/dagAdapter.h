@@ -62,6 +62,9 @@ public:
     virtual void RemovePrim() override;
     MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override;
+    /// Refresh the cached world transform; returns whether it changed.
+    MAYAHYDRALIB_API
+    bool UpdateTransformIfChanged();
     MAYAHYDRALIB_API
     size_t SampleTransform(size_t maxSampleCount, float* times, GfMatrix4d* samples);
     MAYAHYDRALIB_API
