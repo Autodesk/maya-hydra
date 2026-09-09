@@ -117,9 +117,9 @@ endfunction()
 if(IS_WINDOWS)
     _mayaHydra_add_texturing_variant(storm "-x 960 -y 540")
 endif()
-if(NOT IS_MACOSX)
-    _mayaHydra_add_texturing_variant(arnold "-x 160 -y 120")
-endif()
+
+_mayaHydra_add_texturing_variant(arnold "-x 160 -y 120")
+
 if(IS_WINDOWS)
     _mayaHydra_add_texturing_variant(prman "-x 160 -y 120")
 endif()
