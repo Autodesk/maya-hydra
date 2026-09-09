@@ -24,6 +24,7 @@
 #include <mayaUsdAPI/utils.h>
 
 #include <maya/MAnimControl.h>
+#include <maya/MRenderUtil.h>
 #include <maya/MTime.h>
 
 #include <ufe/runTimeMgr.h>
@@ -45,6 +46,7 @@
 #include <pxr/usd/usdRender/pass.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 
@@ -119,6 +121,26 @@ UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
     }
 
     return MayaUsdAPI::ufePathToPrim(outPath);
+}
+
+// Percentage of frames completed, once renderedTime has been rendered.
+int RenderProgressPercentage(const RenderTimes& renderTimes, const MTime& renderedTime)
+{
+    const double startFrame = renderTimes.startTime.as(MTime::uiUnit());
+    const double endFrame   = renderTimes.endTime.as(MTime::uiUnit());
+    // GetRenderTimes() only ever returns a positive increment, but a
+    // SetRenderTimes() caller could pass zero.
+    const double incr = (renderTimes.timeIncr > 0.0f) ? renderTimes.timeIncr : 1.0;
+
+    // The frame loop accumulates the increment, so allow for drift when
+    // counting frames.
+    constexpr double epsilon = 1e-6;
+    const double     span = std::max(0.0, endFrame - startFrame);
+    const int        frameCount = 1 + static_cast<int>(std::floor(span / incr + epsilon));
+    const int        framesDone = 1 + static_cast<int>(std::floor(
+        std::max(0.0, renderedTime.as(MTime::uiUnit()) - startFrame) / incr + epsilon));
+
+    return std::clamp((framesDone * 100) / frameCount, 0, 100);
 }
 
 } // namespace
@@ -428,6 +450,23 @@ RenderTimes GetRenderTimes()
     // Fallback: single frame at current time.
     const auto currentTime = MAnimControl::currentTime();
     return RenderTimes(false, currentTime, currentTime, 1.0f);
+}
+
+void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime)
+{
+    // The following function is fairly inflexible.  The first string is
+    // printed between parentheses in the script editor as a batch render
+    // progress report.  In Hydra v2 render settings mode the render delegate
+    // writes render product output to the file system, and in a render with
+    // multiple render products has full control on the order in which render
+    // products are rendered.  We therefore have no visibility in the
+    // application as to which render product is being written out at any given
+    // time.  For a single render product repetitively printing out the render
+    // product name provides little value.  Printing out an empty string is not
+    // possible, as Maya fills out such a string with a "starting" message.  We
+    // therefore print out a single space.
+    MRenderUtil::sendRenderProgressInfo(
+        " ", RenderProgressPercentage(renderTimes, renderedTime));
 }
 
 } // namespace MAYAHYDRA_NS_DEF
