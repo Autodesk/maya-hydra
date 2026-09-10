@@ -47,6 +47,7 @@ set(HEADERS
     materialAdapter.h
     materialNetworkConverter.h
     mayaAttrs.h
+    mayaHydraCameraExposure.h
     shapeAdapter.h
     tokens.h
     shadowMatrixComputation.h

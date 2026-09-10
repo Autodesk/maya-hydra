@@ -20,11 +20,13 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/adapters/mayaHydraCameraExposure.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/imaging/hd/camera.h>
+#include <pxr/imaging/hd/cameraSchema.h>
 #include <pxr/imaging/hd/changeTracker.h>
 
 #include <maya/MDagMessage.h>
@@ -44,6 +46,11 @@ static const char* const kCameraParamAttributeNames[] = {
     "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
     "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
     "verticalShake", "filmFit", "depthOfField", "orthographic",
+    // Editing any of these must re-pull HdCameraSchema::linearExposureScale.
+    MayaHydraCameraExposure::kAttrUsePhysicalCamera, MayaHydraCameraExposure::kAttrFStopPreset,
+    MayaHydraCameraExposure::kAttrFStopCustom, MayaHydraCameraExposure::kAttrShutterPreset,
+    MayaHydraCameraExposure::kAttrShutterCustom, MayaHydraCameraExposure::kAttrISOPreset,
+    MayaHydraCameraExposure::kAttrISOCustom, MayaHydraCameraExposure::kAttrEVComp,
 };
 
 static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
@@ -142,6 +149,9 @@ void MayaHydraCameraAdapter::Populate()
     if (_isPopulated) {
         return;
     }
+    // Authored at setup rather than during the data-source pull, so the DG is never
+    // modified mid-evaluation.
+    MayaHydraCameraExposure::EnsureExposureAttributes(GetDagPath().node());
     GetMayaHydraSceneIndex()->InsertPrim(this, CameraType(), GetID());
     _isPopulated = true;
 }
@@ -223,6 +233,13 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             status.errorString().asChar());
         return false;
     };
+
+#if PXR_VERSION >= 2505
+    // Read from the shape's own attributes, so handled before the MFnCamera lookup.
+    if (paramName == HdCameraSchemaTokens->linearExposureScale) {
+        return VtValue(MayaHydraCameraExposure::ComputeCameraLinearExposureScale(GetDagPath()));
+    }
+#endif
 
     MFnCamera camera(GetDagPath(), &status);
     if (hadError(status))
