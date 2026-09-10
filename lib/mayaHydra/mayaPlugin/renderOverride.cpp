@@ -1598,11 +1598,11 @@ MStatus MtohRenderOverride::Render(
         // Testing this before each exchange() is what stops a flag being consumed when there is no
         // outline to push it to: && short-circuits, so the flag stays set and the change is
         // delivered once an outline exists. Reversed, a change made in Legacy mode would be lost.
-        const bool outlineLive = _outline && _selection;
+        const bool outlineLive = _outlineManager && _selection;
 
         // Rebuild and push the outline style only when a color preference changed.
         if (outlineLive && _outlineStyleDirty.exchange(false)) {
-            _outline->SetStyle(_BuildOutlineStyle());
+            _outlineManager->SetStyle(_BuildOutlineStyle());
         }
         
         // A stationary cursor can end up over a different prim purely because the view moved --
@@ -1669,7 +1669,7 @@ MStatus MtohRenderOverride::Render(
                 }
             }
 
-            _outline->SetInputs(std::move(inputs));
+            _outlineManager->SetInputs(std::move(inputs));
         }
 
 #ifndef MAYAHYDRALIB_OIT_ENABLED
@@ -2020,11 +2020,11 @@ void MtohRenderOverride::_InitHydraResources(
                 // blitted to screen and will be cleared at the start of the next frame.
                 const SdfPath ccPath =
                     outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
-                _outline = std::make_unique<HVT_NS::Outline::OutlineManager>();
-                _outline->Install(*outlinePass,
-                                  ccPath,
-                                  hvt::TaskManager::InsertionOrder::insertBefore);
-                _outline->SetStyle(_BuildOutlineStyle());
+                _outlineManager = std::make_unique<HVT_NS::Outline::OutlineManager>();
+                _outlineManager->Install(*outlinePass,
+                    ccPath,
+                    hvt::TaskManager::InsertionOrder::insertBefore);
+                _outlineManager->SetStyle(_BuildOutlineStyle());
                 // Freshly (re)created outline: push the current selection on the next Render.
                 _outlineInputsDirty = true;
             }
@@ -2293,7 +2293,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _leadObjectPathTracker.reset();
     // Must stay ahead of the frame pass teardown below. OutlineManager::Install has a \pre that the
     // frame pass outlives the manager, as the manager caches a pointer to it that would dangle.
-    _outline.reset();
+    _outlineManager.reset();
     // Reset the legacy wireframe selection-highlight scene indices so stale RefPtrs do not
     // survive across a clear/reinit cycle (e.g. when toggling the selection-highlight mode).
     _geomSubsetWhSi.Reset();

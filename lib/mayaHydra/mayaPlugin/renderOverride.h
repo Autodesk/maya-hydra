@@ -255,7 +255,7 @@ private:
     bool _OutlineHoverHightlingtingEnabled() const;
 
     /// Viewport hover state, kept per panel: one MtohRenderOverride serves every panel using the
-    /// renderer, as do _outline and the frame passes, so a single shared state would highlight
+    /// renderer, as do _outlineManager and the frame passes, so a single shared state would highlight
     /// every viewport at once.
     struct HoverState
     {
@@ -512,7 +512,7 @@ private:
     MAYAHYDRA_NS_DEF::MhDirtySelectionColorsSceneIndexRefPtr
         _dirtySelectionColorsSceneIndex { nullptr };
 
-    std::unique_ptr<HVT_NS::Outline::OutlineManager> _outline;
+    std::unique_ptr<HVT_NS::Outline::OutlineManager> _outlineManager;
 
 #ifdef MAYAHYDRA_HAS_QT
     // One hover event filter per model panel, keyed by panel name.

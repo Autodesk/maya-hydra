@@ -87,7 +87,7 @@ The manager is installed on **frame pass 0** in `_InitHydraResources()`, and onl
 `_UseOutlineSelectionHighlighting()` is true:
 
 ```cpp
-_outline->Install(*outlinePass, ccPath, hvt::TaskManager::InsertionOrder::insertBefore);
+_outlineManager->Install(*outlinePass, ccPath, hvt::TaskManager::InsertionOrder::insertBefore);
 ```
 
 Pass 0 is the main Storm pass, and is the only candidate: its render index holds all scene geometry,
@@ -119,7 +119,7 @@ graph LR
   manager is made from `Render()`. Each flag is tested against `outlineLive` before its `exchange()`,
   so a change made while no outline exists stays pending rather than being swallowed.
 - **The frame pass must outlive the manager**, which caches a pointer to it. `ClearHydraResources()`
-  therefore does `_outline.reset()` *ahead of* the frame pass teardown. The order is load-bearing
+  therefore does `_outlineManager.reset()` *ahead of* the frame pass teardown. The order is load-bearing
   and carries a comment saying so.
 
 ## Disabling the added-geometry highlight
@@ -277,7 +277,7 @@ The chain is:
 2. **Per-panel state.** The filter's callback writes into a `HoverState` — cursor position, whether
    the cursor is inside with no button held, and a dirty flag — and schedules a refresh. State is
    keyed by panel name because one `MtohRenderOverride` serves every viewport using that renderer,
-   as do `_outline` and the frame passes. A single shared state would highlight every viewport at
+   as do `_outlineManager` and the frame passes. A single shared state would highlight every viewport at
    once. The fields are individually atomic rather than snapshot-consistent: a frame can pair an `x`
    from before a mouse move with a `y` from after, which is one frame of one pixel.
 
