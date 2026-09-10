@@ -234,10 +234,12 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return false;
     };
 
+#if PXR_VERSION >= 2505
     // Read from the shape's own attributes, so handled before the MFnCamera lookup.
     if (paramName == HdCameraSchemaTokens->linearExposureScale) {
         return VtValue(MayaHydraCameraExposure::ComputeCameraLinearExposureScale(GetDagPath()));
     }
+#endif
 
     MFnCamera camera(GetDagPath(), &status);
     if (hadError(status))

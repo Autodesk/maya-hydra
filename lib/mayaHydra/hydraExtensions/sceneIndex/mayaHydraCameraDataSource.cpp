@@ -154,8 +154,10 @@ TfTokenVector MayaHydraCameraDataSource::GetNames()
         HdCameraSchemaTokens->fStop,
         HdCameraSchemaTokens->shutterOpen,
         HdCameraSchemaTokens->shutterClose,
+#if PXR_VERSION >= 2505
         // Typed through the HdCameraSchema allTokens branch in Get() below.
         HdCameraSchemaTokens->linearExposureScale,
+#endif
         HdCameraTokens->windowPolicy,
     };
 
