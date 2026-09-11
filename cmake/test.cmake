@@ -1018,7 +1018,9 @@ endfunction()
 #   RENDERED_IMAGE_SUBDIR - Rendered image root sub-directory (default "projects/default/images")
 #   RENDERED_IMAGE_NAME - Rendered image file name (default test name)
 #   RENDERER_ARGS      - Additional command line arguments to pass to the
-#                        renderer.
+#                        renderer.  -rd defaults to the absolute rendered image
+#                        directory, i.e. where idiff looks for the output; pass
+#                        an explicit -rd to override it.
 #   TEST_NAME_SUFFIX   - Suffix to append to the Maya scene file name to create the test name.
 #   COPY_SCENE         - If set, copies the scene file to the temporary project
 #                        before rendering.
@@ -1091,15 +1093,6 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
         set(SCENE_PATH ${SRC_SCENE_PATH})
     endif()
 
-    # Our test command is a trivial script that invokes the Render executable
-    # to render an image, then invokes idiff to compare the rendered result
-    # with a reference image.
-
-    # The command needs to be the name of an executable, without any 
-    # arguments, as CMake calls an executable with that string unparsed.
-
-    set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-
     # Replace illegal characters in test_name with _.  Rendered images are
     # written here.
     string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
@@ -1124,6 +1117,27 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
         cmake_path(GET EXPECTED_IMAGE_PATH PARENT_PATH _expected_dir)
         set(EXPECTED_IMAGE_PATH "${_expected_dir}/${_expected_stem}_${ARG_TEST_NAME_SUFFIX}.${IMAGE_EXTENSION}")
     endif()
+
+    # Default the render directory to where idiff looks for the output.  The
+    # path must be absolute: the Hydra V2 render-settings path does not resolve
+    # a relative USD render product productName (unlike Hydra V1's
+    # ResolveRenderProductImagePath()), and renderers disagree on what a
+    # relative -rd is relative to.  A caller that passes its own -rd wins; the
+    # boundaries in the match are needed because a quoted path or an image name
+    # can contain "-rd" as a substring.
+    if(NOT ARG_RENDERER_ARGS MATCHES "(^| )-rd( |$)")
+        set(ARG_RENDERER_ARGS "${ARG_RENDERER_ARGS} -rd \"${RENDERED_IMAGE_DIR}\"")
+    endif()
+    file(MAKE_DIRECTORY "${RENDERED_IMAGE_DIR}")
+
+    # Our test command is a trivial script that invokes the Render executable
+    # to render an image, then invokes idiff to compare the rendered result
+    # with a reference image.
+
+    # The command needs to be the name of an executable, without any
+    # arguments, as CMake calls an executable with that string unparsed.
+
+    set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
 
     # Always use the discovered idiff binary; do not fall back to PATH
     if (IMAGE_DIFF_TOOL)
@@ -1213,82 +1227,6 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 
     apply_labels_to_test("${ALL_LABELS}" ${test_name})
 
-endfunction()
-
-# Wraps mayaHydra_add_cmd_line_render_test() for a test that is known to run
-# under Hydra V2 render settings (PRMan by default via
-# _mayaHydra_append_prman_production_render_env, or Arnold when the caller
-# passes ENV MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1).  The Hydra V2
-# render-settings path does not resolve a relative USD render product
-# productName (unlike Hydra V1's ResolveRenderProductImagePath()), so a
-# relative -rd such as "../images" does not land where idiff looks.  This
-# function resolves -rd to an absolute path under the test's own output
-# folder and delegates to mayaHydra_add_cmd_line_render_test().
-#
-#   OUTPUT_NAME            - Folder name under CMAKE_BINARY_DIR/test/Temporary
-#                             identifying this test (must match the
-#                             convention already used by every call site: the
-#                             eventual sanitized test name).
-#   RENDERER_ARGS           - Renderer args WITHOUT -rd; this function
-#                             appends the resolved absolute -rd.
-#   RENDERED_IMAGE_SUBDIR    - default "projects/default/images"; also used
-#                             to build the -rd path, and forwarded unchanged.
-#   PRECREATE_DIR            - If set, MAKE_DIRECTORY the resolved -rd path
-#                             before registering the test.
-#   All other keywords (RENDERER, RENDERED_IMAGE_NAME, IMAGE_EXTENSION, FAIL,
-#   FAILPERCENT, TEST_NAME_SUFFIX, ENV, COPY_SCENE) are forwarded unchanged.
-function(_mayaHydra_add_hydra_v2_cmd_line_render_test SCENE_FILE_LABELED)
-    cmake_parse_arguments(ARG
-        "COPY_SCENE;PRECREATE_DIR"
-        "OUTPUT_NAME;RENDERER;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS;TEST_NAME_SUFFIX"
-        "ENV"
-        ${ARGN}
-    )
-
-    if(NOT ARG_OUTPUT_NAME)
-        message(FATAL_ERROR "_mayaHydra_add_hydra_v2_cmd_line_render_test: OUTPUT_NAME is required.")
-    endif()
-
-    set(_subdir "projects/default/images")
-    if(ARG_RENDERED_IMAGE_SUBDIR)
-        set(_subdir "${ARG_RENDERED_IMAGE_SUBDIR}")
-    endif()
-    set(_render_dir "${CMAKE_BINARY_DIR}/test/Temporary/${ARG_OUTPUT_NAME}/${_subdir}")
-
-    if(ARG_PRECREATE_DIR)
-        file(MAKE_DIRECTORY "${_render_dir}")
-    endif()
-
-    set(_forward_args RENDERER_ARGS "${ARG_RENDERER_ARGS} -rd \"${_render_dir}\"")
-    if(ARG_RENDERER)
-        list(APPEND _forward_args RENDERER ${ARG_RENDERER})
-    endif()
-    if(ARG_RENDERED_IMAGE_SUBDIR)
-        list(APPEND _forward_args RENDERED_IMAGE_SUBDIR ${ARG_RENDERED_IMAGE_SUBDIR})
-    endif()
-    if(ARG_RENDERED_IMAGE_NAME)
-        list(APPEND _forward_args RENDERED_IMAGE_NAME ${ARG_RENDERED_IMAGE_NAME})
-    endif()
-    if(ARG_IMAGE_EXTENSION)
-        list(APPEND _forward_args IMAGE_EXTENSION ${ARG_IMAGE_EXTENSION})
-    endif()
-    if(ARG_FAIL)
-        list(APPEND _forward_args FAIL ${ARG_FAIL})
-    endif()
-    if(ARG_FAILPERCENT)
-        list(APPEND _forward_args FAILPERCENT ${ARG_FAILPERCENT})
-    endif()
-    if(ARG_TEST_NAME_SUFFIX)
-        list(APPEND _forward_args TEST_NAME_SUFFIX ${ARG_TEST_NAME_SUFFIX})
-    endif()
-    if(ARG_COPY_SCENE)
-        list(APPEND _forward_args COPY_SCENE)
-    endif()
-    if(ARG_ENV)
-        list(APPEND _forward_args ENV ${ARG_ENV})
-    endif()
-
-    mayaHydra_add_cmd_line_render_test(${SCENE_FILE_LABELED} ${_forward_args})
 endfunction()
 
 # Discover the mayabatch executable (Windows only; macOS/Linux use maya -batch).
@@ -1391,6 +1329,7 @@ function(mayaHydra_add_mayabatch_render_test SCENE_FILE_LABELED)
     set(RENDERED_IMAGE_NAME "${SANITIZED_TEST_NAME}")
     set(RENDERED_IMAGE_DIR "${MAYA_APP_TEMP_DIR}/${RENDERED_IMAGE_SUBDIR}")
     set(RENDERED_IMAGE_PATH "${RENDERED_IMAGE_DIR}/${RENDERED_IMAGE_NAME}.${IMAGE_EXTENSION}")
+    file(MAKE_DIRECTORY "${RENDERED_IMAGE_DIR}")
     cmake_path(REPLACE_EXTENSION SRC_SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
     if(ARG_TEST_NAME_SUFFIX)
         cmake_path(GET EXPECTED_IMAGE_PATH STEM LAST_ONLY _expected_stem)
@@ -1450,7 +1389,22 @@ function(mayaHydra_add_mayabatch_render_test SCENE_FILE_LABELED)
         cmake_path(REMOVE_EXTENSION SRC_SCENE_PATH OUTPUT_VARIABLE SRC_SCENE_PATH_NO_EXT)
         cmake_path(REMOVE_EXTENSION SCENE_PATH OUTPUT_VARIABLE SCENE_PATH_NO_EXT)
         if(EXISTS "${SRC_SCENE_PATH_NO_EXT}.usda")
-            configure_file("${SRC_SCENE_PATH_NO_EXT}.usda" "${SCENE_PATH_NO_EXT}.usda" COPYONLY)
+            # The Hydra V2 render settings path hands productName to the render
+            # delegate unresolved, so a relative path is written relative to the
+            # test's working directory rather than the Maya project.  Rewrite it
+            # to the absolute path the idiff step compares against.  Scenes with
+            # more than one render product would all be pointed at the same file.
+            #
+            # Substituting text rather than configuring a .usda.in template keeps
+            # the source .usda loadable (the .ma references it by name), and keeps
+            # @VAR@ expansion away from USD's @...@ asset path syntax.
+            file(READ "${SRC_SCENE_PATH_NO_EXT}.usda" _usda_contents)
+            string(REGEX REPLACE
+                "(token productName = )\"[^\"]*\""
+                "\\1\"${RENDERED_IMAGE_PATH}\""
+                _usda_contents "${_usda_contents}")
+            file(WRITE "${SCENE_PATH_NO_EXT}.usda" "${_usda_contents}")
+            unset(_usda_contents)
         endif()
         if(EXISTS "${SRC_SCENE_PATH_NO_EXT}.mtlx")
             configure_file("${SRC_SCENE_PATH_NO_EXT}.mtlx" "${SCENE_PATH_NO_EXT}.mtlx" COPYONLY)
