@@ -624,6 +624,18 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             }
         }
 
+        // A wire skipped by an earlier pass is translated for the first time on whatever delta
+        // makes it relevant again -- a deselection, or the reconsider pass above. That delta
+        // describes what changed since the last frame, not what a brand new adapter needs, so it
+        // can legitimately omit MVS_changedMatrix and MVS_changedEffect. Without them
+        // MayaHydraRenderItemAdapter::_transform is never written (it has no initializer, and
+        // UpdateTransform is its only writer) and no material is bound. Treat every new adapter
+        // as a full initialization instead.
+        if (isNewRenderitem) {
+            flags |= MDataServerOperation::MViewportScene::MVS_changedMatrix
+                | MDataServerOperation::MViewportScene::MVS_changedEffect;
+        }
+
         if (isNewRenderitem) {
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
