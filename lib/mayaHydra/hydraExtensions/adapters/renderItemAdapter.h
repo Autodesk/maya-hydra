@@ -219,7 +219,7 @@ private:
     VtVec2fArray                _uvs = {}; //Are face varying
     MGeometry::Primitive        _primitive;
     MString                     _name;
-    GfMatrix4d                  _transform[2];
+    GfMatrix4d                  _transform[2] { GfMatrix4d(1.0), GfMatrix4d(1.0) };
     int                         _fastId = 0;
     bool                        _visible = false;
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
