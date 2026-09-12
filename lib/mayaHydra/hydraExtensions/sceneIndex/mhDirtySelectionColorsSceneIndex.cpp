@@ -67,11 +67,14 @@ void MhDirtySelectionColorsSceneIndex::dirtySelectionRelatedPrims(const SdfPathV
 
 void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(const SdfPath& primPath, HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const
 {
-    //path can be a hierachy of prim paths so we need to get all children prim paths
+    // path can be a hierarchy of prim paths so we need to get all children prim paths
     std::stack<SdfPath> pathsToDirty({primPath});
+    std::unordered_set<SdfPath, SdfPath::Hash> visited;
     while (!pathsToDirty.empty()) {
         auto currPathToDirty = pathsToDirty.top();
         pathsToDirty.pop();
+        if (!visited.insert(currPathToDirty).second)
+            continue;
 
         inoutDirtiedPrimEntries.emplace_back(currPathToDirty, primvarsColorsLocatorSet);
 
@@ -82,8 +85,10 @@ void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(const SdfPath& 
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPathToDirty);
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
             HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
-            for (const auto& prototypePath : instancerTopology.GetPrototypes()->GetTypedValue(0)) {
-                pathsToDirty.push(prototypePath);
+            if (auto prototypes = instancerTopology.GetPrototypes()) {
+                for (const auto& prototypePath : prototypes->GetTypedValue(0)) {
+                    pathsToDirty.push(prototypePath);
+                }
             }
         }
     }
