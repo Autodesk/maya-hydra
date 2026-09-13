@@ -270,6 +270,11 @@ private:
         /// signal it, so Render() compares against this to dirty the hover. Per panel because each
         /// has its own camera. Render thread only.
         MMatrix lastViewProjMatrix;
+
+        /// The prim path the last pick resolved for this panel. Reused on frames where nothing
+        /// dirtied the hover, so HdxPickTask does not run again, and across panel switches, so
+        /// returning to the hovered panel costs no pick. Render thread only.
+        PXR_NS::SdfPath resolvedPath;
     };
 
     /// The hover state for \p panelName, or nullptr when that panel has none.
@@ -419,6 +424,12 @@ private:
     // Set whenever a host color preference changes, so Render invalidates every prim that pulls a
     // wireframe color rather than only the ones whose selection state changed.
     std::atomic<bool>                     _wireframeColorsDirty = { false };
+
+    /// The hover path currently pushed into the (shared) OutlineManager. Everything else in
+    /// OutlineInputs is global -- selection, lead object, excludes -- and at most one panel holds
+    /// the cursor, so the hover contribution is the only part that differs between panels.
+    /// Comparing it is what replaces pushing inputs every frame. Render thread only.
+    PXR_NS::SdfPath                       _pushedOutlineHoverPath;
 
     /// Keyed by panel name. Entries are created and destroyed alongside the hover event filter,
     /// both on the main thread, so the map structure is never mutated concurrently. The fields are
