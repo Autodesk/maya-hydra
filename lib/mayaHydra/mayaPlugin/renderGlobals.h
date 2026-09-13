@@ -101,8 +101,14 @@ public:
     GfVec4f         colorSelectionHighlightColor = GfVec4f(1.0f, 1.0f, 0.0f, 0.5f);
     bool            colorSelectionHighlight = true;
     bool            wireframeSelectionHighlight = true;
+
     // The pixel outline replaces the legacy wireframe highlighting rather than adding to it.
+#if PXR_VERSION <= 2411 || defined(__APPLE__)
+    bool            outlineSelectionHighlight = false;
+#else
     bool            outlineSelectionHighlight = true;
+#endif
+
     bool            outlineHoverHighlighting = false;
     // Forces the outline manager's whole-scene prim-id pass every frame so that default
     // outlines may be drawn for unselected and non-hovered prims. This cost scales with
