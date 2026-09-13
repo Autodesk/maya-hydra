@@ -1963,6 +1963,24 @@ void MtohRenderOverride::_InitHydraResources(
 
     _initializationAttempted = true;
 
+    // Absorb the opened scene's defaultRenderGlobals before anything below branches on them. The
+    // selection-highlight mode decides whether the outline manager (further down) or the legacy
+    // wireframe highlight scene indices (in _CreateSceneIndicesChainAfterMergingSceneIndex) get
+    // installed, and neither decision is ever revisited for the life of these resources. The
+    // constructor's read of _globals happened at plugin-load time, before any file was opened, and
+    // nothing else pulls the scene's values in: there is no kAfterOpen hook for the globals, and
+    // "mayaHydra -updateRenderGlobals" is only issued from the generated attribute-change handler.
+    // Reading them here rather than at the end of this function is what keeps a scene saved with
+    // the non-default mode from installing the other mode's machinery.
+    //
+    // If the scene has no defaultRenderGlobals, fall back to the user defaults (current state).
+    {
+        constexpr bool filterRenderer = true;
+        constexpr bool fallbackToUserDefaults = true;
+        MtohRenderGlobals::GlobalChanged(
+            { _rendererDesc.rendererName, filterRenderer, fallbackToUserDefaults });
+    }
+
     GlfContextCaps::InitInstance();
 
     static const TfTokenVector allPurposeRenderTags = { HdRenderTagTokens->geometry,
@@ -2212,13 +2230,8 @@ void MtohRenderOverride::_InitHydraResources(
     _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
 
     if (auto* renderDelegate = _GetRenderDelegate()) {
-        // Pull in any options that may have changed due file-open.
-        // If the currentScene has defaultRenderGlobals we'll absorb those new settings,
-        // but if not, fallback to user-defaults (current state) .
-        const bool filterRenderer = true;
-        const bool fallbackToUserDefaults = true;
-        _globals.GlobalChanged(
-            { _rendererDesc.rendererName, filterRenderer, fallbackToUserDefaults });
+        // The globals were absorbed at the top of this function, before anything read them.
+        // Only handing them to the delegate has to wait until the delegate exists.
         _globals.ApplySettings(renderDelegate, _rendererDesc.rendererName);
     }
 
