@@ -454,6 +454,13 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # the globals when 'mayaHydra -updateRenderGlobals' is called. Without
         # this the plug changes but the viewport keeps using the previous mode.
         cmds.mayaHydra(updateRenderGlobals=SELECTION_HIGHLIGHT_MODE_NAME)
+
+        # This refresh is what makes Render() perform the clear/reinit. That same render queues
+        # "ogs -reset" on the idle queue (renderOverride.cpp:1228) to re-send the VP2 render items
+        # the rebuild dropped, and cmds.refresh() does not drain the idle queue -- so without the
+        # two lines below the viewport is left with no Maya-native geometry.
+        cmds.refresh(force=True)
+        maya.utils.processIdleEvents()
         cmds.refresh(force=True)
 
     def tearDown(self):

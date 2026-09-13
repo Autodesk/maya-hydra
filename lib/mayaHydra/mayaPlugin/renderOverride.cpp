@@ -1225,6 +1225,16 @@ MStatus MtohRenderOverride::Render(
         // native objects would vanish; force a full re-send now that the clear/reinit has
         // completed. Issuing it here (rather than from the attribute callback) keeps it
         // ordered after the rebuild, so it cannot race the teardown.
+        //
+        // On idle, not synchronously: a command executed from inside Render() is not safe. The
+        // consequence is that *this* frame is presented with no Maya-native geometry -- the
+        // adapters are already gone and the re-send has not run yet -- so a mode switch flashes
+        // for exactly one frame ("ogs -reset" triggers its own refresh, which repopulates).
+        // Removing the flash means not dropping the adapters at all; see the note in the analysis.
+        //
+        // Anything that needs the post-reset state, notably an image-comparison test, must drain
+        // the idle queue (maya.utils.processIdleEvents()) and refresh again -- cmds.refresh() does
+        // not flush it.
         MGlobal::executeCommandOnIdle("ogs -reset");
     }
 
