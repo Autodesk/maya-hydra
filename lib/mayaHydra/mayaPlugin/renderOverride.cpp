@@ -80,6 +80,7 @@
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/base/tf/token.h>
+#include <pxr/base/tf/diagnostic.h>
 
 #include <ufe/camera.h>
 #include <ufe/hierarchy.h>
@@ -1403,7 +1404,13 @@ MStatus MtohRenderOverride::Render(
     }
     if (_selection && _dirtySelectionColorsSceneIndex && _selectionColorsDirty.exchange(false)) {
         SdfPathVector currentlySelected = _selection->GetFullySelectedPaths();
-        std::sort(currentlySelected.begin(), currentlySelected.end());
+
+        // Already sorted: GetFullySelectedPaths() iterates Selection::_pathToSelections, a
+        // std::map<SdfPath, ...> (fvpSelection.h:46) keyed with std::less<SdfPath>, which is the
+        // ordering set_symmetric_difference below requires. Asserted rather than re-sorted so a
+        // change of container type fails loudly in a debug build instead of silently producing a
+        // wrong symmetric difference.
+        TF_DEV_AXIOM(std::is_sorted(currentlySelected.begin(), currentlySelected.end()));
 
         SdfPathVector selectionStateChanged;
         std::set_symmetric_difference(
