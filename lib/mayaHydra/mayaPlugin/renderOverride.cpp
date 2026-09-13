@@ -1409,11 +1409,16 @@ MStatus MtohRenderOverride::Render(
         _previouslySelectedPaths = std::move(currentlySelected);
     }
 
+    const std::string  panelKey = _currentPanelName.asChar();
+    const auto         oldStyleIt = _oldDisplayStyles.find(panelKey);
+    const unsigned int oldDisplayStyle
+        = (oldStyleIt != _oldDisplayStyles.end()) ? oldStyleIt->second : 0u;
+
     // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
     // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
     // Refinement level for Hydra is set in Hydra Render Globals
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
-    if ( (_reprSelectorSceneIndex && (currentDisplayStyle != _oldDisplayStyle) ) || (delegateParams.refineLevel != _oldRefineLevel)){
+    if ( (_reprSelectorSceneIndex && (currentDisplayStyle != oldDisplayStyle) ) || (delegateParams.refineLevel != _oldRefineLevel)){
         if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) &&
             ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) ||
             (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
@@ -1451,7 +1456,7 @@ MStatus MtohRenderOverride::Render(
         | static_cast<unsigned int>(MHWRender::MFrameContext::kFlatShaded)
         | static_cast<unsigned int>(MHWRender::MFrameContext::kShadeActiveOnly);
     if (_mayaHydraSceneIndex
-        && ((currentDisplayStyle ^ _oldDisplayStyle) & treatmentRelevantStyleBits) != 0) {
+        && ((currentDisplayStyle ^ oldDisplayStyle) & treatmentRelevantStyleBits) != 0) {
         // Re-treats the wires that were translated. Those that were never translated, because they
         // were only ever going to be hidden, are not represented here at all -- UpdateRenderItems
         // recovers them from this frame's scene snapshot instead.
@@ -1464,7 +1469,7 @@ MStatus MtohRenderOverride::Render(
         // -reset", which re-sends everything. Going the other way, into a shaded mode, can only
         // hide more.
         renderItemOptions.reconsiderSkippedHighlightWires
-            = !viewportDrawsWireframes(_oldDisplayStyle)
+            = !viewportDrawsWireframes(oldDisplayStyle)
             && renderItemOptions.viewportDrawsWireframes;
     }
 
@@ -1685,7 +1690,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     //Store as old display style
-    _oldDisplayStyle = currentDisplayStyle;
+    _oldDisplayStyles[panelKey] = currentDisplayStyle;
 
     return MStatus::kSuccess;
 }
@@ -2302,7 +2307,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _niPrototypeWhSi.Reset();
     _piInstancerWhSi.Reset();
     _piPrototypeWhSi.Reset();
-    _oldDisplayStyle = 0;
+    _oldDisplayStyles.clear();
     _oldRefineLevel = 0;
 
     // Cleanup passes
@@ -2466,6 +2471,12 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     // move can schedule a refresh or push hover inputs into a half-removed scene
     // index chain while RemoveRenderViewData() below cascades prim removals.
     _RemoveHoverEventFilter(panelName);
+
+    // Drop this panel's display-style memo as well. Panel names are reused (a new modelPanel4
+    // can appear after the old one is destroyed), and a stale entry would make the first frame
+    // of the new panel diff against the dead one's style -- either missing a treatment refresh
+    // it needs, or firing reconsiderSkippedHighlightWires spuriously.
+    _oldDisplayStyles.erase(std::string(panelName.asChar()));
 
     auto foundPanelCallbacks = _FindPanelCallbacks(panelName);
     if (foundPanelCallbacks != _renderPanelCallbacks.end()) {

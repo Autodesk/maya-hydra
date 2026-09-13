@@ -538,7 +538,12 @@ private:
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
     bool       _currentlyTextured = false;
-    unsigned int _oldDisplayStyle {0};
+
+    // Per panel: one MtohRenderOverride serves every model panel using this renderer, and the
+    // render item adapters it re-treats are shared, so a single memo would make two panels with
+    // different display styles flip the treatment against each other every frame.
+    std::map<std::string, unsigned int> _oldDisplayStyles;
+
     int        _oldRefineLevel {0};
     bool       _useDefaultMaterial;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
