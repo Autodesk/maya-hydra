@@ -1616,7 +1616,8 @@ MStatus MtohRenderOverride::Render(
         // the hover too, instead of leaving the outline on the prim that used to be under the
         // cursor. Only while genuinely hovering, so a non-hovering viewport pays nothing.
         HoverState* hover = _GetHoverState(_currentPanelName.asChar());
-        if (hover && hover->active.load() && _HitTestEnabled()) {
+        const bool  hitTestEnabled = _HitTestEnabled();
+        if (hover && hover->active.load() && hitTestEnabled) {
             const MMatrix viewProjMatrix
                 = drawContext.getMatrix(MHWRender::MFrameContext::kViewProjMtx);
             if (viewProjMatrix != hover->lastViewProjMatrix) {
@@ -1625,21 +1626,45 @@ MStatus MtohRenderOverride::Render(
             }
         }
 
-        // Rebuild and push the outline inputs only when the selection changed, or when the hover
-        // changed because the cursor or the view moved.
         const bool selectionChanged = outlineLive && _outlineInputsDirty.exchange(false);
         const bool hoverChanged     = outlineLive && hover && hover->dirty.exchange(false);
 
-        // With one OutlineManager shared by every panel, the manager holds whatever the last panel
-        // pushed -- so while hover is on, each panel must push its own inputs every frame or it
-        // draws the previous panel's hover. The dirty-flag optimisation stays valid for the
-        // selection-only case, since selection is global and every panel wants the same paths.
+        // Re-resolve the prim under the cursor only when something actually moved the hover: a
+        // mouse move, the cursor entering or leaving, or the view moving under a stationary cursor
+        // (the matrix compare above). HdxPickTask draws the whole scene, so picking every frame
+        // cost a full scene traversal per frame of any continuously refreshing viewport --
+        // playback, an animated camera -- for a cursor that had not moved.
         //
-        // Gated on the hit test rather than on hover: with the pick on and the draw off, the pick
-        // must still run every frame so its cost is what separates that configuration from the
-        // no-pick one. The resolved path is simply not pushed -- see below.
-        const bool hitTestEnabled = _HitTestEnabled();
-        if (outlineLive && (selectionChanged || hoverChanged || hitTestEnabled)) {
+        // Accepted consequence: geometry animating out from under a stationary cursor does not
+        // re-resolve, so the outline stays on the prim that was under the cursor until the next
+        // mouse move. Dirtying on scene change instead would put the per-frame pick straight back
+        // during playback, which is the cost this avoids.
+        //
+        // mayaHydraForceEnableInteractiveHitTest keeps the per-frame pick: measuring the pick cost
+        // with the draw off is the whole purpose of that configuration. Not exposed in the UI and
+        // false by default, so shipping behavior is event-driven.
+        const bool hovering = hover && hover->active.load() && hitTestEnabled;
+        if (outlineLive && hovering
+            && (hoverChanged || _globals.forceEnableInteractiveHitTest)) {
+            hover->resolvedPath = _ResolveHoverPath(drawContext);
+        }
+        else if (hover && !hovering) {
+            // Cursor left, or the hit test was turned off. Drop the cached path so re-entering
+            // cannot briefly draw a hover resolved at a stale cursor position.
+            hover->resolvedPath = SdfPath();
+        }
+
+        // The hover contribution this panel wants. Empty for every panel that is not the hovered
+        // one, and empty when the pick runs but nothing draws the result.
+        const SdfPath wantedHoverPath
+            = (hovering && _OutlineHoverHightlingtingEnabled()) ? hover->resolvedPath : SdfPath();
+
+        // Push when the selection changed, or when the hover contribution differs from what the
+        // manager already holds. Everything else in OutlineInputs is global, and at most one panel
+        // can hold the cursor, so that second test is what makes a panel switch push only when it
+        // has to: with one OutlineManager shared by every panel, two non-hovering panels both want
+        // an empty hover and need nothing, while switching to or from the hovered panel does.
+        if (outlineLive && (selectionChanged || wantedHoverPath != _pushedOutlineHoverPath)) {
             HVT_NS::Outline::OutlineInputs inputs;
             inputs.selectedPaths = _selection->GetFullySelectedPaths();
             // Set the lead (last-selected) object
@@ -1658,23 +1683,22 @@ MStatus MtohRenderOverride::Render(
             // whole visible silhouette, occlusion-aware, exactly like a host-supplied one. See
             // _ResolveHoverPath().
             //
-            // The pick runs whenever the hit test is on; only pushing the result is conditional on
-            // hover highlighting. That split is what makes "pick, draw nothing" a distinct
-            // configuration from "pick and draw".
-            if (hover && hover->active.load() && _HitTestEnabled()) {
-                const SdfPath hoverPath = _ResolveHoverPath(drawContext);
-                if (!hoverPath.IsEmpty() && _OutlineHoverHightlingtingEnabled()) {
-                    inputs.hoverPaths = { hoverPath };
-                    // A hovered prim already in the selection uses the selected-hover color.
-                    inputs.isHoverSelected =
-                        std::any_of(inputs.selectedPaths.begin(), inputs.selectedPaths.end(),
-                            [&hoverPath](const SdfPath& sel) {
-                                return hoverPath == sel || hoverPath.HasPrefix(sel);
-                            });
-                }
+            // Resolved before this block, so nothing here runs a pick. Already empty for a panel
+            // that is not the hovered one, and empty when the pick runs but nothing draws the
+            // result -- which is what keeps "pick, draw nothing" a distinct configuration from
+            // "pick and draw".
+            if (!wantedHoverPath.IsEmpty()) {
+                inputs.hoverPaths = { wantedHoverPath };
+                // A hovered prim already in the selection uses the selected-hover color.
+                inputs.isHoverSelected = std::any_of(
+                    inputs.selectedPaths.begin(), inputs.selectedPaths.end(),
+                    [&wantedHoverPath](const SdfPath& sel) {
+                        return wantedHoverPath == sel || wantedHoverPath.HasPrefix(sel);
+                    });
             }
 
             _outlineManager->SetInputs(std::move(inputs));
+            _pushedOutlineHoverPath = wantedHoverPath;
         }
 
 #ifndef MAYAHYDRALIB_OIT_ENABLED
@@ -2312,6 +2336,10 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // Must stay ahead of the frame pass teardown below. OutlineManager::Install has a \pre that the
     // frame pass outlives the manager, as the manager caches a pointer to it that would dangle.
     _outlineManager.reset();
+    // Nothing is pushed any more. Load-bearing rather than hygiene: a stale value here would match
+    // the first post-install comparison whenever the cursor is still over the same prim, and so
+    // suppress the push that would have re-established the hover.
+    _pushedOutlineHoverPath = SdfPath();
     // Reset the legacy wireframe selection-highlight scene indices so stale RefPtrs do not
     // survive across a clear/reinit cycle (e.g. when toggling the selection-highlight mode).
     _geomSubsetWhSi.Reset();
