@@ -591,15 +591,20 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             continue;
         }
 
-        // VP2 draws its own selection highlighting by making the shape's wireframe item visible in the
-        // selection color, so when something else owns the highlight that wire must stop acting as one
-        // or the object is highlighted twice.
-        const bool replacedByOutline
-            = isWireframeItemReplacedByOutline(riName.asChar(), ri.sourceDagPath(), options);
-
         int                           fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
+
+        // Cheap bail before the display-status query below, which is the expensive part.
+        if (unchanged && !isNewRenderitem) {
+            continue;
+        }
+
+        // VP2 draws its own selection highlighting by making the shape's wireframe item visible in
+        // the selection color, so when something else owns the highlight that wire must stop acting
+        // as one or the object is highlighted twice.
+        const bool replacedByOutline
+            = isWireframeItemReplacedByOutline(riName.asChar(), ri.sourceDagPath(), options);
 
         // The only unflagged items worth translating are those an earlier pass skipped. The rest
         // are re-treated by RefreshRenderItemLegacyHighlightTreatment instead.
