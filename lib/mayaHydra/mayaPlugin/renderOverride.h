@@ -89,6 +89,7 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 #include <map>
@@ -245,6 +246,9 @@ private:
     /// wireframe scene indices are installed, while the selection itself is still tracked. The
     /// no-highlight floor a highlight cost is measured against.
     bool _SuppressLegacySelectionHighlight() const;
+
+    /// Whether any panel this override drives is currently drawing wireframes.
+    bool _AnyPanelDrawsWireframes(const std::string& currentPanel, unsigned int currentStyle) const;
 
     /// Whether the per-mouse-move pick runs. Implied by hover highlighting, which consumes the
     /// resolved path, and additionally forced on by mayaHydraForceEnableInteractiveHitTest, so
@@ -557,6 +561,24 @@ private:
     // render item adapters it re-treats are shared, so a single memo would make two panels with
     // different display styles flip the treatment against each other every frame.
     std::map<std::string, unsigned int> _oldDisplayStyles;
+
+    /// The legacy-highlight treatment currently pushed into the render item adapters. The adapters
+    /// are shared by every panel and carry one visibility bit each, so this records what they are
+    /// set to, not what any one panel wants -- that is what lets a panel switch re-push it.
+    /// Empty when no treatment has been applied (fresh resources, adapters dropped).
+    struct RenderItemTreatment
+    {
+        bool legacyMayaNativeHighlightEnabled;
+        bool viewportDrawsWireframes;
+
+        bool operator==(const RenderItemTreatment& o) const
+        {
+            return legacyMayaNativeHighlightEnabled == o.legacyMayaNativeHighlightEnabled
+                && viewportDrawsWireframes == o.viewportDrawsWireframes;
+        }
+        bool operator!=(const RenderItemTreatment& o) const { return !(*this == o); }
+    };
+    std::optional<RenderItemTreatment> _appliedRenderItemTreatment;
 
     int        _oldRefineLevel {0};
     bool       _useDefaultMaterial;

@@ -1394,9 +1394,17 @@ MStatus MtohRenderOverride::Render(
     // Are we using Bounding Box display style ?
     const bool usingBBoxMode = (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox) != 0;
     _bboxSceneIndex->Enable(usingBBoxMode);
-    
+
+    const std::string panelKey
+        = panelNameStr.empty() ? std::string(_currentPanelName.asChar()) : panelNameStr;
+    const auto         oldStyleIt = _oldDisplayStyles.find(panelKey);
+    const unsigned int oldDisplayStyle
+        = (oldStyleIt != _oldDisplayStyles.end()) ? oldStyleIt->second : 0u;
+
     renderItemOptions.legacyMayaNativeHighlightEnabled = !_SuppressLegacySelectionHighlight();
     renderItemOptions.viewportDrawsWireframes = viewportDrawsWireframes(currentDisplayStyle);
+    renderItemOptions.anyViewportDrawsWireframes
+        = _AnyPanelDrawsWireframes(panelKey, currentDisplayStyle);
 
     // A prim's wireframe color is pulled once and only re-pulled when the prim is dirtied, so a
     // selection change has to invalidate the prims involved or their color goes stale.
@@ -1450,12 +1458,6 @@ MStatus MtohRenderOverride::Render(
         _previouslySelectedPaths = std::move(currentlySelected);
     }
 
-    const std::string panelKey
-        = panelNameStr.empty() ? std::string(_currentPanelName.asChar()) : panelNameStr;
-    const auto oldStyleIt = _oldDisplayStyles.find(panelKey);
-    const unsigned int oldDisplayStyle
-        = (oldStyleIt != _oldDisplayStyles.end()) ? oldStyleIt->second : 0u;
-
     // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
     // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
     // Refinement level for Hydra is set in Hydra Render Globals
@@ -1485,35 +1487,35 @@ MStatus MtohRenderOverride::Render(
         _oldRefineLevel = delegateParams.refineLevel;
     }
 
-    // Maya does not re-send unchanged render items on a display style change, so UpdateRenderItems
-    // cannot fix up their treatment. This walks the render item adapters, so trigger it only on the
-    // bits the treatment depends on -- toggling X-ray or backface culling changes the display style
-    // without changing whether wireframes are drawn.
-    const unsigned int treatmentRelevantStyleBits
-        = static_cast<unsigned int>(MHWRender::MFrameContext::kWireFrame)
-        | static_cast<unsigned int>(MHWRender::MFrameContext::kGouraudShaded)
-        | static_cast<unsigned int>(MHWRender::MFrameContext::kTextured)
-        // Flat shading is a shaded mode like Gouraud, and "shade active only" decides whether
-        // unselected objects are drawn as wireframe, so both change the treatment.
-        | static_cast<unsigned int>(MHWRender::MFrameContext::kFlatShaded)
-        | static_cast<unsigned int>(MHWRender::MFrameContext::kShadeActiveOnly);
+    // Maya does not re-send unchanged render items, so UpdateRenderItems cannot fix up the
+    // treatment on its own. Keyed on the treatment the adapters are actually in, not on a
+    // display-style transition in this panel: the adapters are shared, so the bit has to be
+    // re-pushed whenever the panel being drawn wants something different from what is there --
+    // including when nothing changed in this panel and the previous render was simply a different
+    // one. Keying it per panel is what let the last panel to transition decide for all of them.
+    //
+    // Same shape as the isolate select scene index above: one shared thing, re-pointed at the
+    // viewport being drawn, dirtying only the delta.
+    //
+    // Comparing the derived booleans rather than raw style bits also drops the need for a
+    // relevant-bits mask -- toggling X-ray or backface culling does not change
+    // viewportDrawsWireframes, so it cannot trigger a walk.
+    const RenderItemTreatment wantedTreatment { renderItemOptions.legacyMayaNativeHighlightEnabled,
+                                                renderItemOptions.viewportDrawsWireframes };
     if (_mayaHydraSceneIndex
-        && ((currentDisplayStyle ^ oldDisplayStyle) & treatmentRelevantStyleBits) != 0) {
-        // Re-treats the wires that were translated. Those that were never translated, because they
-        // were only ever going to be hidden, are not represented here at all -- UpdateRenderItems
-        // recovers them from this frame's scene snapshot instead.
+        && (!_appliedRenderItemTreatment || *_appliedRenderItemTreatment != wantedTreatment)) {
+        // Re-treats the wires that were translated. Those never translated, because no panel needed
+        // them, are not represented here at all -- the reconsider pass below recovers those.
         _mayaHydraSceneIndex->RefreshRenderItemLegacyHighlightTreatment(renderItemOptions);
-
-        // Recovery is only needed when the viewport starts drawing wireframes: that is the one
-        // transition turning a skipped wire back into one we must draw. The other ways a skipped
-        // wire becomes relevant do not need it -- the shape being deselected arrives as an ordinary
-        // render item delta, and switching the highlight mode rebuilds resources and issues "ogs
-        // -reset", which re-sends everything. Going the other way, into a shaded mode, can only
-        // hide more.
-        renderItemOptions.reconsiderSkippedHighlightWires
-            = !viewportDrawsWireframes(oldDisplayStyle)
-            && renderItemOptions.viewportDrawsWireframes;
+        _appliedRenderItemTreatment = wantedTreatment;
     }
+
+    // Recovery stays a per-panel transition: it is this panel starting to draw wireframes that can
+    // turn a wire no panel previously needed into one that must now be translated. The other ways a
+    // skipped wire becomes relevant do not need it -- a deselection arrives as an ordinary render
+    // item delta, and a highlight-mode switch rebuilds resources and issues "ogs -reset".
+    renderItemOptions.reconsiderSkippedHighlightWires
+        = !viewportDrawsWireframes(oldDisplayStyle) && renderItemOptions.viewportDrawsWireframes;
 
     // Set MSAA as per Maya AntiAliasing settings
     const bool isMultiSampled
@@ -1781,6 +1783,25 @@ bool MtohRenderOverride::_UseOutlineSelectionHighlighting() const
 bool MtohRenderOverride::_SuppressLegacySelectionHighlight() const
 {
     return _UseOutlineSelectionHighlighting() || _globals.forceDisableSelectionHighlight;
+}
+
+bool MtohRenderOverride::_AnyPanelDrawsWireframes(
+    const std::string& currentPanel,
+    unsigned int       currentStyle) const
+{
+    if (viewportDrawsWireframes(currentStyle)) {
+        return true;
+    }
+    // _oldDisplayStyles holds each other panel's last drawn style, which is what it is still
+    // showing. Entries are added on first render and dropped in _RemovePanel. A stale entry can
+    // only make this answer true when it need not be, which keeps a wire translated rather than
+    // losing one.
+    for (const auto& [panelName, displayStyle] : _oldDisplayStyles) {
+        if (panelName != currentPanel && viewportDrawsWireframes(displayStyle)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool MtohRenderOverride::_HitTestEnabled() const
@@ -2399,6 +2420,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _piInstancerWhSi.Reset();
     _piPrototypeWhSi.Reset();
     _oldDisplayStyles.clear();
+    _appliedRenderItemTreatment.reset();
     _oldRefineLevel = 0;
 
     // Cleanup passes

@@ -143,16 +143,19 @@ constexpr std::array<std::string_view, 2> kSelectionHighlightWireNames = {
     "DormantIsoparmWire"   // NURBS surface
 };
 
-// True when the wireframe item no longer needs to be drawn. Whenever the viewport draws wireframes
-// at all the wire is kept. The mode wireframe-on-shaded shows both cues. Items not named in
-// kSelectionHighlightWireNames are always false, which keeps bounding boxes, hulls and cages
-// untouched.
-bool isWireframeItemReplacedByOutline(
+// True when this item is the wireframe VP2 uses as the object-level selection highlight *and* the
+// outline has taken that job over, i.e. the wire carries nothing the outline does not already draw.
+// Deliberately independent of any panel's display style: whether such a wire is still needed and
+// whether it is visible in the panel being drawn are different questions with different scopes (see
+// RenderItemUpdateOptions), and displayStatus() below must run only once to answer both.
+// Items not named in kSelectionHighlightWireNames are always false, which keeps bounding boxes,
+// hulls and cages untouched.
+bool isLegacySelectionHighlightWire(
     const char*                                         itemName,
     const MDagPath&                                     itemDagPath,
     const MayaHydraSceneIndex::RenderItemUpdateOptions& options)
 {
-    if (options.legacyMayaNativeHighlightEnabled || options.viewportDrawsWireframes) {
+    if (options.legacyMayaNativeHighlightEnabled) {
         return false;
     }
 
@@ -603,20 +606,16 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // VP2 draws its own selection highlighting by making the shape's wireframe item visible in
         // the selection color, so when something else owns the highlight that wire must stop acting
         // as one or the object is highlighted twice.
-        const bool replacedByOutline
-            = isWireframeItemReplacedByOutline(riName.asChar(), ri.sourceDagPath(), options);
-
-        // The only unflagged items worth translating are those an earlier pass skipped. The rest
-        // are re-treated by RefreshRenderItemLegacyHighlightTreatment instead.
-        if (unchanged && !isNewRenderitem) {
-            continue;
-        }
+        const bool isHighlightWire
+            = isLegacySelectionHighlightWire(riName.asChar(), ri.sourceDagPath(), options);
+        const bool neededByAnyPanel = !isHighlightWire || options.anyViewportDrawsWireframes;
+        const bool visibleInThisPanel = !isHighlightWire || options.viewportDrawsWireframes;
 
         // Storm syncs invisible rprims, so hiding a wire still pays the vertex buffer copy, index
         // scan, topology build and GPU upload -- skip translating it instead. A wire translated
         // earlier, in a mode that needed it, is hidden through the adapter below rather than
         // removed: dropping and re-adding its prim on every selection change would cost more.
-        if (isNewRenderitem && replacedByOutline) {
+        if (isNewRenderitem && !neededByAnyPanel) {
             continue;
         }
 
@@ -708,7 +707,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(
 
         // After UpdateFromDelta, so that a visibility change coming from VP2 in this same delta does
         // not overwrite this one.
-        ria->SetWireframeSelectionHighlightEnabled(!replacedByOutline);
+        ria->SetWireframeSelectionHighlightEnabled(visibleInThisPanel);
     }
 }
 
@@ -724,7 +723,8 @@ void MayaHydraSceneIndex::RefreshRenderItemLegacyHighlightTreatment(
         }
 
         ria->SetWireframeSelectionHighlightEnabled(
-            !isWireframeItemReplacedByOutline(ria->Name(), ria->GetDagPath(), options));
+            !isLegacySelectionHighlightWire(ria->Name(), ria->GetDagPath(), options)
+            || options.viewportDrawsWireframes);
     }
 }
 
