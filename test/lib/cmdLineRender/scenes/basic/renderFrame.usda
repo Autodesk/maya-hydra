@@ -1,0 +1,66 @@
+#usda 1.0
+(
+    defaultPrim = "Render"
+    renderSettingsPrimPath = "/Render/MainRender"
+)
+
+def Scope "Render"
+{
+    def RenderSettings "MainRender"
+    {
+        rel camera = </World/Camera>
+        float pixelAspectRatio = 1
+        rel products = </Render/BeautyProduct>
+        int2 resolution = (1920, 1080)
+    }
+
+    def RenderProduct "BeautyProduct"
+    {
+        token fileFormat = "png"
+        rel orderedVars = </Render/color>
+        token productName = "../images/renderFrame.png"
+        token productType = "raster"
+    }
+
+    def RenderVar "color"
+    {
+        string sourceName = "color"
+    }
+}
+
+def Scope "World"
+{
+    def Camera "Camera"
+    {
+        float2 clippingRange = (0.1, 10000)
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 24
+        double3 xformOp:translate = (0, 0, 13.037088163697701)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+def DistantLight "DistantLight1"
+{
+    double3 xformOp:translate = (0, 0, 9.816884029117492)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+
+def Scope "mtl"
+{
+    def Material "open_pbr_surface1" (
+        prepend apiSchemas = ["MaterialXConfigAPI"]
+    )
+    {
+        string config:mtlx:version = "1.39"
+        token outputs:mtlx:surface.connect = </mtl/open_pbr_surface1/open_pbr_surface1.outputs:out>
+
+        def Shader "open_pbr_surface1"
+        {
+            uniform token info:id = "ND_open_pbr_surface_surfaceshader"
+            color3f inputs:base_color = (1, 0, 0)
+            token outputs:out
+        }
+    }
+}

@@ -600,6 +600,11 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
     while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
         int currFaceCount = originalFaceVertexCounts[iFaceCounts];
 
+        const size_t remainingFaceVertexIndices = originalFaceVertexIndices.size() - iFaceIndices;
+        if (currFaceCount < 0 || static_cast<size_t>(currFaceCount) > remainingFaceVertexIndices) {
+            return meshPrimDataSource;
+        }
+
         if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
             trimmedFaceVertexCounts.push_back(currFaceCount);
             for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
@@ -612,7 +617,7 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
         }
 
         iFaceCounts++;
-        iFaceIndices += currFaceCount;
+        iFaceIndices += static_cast<size_t>(currFaceCount);
     }
     auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
     auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);

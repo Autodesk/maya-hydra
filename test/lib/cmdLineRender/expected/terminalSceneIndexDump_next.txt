@@ -357,7 +357,7 @@
 |                   |___Blocked or absent data source : categories
 |___@ Prim : UsdDefaultSettings_PluginNode --- Type : 
     |___# ContainerDataSource : 
-    |___@ Prim : UsdDefaultRenderSettings --- Type : 
+    |___@ Prim : UsdDefaultRenderDescription --- Type : 
         |___# ContainerDataSource : 
             |___# ContainerDataSource : sceneGlobals
             |   |___SampledDataSource -> SdfPath : activeRenderSettingsPrim

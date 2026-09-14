@@ -134,6 +134,7 @@ extern MObject wrapU;
 extern MObject wrapV;
 extern MObject mirrorU;
 extern MObject mirrorV;
+extern MObject colorSpace;
 
 } // namespace file
 

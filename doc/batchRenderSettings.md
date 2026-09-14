@@ -5,26 +5,9 @@
 MayaHydra supports batch rendering through the `hydraRender` command.  When a
 batch render is initiated, MayaHydra must decide how to obtain the render
 configuration — resolution, camera, output paths, AOVs (arbitrary output
-variables), and other render settings.  Three strategies are available, and the
+variables), and other render settings.  Two strategies are available, and the
 appropriate one is selected automatically based on the render delegate in use
 and the contents of the scene.
-
-## Maya Render Settings
-
-This is the traditional approach used by Maya renderers.  Render configuration
-is read from standard Maya nodes:
-
-- **defaultRenderGlobals** — animation range, image format, file naming.
-- **defaultResolution** — image width and height.
-- **Renderable cameras** — one or more Maya cameras marked as renderable.
-
-The batch renderer translates these Maya settings into Hydra task controller
-parameters, then manages the full render loop: it sets up the Hydra render
-task, iterates frames, waits for render convergence, and writes the output
-images.
-
-This strategy is used when the scene does not contain USD render settings
-prims and the render delegate does not request ownership of the render pass.
 
 ## Hydra V1 Render Settings
 
@@ -41,10 +24,9 @@ MayaUsdProxyShape):
 
 The batch renderer reads these prims from the USD stage, extracts the
 relevant parameters (resolution, camera, AOVs, render products), and applies
-them to the Hydra task controller.  As with the Maya strategy, the batch
-renderer still manages the render loop, convergence detection, and image
-output — but the source of truth for the configuration is the USD stage
-rather than Maya globals.
+them to the Hydra task controller.  The batch renderer manages the render
+loop, convergence detection, and image output — and the source of truth for
+the configuration is the USD stage.
 
 Each render product is processed individually.  Products may override the
 resolution and camera defined in the parent UsdRenderSettings prim, and each
@@ -116,7 +98,7 @@ The render settings strategy is determined at render time by
    **Hydra V2** is selected.
 2. Otherwise, if USD render settings prims are found in any
    MayaUsdProxyShape stage in the scene, **Hydra V1** is selected.
-3. If neither condition is met, the **Maya** strategy is used.
+3. If neither condition is met, batch rendering fails with an error.
 
 ## Related Source Files
 
@@ -124,10 +106,8 @@ The render settings strategy is determined at render time by
 |------|-------------|
 | `renderSettingsUtils.h / .cpp` | `RenderSettingsType` enum and strategy selection logic |
 | `batchRenderer.h / .cpp` | Core batch renderer (shared infrastructure) |
-| `batchRendererMayaRenderSettings.h / .cpp` | Maya render settings strategy |
 | `batchRendererHydraV1RenderSettings.h / .cpp` | Hydra V1 render settings strategy |
 | `batchRendererHydraV2RenderSettings.h / .cpp` | Hydra V2 render settings strategy |
 | `hydraRenderCmd.h / .cpp` | `hydraRender` command entry point |
-| `hydraRenderCmdMayaRenderSettings.cpp` | Command-level logic for Maya strategy |
 | `hydraRenderCmdHydraV1RenderSettings.cpp` | Command-level logic for Hydra V1 strategy |
 | `hydraRenderCmdHydraV2RenderSettings.cpp` | Command-level logic for Hydra V2 strategy |

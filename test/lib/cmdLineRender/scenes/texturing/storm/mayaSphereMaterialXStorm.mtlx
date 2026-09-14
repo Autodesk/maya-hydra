@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<materialx version="1.38" colorspace="acescg" xpos="0.0555556" ypos="0.0555556">
+  <open_pbr_surface name="open_pbr_surface1" type="surfaceshader" nodedef="ND_open_pbr_surface_surfaceshader" xpos="0.0555556" ypos="0.188889">
+    <input name="base_color" type="color3" nodename="image1" />
+  </open_pbr_surface>
+  <surfacematerial name="OpenPBR_Surface1" type="material" nodedef="ND_surfacematerial" xpos="1.75" ypos="0.0555556">
+    <input name="surfaceshader" type="surfaceshader" nodename="open_pbr_surface1" />
+  </surfacematerial>
+  <image name="image1" type="color3" nodedef="ND_image_color3" xpos="-1.17993" ypos="0.151829">
+    <input name="file" type="filename" value="UVChecker.png" colorspace="srgb_texture" />
+  </image>
+</materialx>

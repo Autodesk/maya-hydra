@@ -235,6 +235,32 @@ def BuildVariant(context):
         return "RelWithDebInfo"
     return "RelWithDebInfo"
 
+def MergeCtestExcludeRegex(ctestArgs, filesToExclude):
+    """Merge files_to_exclude into one -E regex.
+
+    CTest keeps only the last -E flag, so callers (e.g. ECG build.py) and
+    tests-to-run.json must not each add a separate -E.
+    """
+    if not filesToExclude:
+        return
+
+    extra = "|".join(filesToExclude)
+    for i, arg in enumerate(ctestArgs):
+        if arg == "-E":
+            if i + 1 < len(ctestArgs):
+                ctestArgs[i + 1] = f'{ctestArgs[i + 1]}|{extra}'
+            return
+        if arg.startswith("-E"):
+            pattern = arg[2:].strip()
+            if len(pattern) >= 2 and pattern[0] == pattern[-1] and pattern[0] in ('"', "'"):
+                inner = pattern[1:-1]
+                ctestArgs[i] = f'-E "{inner}|{extra}"'
+            else:
+                ctestArgs[i] = f'-E {pattern}|{extra}'
+            return
+
+    ctestArgs.append(f'-E {extra}')
+
 def FormatMultiProcs(numJobs, generator):
     tag = "-j"
     if generator:
@@ -815,9 +841,9 @@ class InstallContext:
         # get labels to be passed for ctest
         self.get_ctest_labels()
         
-        # add -E args for test file to be excluded by name
-        if self.kFilesToExclude:
-            self.ctestArgs.append(f'{"-E"} {"|".join(self.kFilesToExclude)}')
+        # Merge files_to_exclude into any existing -E from --ctest-args.
+        # CTest only honors the last -E; a second one would drop ECG exclusions.
+        MergeCtestExcludeRegex(self.ctestArgs, self.kFilesToExclude)
 
         # add -L args, test with following labels to run
         if self.kPluginsToInclude:

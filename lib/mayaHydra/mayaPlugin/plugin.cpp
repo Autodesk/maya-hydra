@@ -297,6 +297,16 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // Set the path where maya hydra is loaded to be used later
     //This must be called before the renderoverride is created
     MtohSetMayaHydraPluginLocation(std::filesystem::path(plugin.loadPath().asChar())); 
+
+    // Ensure mayaUsdPlugin is initialized so registerVersionedPlugins() runs before
+    // MtohGetRendererDescriptions() freezes HdRendererPluginRegistry via GetPluginDescs().
+    {
+        int isLoaded = false;
+        MGlobal::executeCommand("pluginInfo -query -loaded mayaUsdPlugin", isLoaded);
+        if (!isLoaded) {
+            MGlobal::executeCommand("loadPlugin -quiet mayaUsdPlugin");
+        }
+    }
   
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {

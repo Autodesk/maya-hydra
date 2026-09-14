@@ -1,0 +1,22 @@
+#usda 1.0
+(
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Camera "camera1"
+{
+    float2 clippingRange = (0.1, 10000)
+    float focalLength = 35
+    float focusDistance = 5
+    float horizontalAperture = 35.999928
+    float horizontalApertureOffset = 0
+    token projection = "perspective"
+    float verticalAperture = 23.999952
+    float verticalApertureOffset = 0
+    token visibility = "inherited"
+    float3 xformOp:rotateXYZ = (-6.5339074, 43.832836, -1.252599)
+    double3 xformOp:translate = (13.582673096837134, 2.37589610214962, 10.928036236590563)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+}
+

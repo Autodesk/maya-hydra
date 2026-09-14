@@ -55,13 +55,16 @@ def _applyModifierToAttribute(attr, modifierFn):
 
     USD render products can author productName as time samples (one path per
     frame).  A plain attr.Set() only updates the default value, which Hydra
-    batch rendering ignores when time samples exist."""
+    batch rendering ignores when time samples exist.
+
+    modifierFn is called as modifierFn(value, frame), where frame is the
+    time sample's time code when attr is time-sampled."""
     timeSamples = attr.GetTimeSamples()
     if timeSamples:
         for t in timeSamples:
-            attr.Set(modifierFn(attr.Get(t)), t)
+            attr.Set(modifierFn(attr.Get(t), t), t)
     else:
-        attr.Set(modifierFn(attr.Get()))
+        attr.Set(modifierFn(attr.Get(), None))
 
 
 def applyToProductName(modifierFn):

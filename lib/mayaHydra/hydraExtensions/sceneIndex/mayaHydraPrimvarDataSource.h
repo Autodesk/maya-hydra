@@ -83,8 +83,18 @@ public:
         std::vector<Time>* outSampleTimes) override;
 
 private:
+    // Three keys (open, centre, close) let a consumer interpolate a curved motion path
+    // rather than a straight line between the endpoints.
+    static constexpr size_t kMotionKeys = 3;
+
+    // Samples the primvar across the shutter on first use and caches the result.
+    void _EnsureSamples();
+
     TfToken _primvarName;
     MayaHydraAdapter* _adapter;
+
+    bool    _sampled { false };
+    std::vector<std::pair<float, VtValue>> _samples;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

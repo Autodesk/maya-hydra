@@ -7,6 +7,7 @@ target_sources(${TARGET_NAME}
     fvpSceneIndexUtils.cpp
     fvpSelectionSceneIndex.cpp
     fvpDisplayStyleOverrideSceneIndex.cpp
+    fvpFrameNbResolvingSceneIndex.cpp
     fvpPruneTexturesSceneIndex.cpp
     fvpPruningSceneIndex.cpp
     fvpBBoxSceneIndex.cpp
@@ -18,6 +19,7 @@ target_sources(${TARGET_NAME}
     fvpPurposeFilteringSceneIndex.cpp
     fvpDataProducerMergingSceneIndexProxy.cpp
     fvpPrimRemovalEnforcingSceneIndex.cpp
+    fvpRenderingColorSpaceResolvingSceneIndex.cpp
 )
 
 set(HEADERS
@@ -25,6 +27,7 @@ set(HEADERS
     fvpSceneIndexUtils.h
     fvpSelectionSceneIndex.h
     fvpDisplayStyleOverrideSceneIndex.h
+    fvpFrameNbResolvingSceneIndex.h
     fvpPruneTexturesSceneIndex.h
     fvpPruningSceneIndex.h
     fvpBBoxSceneIndex.h
@@ -36,6 +39,7 @@ set(HEADERS
     fvpPurposeFilteringSceneIndex.h
     fvpDataProducerMergingSceneIndexProxy.h
     fvpPrimRemovalEnforcingSceneIndex.h
+    fvpRenderingColorSpaceResolvingSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------

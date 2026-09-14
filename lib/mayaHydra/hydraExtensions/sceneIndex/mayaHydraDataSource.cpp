@@ -25,7 +25,12 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 #include <mayaHydraLib/adapters/adapter.h>
 #include <mayaHydraLib/adapters/customDagAdapter.h>
+#include <mayaHydraLib/adapters/dagAdapter.h>
+#include <mayaHydraLib/adapters/renderItemAdapter.h>
 #include <mayaHydraLib/adapters/tokens.h>
+
+#include <cmath>
+#include <limits>
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
@@ -51,6 +56,124 @@
 #include <pxr/imaging/hd/extentSchema.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+namespace {
+
+// Transform matrix data source for motion blur: publishes several matrix keys across
+// the shutter when motion samples are enabled, and a single sample otherwise.
+class MayaHydraTransformMatrixDataSource final : public HdMatrixDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(MayaHydraTransformMatrixDataSource);
+
+    MayaHydraTransformMatrixDataSource(
+        MayaHydraSceneIndex* sceneIndex, MayaHydraAdapter* adapter)
+        : _sceneIndex(sceneIndex)
+        , _adapter(adapter)
+    {
+    }
+
+    VtValue GetValue(Time shutterOffset) override
+    {
+        return VtValue(GetTypedValue(shutterOffset));
+    }
+
+    GfMatrix4d GetTypedValue(Time shutterOffset) override
+    {
+        // Offset 0 is the rendered frame: return the live transform, never a sample.
+        // The samples come from the animation and so ignore interactive edits such as
+        // tumbling an animated camera.
+        if (shutterOffset == 0.0) {
+            return _adapter->GetTransform();
+        }
+        _EnsureSamples();
+        if (_count <= 1) {
+            return _adapter->GetTransform();
+        }
+        // Consumers query at the contributing times reported below, so nearest-time
+        // matching is exact for them.
+        size_t best = 0;
+        float  bestDist = std::numeric_limits<float>::max();
+        for (size_t i = 0; i < _count; ++i) {
+            const float d = std::abs(_times[i] - static_cast<float>(shutterOffset));
+            if (d < bestDist) {
+                bestDist = d;
+                best = i;
+            }
+        }
+        return _samples[best];
+    }
+
+    bool GetContributingSampleTimesForInterval(
+        Time startTime, Time endTime,
+        std::vector<Time>* outSampleTimes) override
+    {
+        _EnsureSamples();
+        if (_count <= 1) {
+            return false;
+        }
+        if (outSampleTimes) {
+            outSampleTimes->clear();
+            outSampleTimes->reserve(_count);
+            for (size_t i = 0; i < _count; ++i) {
+                outSampleTimes->push_back(_times[i]);
+            }
+        }
+        return true;
+    }
+
+private:
+    void _EnsureSamples()
+    {
+        if (_sampled) {
+            return;
+        }
+        _sampled = true;
+
+        if (!_sceneIndex || !_sceneIndex->GetParams().motionSamplesEnabled()) {
+            _count = 0;
+            return;
+        }
+
+        // DAG-backed prims (mesh / light / camera) re-evaluate under MDGContextGuard.
+        if (MayaHydraDagAdapter* dagAdapter = dynamic_cast<MayaHydraDagAdapter*>(_adapter)) {
+            _count = dagAdapter->SampleTransform(kMotionKeys, _times, _samples);
+            return;
+        }
+
+        // Render items are not DAG adapters: UpdateTransform captured their shutter
+        // keys, so publish those as a two-sample span when they differ.
+        if (MayaHydraRenderItemAdapter* riAdapter
+            = dynamic_cast<MayaHydraRenderItemAdapter*>(_adapter)) {
+            const GfMatrix4d open  = riAdapter->GetOpenTransform();
+            const GfMatrix4d close = riAdapter->GetCloseTransform();
+            if (open == close) {
+                _count = 0;
+                return;
+            }
+            const GfInterval shutter = _sceneIndex->GetCurrentTimeSamplingInterval();
+            _times[0]   = static_cast<float>(shutter.GetMin());
+            _samples[0] = open;
+            _times[1]   = static_cast<float>(shutter.GetMax());
+            _samples[1] = close;
+            _count      = 2;
+            return;
+        }
+
+        _count = 0;
+    }
+
+    static constexpr size_t kMotionKeys = 3;
+
+    MayaHydraSceneIndex* _sceneIndex { nullptr };
+    MayaHydraAdapter*    _adapter { nullptr };
+    bool                 _sampled { false };
+    size_t               _count { 0 };
+    float                _times[kMotionKeys] {};
+    GfMatrix4d           _samples[kMotionKeys] {};
+};
+
+}
 
 MayaHydraDataSource::MayaHydraDataSource(
     const SdfPath& id,
@@ -207,11 +330,18 @@ MayaHydraDataSource::Get(const TfToken& name)
        return _GetMaterialBindingDataSource();
     }
     else if (name == HdXformSchemaTokens->xform) {
-        auto xform = _adapter->GetTransform();
-        return HdXformSchema::Builder()
-            .SetMatrix(
-                HdRetainedTypedSampledDataSource<GfMatrix4d>::New(xform))
-            .Build();
+        // Fall back to a retained sample when motion blur is off, so static scenes pay
+        // nothing for the sampling wrapper. SetParams re-queries this when the motion
+        // params change, so toggling motion blur on still installs the sampling source.
+        HdMatrixDataSourceHandle matrixDs;
+        if (_sceneIndex && _sceneIndex->GetParams().motionSamplesEnabled()) {
+            matrixDs = MayaHydraTransformMatrixDataSource::New(_sceneIndex, _adapter);
+        }
+        else {
+            matrixDs = HdRetainedTypedSampledDataSource<GfMatrix4d>::New(
+                _adapter->GetTransform());
+        }
+        return HdXformSchema::Builder().SetMatrix(matrixDs).Build();
     }
     else if (name == HdMaterialSchemaTokens->material) {
        return _GetMaterialDataSource();

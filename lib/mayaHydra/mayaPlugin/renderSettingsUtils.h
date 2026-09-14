@@ -42,12 +42,7 @@ namespace MAYAHYDRA_NS_DEF {
 
 /*! \brief Determines how render settings are sourced for batch rendering.
  *
- *  MayaHydra supports three render settings strategies:
- *
- *  - **Maya**: Traditional Maya render settings (defaultRenderGlobals,
- *    defaultResolution, etc.) are read and translated into Hydra task
- *    controller parameters.  The batch renderer manages the render loop,
- *    convergence, and image output.
+ *  MayaHydra supports two render settings strategies:
  *
  *  - **HydraV1**: The batch renderer reads USD render settings prims
  *    (UsdRenderSettings, UsdRenderProduct, UsdRenderVar) from a USD
@@ -70,7 +65,6 @@ namespace MAYAHYDRA_NS_DEF {
 enum class RenderSettingsType
 {
     Unknown = 0,
-    Maya,
     HydraV1,
     HydraV2,
 };
@@ -95,12 +89,15 @@ Ufe::Path GetActiveRenderSettingsAppPath();
 // Get the Hydra path to the active render settings prim from the Maya scene.
 PXR_NS::SdfPath GetActiveRenderSettingsHydraPath();
 
+// Get the UFE application path to the active render pass prim from the Maya scene.
+Ufe::Path GetActiveRenderPassAppPath();
+
+// Get the Hydra path to the active render pass prim from the Maya scene.
+PXR_NS::SdfPath GetActiveRenderPassHydraPath();
+
 // Get render output tokens from the active Hydra render settings prim.
 PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
     const PXR_NS::HdRenderIndex* renderIndex);
-
-// Get render times from the USD stage time range.
-std::vector<MTime> GetRenderTimesFromStage(const PXR_NS::UsdStageRefPtr& stage);
 
 struct RenderTimes
 {
@@ -115,6 +112,10 @@ struct RenderTimes
 
 // Get the render times from the Maya scene.
 RenderTimes GetRenderTimes();
+
+// Report to Maya the progress of a batch render, as an integer percentage of
+// the frames in renderTimes, given the frame that has just finished rendering.
+void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime);
 
 } // namespace MAYAHYDRA_NS_DEF
 

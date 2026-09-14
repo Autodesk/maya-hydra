@@ -41,9 +41,10 @@ using namespace MayaHydra;
 //
 // The delta that revives a skipped wire describes what changed since the last frame, not what a
 // brand new adapter needs, so it can legitimately omit MVS_changedMatrix. mayaHydraSceneIndex.cpp
-// forces that bit for every new adapter; without it MayaHydraRenderItemAdapter::_transform is
-// never written (it has no initializer, and UpdateTransform is its only writer). Removing the flag
-// passes every other test in the suite, which is why this one exists.
+// forces that bit for every new adapter; without it MayaHydraRenderItemAdapter::_transform keeps
+// its identity initializer (UpdateTransform is its only writer) and the wire draws at the origin
+// instead of on the shape. Removing the flag passes every other test in the suite, which is why
+// this one exists.
 //
 // Deliberately no material assertion. mayaHydraSceneIndex.cpp forces MVS_changedEffect alongside
 // MVS_changedMatrix, but that bit is unobservable on a wire: GetMaterialId() short-circuits on

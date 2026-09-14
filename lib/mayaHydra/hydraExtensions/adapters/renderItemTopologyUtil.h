@@ -45,6 +45,8 @@ bool RenderItemTopologyConnectivityChanged(
     size_t                      lineStripVertexCount);
 
 /// Policy for whether UpdateFromDelta should emit mesh/topology locators on the render item path.
+/// \p newIndices / \p newCounts are only populated when \p topoChanged is true, which is why the
+/// geometry-only path returns early instead of comparing connectivity.
 MAYAHYDRALIB_API
 bool RenderItemShouldEmitTopologyLocators(
     bool                        topoChanged,

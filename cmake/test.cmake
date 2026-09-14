@@ -187,6 +187,10 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     _mayaHydra_setup_test_USD_paths()
     _mayaHydra_setup_test_finalize_env("${test_name}")
 
+    if("${RENDERER}" STREQUAL "HdPrmanLoaderRendererPlugin")
+        _mayaHydra_append_prman_production_render_env("${test_name}")
+    endif()
+
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_IGNORE_DIALOGS=1")
 
@@ -964,6 +968,26 @@ finally:
     endif()
 endfunction()
 
+# PRMan production rendering (Render.exe / cmdLineRender) uses an isolated
+# RenderMan config directory and Hydra V2 render settings (PRMan drives the
+# render pass).  Clear HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS on individual
+# tests to exercise the Hydra V1 render-settings path.  Viewport tests must
+# not call this helper.
+function(_mayaHydra_append_prman_production_render_env test_name)
+    string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+    set(_prman_config_dir
+        "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}/prman_config")
+    file(MAKE_DIRECTORY "${_prman_config_dir}")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=1")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "RMAN_CONFIG_OVERRIDE=${_prman_config_dir}")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "RDIR=${_prman_config_dir}")
+endfunction()
+
 #
 # mayaHydra_add_cmd_line_render_test( <scene_file_labeled>
 #                           [RENDERER <renderer_name>]
@@ -1159,6 +1183,10 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # Set environment variables as test properties.
     _mayaHydra_setup_test_finalize_env("${test_name}")
 
+    if("${RENDERER}" STREQUAL "HdPrmanLoaderRendererPlugin")
+        _mayaHydra_append_prman_production_render_env("${test_name}")
+    endif()
+
     if(ARG_COPY_SCENE)
         configure_file(${SRC_SCENE_PATH} ${SCENE_PATH} COPYONLY)
         cmake_path(REMOVE_EXTENSION SRC_SCENE_PATH OUTPUT_VARIABLE SRC_SCENE_PATH_NO_EXT)
@@ -1181,6 +1209,262 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
         "MAYA_IGNORE_DIALOGS=1")
         
     # Add a label to identify render tests
+    set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
+
+    apply_labels_to_test("${ALL_LABELS}" ${test_name})
+
+endfunction()
+
+# Wraps mayaHydra_add_cmd_line_render_test() for a test that is known to run
+# under Hydra V2 render settings (PRMan by default via
+# _mayaHydra_append_prman_production_render_env, or Arnold when the caller
+# passes ENV MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1).  The Hydra V2
+# render-settings path does not resolve a relative USD render product
+# productName (unlike Hydra V1's ResolveRenderProductImagePath()), so a
+# relative -rd such as "../images" does not land where idiff looks.  This
+# function resolves -rd to an absolute path under the test's own output
+# folder and delegates to mayaHydra_add_cmd_line_render_test().
+#
+#   OUTPUT_NAME            - Folder name under CMAKE_BINARY_DIR/test/Temporary
+#                             identifying this test (must match the
+#                             convention already used by every call site: the
+#                             eventual sanitized test name).
+#   RENDERER_ARGS           - Renderer args WITHOUT -rd; this function
+#                             appends the resolved absolute -rd.
+#   RENDERED_IMAGE_SUBDIR    - default "projects/default/images"; also used
+#                             to build the -rd path, and forwarded unchanged.
+#   PRECREATE_DIR            - If set, MAKE_DIRECTORY the resolved -rd path
+#                             before registering the test.
+#   All other keywords (RENDERER, RENDERED_IMAGE_NAME, IMAGE_EXTENSION, FAIL,
+#   FAILPERCENT, TEST_NAME_SUFFIX, ENV, COPY_SCENE) are forwarded unchanged.
+function(_mayaHydra_add_hydra_v2_cmd_line_render_test SCENE_FILE_LABELED)
+    cmake_parse_arguments(ARG
+        "COPY_SCENE;PRECREATE_DIR"
+        "OUTPUT_NAME;RENDERER;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS;TEST_NAME_SUFFIX"
+        "ENV"
+        ${ARGN}
+    )
+
+    if(NOT ARG_OUTPUT_NAME)
+        message(FATAL_ERROR "_mayaHydra_add_hydra_v2_cmd_line_render_test: OUTPUT_NAME is required.")
+    endif()
+
+    set(_subdir "projects/default/images")
+    if(ARG_RENDERED_IMAGE_SUBDIR)
+        set(_subdir "${ARG_RENDERED_IMAGE_SUBDIR}")
+    endif()
+    set(_render_dir "${CMAKE_BINARY_DIR}/test/Temporary/${ARG_OUTPUT_NAME}/${_subdir}")
+
+    if(ARG_PRECREATE_DIR)
+        file(MAKE_DIRECTORY "${_render_dir}")
+    endif()
+
+    set(_forward_args RENDERER_ARGS "${ARG_RENDERER_ARGS} -rd \"${_render_dir}\"")
+    if(ARG_RENDERER)
+        list(APPEND _forward_args RENDERER ${ARG_RENDERER})
+    endif()
+    if(ARG_RENDERED_IMAGE_SUBDIR)
+        list(APPEND _forward_args RENDERED_IMAGE_SUBDIR ${ARG_RENDERED_IMAGE_SUBDIR})
+    endif()
+    if(ARG_RENDERED_IMAGE_NAME)
+        list(APPEND _forward_args RENDERED_IMAGE_NAME ${ARG_RENDERED_IMAGE_NAME})
+    endif()
+    if(ARG_IMAGE_EXTENSION)
+        list(APPEND _forward_args IMAGE_EXTENSION ${ARG_IMAGE_EXTENSION})
+    endif()
+    if(ARG_FAIL)
+        list(APPEND _forward_args FAIL ${ARG_FAIL})
+    endif()
+    if(ARG_FAILPERCENT)
+        list(APPEND _forward_args FAILPERCENT ${ARG_FAILPERCENT})
+    endif()
+    if(ARG_TEST_NAME_SUFFIX)
+        list(APPEND _forward_args TEST_NAME_SUFFIX ${ARG_TEST_NAME_SUFFIX})
+    endif()
+    if(ARG_COPY_SCENE)
+        list(APPEND _forward_args COPY_SCENE)
+    endif()
+    if(ARG_ENV)
+        list(APPEND _forward_args ENV ${ARG_ENV})
+    endif()
+
+    mayaHydra_add_cmd_line_render_test(${SCENE_FILE_LABELED} ${_forward_args})
+endfunction()
+
+# Discover the mayabatch executable (Windows only; macOS/Linux use maya -batch).
+if(IS_WINDOWS)
+    find_program(MAYA_BATCH_EXECUTABLE mayabatch
+        HINTS "${MAYA_LOCATION}" "$ENV{MAYA_LOCATION}" "${MAYA_BASE_DIR}"
+        PATH_SUFFIXES bin/
+        DOC "Maya batch executable")
+    if(NOT MAYA_BATCH_EXECUTABLE)
+        message(FATAL_ERROR "mayabatch not found. Set MAYA_LOCATION.")
+    endif()
+endif()
+
+#
+# mayaHydra_add_mayabatch_render_test( <scene_file_labeled>
+#                           [IMAGE_EXTENSION <extension>]
+#                           [FAIL <idiff fail value>]
+#                           [FAILPERCENT <idiff failpercent value>]
+#                           [WORKING_DIRECTORY <dir>]
+#                           [TEST_NAME_SUFFIX <suffix>]
+#                           [COPY_SCENE]
+#                           [ENV <varname>=<varvalue> ...])
+#
+# Similar to mayaHydra_add_cmd_line_render_test but uses mayabatch (Windows) or
+# maya -batch (macOS/Linux) with a MEL script instead of the Render executable.
+# The MEL script is assumed to have the same base name as the Maya scene file
+# (with a .mel extension) and to be co-located with it in the scenes directory.
+#
+# The MEL script is responsible for opening the scene and invoking a rendering
+# command, e.g. hydraRender.  The rendered image is then compared to a
+# reference image using idiff, exactly as for
+# mayaHydra_add_cmd_line_render_test.
+#
+function(mayaHydra_add_mayabatch_render_test SCENE_FILE_LABELED)
+    # -----------------
+    # 1) Arg processing
+    # -----------------
+
+    cmake_parse_arguments(ARG
+        "COPY_SCENE"             # Boolean options.
+        "WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;TEST_NAME_SUFFIX" # one_value keywords
+        "ENV"                                    # multi_value keywords
+        ${ARGN}
+    )
+
+    if(ARG_WORKING_DIRECTORY)
+        set(WORKING_DIR ${ARG_WORKING_DIRECTORY})
+    else()
+        set(WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR})
+    endif()
+
+    # -------------- 
+    # 2) Create test
+    # --------------
+
+    if(ARG_SCENE_FILE_LABELED)
+        set(SCENE_FILE_LABELED "${ARG_SCENE_FILE_LABELED}")
+    endif()
+
+    get_testfile_and_labels(ALL_LABELS SCENE_FILE ${SCENE_FILE_LABELED})
+    mayaUsd_get_unittest_target(test_name ${SCENE_FILE})
+    if(ARG_TEST_NAME_SUFFIX)
+        set(test_name "${test_name}_${ARG_TEST_NAME_SUFFIX}")
+    endif()
+
+    set(IMAGE_EXTENSION "png")
+    if(ARG_IMAGE_EXTENSION)
+        set(IMAGE_EXTENSION "${ARG_IMAGE_EXTENSION}")
+    endif()
+
+    set(FAIL "0.01")
+    if(ARG_FAIL)
+        set(FAIL "${ARG_FAIL}")
+    endif()
+
+    set(FAILPERCENT "1.0")
+    if(ARG_FAILPERCENT)
+        set(FAILPERCENT "${ARG_FAILPERCENT}")
+    endif()
+
+    set(SRC_SCENE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/scenes/${SCENE_FILE})
+
+    # Derive the MEL script path from the scene file path.
+    cmake_path(REPLACE_EXTENSION SRC_SCENE_PATH ".mel" OUTPUT_VARIABLE SRC_MEL_SCRIPT_PATH)
+
+    if(ARG_COPY_SCENE)
+        string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+        cmake_path(GET SCENE_FILE FILENAME SCENE_FILE_NAME)
+        set(SCENE_PATH "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}/projects/default/scenes/${SCENE_FILE_NAME}")
+        cmake_path(REPLACE_EXTENSION SCENE_PATH ".mel" OUTPUT_VARIABLE MEL_SCRIPT_PATH)
+    else()
+        set(SCENE_PATH ${SRC_SCENE_PATH})
+        set(MEL_SCRIPT_PATH ${SRC_MEL_SCRIPT_PATH})
+    endif()
+
+    string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+    set(MAYA_APP_TEMP_DIR "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}")
+
+    set(RENDERED_IMAGE_SUBDIR "projects/default/images")
+    set(RENDERED_IMAGE_NAME "${SANITIZED_TEST_NAME}")
+    set(RENDERED_IMAGE_DIR "${MAYA_APP_TEMP_DIR}/${RENDERED_IMAGE_SUBDIR}")
+    set(RENDERED_IMAGE_PATH "${RENDERED_IMAGE_DIR}/${RENDERED_IMAGE_NAME}.${IMAGE_EXTENSION}")
+    cmake_path(REPLACE_EXTENSION SRC_SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
+    if(ARG_TEST_NAME_SUFFIX)
+        cmake_path(GET EXPECTED_IMAGE_PATH STEM LAST_ONLY _expected_stem)
+        cmake_path(GET EXPECTED_IMAGE_PATH PARENT_PATH _expected_dir)
+        set(EXPECTED_IMAGE_PATH "${_expected_dir}/${_expected_stem}_${ARG_TEST_NAME_SUFFIX}.${IMAGE_EXTENSION}")
+    endif()
+
+    if (IMAGE_DIFF_TOOL)
+        set(IDIFF_CMD "${IMAGE_DIFF_TOOL}")
+    else()
+        message(FATAL_ERROR "idiff binary not discovered. Set IMAGE_DIFF_TOOL (e.g. via OIIO_idiff_BINARY).")
+    endif()
+
+    if (WIN32)
+        set(CMD PowerShell)
+        set(RENDER_ARGS "& \"${MAYA_BATCH_EXECUTABLE}\" -script \"${MEL_SCRIPT_PATH}\"")
+        set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+        set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
+		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
+    else()
+        set(CMD /bin/sh)
+        set(RENDER_ARGS "\"${MAYA_EXECUTABLE}\" -batch -script \"${MEL_SCRIPT_PATH}\"")
+        set(IDIFF_ARGS "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${IDIFF_ARGS}")
+    endif()
+
+    add_test(
+        NAME "${test_name}"
+        WORKING_DIRECTORY ${WORKING_DIR}
+        COMMAND ${CMD} ${CMD_ARGS}
+    )
+
+    # -----------------
+    # 3) Set up environ
+    # -----------------
+
+    _mayaHydra_setup_test_common_path_vars()
+    list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
+
+    _mayaHydra_setup_test_common_defaults("${test_name}")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface")
+
+    _mayaHydra_setup_test_plugins()
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
+         "${CMAKE_INSTALL_PREFIX}/renderDesc")
+
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+
+    _mayaHydra_setup_test_USD_paths()
+
+    _mayaHydra_setup_test_finalize_env("${test_name}")
+
+    if(ARG_COPY_SCENE)
+        configure_file(${SRC_SCENE_PATH} ${SCENE_PATH} COPYONLY)
+        configure_file(${SRC_MEL_SCRIPT_PATH} ${MEL_SCRIPT_PATH} COPYONLY)
+        cmake_path(REMOVE_EXTENSION SRC_SCENE_PATH OUTPUT_VARIABLE SRC_SCENE_PATH_NO_EXT)
+        cmake_path(REMOVE_EXTENSION SCENE_PATH OUTPUT_VARIABLE SCENE_PATH_NO_EXT)
+        if(EXISTS "${SRC_SCENE_PATH_NO_EXT}.usda")
+            configure_file("${SRC_SCENE_PATH_NO_EXT}.usda" "${SCENE_PATH_NO_EXT}.usda" COPYONLY)
+        endif()
+        if(EXISTS "${SRC_SCENE_PATH_NO_EXT}.mtlx")
+            configure_file("${SRC_SCENE_PATH_NO_EXT}.mtlx" "${SCENE_PATH_NO_EXT}.mtlx" COPYONLY)
+        endif()
+        cmake_path(GET SRC_SCENE_PATH PARENT_PATH SRC_SCENE_DIR)
+        cmake_path(GET SCENE_PATH PARENT_PATH SCENE_DIR)
+        if(EXISTS "${SRC_SCENE_DIR}/UVChecker.png")
+            configure_file("${SRC_SCENE_DIR}/UVChecker.png" "${SCENE_DIR}/UVChecker.png" COPYONLY)
+        endif()
+    endif()
+
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_IGNORE_DIALOGS=1")
+
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
 
     apply_labels_to_test("${ALL_LABELS}" ${test_name})

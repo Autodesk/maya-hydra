@@ -94,6 +94,7 @@ endif()
 # modules and definitions
 #------------------------------------------------------------------------------
 include(cmake/utils.cmake)
+include(cmake/resolveUsdLocation.cmake)
 find_package(Maya 2024 REQUIRED)
 
 if(Maya_FOUND AND APPLE)
@@ -137,7 +138,42 @@ message(STATUS "   PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
 message(STATUS "   PYTHON_LIBRARIES    = ${PYTHON_LIBRARIES}")
 message(STATUS "   Python_EXECUTABLE   = ${Python_EXECUTABLE}")
 
+# On macOS, use MayaUSD's OpenUSD runtime to avoid duplicate Tf registration.
+mayaHydra_resolve_usd_location(
+    MAYAHYDRA_RESOLVED_USD_LOCATION
+    "${PXR_USD_LOCATION}"
+    "${MAYAUSD_LOCATION}"
+)
+
+# Load CMake targets from the developer OpenUSD package. MayaUSD's runtime
+# bundle intentionally omits pxrTargets.cmake and cannot configure consumers.
 find_package(USD 0.22.11 REQUIRED)
+
+if(NOT "${MAYAHYDRA_RESOLVED_USD_LOCATION}" STREQUAL "${PXR_USD_LOCATION}")
+    message(STATUS
+        "Using MayaUSD's bundled OpenUSD libraries: "
+        "${MAYAHYDRA_RESOLVED_USD_LOCATION}")
+    mayaHydra_retarget_usd_imported_libraries(
+        "${MAYAHYDRA_RESOLVED_USD_LOCATION}"
+    )
+
+    # Downstream rpath and test setup must refer to the same libraries.
+    set(
+        PXR_USD_LOCATION
+        "${MAYAHYDRA_RESOLVED_USD_LOCATION}"
+        CACHE PATH
+        "OpenUSD runtime installation used by MayaHydra"
+        FORCE
+    )
+    set(
+        USD_LIBRARY_DIR
+        "${PXR_USD_LOCATION}/lib"
+        CACHE PATH
+        "OpenUSD runtime library directory"
+        FORCE
+    )
+endif()
+
 if (CMAKE_WANT_MATERIALX_BUILD)
     # Requires at least USD 22.11 for hdMtlx module and USD must have been built with MaterialX:
     if(NOT TARGET hdMtlx)
@@ -241,6 +277,11 @@ if (BUILD_TESTS)
     include(cmake/test.cmake)
     fetch_googletest()
     enable_testing()
+    add_test(
+        NAME mayaHydra_resolveUsdLocation
+        COMMAND ${CMAKE_COMMAND}
+            -P "${CMAKE_SOURCE_DIR}/cmake/tests/testResolveUsdLocation.cmake"
+    )
     add_subdirectory(test)
 endif()
 

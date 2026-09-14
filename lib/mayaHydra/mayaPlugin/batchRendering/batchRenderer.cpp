@@ -17,7 +17,6 @@
 #include "batchRenderer.h"
 #include "batchRendererHydraV1RenderSettings.h"
 #include "batchRendererHydraV2RenderSettings.h"
-#include "batchRendererMayaRenderSettings.h"
 #include "tokens.h"
 
 #include "pluginDebugCodes.h"
@@ -54,6 +53,8 @@
 #include <ufeExtensions/Global.h>
 #include <ufe/colorManagementHandler.h>
 
+#include <maya/MAnimControl.h>
+#include <maya/MEventMessage.h>
 #include <maya/MMessage.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MStatus.h>
@@ -136,6 +137,9 @@ const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaData");
 
 namespace MAYAHYDRA_NS_DEF {
 
+// Static member initialization for batch rendering unit tests.
+std::unique_ptr<BatchRenderer> BatchRenderer::_retainedForTest;
+
 BatchRenderer::BatchRenderer(const MtohRendererDescription& desc)
     : _rendererDesc(desc)
     , _sceneIndexRegistry(nullptr)
@@ -186,13 +190,6 @@ HdRenderDelegate* BatchRenderer::_GetRenderDelegate()
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
 }
 
-MStatus BatchRenderer::RenderFromMayaRenderSettings(
-    const InputParams& inputParams)
-{
-    // Delegate the Maya render-settings path to the dedicated implementation.
-    return BatchRendererMayaRenderSettings::Render(*this, inputParams);
-}
-  
 MStatus BatchRenderer::RenderFromHydraV1RenderSettings(
     const InputParams& inputParams)
 {
@@ -484,17 +481,26 @@ void BatchRenderer::_InitHydraResources()
     }
     
     //Create internal scene indices chain
-    _inputSceneIndexOfFilteringSceneIndicesChain
+    auto inputSceneIndexOfFilteringSceneIndicesChain
         = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
-    //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
-    _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
-    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_blockPrimRemovalPropagationSceneIndex);
-    _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
-    _inputSceneIndexOfFilteringSceneIndicesChain = _pruningSceneIndex;
+    _CreateSceneIndicesChainAfterMergingSceneIndex(inputSceneIndexOfFilteringSceneIndicesChain);
 
-    _CreateSceneIndicesChainAfterMergingSceneIndex();
-    
+    if (_sceneGlobalsSceneIndex) {
+        const MTime currentTime = MAnimControl::currentTime();
+        const double currentFrame = currentTime.value();
+        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+
+        if (_timeChangeCallbackId == 0) {
+            MStatus status;
+            _timeChangeCallbackId = MEventMessage::addEventCallback(
+                "timeChanged", _TimeChangedCallback, this, &status);
+            if (!status) {
+                TF_WARN("BatchRenderer: Failed to register time change callback");
+            }
+        }
+    }
+
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
         // If the currentScene has defaultRenderGlobals we'll absorb those new settings,
@@ -542,6 +548,7 @@ void BatchRenderer::_InitHydraResources()
     // Hydra scene.  Hydra Prman supports this when the
     // HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=true environment variable
     // is set.
+    _SetActiveRenderPassPrimFromScene();
     _SetActiveRenderSettingsPrimFromScene();
 
     _initializationSucceeded = true;
@@ -556,6 +563,13 @@ void BatchRenderer::_ClearHydraResources()
 
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("BatchRenderer::_ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
+
+    if (_timeChangeCallbackId) {
+        MMessage::removeCallback(_timeChangeCallbackId);
+        _timeChangeCallbackId = 0;
+    }
+
+    _sceneGlobalsSceneIndex.Reset();
 
     // Only remove information for our dummy batch render viewport, to avoid
     // affecting interactive viewports.
@@ -600,18 +614,54 @@ void BatchRenderer::_ClearHydraResources()
     _initializationAttempted = false;
 }
 
-void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex()
+void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex(
+    const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndexOfFilteringSceneIndicesChain
+)
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
-    //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
-    _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
+    //We use as its input scene index the argument inputSceneIndexOfFilteringSceneIndicesChain
+    _lastFilteringSceneIndexBeforeCustomFiltering = inputSceneIndexOfFilteringSceneIndicesChain;
 
     _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    // The scene globals scene index must be upstream of the frame number
+    // resolving scene index, so that dirtying time on the scene globals will
+    // also dirty render product names that need frame number resolution.
+    _lastFilteringSceneIndexBeforeCustomFiltering = _frameNbResolvingSceneIndex = Fvp::FrameNbResolvingSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    _lastFilteringSceneIndexBeforeCustomFiltering = _renderingColorSpaceSceneIndex
+        = MhRenderingColorSpaceResolvingSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
     TF_AXIOM(_mayaHydraSceneIndex);
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
 #endif
+}
+
+void BatchRenderer::_TimeChangedCallback(void* data)
+{
+    auto* instance = reinterpret_cast<BatchRenderer*>(data);
+    if (!TF_VERIFY(instance)) {
+        return;
+    }
+    if (!instance->_initializationSucceeded) {
+        return;
+    }
+    if (!instance->_sceneGlobalsSceneIndex) {
+        return;
+    }
+    const MTime currentTime = MAnimControl::currentTime();
+    const double currentFrame = currentTime.value();
+    instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+}
+
+void BatchRenderer::_SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame)
+{
+    if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
+        return;
+    }
+    _sceneGlobalsSceneIndex->SetCurrentFrame(currentFrame);
 }
 
 void BatchRenderer::_ClearHydraCallback(void* data)
@@ -623,9 +673,43 @@ void BatchRenderer::_ClearHydraCallback(void* data)
     instance->_ClearHydraResources();
 }
 
+
+bool BatchRenderer::TestModeEnabled()
+{
+    return TfGetenvBool("MAYA_HYDRA_BATCH_RENDER_TEST_MODE", false);
+}
+
+void BatchRenderer::RetainForTest(std::unique_ptr<BatchRenderer> batchRenderer)
+{
+    _retainedForTest = std::move(batchRenderer);
+}
+
+void BatchRenderer::ReleaseRetainedForTest()
+{
+    _retainedForTest.reset();
+}
+
 HdRenderIndex* BatchRenderer::renderIndex() const
 {
     return _renderIndex;
+}
+
+void BatchRenderer::_SetActiveRenderPassPrimFromScene()
+{
+    if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
+        return;
+    }
+
+    const auto hydraRpPath = GetActiveRenderPassHydraPath();
+    if (hydraRpPath.IsEmpty()) {
+        return;
+    }
+
+    TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                 "Active render pass set to " +
+                 hydraRpPath.GetAsString() + "\n");
+
+    _sceneGlobalsSceneIndex->SetActiveRenderPassPrimPath(hydraRpPath);
 }
 
 void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
@@ -645,6 +729,22 @@ void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
                  hydraRsPath.GetAsString() + "\n");
 
     _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(hydraRsPath);
+}
+
+void BatchRenderer::SetRenderTimes(const RenderTimes& renderTimes)
+{
+    // Cannot assign, as all RenderTimes data members are const.
+    _renderTimes.emplace(
+        renderTimes.isAnimated, 
+        renderTimes.startTime,
+        renderTimes.endTime,
+        renderTimes.timeIncr
+    );
+}
+
+RenderTimes BatchRenderer::GetRenderTimes() const
+{
+    return _renderTimes.has_value() ? *_renderTimes : ::GetRenderTimes();
 }
 
 }

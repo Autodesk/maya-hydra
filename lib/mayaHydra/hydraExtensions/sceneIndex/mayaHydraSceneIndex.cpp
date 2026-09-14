@@ -545,13 +545,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         int fastId = scene.mRemovals[i];
         if (fastId == kInvalidId)
             continue;
-        // The removal list can contain duplicate fastIds.  After the first
-        // removal succeeds, subsequent duplicates will not be found, and
-        // _GetRenderItem simply reports failure.
-        MayaHydraRenderItemAdapterPtr ria = nullptr;
-        if (_GetRenderItem(fastId, ria)) {
-            _RemoveRenderItem(ria);
-        }
+
+        _RemoveRenderItem(fastId);
     }
 
     // Coalesce DirtyPrims notifications produced per render item.
@@ -572,31 +567,19 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         }
 
         auto& ri = *scene.mItems[i];
-
-        // ProxyGeometryItems are a special type of dummy render item created internally by Maya
-        // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
+        // Hoisted above the new-adapter block below, which is not its only reader: the
+        // highlight-wire classification needs the name on every delta, not just the first one.
         const MString riName = ri.name();
-        if (riName == "ProxyGeometryItem") {
-            continue;
-        }
-
-        // VP2 image planes emit a DepthPrepass render item that uses a special
-        // shader writing only to the depth buffer with alpha-tested discard.
-        // Hydra has no equivalent; rendering it as a regular textured mesh
-        // creates a second overlapping layer that causes visual artifacts.
-        if (riName == "imagePlane_ColorImage_DepthPrepass") {
-            continue;
-        }
-
-        // Meshes can optionally be handled by the mesh adapter, rather than by
-        // render items.
-        if (filterMesh(ri, useMeshAdapter())) {
-            continue;
-        }
-
-        int                           fastId = ri.InternalObjectId();
+        int fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
+
+        // A cached null adapter: an item Maya keeps sending that Hydra deliberately does not
+        // translate. Bailing here rather than after the new-adapter block below keeps the
+        // steady-state cost of those items at the single lookup above.
+        if (!isNewRenderitem && ria == nullptr) {
+            continue;
+        }
 
         // Cheap bail before the display-status query below, which is the expensive part.
         if (unchanged && !isNewRenderitem) {
@@ -615,6 +598,11 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // scan, topology build and GPU upload -- skip translating it instead. A wire translated
         // earlier, in a mode that needed it, is hidden through the adapter below rather than
         // removed: dropping and re-adding its prim on every selection change would cost more.
+        //
+        // Deliberately a bare continue, and deliberately above the new-adapter block below: this
+        // wire must NOT be recorded in _renderItemsAdaptersFast as a null adapter. That cache is
+        // for items Hydra never translates, whereas this one has to stay invisible to
+        // _GetRenderItem so a later delta, or the reconsider pass, can still pick it up.
         if (isNewRenderitem && !neededByAnyPanel) {
             continue;
         }
@@ -632,9 +620,9 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // makes it relevant again -- a deselection, or the reconsider pass above. That delta
         // describes what changed since the last frame, not what a brand new adapter needs, so it
         // can legitimately omit MVS_changedMatrix and MVS_changedEffect. Without MVS_changedMatrix
-        // MayaHydraRenderItemAdapter::_transform is never written (it has no initializer, and
-        // UpdateTransform is its only writer). Treat every new adapter as a full initialization
-        // instead.
+        // MayaHydraRenderItemAdapter::_transform keeps its identity initializer, since
+        // UpdateTransform is its only writer, and the wire draws at the origin. Treat every new
+        // adapter as a full initialization instead.
         //
         // MVS_changedEffect is forced for the same reason, but it only bites on a mesh adapter:
         // GetMaterialId() short-circuits on kLines/kLineStrip and returns the empty
@@ -648,13 +636,43 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         }
 
         if (isNewRenderitem) {
+            // First check if the new render item should have a null adapter
+            bool createNullRenderItemAdapter = false;
+
+            // ProxyGeometryItems are a special type of dummy render item created internally by Maya
+            // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
+            if (riName == "ProxyGeometryItem") {
+                createNullRenderItemAdapter = true;
+            }
+
+            // VP2 image planes emit a DepthPrepass render item that uses a special
+            // shader writing only to the depth buffer with alpha-tested discard.
+            // Hydra has no equivalent; rendering it as a regular textured mesh
+            // creates a second overlapping layer that causes visual artifacts.
+            if (riName == "imagePlane_ColorImage_DepthPrepass") {
+                createNullRenderItemAdapter = true;
+            }
+
+            // Meshes can optionally be handled by the mesh adapter, rather than by
+            // render items.
+            if (filterMesh(ri, useMeshAdapter())) {
+                createNullRenderItemAdapter = true;
+            }
+        
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
             // Maya/MtoA adds texturedSkyDome mesh object for VP2.
             // We do not want that to be translated to Hydra
             if (slowId.IsEmpty() || IsTexturedSkyDomeRenderItem(slowId)) {
+                createNullRenderItemAdapter = true;
+            }
+            
+            if (createNullRenderItemAdapter) {
+                _renderItemsAdaptersFast.insert({ fastId, nullptr });
                 continue;
             }
+
+            // Otherwise create a valid adapter
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
             ria = std::make_shared<MayaHydraRenderItemAdapter>(
@@ -853,6 +871,24 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
 
     return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
+}
+
+void MayaHydraSceneIndex::RefreshCamerasOnTimeChange()
+{
+    _MapAdapter<MayaHydraCameraAdapter>(
+        [](MayaHydraCameraAdapter* a) {
+            if (a->UpdateTransformIfChanged()) {
+                MayaHydra::DirtyNotifier(a).dirtyTransform();
+            }
+        },
+        _cameraAdapters);
+}
+
+SdfPath MayaHydraSceneIndex::GetCameraPrimPath(const MDagPath& camPath) const
+{
+    const SdfPath camID = GetPrimPath(camPath, true);
+    // Only report a published path, or the caller would bind a non-existent prim.
+    return TfMapLookupPtr(_cameraAdapters, camID) ? camID : SdfPath();
 }
 
 SdfPath MayaHydraSceneIndex::GetDelegateID(TfToken name) { return _ID; }
@@ -1276,11 +1312,10 @@ bool MayaHydraSceneIndex::_GetRenderItem(int fastId, MayaHydraRenderItemAdapterP
     // class and best to avoid in any performance- critical area. Simply workaround for the
     // prototype is an additional lookup index based on InternalObjectID.  Long term goal would be
     // that the plug-in rarely, if ever, deals with TdagPath.
-    MayaHydraRenderItemAdapterPtr* result = TfMapLookupPtr(_renderItemsAdaptersFast, fastId);
-
-    if (result != nullptr) {
-        // adapter already exists, return it
-        ria = *result;
+    auto it = _renderItemsAdaptersFast.find(fastId);
+    if (it != _renderItemsAdaptersFast.end()) {
+        // entry already exists, return it
+        ria = it->second;
         return true;
     }
 
@@ -1294,11 +1329,17 @@ void MayaHydraSceneIndex::_AddRenderItem(const MayaHydraRenderItemAdapterPtr& ri
     _renderItemsAdapters.insert({ primPath, ria });
 }
 
-void MayaHydraSceneIndex::_RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria)
+void MayaHydraSceneIndex::_RemoveRenderItem(int fastId)
 {
-    const SdfPath& primPath = ria->GetID();
-    _renderItemsAdaptersFast.erase(ria->GetFastID());
-    _renderItemsAdapters.erase(primPath);
+    MayaHydraRenderItemAdapterPtr ria = nullptr;
+    if (_GetRenderItem(fastId, ria)) {
+        if (ria != nullptr) {
+            const SdfPath& primPath = ria->GetID();
+            _renderItemsAdapters.erase(primPath);
+        }
+        
+        _renderItemsAdaptersFast.erase(fastId);
+    }
 }
 
 void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
