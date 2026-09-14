@@ -1437,8 +1437,9 @@ MStatus MtohRenderOverride::Render(
         _previouslySelectedPaths = std::move(currentlySelected);
     }
 
-    const std::string  panelKey = _currentPanelName.asChar();
-    const auto         oldStyleIt = _oldDisplayStyles.find(panelKey);
+    const std::string panelKey
+        = panelNameStr.empty() ? std::string(_currentPanelName.asChar()) : panelNameStr;
+    const auto oldStyleIt = _oldDisplayStyles.find(panelKey);
     const unsigned int oldDisplayStyle
         = (oldStyleIt != _oldDisplayStyles.end()) ? oldStyleIt->second : 0u;
 

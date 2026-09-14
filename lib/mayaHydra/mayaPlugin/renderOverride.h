@@ -437,8 +437,11 @@ private:
     /// mouse move with a y from after, which is one frame of one pixel and not worth a lock.
     std::map<std::string, std::unique_ptr<HoverState>> _hoverStates;
 
-    /// The panel currently being drawn, recorded by setup() and read by Render(). Maya calls
-    /// setup() with the destination panel before each of that panel's renders.
+    /// The destination panel of the render about to happen, recorded in setup(). This is the key
+    /// _hoverStates and _hoverEventFilters use, because _InstallHoverEventFilter runs in setup(),
+    /// before any frame context exists. Render() prefers the frame context's
+    /// renderingDestination() where it has one (see panelNameStr) -- the two agree for a model
+    /// panel, and this member is the fallback.
     MString _currentPanelName;
 
     /// Hgi and HdDriver should be constructed before HdEngine to ensure they
