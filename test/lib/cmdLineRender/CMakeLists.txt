@@ -354,13 +354,10 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
         RENDERER_ARGS "-s 5 -e 7 -im ${new_image_name}"
     )
 
-    # Frame number resolution in render product names (frame 9).  Token expansion
+    # Frame number resolution in render product names).  Token expansion
     # in productName requires Hydra v2 render settings (Arnold env or PRMan production
     # render env).  Storm uses Hydra v1 here and does not resolve # tokens, so it is
     # intentionally excluded (the pre-HYDRA-2460 test was Arnold-only for the same reason).
-    #
-    # As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
-    # render settings mode (-s 9 -e 11); single-frame (-s 9 -e 9) is used instead.
     set(_add_frame_nb_resolution FALSE)
     if(folder STREQUAL "arnold")
         set(_add_frame_nb_resolution TRUE)
@@ -380,10 +377,9 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
                 FAILPERCENT 1.0
                 # Hydra v2 does not resolve relative render product paths.
                 RENDERER_ARGS
-                    "-s 9 -e 9 -rd \"${TEST_OUTPUT_ROOT}/frameNbResolution_${suffix}/projects/default/images\""
+                    "-s 9 -e 11 -rd \"${TEST_OUTPUT_ROOT}/frameNbResolution_${suffix}/projects/default/images\""
                 ENV
                     "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
-                    "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
             )
         else()
             mayaHydra_add_cmd_line_render_multi_image_test(${frame_nb_scene}${dep_label}
