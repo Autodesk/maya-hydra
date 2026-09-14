@@ -420,16 +420,29 @@ void BatchRenderer::_InitHydraResources()
     GlfContextCaps::InitInstance();
     _rendererPlugin
         = HdRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererDesc.rendererName);
-    if (!_rendererPlugin)
+    if (!_rendererPlugin) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: unknown or unregistered renderer \"%s\"; no matching Hydra "
+            "renderer plugin was found.",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
 
     _renderDelegate = HdRendererPluginRegistry::GetInstance().CreateRenderDelegate(_rendererDesc.rendererName);
-    if (!_renderDelegate)
+    if (!_renderDelegate) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: failed to create the render delegate for renderer \"%s\".",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
 
     _renderIndex = HdRenderIndex::New(_renderDelegate.Get(), {&_hgiDriver});
-    if (!_renderIndex)
+    if (!_renderIndex) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: failed to create the render index for renderer \"%s\".",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
 
     _taskController = std::make_unique<HdxTaskController>(

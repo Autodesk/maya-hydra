@@ -161,7 +161,35 @@ HydraRenderCmd::~HydraRenderCmd()
 
 bool HydraRenderCmd::parseDatabase(const MArgDatabase& db)
 {
+    if (db.isFlagSet(_renderer)) {
+        MString rn;
+        CHECK_MSTATUS_AND_RETURN(db.getFlagArgument(_renderer, 0, rn), false);
+
+        _rendererFlagSet   = true;
+        _rendererFromFlag  = TfToken(rn.asChar());
+    }
+
     return true;
+}
+
+TfToken HydraRenderCmd::GetRenderer() const
+{
+    if (_rendererFlagSet) {
+        if (_rendererFromFlag.IsEmpty()) {
+            TF_RUNTIME_ERROR(
+                "hydraRender: the -renderer/-r flag was set to an empty renderer name.");
+        }
+        return _rendererFromFlag;
+    }
+
+    const TfToken currentRenderer = GetCurrentRenderer();
+    if (currentRenderer.IsEmpty()) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: no renderer specified. Pass -renderer/-r, or author the "
+            "currentRenderer attribute on the USD render-description node.");
+    }
+
+    return currentRenderer;
 }
 
 bool HydraRenderCmd::initialize()
@@ -243,15 +271,6 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
       return MS::kFailure;
     }
 
-    // By default the renderer is Hydra Storm.
-    TfToken rendererName("HdStormRendererPlugin");
-    if (db.isFlagSet(_renderer)) {
-        MString rn;
-        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_renderer, 0, rn));
-
-        rendererName = TfToken(rn.asChar());
-    }
-
     if (db.isFlagSet(_gpuEnabledFlag)) {
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_gpuEnabledFlag, 0, _gpuEnabled));
     }
@@ -259,6 +278,11 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
     // Create the batch renderer.  The second and third arguments of
     // the renderer description are the unused override name and
     // display name, respectively.
+    TfToken rendererName = GetRenderer();
+    if (rendererName.IsEmpty()) {
+        // GetRenderer() has already posted a TF_RUNTIME_ERROR
+        return MS::kFailure;
+    }
     _batchRenderer = std::make_unique<BatchRenderer>(
         MtohRendererDescription(rendererName, {}, {}));
 

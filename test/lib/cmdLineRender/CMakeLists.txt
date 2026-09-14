@@ -424,6 +424,80 @@ foreach(scene ${ARNOLD_MAYABATCH_RENDER_SCENES})
     )
 endforeach()
 
+# Render.exe/CTest coverage for renderer resolution precedence around the
+# USD currentRenderer attribute (see testCurrentRendererSelection.py's
+# test_ExplicitRendererFlagOverridesUsdCurrentRenderer for the equivalent
+# Python/mayabatch coverage).
+#
+# renderCurrentFrame_UsdCurrentRendererStorm.ma bakes
+# UsdDefaultRenderDescription.currentRenderer to "HdStormRendererPlugin"
+# directly in the scene file (rather than setting it at runtime, as the
+# Python test does), so pure Render.exe/CTest invocations can exercise it.
+# It also sets defaultRenderGlobals.preMel to "loadPlugin -quiet mayaHydra;"
+# so that mayaHydra -- and therefore its Hydra renderers -- is registered
+# with Maya's `renderer` command even when Render.exe is invoked without an
+# explicit -renderer flag (see the third test below): without an explicit
+# -renderer flag, no renderDesc/*.xml <melheader> runs, so nothing else would
+# load mayaHydra before Maya's currentRenderer()/mayaBatchRenderProcedure MEL
+# logic needs it registered.
+set(scene basic/renderCurrentFrame_UsdCurrentRendererStorm.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+
+# Sanity check: explicit -renderer matches the scene's baked-in
+# currentRenderer attribute (Storm, Hydra V1 render settings). Baseline is the
+# scene's own renderCurrentFrame_UsdCurrentRendererStorm.png (also used by
+# test_UsdCurrentRendererStormIsHonored).
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-rd ../images -im ${sceneFileNameNoExt}"
+)
+
+# Override check: explicit -renderer HdArnoldRendererPlugin must win over the
+# scene's baked-in currentRenderer=HdStormRendererPlugin attribute (Hydra V2
+# render settings, same as testCurrentRendererSelection.py's Arnold cases).
+# Baseline is a copy of renderCurrentFrame_UsdCurrentRendererHonored.png: same
+# scene geometry/lighting, same renderer, so identical expected pixels.
+_mayaHydra_add_hydra_v2_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    OUTPUT_NAME ${sceneFileNameNoExt}_ArnoldOverridesStorm
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_ArnoldOverridesStorm
+    RENDERER_ARGS "-im ${sceneFileNameNoExt}_ArnoldOverridesStorm"
+    TEST_NAME_SUFFIX ArnoldOverridesStorm
+    ENV
+        "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+        "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+)
+
+# Fallback check: Render.exe invoked with NO -renderer flag at all must still
+# render with Storm, resolved purely from the scene's baked-in
+# UsdDefaultRenderDescription.currentRenderer="HdStormRendererPlugin"
+# attribute. This exercises Maya's currentRenderer() MEL proc
+# (supportRenderers.mel), which reads that USD attribute before falling back
+# to defaultRenderGlobals.currentRenderer -- the no-flag half of the
+# precedence rule that the two tests above (both using an explicit -renderer
+# flag) cannot reach.
+#
+# Command-line overrides such as -rd/-im/-x/-y are NOT forwarded by Maya's
+# registered "<renderer>Render" command-render MEL procedure in this no-flag
+# path (see registerRenderer() in pluginUtils.cpp), so none are passed here;
+# the render lands whereever the USD render product's productName resolves
+# to, same as testCurrentRendererSelection.py's renders
+# (projects/default/images/renderCurrentFrame.png). Baseline is a copy of
+# renderCurrentFrame_UsdCurrentRendererStorm.png: same scene, same renderer,
+# so identical expected pixels.
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    NO_RENDERER_FLAG
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME renderCurrentFrame
+    TEST_NAME_SUFFIX NoRendererFlagUsesUsdCurrentRenderer
+)
+
 
 # Test a render using the fallback USD resolution settings
 set(scene basic/sphereFallbackResolution.ma)
@@ -677,6 +751,7 @@ set_tests_properties(
 set(MAYABATCH_TEST_SCRIPT_FILES
     testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
     testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
+    testCurrentRendererSelection.py|depOnPlugins:mtoa
 )
 # registeredMayaRenderers fails on Linux and macOS.
 if(IS_WINDOWS)
@@ -702,6 +777,19 @@ foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})
     set(test_env "DISPLAY=:0")
     if(test_filename IN_LIST MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE)
         list(APPEND test_env "MAYA_HYDRA_BATCH_RENDER_TEST_MODE=1")
+    endif()
+
+    # HdArnoldRendererPlugin unit tests are being converted to Hydra V2 render
+    # settings (the render delegate owns render settings/writes the render
+    # product itself, rather than MayaHydra's Hydra V1 strategy). This test
+    # file's Arnold cases are the first mayabatch tests converted; see
+    # testCurrentRendererSelection.py's use of an absolute render product path
+    # to work around Hydra V2 not resolving a relative USD productName.
+    if(test_filename STREQUAL "testCurrentRendererSelection.py")
+        list(APPEND test_env
+            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS")
     endif()
 
     mayaUsd_add_test(${target}

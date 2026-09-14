@@ -88,6 +88,59 @@ So `-reg 0 W-1 0 H-1` covers the full image, `-reg p p p p` selects exactly
 one pixel at `(p, p)`, and a region with `right < left` or `top < bottom`
 raises a Python `RuntimeError`.
 
+## Renderer Selection
+
+Before any render settings strategy is chosen, `hydraRender` must first
+resolve **which render delegate** to use.  Resolution follows a two-step
+precedence:
+
+1. **Explicit `-renderer`/`-r` flag.**  If the flag is set, its value is
+   used directly as the Hydra render delegate's plugin id.  An explicitly
+   empty flag value (`-renderer ""`) is a hard error.
+2. **The `currentRenderer` attribute on the `UsdDefaultRenderDescription`
+   singleton node.**  If no flag is given, this USD-authored string
+   attribute is read and, if non-empty, used as the render delegate's
+   plugin id.
+
+`defaultRenderGlobals.currentRenderer` (the classic Maya Render Settings
+renderer, e.g. `"arnold"` for MtoA's legacy renderer) is never read by this
+resolution logic — it is a separate, unrelated attribute consulted only by
+the legacy (non-Hydra) `render`/`Render` command path.
+
+### Version-contract requirement
+
+The `UsdDefaultRenderDescription` node and its `currentRenderer` attribute
+are looked up unconditionally, without feature-detecting whether they
+exist.  In every supported production configuration, MayaUSD's
+`UsdDefaultRenderDescription` singleton (and its `currentRenderer`
+attribute) is always present, so a missing node or attribute is treated as
+a coding error, not as "the feature is disabled".  Either that case or an
+unauthored (empty) attribute value is reported as "no renderer specified".
+
+### Error posture
+
+Resolution failures always produce a clear error and abort the batch
+render — there is no silent fallback to a default renderer:
+
+- **No flag and an empty/missing `currentRenderer`:** fails with "no
+  renderer specified..." before any render delegate is created.
+- **An unrecognized renderer name** (from either the flag or the
+  attribute): resolution itself does not validate the name against Maya's
+  registered renderers.  Instead, the name is looked up against the
+  registered Hydra render delegates when the batch renderer initializes;
+  if no matching render delegate plugin is found, it fails with "unknown
+  or unregistered renderer...".  Either way, the failure surfaces as a
+  Python `RuntimeError` from `cmds.hydraRender()` and does not crash or
+  otherwise disturb the Maya session — a subsequent `hydraRender` call
+  with a valid renderer succeeds normally.
+
+### No hardcoded default renderer
+
+This is intentional: `hydraRender` never falls back to a hardcoded renderer
+(e.g. Storm) on its own.  Callers must either pass `-renderer`/`-r`
+explicitly or author the `currentRenderer` attribute (see "No flag and an
+empty/missing `currentRenderer`" above).
+
 ## Strategy Selection
 
 The render settings strategy is determined at render time by
@@ -104,10 +157,10 @@ The render settings strategy is determined at render time by
 
 | File | Description |
 |------|-------------|
-| `renderSettingsUtils.h / .cpp` | `RenderSettingsType` enum and strategy selection logic |
-| `batchRenderer.h / .cpp` | Core batch renderer (shared infrastructure) |
+| `renderSettingsUtils.h / .cpp` | `RenderSettingsType` enum and strategy selection logic; reading the USD `currentRenderer` attribute |
+| `batchRenderer.h / .cpp` | Core batch renderer (shared infrastructure); validates the selected renderer against the registered Hydra render delegates |
 | `batchRendererHydraV1RenderSettings.h / .cpp` | Hydra V1 render settings strategy |
 | `batchRendererHydraV2RenderSettings.h / .cpp` | Hydra V2 render settings strategy |
-| `hydraRenderCmd.h / .cpp` | `hydraRender` command entry point |
+| `hydraRenderCmd.h / .cpp` | `hydraRender` command entry point; resolves which renderer to use (`-renderer`/`-r` flag, then `currentRenderer`) |
 | `hydraRenderCmdHydraV1RenderSettings.cpp` | Command-level logic for Hydra V1 strategy |
 | `hydraRenderCmdHydraV2RenderSettings.cpp` | Command-level logic for Hydra V2 strategy |

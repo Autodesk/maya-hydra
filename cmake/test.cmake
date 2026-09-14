@@ -1022,6 +1022,24 @@ endfunction()
 #   TEST_NAME_SUFFIX   - Suffix to append to the Maya scene file name to create the test name.
 #   COPY_SCENE         - If set, copies the scene file to the temporary project
 #                        before rendering.
+#   NO_RENDERER_FLAG   - If set, the -renderer <RENDERER> flag is NOT passed
+#                        on the Render.exe command line at all (RENDERER is
+#                        otherwise unused).  This exercises Render.exe's own
+#                        no-flag renderer resolution: Maya's currentRenderer()
+#                        MEL proc, which reads the UsdDefaultRenderDescription
+#                        currentRenderer attribute if authored, falling back
+#                        to defaultRenderGlobals.currentRenderer otherwise.
+#                        That fallback is Maya's Render.exe resolution only;
+#                        hydraRender itself only reads the USD currentRenderer
+#                        attribute when -renderer is omitted (see
+#                        doc/batchRenderSettings.md).
+#                        Since no renderDesc/*.xml <melheader> runs without an
+#                        explicit -renderer flag, mayaHydra never gets
+#                        loadPlugin'd (and its Hydra renderers never get
+#                        registered with Maya's `renderer` command) unless
+#                        the scene itself forces it, e.g. via
+#                        defaultRenderGlobals.preMel = "loadPlugin -quiet
+#                        mayaHydra;".
 #   ENV                - Set or append the indicated environment variables;
 #                        Similar to mayaUsd_add_test, this function manages
 #                        the same environment variables.
@@ -1032,7 +1050,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # -----------------
 
     cmake_parse_arguments(ARG
-        "COPY_SCENE"             # Boolean options.
+        "COPY_SCENE;NO_RENDERER_FLAG"             # Boolean options.
         "RENDERER;SCENE_FILE;WORKING_DIRECTORY;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS;TEST_NAME_SUFFIX" # one_value keywords
         "ENV"                                    # multi_value keywords
         ${ARGN}
@@ -1098,7 +1116,11 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # The command needs to be the name of an executable, without any 
     # arguments, as CMake calls an executable with that string unparsed.
 
-    set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
+    if(ARG_NO_RENDERER_FLAG)
+        set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
+    else()
+        set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
+    endif()
 
     # Replace illegal characters in test_name with _.  Rendered images are
     # written here.
@@ -1142,7 +1164,11 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     if (WIN32)
         set(CMD PowerShell)
 		# Windows (PowerShell)
-		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
+		if(ARG_NO_RENDERER_FLAG)
+			set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
+		else()
+			set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
+		endif()
         set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
 		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
