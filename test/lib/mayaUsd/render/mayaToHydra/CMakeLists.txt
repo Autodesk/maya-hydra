@@ -121,6 +121,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testMaterialBlocking.py
     cpp/testPassFiltering.py
     cpp/testLegacyHighlightPassRouting.py
+    cpp/testDeferredHighlightWireInit.py
     cpp/testRenderItemDirtyLocators.py
 )
 
