@@ -674,6 +674,8 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
                 }
             } // Render product loop
         }//if (renderProductsRel.GetTargets(&productTargets)) {
+
+        SendRenderProgress(renderTimes, time);
     } // Time loop
 
     return true;
