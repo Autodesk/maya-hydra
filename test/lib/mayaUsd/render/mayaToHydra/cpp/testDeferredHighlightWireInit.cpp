@@ -17,7 +17,6 @@
 
 #include <mayaHydraLib/mayaUtils.h>
 
-#include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/xformSchema.h>
 
@@ -33,23 +32,31 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-// What:   A selection-highlight wire whose first translation was deferred is fully initialized.
+// What:   A selection-highlight wire whose first translation was deferred gets its transform.
 // How:    Python leaves a translated cube selected in a shaded panel, forces "ogs -reset" so the
 //         DormantPolyWire reaches the scene index for the first time while the shape is selected
 //         (which is what makes isLegacySelectionHighlightWire() skip it), then switches the panel
 //         to wireframe so reconsiderSkippedHighlightWires recovers it from a thin delta.
-// Expect: the wire prim's xform matches the shape's world matrix, and it has a material binding.
+// Expect: the wire prim exists and its xform matches the shape's world matrix.
 //
 // The delta that revives a skipped wire describes what changed since the last frame, not what a
-// brand new adapter needs, so it can legitimately omit MVS_changedMatrix / MVS_changedEffect.
-// mayaHydraSceneIndex.cpp forces both for every new adapter; without that,
-// MayaHydraRenderItemAdapter::_transform is never written and no material is bound. Removing those
-// two flag bits passes every other test in the suite, which is why this one exists.
+// brand new adapter needs, so it can legitimately omit MVS_changedMatrix. mayaHydraSceneIndex.cpp
+// forces that bit for every new adapter; without it MayaHydraRenderItemAdapter::_transform is
+// never written (it has no initializer, and UpdateTransform is its only writer). Removing the flag
+// passes every other test in the suite, which is why this one exists.
+//
+// Deliberately no material assertion. mayaHydraSceneIndex.cpp forces MVS_changedEffect alongside
+// MVS_changedMatrix, but that bit is unobservable on a wire: GetMaterialId() short-circuits on
+// kLines/kLineStrip and returns the intentionally empty _fallbackMaterial without consulting the
+// adapter's stored material, and _GetMaterialBindingDataSource() yields no data source for an
+// empty path. A wire prim therefore never carries a material binding, in either mode. The effect
+// bit still matters for a mesh adapter first translated from a thin delta, which this scenario
+// cannot produce -- only wires are ever skipped.
 //
 // Runs in both selection-highlight modes. In legacy mode nothing is ever skipped, so the wire is
 // created normally and this degenerates into a weaker "the wire is correct" assertion rather than
 // failing -- worth keeping as a cheap control.
-TEST(DeferredHighlightWireInit, testTransformAndMaterial)
+TEST(DeferredHighlightWireInit, testDeferredTransform)
 {
     const auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -95,11 +102,4 @@ TEST(DeferredHighlightWireInit, testTransformAndMaterial)
     EXPECT_TRUE(MatricesAreClose(actual, expected, 1e-6))
         << "DormantPolyWire transform was not initialized on its deferred first translation: hydra "
         << actual << " vs maya " << expected;
-
-    // The material half of the same defect: MVS_changedEffect was likewise absent, so SetMaterial()
-    // was never called.
-    HdMaterialBindingsSchema bindings
-        = HdMaterialBindingsSchema::GetFromParent(wirePrim.dataSource);
-    EXPECT_TRUE(bindings.IsDefined())
-        << "DormantPolyWire has no material binding after its deferred first translation.";
 }

@@ -631,10 +631,17 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // A wire skipped by an earlier pass is translated for the first time on whatever delta
         // makes it relevant again -- a deselection, or the reconsider pass above. That delta
         // describes what changed since the last frame, not what a brand new adapter needs, so it
-        // can legitimately omit MVS_changedMatrix and MVS_changedEffect. Without them
+        // can legitimately omit MVS_changedMatrix and MVS_changedEffect. Without MVS_changedMatrix
         // MayaHydraRenderItemAdapter::_transform is never written (it has no initializer, and
-        // UpdateTransform is its only writer) and no material is bound. Treat every new adapter
-        // as a full initialization instead.
+        // UpdateTransform is its only writer). Treat every new adapter as a full initialization
+        // instead.
+        //
+        // MVS_changedEffect is forced for the same reason, but it only bites on a mesh adapter:
+        // GetMaterialId() short-circuits on kLines/kLineStrip and returns the empty
+        // _fallbackMaterial without consulting the value SetMaterial() stored, so a wire never
+        // carries a material binding either way. Only wires are ever skipped, so today the effect
+        // bit is inert on the deferred path -- it is kept so that "new adapter" means "fully
+        // initialized" for any render item that reaches this branch later.
         if (isNewRenderitem) {
             flags |= MDataServerOperation::MViewportScene::MVS_changedMatrix
                 | MDataServerOperation::MViewportScene::MVS_changedEffect;

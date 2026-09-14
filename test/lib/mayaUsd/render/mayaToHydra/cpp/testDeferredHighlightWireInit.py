@@ -60,7 +60,7 @@ class TestDeferredHighlightWireInit(mtohUtils.MayaHydraBaseTestCase):
 
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
-                shape, f="DeferredHighlightWireInit.testTransformAndMaterial")
+                shape, f="DeferredHighlightWireInit.testDeferredTransform")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
