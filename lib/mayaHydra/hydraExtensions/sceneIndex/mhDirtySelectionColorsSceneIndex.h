@@ -93,8 +93,16 @@ protected:
         _SendPrimsRemoved(entries);
     }
 
+    /// Appends a primvar-colors dirty entry for \p primPath and everything below it, following
+    /// instancer prototypes as well as child paths. \p inoutVisited is owned by the caller and
+    /// shared across every path in one call: a delta can legitimately contain both a prim and its
+    /// descendant, and without a call-wide set the shared subtree is walked once per ancestor and
+    /// emits duplicate dirty entries.
     MAYAHYDRALIB_API
-    void _DirtyPrimPathRecursively(const PXR_NS::SdfPath& primPath, PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const;
+    void _DirtyPrimPathRecursively(
+        const PXR_NS::SdfPath&                                      primPath,
+        PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries&           inoutDirtiedPrimEntries,
+        std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>& inoutVisited) const;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

@@ -41,11 +41,18 @@ void MhDirtySelectionColorsSceneIndex::dirtyLeadObjectRelatedSelections(const Fv
 {
     // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
+
+    // One set for the whole call: the previous and current lead selections routinely share a
+    // subtree, and so can two paths within either of them.
+    std::unordered_set<SdfPath, SdfPath::Hash> visited;
+
     for (const auto& previousLeadObjectPrimSelection : previousLeadObjectPrimSelections) {
-        _DirtyPrimPathRecursively(previousLeadObjectPrimSelection.primPath, dirtiedPrimEntries);
+        _DirtyPrimPathRecursively(
+            previousLeadObjectPrimSelection.primPath, dirtiedPrimEntries, visited);
     }
     for (const auto& currentLeadObjectPrimSelection : currentLeadObjectPrimSelections) {
-        _DirtyPrimPathRecursively(currentLeadObjectPrimSelection.primPath, dirtiedPrimEntries);
+        _DirtyPrimPathRecursively(
+            currentLeadObjectPrimSelection.primPath, dirtiedPrimEntries, visited);
     }
 
     if (! dirtiedPrimEntries.empty()){
@@ -55,9 +62,10 @@ void MhDirtySelectionColorsSceneIndex::dirtyLeadObjectRelatedSelections(const Fv
 
 void MhDirtySelectionColorsSceneIndex::dirtySelectionRelatedPrims(const SdfPathVector& primPaths)
 {
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
+    HdSceneIndexObserver::DirtiedPrimEntries   dirtiedPrimEntries;
+    std::unordered_set<SdfPath, SdfPath::Hash> visited;
     for (const auto& primPath : primPaths) {
-        _DirtyPrimPathRecursively(primPath, dirtiedPrimEntries);
+        _DirtyPrimPathRecursively(primPath, dirtiedPrimEntries, visited);
     }
 
     if (! dirtiedPrimEntries.empty()){
@@ -65,15 +73,17 @@ void MhDirtySelectionColorsSceneIndex::dirtySelectionRelatedPrims(const SdfPathV
     }
 }
 
-void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(const SdfPath& primPath, HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const
+void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(
+    const SdfPath&                              primPath,
+    HdSceneIndexObserver::DirtiedPrimEntries&   inoutDirtiedPrimEntries,
+    std::unordered_set<SdfPath, SdfPath::Hash>& inoutVisited) const
 {
     // path can be a hierarchy of prim paths so we need to get all children prim paths
-    std::stack<SdfPath> pathsToDirty({primPath});
-    std::unordered_set<SdfPath, SdfPath::Hash> visited;
+    std::stack<SdfPath> pathsToDirty({ primPath });
     while (!pathsToDirty.empty()) {
         auto currPathToDirty = pathsToDirty.top();
         pathsToDirty.pop();
-        if (!visited.insert(currPathToDirty).second)
+        if (!inoutVisited.insert(currPathToDirty).second)
             continue;
 
         inoutDirtiedPrimEntries.emplace_back(currPathToDirty, primvarsColorsLocatorSet);
