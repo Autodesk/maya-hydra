@@ -1782,6 +1782,14 @@ MtohRenderOverride::HoverState* MtohRenderOverride::_GetHoverState(const std::st
 void MtohRenderOverride::_InstallHoverEventFilter(const MString& panelName)
 {
 #ifdef MAYAHYDRA_HAS_QT
+    // Deliberately independent of the current highlight mode -- see _SetHoverPosition -- but not of
+    // the renderer: _UseOutlineSelectionHighlighting() is false by construction when !_isUsingHdSt
+    // (a const member set in the ctor), so _HitTestEnabled() can never become true for a non-Storm
+    // override and nothing would ever consume the tracked position.
+    if (!_isUsingHdSt) {
+        return;
+    }
+
     const std::string key(panelName.asChar());
     if (_hoverEventFilters.find(key) != _hoverEventFilters.end()) {
         return; // Already installed for this panel.
@@ -2688,7 +2696,10 @@ MStatus MtohRenderOverride::setup(const MString& destination)
     }
 
     // Track the mouse over this panel's viewport for hover highlighting. Idempotent, and a no-op
-    // when Qt is unavailable.
+    // when Qt is unavailable or this override's renderer cannot use the outline. Installed
+    // regardless of the current highlight mode on purpose: when hover is off the filter costs one
+    // early-returning callback per mouse move (_SetHoverPosition), and keeping it installed is what
+    // lets enabling hover take effect on the next mouse move rather than needing a reinstall.
     _InstallHoverEventFilter(destination);
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
