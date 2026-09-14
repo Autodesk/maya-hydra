@@ -59,6 +59,14 @@ bool HoverEventFilter::eventFilter(QObject* watched, QEvent* event)
 {
     if (watched == _widget && _callback) {
         switch (event->type()) {
+        // Press and release are handled by the same code as a move: Qt reports buttons() with the
+        // pressed button already included on a press and the released one already removed on a
+        // release, so `active` below comes out right for all three. Without them, pressing a button
+        // without moving the cursor leaves the hover outline drawn through the click -- the start
+        // of a tumble or a marquee drag -- and releasing without moving leaves it off until the
+        // next move.
+        case QEvent::MouseButtonPress:
+        case QEvent::MouseButtonRelease:
         case QEvent::MouseMove: {
             auto* mouseEvent = static_cast<QMouseEvent*>(event);
             // Any held button means the user is dragging/tumbling, not hovering.
