@@ -113,6 +113,10 @@ struct RenderTimes
 // Get the render times from the Maya scene.
 RenderTimes GetRenderTimes();
 
+// Report to Maya the progress of a batch render, as an integer percentage of
+// the frames in renderTimes, given the frame that has just finished rendering.
+void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRA_RENDER_SETTINGS_UTILS_H

@@ -56,6 +56,8 @@ bool HydraRenderCmd::hydraRenderFromHydraV2RenderSettings()
                 "BatchRenderer::RenderFromHydraV2RenderSettings failed.\n");
             return false;
         }
+
+        SendRenderProgress(renderTimes, time);
     }
 
     return true;
