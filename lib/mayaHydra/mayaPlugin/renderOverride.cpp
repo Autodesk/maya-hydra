@@ -545,9 +545,20 @@ void MtohRenderOverride::UpdateRenderGlobals(
         // it decides which highlight scene indices get installed, so it is consumed at
         // resource-init time too.
         if (attrName.GetString().find("SelectionHighlight") != std::string::npos) {
+            // Two attributes match this substring and they differ in reach.
+            // mayaHydraSelectionHighlightMode only feeds _UseOutlineSelectionHighlighting(), which
+            // is false by construction when !_isUsingHdSt, so a non-Storm override's installed
+            // scene indices cannot depend on it -- rebuilding it would cost a full resource
+            // teardown plus an "ogs -reset" render-item re-send for no change in output.
+            // mayaHydraForceDisableSelectionHighlight, by contrast, feeds
+            // _SuppressLegacySelectionHighlight() directly and so must reach every renderer.
+            const bool stormOnly
+                = attrName.GetString().find("SelectionHighlightMode") != std::string::npos;
             std::lock_guard<std::mutex> lock(_allInstancesMutex);
             for (auto* instance : _allInstances) {
-                instance->_needsClear = true;
+                if (!stormOnly || instance->_isUsingHdSt) {
+                    instance->_needsClear = true;
+                }
             }
         }
         else if (attrName.GetString().find("DefaultOutlines") != std::string::npos) {
