@@ -66,6 +66,7 @@
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+#include <flowViewport/colorPreferences/fvpColorChanged.h>
 
 #include <hvt/engine/framePass.h>
 #include <hvt/engine/framePassUtils.h>
@@ -330,11 +331,23 @@ public:
         : Ufe::Observer(), _renderOverride(renderOverride)
     {}
 
-    void operator()(const Ufe::Notification& /* notification */) override
+    void operator()(const Ufe::Notification& notification) override
     {
-        // ColorPreferences only rebroadcasts ColorChanged notifications, so any
-        // notification received here means a color preference has changed.
-        _renderOverride.ColorPreferencesChanged();
+        // ColorPreferences only rebroadcasts ColorChanged notifications, but of the six colors
+        // the Maya translator tracks only these three are consumed here (RefreshColors and
+        // _BuildOutlineStyle); the component-selection colors -- vertex, edge, face -- are not.
+        // Filtering matters because the handler dirties every prim in the scene, so without it
+        // changing the vertex selection color repaints the whole scene for no visible effect.
+        const auto* colorChanged = dynamic_cast<const Fvp::ColorChanged*>(&notification);
+        if (!colorChanged) {
+            return;
+        }
+        const PXR_NS::TfToken& token = colorChanged->token();
+        if (token == FvpColorPreferencesTokens->wireframeSelection
+            || token == FvpColorPreferencesTokens->wireframeSelectionSecondary
+            || token == FvpColorPreferencesTokens->polymeshDormant) {
+            _renderOverride.ColorPreferencesChanged();
+        }
     }
 
 private:
