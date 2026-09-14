@@ -1674,7 +1674,7 @@ MStatus MtohRenderOverride::Render(
         // The hover contribution this panel wants. Empty for every panel that is not the hovered
         // one, and empty when the pick runs but nothing draws the result.
         const SdfPath wantedHoverPath
-            = (hovering && _OutlineHoverHightlingtingEnabled()) ? hover->resolvedPath : SdfPath();
+            = (hovering && _OutlineHoverHightlightingEnabled()) ? hover->resolvedPath : SdfPath();
 
         // Push when the selection changed, or when the hover contribution differs from what the
         // manager already holds. Everything else in OutlineInputs is global, and at most one panel
@@ -1764,11 +1764,11 @@ bool MtohRenderOverride::_HitTestEnabled() const
     // the hit test on its own. mayaHydraForceEnableInteractiveHitTest only adds the pick on top for
     // the instrumentation configuration that runs the pick and draws nothing. It must never be able
     // to be switched from the UI and defaults to false.
-    return _OutlineHoverHightlingtingEnabled()
+    return _OutlineHoverHightlightingEnabled()
         || (_globals.forceEnableInteractiveHitTest && _UseOutlineSelectionHighlighting());
 }
 
-bool MtohRenderOverride::_OutlineHoverHightlingtingEnabled() const
+bool MtohRenderOverride::_OutlineHoverHightlightingEnabled() const
 {
     return _globals.outlineHoverHighlighting && _UseOutlineSelectionHighlighting();
 }
