@@ -74,6 +74,37 @@ class TestLightPrimvars(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="LightPrimvars.IntensityUpdateNoDuplicatePrimvarsDirty")
 
+    # Create a spot light with depth-map shadows, which is the light type that
+    # carries Maya's dmap* attributes (the Arnold sky dome light does not).
+    def setupSpotLightScene(self):
+        cmds.file(new=True, force=True)
+        light_shape = cmds.spotLight()
+        light_shape = cmds.ls(light_shape, long=True)[0]
+        cmds.setAttr(light_shape + ".useDepthMapShadows", 1)
+        cmds.setAttr(light_shape + ".dmapResolution", 1024)
+        cmds.setAttr(light_shape + ".dmapBias", 0.02)
+        cmds.setAttr(light_shape + ".dmapFilterSize", 4)
+
+        self.setHdStormRenderer()
+        cmds.optionVar(stringValue=("mhLightShape", light_shape))
+        cmds.refresh()
+
+    # What: Maya depth-map shadow attributes are translated to the shadow:* light params.
+    # How: build a spot light with known dmap settings, then run the C++ test that reads them.
+    # Expect: shadow:resolution/bias match the authored values; blur is filter size / resolution.
+    def test_shadowMapParamsRoundTrip(self):
+        self.setupSpotLightScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="LightPrimvars.ShadowMapParamsRoundTrip")
+
+    # What: the light param attribute list stays in sync with the adapter's attribute usage.
+    # How: run the C++ test that compares the expected list against the adapter's set.
+    # Expect: every attribute read by the light adapter is present in the param list.
+    def test_paramAttributesMatchGetLogic(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="LightPrimvars.ParamAttributesMatchGetLogic")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
