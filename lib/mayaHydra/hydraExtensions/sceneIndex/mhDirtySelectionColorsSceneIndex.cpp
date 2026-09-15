@@ -26,6 +26,7 @@
 #include <pxr/usd/sdf/path.h>
 
 #include <stack>
+#include <unordered_set>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

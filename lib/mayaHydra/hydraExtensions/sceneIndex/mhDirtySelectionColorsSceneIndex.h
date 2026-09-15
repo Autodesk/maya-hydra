@@ -26,6 +26,9 @@
 //Usd/Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
+//STL headers
+#include <unordered_set>
+
 
 namespace MAYAHYDRA_NS_DEF {
 
