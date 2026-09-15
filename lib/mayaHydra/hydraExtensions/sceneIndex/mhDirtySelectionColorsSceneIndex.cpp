@@ -15,7 +15,7 @@
 //
 
 //Local headers
-#include "mhDirtyLeadObjectSceneIndex.h"
+#include "mhDirtySelectionColorsSceneIndex.h"
 
 #include <flowViewport/tokens.h>
 
@@ -26,11 +26,10 @@
 #include <pxr/usd/sdf/path.h>
 
 #include <stack>
+#include <unordered_set>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-// The MhDirtyLeadObjectSceneIndex class is responsible for dirtying the current and previous maya selection lead objects prim
-// path when a change in the lead object selection has happened.
 namespace MAYAHYDRA_NS_DEF {
 
 DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
@@ -39,15 +38,22 @@ static const HdDataSourceLocatorSet primvarsColorsLocatorSet{ primvarsOverrideWi
                                                             HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)
                                                          };
 
-void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections)
+void MhDirtySelectionColorsSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections)
 {
     // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
+
+    // One set for the whole call: the previous and current lead selections routinely share a
+    // subtree, and so can two paths within either of them.
+    std::unordered_set<SdfPath, SdfPath::Hash> visited;
+
     for (const auto& previousLeadObjectPrimSelection : previousLeadObjectPrimSelections) {
-        _DirtyPrimSelectionRecursively(previousLeadObjectPrimSelection, dirtiedPrimEntries);
+        _DirtyPrimPathRecursively(
+            previousLeadObjectPrimSelection.primPath, dirtiedPrimEntries, visited);
     }
     for (const auto& currentLeadObjectPrimSelection : currentLeadObjectPrimSelections) {
-        _DirtyPrimSelectionRecursively(currentLeadObjectPrimSelection, dirtiedPrimEntries);
+        _DirtyPrimPathRecursively(
+            currentLeadObjectPrimSelection.primPath, dirtiedPrimEntries, visited);
     }
 
     if (! dirtiedPrimEntries.empty()){
@@ -55,13 +61,31 @@ void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::Pr
     }
 }
 
-void MhDirtyLeadObjectSceneIndex::_DirtyPrimSelectionRecursively(const Fvp::PrimSelection& primSelection, HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const
+void MhDirtySelectionColorsSceneIndex::dirtySelectionRelatedPrims(const SdfPathVector& primPaths)
 {
-    //path can be a hierachy of prim paths so we need to get all children prim paths
-    std::stack<SdfPath> pathsToDirty({primSelection.primPath});
+    HdSceneIndexObserver::DirtiedPrimEntries   dirtiedPrimEntries;
+    std::unordered_set<SdfPath, SdfPath::Hash> visited;
+    for (const auto& primPath : primPaths) {
+        _DirtyPrimPathRecursively(primPath, dirtiedPrimEntries, visited);
+    }
+
+    if (! dirtiedPrimEntries.empty()){
+        _SendPrimsDirtied(dirtiedPrimEntries);
+    }
+}
+
+void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(
+    const SdfPath&                              primPath,
+    HdSceneIndexObserver::DirtiedPrimEntries&   inoutDirtiedPrimEntries,
+    std::unordered_set<SdfPath, SdfPath::Hash>& inoutVisited) const
+{
+    // path can be a hierarchy of prim paths so we need to get all children prim paths
+    std::stack<SdfPath> pathsToDirty({ primPath });
     while (!pathsToDirty.empty()) {
         auto currPathToDirty = pathsToDirty.top();
         pathsToDirty.pop();
+        if (!inoutVisited.insert(currPathToDirty).second)
+            continue;
 
         inoutDirtiedPrimEntries.emplace_back(currPathToDirty, primvarsColorsLocatorSet);
 
@@ -72,8 +96,10 @@ void MhDirtyLeadObjectSceneIndex::_DirtyPrimSelectionRecursively(const Fvp::Prim
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPathToDirty);
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
             HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
-            for (const auto& prototypePath : instancerTopology.GetPrototypes()->GetTypedValue(0)) {
-                pathsToDirty.push(prototypePath);
+            if (auto prototypes = instancerTopology.GetPrototypes()) {
+                for (const auto& prototypePath : prototypes->GetTypedValue(0)) {
+                    pathsToDirty.push(prototypePath);
+                }
             }
         }
     }

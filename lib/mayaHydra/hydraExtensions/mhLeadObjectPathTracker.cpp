@@ -69,9 +69,9 @@ class GlobalSelectionChangedObs : public Ufe::Observer
 }
 namespace MAYAHYDRA_NS_DEF {
 
-MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
+MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtySelectionColorsSceneIndexRefPtr& dirtySelectionColorsSceneIndex) 
     : _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
-    , _dirtyLeadObjectSceneIndex(dirtyLeadObjectSceneIndex)
+    , _dirtySelectionColorsSceneIndex(dirtySelectionColorsSceneIndex)
 {
     const Ufe::GlobalSelection::Ptr& ufeSelection = Ufe::GlobalSelection::get();
     if (ufeSelection->size() > 0){
@@ -124,8 +124,8 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
     _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
 
     // Dirty the previous lead object
-    if(_dirtyLeadObjectSceneIndex){
-        _dirtyLeadObjectSceneIndex->dirtyLeadObjectRelatedSelections(oldLeadObjectPrimSelections, _leadObjectPrimSelections);
+    if(_dirtySelectionColorsSceneIndex){
+        _dirtySelectionColorsSceneIndex->dirtyLeadObjectRelatedSelections(oldLeadObjectPrimSelections, _leadObjectPrimSelections);
     }
 }
 
