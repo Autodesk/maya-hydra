@@ -135,6 +135,23 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
         set(RENDERED_IMAGE_SUBDIR "${ARG_RENDERED_IMAGE_SUBDIR}")
     endif()
 
+    # Default the render directory to where idiff looks for the output, which
+    # is renderSettingsMultiImageTest.py's MAYA_APP_DIR plus the subdirectory
+    # above.  The path must be absolute: the Hydra V2 render-settings path
+    # hands a relative USD render product productName to the render delegate
+    # unresolved, so the image is written relative to the render process's
+    # current directory, which is not the test project directory on macOS
+    # (bin/Render there is the Render_mac.sh wrapper).  Maya's -rd is applied
+    # to productName by mayaHydra.renderSettings.output.setRenderDirectory(),
+    # so an absolute -rd makes every product path absolute.  Same workaround,
+    # and same caller-wins rule, as mayaHydra_add_cmd_line_render_test().
+    string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+    set(RENDERED_IMAGE_DIR
+        "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}/${RENDERED_IMAGE_SUBDIR}")
+    if(NOT ARG_RENDERER_ARGS MATCHES "(^| )-rd( |$)")
+        set(ARG_RENDERER_ARGS "${ARG_RENDERER_ARGS} -rd \"${RENDERED_IMAGE_DIR}\"")
+    endif()
+
     set(SCENE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scenes)
     set(SCENE_PATH ${SCENE_DIR}/${SCENE_FILE})
 

@@ -249,6 +249,15 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
     if(folder STREQUAL "storm")
         set(singlecam_fail_args "")
     endif()
+    # Hydra v2 render settings rendering needs an absolute -rd path for
+    # predictable rendered image location.  HdStorm uses Hydra v1
+    # render settings, for which MayaHydra resolves relative paths.
+    cmake_path(GET singlecam_scene STEM singlecam_stem)
+    set(singlecam_renderdir "images/aSubDirectory")
+    if(NOT folder STREQUAL "storm")
+        set(singlecam_renderdir
+            "${TEST_OUTPUT_ROOT}/${singlecam_stem}_${suffix}RenderDir/projects/default/images/aSubDirectory")
+    endif()
     mayaHydra_add_cmd_line_render_multi_image_test(${singlecam_scene}${dep_label}
         RENDERER ${renderer}
         EXPECTED_IMAGES_DIR renderSettings/${folder}/images/singleCam_frames5to9
@@ -256,7 +265,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         IMAGE_EXTENSION png
         TEST_NAME_SUFFIX ${suffix}RenderDir
         ${singlecam_fail_args}
-        RENDERER_ARGS "-rd images/aSubDirectory"
+        RENDERER_ARGS "-rd \"${singlecam_renderdir}\""
     )
 
     # Test -im with an animated scene.
@@ -282,29 +291,22 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
 
     if(_add_frame_nb_resolution)
         set(frame_nb_scene "renderSettings/${folder}/frameNbResolution.ma")
+        # Arnold renders frames 9 to 11, whose baselines cover the #, ## and ###
+        # padding widths across the one to two digit frame number boundary.
+        # PRMan renders frame 9 only.
+        set(frame_nb_range "-s 9 -e 9")
         if(folder STREQUAL "arnold")
-            mayaHydra_add_cmd_line_render_multi_image_test(${frame_nb_scene}${dep_label}
-                RENDERER ${renderer}
-                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frameNbResolution
-                IMAGE_EXTENSION png
-                TEST_NAME_SUFFIX ${suffix}
-                FAIL 0.05
-                FAILPERCENT 1.0
-                # Hydra v2 does not resolve relative render product paths.
-                RENDERER_ARGS
-                    "-s 9 -e 11 -rd \"${TEST_OUTPUT_ROOT}/frameNbResolution_${suffix}/projects/default/images\""
-            )
-        else()
-            mayaHydra_add_cmd_line_render_multi_image_test(${frame_nb_scene}${dep_label}
-                RENDERER ${renderer}
-                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frameNbResolution
-                IMAGE_EXTENSION png
-                TEST_NAME_SUFFIX ${suffix}
-                FAIL 0.05
-                FAILPERCENT 1.0
-                RENDERER_ARGS "-s 9 -e 9"
-            )
+            set(frame_nb_range "-s 9 -e 11")
         endif()
+        mayaHydra_add_cmd_line_render_multi_image_test(${frame_nb_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frameNbResolution
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}
+            FAIL 0.05
+            FAILPERCENT 1.0
+            RENDERER_ARGS "${frame_nb_range}"
+        )
     endif()
 endfunction()
 
