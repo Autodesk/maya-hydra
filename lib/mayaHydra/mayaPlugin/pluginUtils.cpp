@@ -214,8 +214,30 @@ bool registerRenderer(const MtohRendererDescription& desc)
            << " -addGlobalsTab Common createMayaSoftwareCommonGlobalsTab updateMayaSoftwareCommonGlobalsTab"
            << " " << desc.rendererName;
 
-    if (MGlobal::executeCommand(cmdStr.str().c_str()) != MS::kSuccess) {
-        return false;
+    // [DEBUG-hydra2445] Diagnose HYDRA-2445: confirm whether the 'renderer'
+    // registration command succeeds, and whether Maya reports the renderer as
+    // existing immediately afterwards (i.e. registration took effect
+    // synchronously, before initializePlugin() returns to its caller).
+    {
+        MStatus regStatus = MGlobal::executeCommand(cmdStr.str().c_str());
+        if (regStatus != MS::kSuccess) {
+            MGlobal::displayWarning(MString(TfStringPrintf(
+                "[DEBUG-hydra2445] registerRenderer: 'renderer' command FAILED for %s, "
+                "status=%s, cmd=%s",
+                desc.rendererName.GetText(),
+                regStatus.errorString().asChar(),
+                cmdStr.str().c_str()).c_str()));
+            return false;
+        }
+        bool existsNow = false;
+        std::ostringstream existsCmd;
+        existsCmd << "renderer -exists " << desc.rendererName;
+        MGlobal::executeCommand(existsCmd.str().c_str(), existsNow);
+        MGlobal::displayWarning(MString(TfStringPrintf(
+            "[DEBUG-hydra2445] registerRenderer: 'renderer' command OK for %s, "
+            "'renderer -exists' immediately after = %s",
+            desc.rendererName.GetText(),
+            existsNow ? "true" : "FALSE").c_str()));
     }
 
     // Next, define the callback procedures themselves.
@@ -249,8 +271,16 @@ bool registerRenderer(const MtohRendererDescription& desc)
           << "return " << dq << " -r " << rn << " " << dq << ";\n"
           << "}\n";
 
-    if (MGlobal::executeCommand(cbStr.str().c_str()) != MS::kSuccess) {
-        return false;
+    {
+        MStatus cbStatus = MGlobal::executeCommand(cbStr.str().c_str());
+        if (cbStatus != MS::kSuccess) {
+            // [DEBUG-hydra2445]
+            MGlobal::displayWarning(MString(TfStringPrintf(
+                "[DEBUG-hydra2445] registerRenderer: callback-proc command FAILED for %s, status=%s",
+                desc.rendererName.GetText(),
+                cbStatus.errorString().asChar()).c_str()));
+            return false;
+        }
     }
 
     return true;
