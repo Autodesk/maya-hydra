@@ -165,6 +165,14 @@ if(NOT "${MAYAHYDRA_RESOLVED_USD_LOCATION}" STREQUAL "${PXR_USD_LOCATION}")
         "OpenUSD runtime installation used by MayaHydra"
         FORCE
     )
+    # find_package(USD) (via cmake/modules/FindUSD.cmake) already set PXR_USD_LOCATION
+    # as an ordinary (non-cache) variable pointing at the standalone USD install. An
+    # ordinary variable shadows a cache entry of the same name in this scope, so the
+    # CACHE ... FORCE above updates the cache but NOT what ${PXR_USD_LOCATION} resolves
+    # to here. Unset the ordinary variable so subsequent reads (below, and in
+    # cmake/test.cmake) fall through to the resolved cache value instead of the stale
+    # standalone path.
+    unset(PXR_USD_LOCATION)
     set(
         USD_LIBRARY_DIR
         "${PXR_USD_LOCATION}/lib"
