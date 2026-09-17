@@ -35,7 +35,7 @@ using namespace MayaHydra;
 // What:   A selection-highlight wire whose first translation was deferred gets its transform.
 // How:    Python leaves a translated cube selected in a shaded panel, forces "ogs -reset" so the
 //         DormantPolyWire reaches the scene index for the first time while the shape is selected
-//         (which is what makes isLegacySelectionHighlightWire() skip it), then switches the panel
+//         (which is what makes isReplaceableHighlightWireShape() classify it as skippable), then switches the panel
 //         to wireframe so reconsiderSkippedHighlightWires recovers it from a thin delta.
 // Expect: the wire prim exists and its xform matches the shape's world matrix.
 //

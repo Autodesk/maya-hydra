@@ -143,33 +143,37 @@ constexpr std::array<std::string_view, 2> kSelectionHighlightWireNames = {
     "DormantIsoparmWire"   // NURBS surface
 };
 
-// True when this item is the wireframe VP2 uses as the object-level selection highlight *and* the
-// outline has taken that job over, i.e. the wire carries nothing the outline does not already draw.
-// Deliberately independent of any panel's display style: whether such a wire is still needed and
-// whether it is visible in the panel being drawn are different questions with different scopes (see
-// RenderItemUpdateOptions), and displayStatus() below must run only once to answer both.
-// Items not named in kSelectionHighlightWireNames are always false, which keeps bounding boxes,
-// hulls and cages untouched.
-bool isLegacySelectionHighlightWire(
-    const char*                                         itemName,
-    const MDagPath&                                     itemDagPath,
-    const MayaHydraSceneIndex::RenderItemUpdateOptions& options)
+// Whether the item's name is one VP2 gives its object-level selection-highlight wire. Items not
+// named in kSelectionHighlightWireNames are always false, which keeps bounding boxes, hulls and
+// cages untouched.
+//
+// Split out from isReplaceableHighlightWireShape below and kept free of any Maya DAG access, so the
+// hot loop can reject the ~all of items that are not candidates before materializing an MDagPath:
+// MRenderItem::sourceDagPath() returns by value, so the temporary is a real construction per changed
+// item per frame.
+bool isSelectionHighlightWireName(const char* itemName)
 {
-    if (options.legacyMayaNativeHighlightEnabled) {
-        return false;
-    }
-
     if (!itemName) {
         return false;
     }
     const std::string_view name(itemName);
-    if (std::none_of(
-            kSelectionHighlightWireNames.begin(),
-            kSelectionHighlightWireNames.end(),
-            [name](std::string_view candidate) { return candidate == name; })) {
-        return false;
-    }
+    return std::any_of(
+        kSelectionHighlightWireNames.begin(),
+        kSelectionHighlightWireNames.end(),
+        [name](std::string_view candidate) { return candidate == name; });
+}
 
+// True when a wire whose name already matched is one the outline has taken the job of, i.e. it
+// carries nothing the outline does not already draw.
+//
+// Deliberately independent of any panel's display style: whether such a wire is still needed and
+// whether it is visible in the panel being drawn are different questions with different scopes (see
+// RenderItemUpdateOptions), and displayStatus() below must run only once to answer both.
+//
+// The caller owns the name test and the "is the legacy highlight enabled" short circuit; this is the
+// half that costs Maya DAG queries.
+bool isReplaceableHighlightWireShape(const MDagPath& itemDagPath)
+{
     if (!itemDagPath.isValid()) {
         return false;
     }
@@ -567,9 +571,6 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         }
 
         auto& ri = *scene.mItems[i];
-        // Hoisted above the new-adapter block below, which is not its only reader: the
-        // highlight-wire classification needs the name on every delta, not just the first one.
-        const MString riName = ri.name();
         int fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
@@ -586,11 +587,27 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             continue;
         }
 
+        // Two readers: the new-adapter block below, and the highlight-wire classification -- which is
+        // a no-op while the legacy highlight is enabled. MRenderItem::name() returns by value, so
+        // fetching it unconditionally is an MString construction per changed item per frame, wasted
+        // in Legacy mode for every item that is not new.
+        const bool classifyHighlightWire = !options.legacyMayaNativeHighlightEnabled;
+        MString    riName;
+        if (isNewRenderitem || classifyHighlightWire) {
+            riName = ri.name();
+        }
+
         // VP2 draws its own selection highlighting by making the shape's wireframe item visible in
         // the selection color, so when something else owns the highlight that wire must stop acting
         // as one or the object is highlighted twice.
-        const bool isHighlightWire
-            = isLegacySelectionHighlightWire(riName.asChar(), ri.sourceDagPath(), options);
+        //
+        // Name first, DAG path second: sourceDagPath() also returns by value, and ~every item that
+        // reaches here is not a highlight wire, so testing the name before materializing the path
+        // keeps that construction off the hot path.
+        bool isHighlightWire = false;
+        if (classifyHighlightWire && isSelectionHighlightWireName(riName.asChar())) {
+            isHighlightWire = isReplaceableHighlightWireShape(ri.sourceDagPath());
+        }
         const bool neededByAnyPanel = !isHighlightWire || options.anyViewportDrawsWireframes;
         const bool visibleInThisPanel = !isHighlightWire || options.viewportDrawsWireframes;
 
@@ -730,6 +747,16 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColorDirty);
         ria->UpdateFromDelta(data);
 
+        // Recorded on the adapter so RefreshRenderItemLegacyHighlightTreatment does not have to
+        // recompute it: that walk covers every adapter, and the classification costs a DAG query per
+        // item. Set here rather than where isHighlightWire is computed, because for a new render item
+        // the adapter does not exist yet at that point.
+        //
+        // Only written on frames where this item had a delta. That is enough: the classification
+        // depends on the shape's selection state, and a change to that arrives as a delta for this
+        // very wire -- the same assumption reconsiderSkippedHighlightWires already relies on.
+        ria->SetIsReplaceableHighlightWire(isHighlightWire);
+
         // After UpdateFromDelta, so that a visibility change coming from VP2 in this same delta does
         // not overwrite this one.
         ria->SetWireframeSelectionHighlightEnabled(visibleInThisPanel);
@@ -747,9 +774,16 @@ void MayaHydraSceneIndex::RefreshRenderItemLegacyHighlightTreatment(
             continue;
         }
 
+        // Reads the classification UpdateRenderItems cached on the adapter rather than recomputing
+        // it. The expensive half is MGeometryUtilities::displayStatus(), a DAG query per item, and
+        // this walk runs on every treatment change -- which for two panels in different display
+        // styles is every frame. The legacyMayaNativeHighlightEnabled test is redundant with the
+        // cached value, which is false throughout Legacy mode, and is kept only so that this reads
+        // correctly on its own.
+        const bool replaceable
+            = !options.legacyMayaNativeHighlightEnabled && ria->GetIsReplaceableHighlightWire();
         ria->SetWireframeSelectionHighlightEnabled(
-            !isLegacySelectionHighlightWire(ria->Name(), ria->GetDagPath(), options)
-            || options.viewportDrawsWireframes);
+            !replaceable || options.viewportDrawsWireframes);
     }
 }
 

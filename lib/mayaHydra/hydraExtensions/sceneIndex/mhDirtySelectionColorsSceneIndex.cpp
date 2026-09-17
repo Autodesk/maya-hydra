@@ -79,6 +79,14 @@ void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(
     HdSceneIndexObserver::DirtiedPrimEntries&   inoutDirtiedPrimEntries,
     std::unordered_set<SdfPath, SdfPath::Hash>& inoutVisited) const
 {
+    // Instancer prototypes are ordinary prims in the scene index namespace, so a walk seeded at the
+    // absolute root already reaches them through GetChildPrimPaths below. The probe further down
+    // earns its cost only for a subtree whose instancer points at prototypes outside that subtree,
+    // which cannot happen from the root -- and it costs one GetPrim() per prim visited, each
+    // traversing the whole filtering chain. Skipping it is what keeps the whole-scene invalidation
+    // from paying that per prim.
+    const bool followInstancerPrototypes = (primPath != SdfPath::AbsoluteRootPath());
+
     // path can be a hierarchy of prim paths so we need to get all children prim paths
     std::stack<SdfPath> pathsToDirty({ primPath });
     while (!pathsToDirty.empty()) {
@@ -92,7 +100,11 @@ void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(
         for (const auto& childPath : GetChildPrimPaths(currPathToDirty)) {
             pathsToDirty.push(childPath);
         }
-        
+
+        if (!followInstancerPrototypes) {
+            continue;
+        }
+
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPathToDirty);
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
             HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);

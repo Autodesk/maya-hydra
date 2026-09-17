@@ -236,6 +236,39 @@ bool viewportDrawsWireframes(unsigned int displayStyle)
     return (displayStyle & wireframeDrawingBits) != 0;
 }
 
+//! \brief  Whether \p path is at or below any entry of \p sortedSelectedPaths.
+//!
+//! \p sortedSelectedPaths must be sorted with SdfPath's default (std::less) ordering, which is what
+//! Selection::GetFullySelectedPaths() returns -- it iterates a std::map<SdfPath, ...>.
+//!
+//! Replaces a linear HasPrefix() scan over the selection. Walks \p path's own ancestors instead and
+//! binary-searches each, so the cost is O(depth * log n) rather than O(n). Worth it because this runs
+//! on every hover change, i.e. every time the cursor crosses an object boundary, and prim depths are
+//! small while selections are not.
+//!
+//! Equivalent to the scan it replaces: selection entries are prim paths, so "is an ancestor of" and
+//! "is a prefix of" coincide, and walking GetParentPath() enumerates exactly the prefixes that can be
+//! prim paths.
+bool isPathInSelection(const SdfPathVector& sortedSelectedPaths, const SdfPath& path)
+{
+    if (sortedSelectedPaths.empty() || path.IsEmpty()) {
+        return false;
+    }
+    for (SdfPath p = path; !p.IsEmpty();) {
+        if (std::binary_search(sortedSelectedPaths.begin(), sortedSelectedPaths.end(), p)) {
+            return true;
+        }
+        // GetParentPath() of the absolute root is itself, so stop on the fixed point rather than
+        // testing IsAbsoluteRootPath() and losing the root as a candidate.
+        const SdfPath parent = p.GetParentPath();
+        if (parent == p) {
+            break;
+        }
+        p = parent;
+    }
+    return false;
+}
+
 //! \brief  Post-multiply onto a projection matrix so the pick region fills the whole viewport.
 MMatrix pickProjectionMatrix(
     const MMatrix& projMatrix,
@@ -346,7 +379,10 @@ public:
         if (token == FvpColorPreferencesTokens->wireframeSelection
             || token == FvpColorPreferencesTokens->wireframeSelectionSecondary
             || token == FvpColorPreferencesTokens->polymeshDormant) {
-            _renderOverride.ColorPreferencesChanged();
+            // Forwarded rather than collapsed to a bare "something changed": the three differ in how
+            // far they reach, and treating them alike is what made a selection-color edit walk the
+            // whole scene.
+            _renderOverride.ColorPreferencesChanged(token);
         }
     }
 
@@ -1296,8 +1332,16 @@ MStatus MtohRenderOverride::Render(
                 _needToReplaceSelection = true;
             }
             //Update the leadObjectTacker in case it could not find the current lead object which could be in a custom data producer scene index or a maya usd proxy shape scene index
-            if (_leadObjectPathTracker){
-                _leadObjectPathTracker->updatePrimSelections();
+            if (_leadObjectPathTracker && _leadObjectPathTracker->updatePrimSelections()) {
+                // The lead resolved only now, frames after the selection change that produced it, and
+                // no selection notification accompanies that -- so nothing else flags the outline
+                // inputs. Without this the lead object keeps the ordinary selected colour instead of
+                // the lead colour until the next selection change, or until a hover move happens to
+                // trigger a push for its own reasons.
+                //
+                // Consumed later in this same frame (see selectionChanged below), so the corrected
+                // lead is pushed on the frame it resolves rather than the next one.
+                _outlineInputsDirty = true;
             }
         }
     }
@@ -1395,8 +1439,13 @@ MStatus MtohRenderOverride::Render(
     const bool usingBBoxMode = (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox) != 0;
     _bboxSceneIndex->Enable(usingBBoxMode);
 
+    // Keyed on the setup() destination, which is what _RemovePanel erases and what _hoverStates and
+    // _hoverEventFilters use. renderingDestination() agrees with it for a model panel, but keying
+    // on that instead means a divergence leaves entries no _RemovePanel call can reach -- and
+    // _AnyPanelDrawsWireframes would keep answering from panels that no longer exist.
+    // panelNameStr remains the fallback for the (unobserved) case of an empty destination.
     const std::string panelKey
-        = panelNameStr.empty() ? std::string(_currentPanelName.asChar()) : panelNameStr;
+        = (_currentPanelName.length() > 0) ? std::string(_currentPanelName.asChar()) : panelNameStr;
     const auto         oldStyleIt = _oldDisplayStyles.find(panelKey);
     const unsigned int oldDisplayStyle
         = (oldStyleIt != _oldDisplayStyles.end()) ? oldStyleIt->second : 0u;
@@ -1406,43 +1455,114 @@ MStatus MtohRenderOverride::Render(
     renderItemOptions.anyViewportDrawsWireframes
         = _AnyPanelDrawsWireframes(panelKey, currentDisplayStyle);
 
+    // Fetched at most once per frame. Two consumers below need the fully-selected paths -- the
+    // colour invalidation delta and the outline inputs -- and Selection::GetFullySelectedPaths()
+    // walks the whole selection map and constructs an SdfPath per entry on every call, so the
+    // previous two unconditional calls per selection-change frame were one walk too many.
+    std::optional<SdfPathVector> cachedFullySelectedPaths;
+    auto                         getFullySelectedPaths = [&]() -> const SdfPathVector& {
+        if (!cachedFullySelectedPaths) {
+            cachedFullySelectedPaths = _selection->GetFullySelectedPaths();
+
+            // Already sorted: GetFullySelectedPaths() iterates Selection::_pathToSelections, a
+            // std::map<SdfPath, ...> (fvpSelection.h:46) keyed with std::less<SdfPath>. That is the
+            // ordering both set_symmetric_difference and isPathInSelection() require. Asserted
+            // rather than re-sorted so a change of container type fails loudly in a debug build
+            // instead of silently producing a wrong answer.
+            TF_DEV_AXIOM(
+                std::is_sorted(cachedFullySelectedPaths->begin(), cachedFullySelectedPaths->end()));
+        }
+        return *cachedFullySelectedPaths;
+    };
+
+    // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
+    // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
+    // Refinement level for Hydra is set in Hydra Render Globals
+    const MFrameContext::WireOnShadedMode wireOnShadedMode
+        = MFrameContext::wireOnShadedMode(); // Get the user preference
+
+    // Derived from the panel being drawn, then compared against what is installed -- deliberately
+    // not against this panel's previous style. _reprSelectorSceneIndex is one scene index shared by
+    // every panel, so a per-panel style memo lets the last panel to transition decide the repr for
+    // all of them: with panel1 in wireframe and panel2 shaded, each panel's style stops "changing"
+    // after its own first frame and the repr freezes at whichever was pushed last. Same shape as
+    // _appliedRenderItemTreatment below and the isolate select scene index above: one shared thing,
+    // re-pointed at the viewport being drawn.
+    ReprTreatment wantedRepr { Fvp::ReprSelectorSceneIndex::RepSelectorType::Default,
+                               /*needsReprChanged=*/false,
+                               delegateParams.refineLevel };
+    if ((currentDisplayStyle & MHWRender::MFrameContext::kWireFrame)
+        && ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded)
+            || (currentDisplayStyle & MHWRender::MFrameContext::kTextured))) {
+        // Wireframe on top of shaded
+        wantedRepr.reprType
+            = (MFrameContext::WireOnShadedMode::kWireframeOnShadedFull == wireOnShadedMode)
+            ? Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined
+            : Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface;
+        wantedRepr.needsReprChanged = true;
+    } else if (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) {
+        // wireframe only, not on top of shaded
+        wantedRepr.reprType = Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined;
+        wantedRepr.needsReprChanged = true;
+    }
+
+    // Hoisted above the colour blocks, which both need it: SetReprType() dirties every prim on its
+    // own, so a whole-scene colour invalidation in the same frame would be a second redundant walk.
+    const bool reprWillBePushed = _reprSelectorSceneIndex
+        && (!_appliedReprTreatment || *_appliedReprTreatment != wantedRepr);
+
+    // Which prims pull a wireframe colour depends entirely on the display style.
+    // ReprSelectorSceneIndex::GetPrim pulls one for every mesh, but only while needsReprChanged;
+    // BboxSceneIndex only in bounding box mode. In shaded and textured modes the only consumers are
+    // the *WhSi highlight prims, which exist for selected prims and only in Legacy mode.
+    const bool pullsWireframeColorPerPrim = wantedRepr.needsReprChanged || usingBBoxMode;
+
     // A prim's wireframe color is pulled once and only re-pulled when the prim is dirtied, so a
     // selection change has to invalidate the prims involved or their color goes stale.
     //
     // Done here rather than in SelectionChanged() for two reasons: the Fvp selection is guaranteed
     // to have been updated by now, and scene index mutation belongs on the render thread.
     //
+    // The cache is refreshed here rather than in ColorPreferencesChanged() because
+    // MayaColorPreferencesTranslator::syncPreferences() notifies before storing the new value, so a
+    // color read during the notification still returns the old one.
+    const bool selectionColorPrefChanged = _selectionWireframeColorsDirty.exchange(false);
+    const bool dormantColorPrefChanged = _dormantWireframeColorDirty.exchange(false);
+    if ((selectionColorPrefChanged || dormantColorPrefChanged) && _wireframeColorInterfaceImp) {
+        _wireframeColorInterfaceImp->RefreshColors();
+    }
+
+    if (selectionColorPrefChanged && _selection && _dirtySelectionColorsSceneIndex) {
+        // wireframeSelection / wireframeSelectionSecondary are pulled only by prims that are
+        // selected and by the *WhSi highlight prims under _highlightHierarchyPrefix. Dirtying from
+        // the root instead -- as this used to -- repaints the whole scene to change the colour of
+        // the selection, and Maya's colour UI notifies continuously while a swatch is dragged.
+        SdfPathVector        selectionColorConsumers { _highlightHierarchyPrefix };
+        const SdfPathVector& selected = getFullySelectedPaths();
+        selectionColorConsumers.insert(
+            selectionColorConsumers.end(), selected.begin(), selected.end());
+        _dirtySelectionColorsSceneIndex->dirtySelectionRelatedPrims(selectionColorConsumers);
+    }
+
+    if (dormantColorPrefChanged && _dirtySelectionColorsSceneIndex && pullsWireframeColorPerPrim
+        && !reprWillBePushed) {
+        // The dormant colour genuinely is pulled by every prim, so this one does need the root walk
+        // -- but only while the display style pulls a wireframe colour at all, and only when
+        // SetReprType() below is not about to dirty everything for us. The flag is dropped rather
+        // than deferred in the other cases: entering a style that pulls a per-prim wireframe colour
+        // goes through SetReprType() or BboxSceneIndex::Enable(), both of which dirty every prim.
+        _dirtySelectionColorsSceneIndex->dirtySelectionRelatedPrims(
+            { SdfPath::AbsoluteRootPath() });
+    }
+
     // Only the prims that were selected or deselected need it. One that stayed selected cannot have
     // changed color, and a change of lead among them goes through
     // dirtyLeadObjectRelatedSelections() instead. Dirtying a path walks its whole subtree, so the
     // difference matters: adding one object to a large selection would otherwise re-walk all of it.
     //
     // _previouslySelectedPaths is kept sorted so only the incoming list has to be.
-    //
-    // A color preference change is the exception: it repaints every prim that pulls a wireframe
-    // color, dormant ones included, so it dirties from the root instead of a selection delta.
-    //
-    // The cache is refreshed here rather than in ColorPreferencesChanged() because
-    // MayaColorPreferencesTranslator::syncPreferences() notifies before storing the new value, so a
-    // color read during the notification still returns the old one.
-    if (_wireframeColorsDirty.exchange(false)) {
-        if (_wireframeColorInterfaceImp) {
-            _wireframeColorInterfaceImp->RefreshColors();
-        }
-        if (_dirtySelectionColorsSceneIndex) {
-            _dirtySelectionColorsSceneIndex->dirtySelectionRelatedPrims(
-                { SdfPath::AbsoluteRootPath() });
-        }
-    }
     if (_selection && _dirtySelectionColorsSceneIndex && _selectionColorsDirty.exchange(false)) {
-        SdfPathVector currentlySelected = _selection->GetFullySelectedPaths();
-
-        // Already sorted: GetFullySelectedPaths() iterates Selection::_pathToSelections, a
-        // std::map<SdfPath, ...> (fvpSelection.h:46) keyed with std::less<SdfPath>, which is the
-        // ordering set_symmetric_difference below requires. Asserted rather than re-sorted so a
-        // change of container type fails loudly in a debug build instead of silently producing a
-        // wrong symmetric difference.
-        TF_DEV_AXIOM(std::is_sorted(currentlySelected.begin(), currentlySelected.end()));
+        const SdfPathVector& currentlySelected = getFullySelectedPaths();
 
         SdfPathVector selectionStateChanged;
         std::set_symmetric_difference(
@@ -1455,36 +1575,13 @@ MStatus MtohRenderOverride::Render(
         if (!selectionStateChanged.empty()) {
             _dirtySelectionColorsSceneIndex->dirtySelectionRelatedPrims(selectionStateChanged);
         }
-        _previouslySelectedPaths = std::move(currentlySelected);
+        _previouslySelectedPaths = currentlySelected;
     }
 
-    // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
-    // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
-    // Refinement level for Hydra is set in Hydra Render Globals
-    const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
-    if ( (_reprSelectorSceneIndex && (currentDisplayStyle != oldDisplayStyle) ) || (delegateParams.refineLevel != _oldRefineLevel)){
-        if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) &&
-            ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) ||
-            (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
-                // Wireframe on top of shaded
-                if (MFrameContext::WireOnShadedMode::kWireframeOnShadedFull == wireOnShadedMode) {
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined,
-                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
-                } else {
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface,
-                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
-                }
-            }
-            else if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) ) {
-                    //wireframe only, not on top of shaded
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined,
-                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
-                }
-            else // Shaded mode
-                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default,
-                                                     /*needsReprChanged=*/false, delegateParams.refineLevel);
-
-        _oldRefineLevel = delegateParams.refineLevel;
+    if (reprWillBePushed) {
+        _reprSelectorSceneIndex->SetReprType(
+            wantedRepr.reprType, wantedRepr.needsReprChanged, wantedRepr.refineLevel);
+        _appliedReprTreatment = wantedRepr;
     }
 
     // Maya does not re-send unchanged render items, so UpdateRenderItems cannot fix up the
@@ -1500,8 +1597,17 @@ MStatus MtohRenderOverride::Render(
     // Comparing the derived booleans rather than raw style bits also drops the need for a
     // relevant-bits mask -- toggling X-ray or backface culling does not change
     // viewportDrawsWireframes, so it cannot trigger a walk.
+    //
+    // viewportDrawsWireframes is normalized out when the legacy highlight is enabled: UpdateRenderItems
+    // skips the highlight-wire classification entirely in that mode, so every adapter's cached
+    // "replaceable" flag is false and the refresh sets every bit to true either way. Without this,
+    // two panels in different display
+    // styles walk every adapter on every frame to compute the same answer -- which is the only
+    // behaviour on macOS and USD 24.11, where Legacy is the sole mode.
     const RenderItemTreatment wantedTreatment { renderItemOptions.legacyMayaNativeHighlightEnabled,
-                                                renderItemOptions.viewportDrawsWireframes };
+                                                renderItemOptions.legacyMayaNativeHighlightEnabled
+                                                    ? false
+                                                    : renderItemOptions.viewportDrawsWireframes };
     if (_mayaHydraSceneIndex
         && (!_appliedRenderItemTreatment || *_appliedRenderItemTreatment != wantedTreatment)) {
         // Re-treats the wires that were translated. Those never translated, because no panel needed
@@ -1514,8 +1620,8 @@ MStatus MtohRenderOverride::Render(
     // turn a wire no panel previously needed into one that must now be translated. The other ways a
     // skipped wire becomes relevant do not need it -- a deselection arrives as an ordinary render
     // item delta, and a highlight-mode switch rebuilds resources and issues "ogs -reset".
-    renderItemOptions.reconsiderSkippedHighlightWires
-        = !viewportDrawsWireframes(oldDisplayStyle) && renderItemOptions.viewportDrawsWireframes;
+    renderItemOptions.reconsiderSkippedHighlightWires = !viewportDrawsWireframes(oldDisplayStyle)
+        && renderItemOptions.viewportDrawsWireframes;
 
     // Set MSAA as per Maya AntiAliasing settings
     const bool isMultiSampled
@@ -1725,11 +1831,35 @@ MStatus MtohRenderOverride::Render(
         // an empty hover and need nothing, while switching to or from the hovered panel does.
         if (outlineLive && (selectionChanged || wantedHoverPath != _pushedOutlineHoverPath)) {
             HVT_NS::Outline::OutlineInputs inputs;
-            inputs.selectedPaths = _selection->GetFullySelectedPaths();
+
+            // Rebuilt only on the pushes where the selection actually changed. The other trigger for
+            // this block is a hover move, which happens every time the cursor crosses an object
+            // boundary and leaves the selection untouched -- and GetFullySelectedPaths() walks the
+            // whole selection map to build a fresh vector, so rebuilding it there would scale the
+            // per-mouse-move cost with the selection size.
+            //
+            // selectionChanged is true on the first push after every Install (_outlineInputsDirty is
+            // set there) and after every ClearHydraResources, so the cache is never read unseeded.
+            if (selectionChanged) {
+                _pushedOutlineSelectedPaths = getFullySelectedPaths();
+            }
+            inputs.selectedPaths = _pushedOutlineSelectedPaths;
+
             // Set the lead (last-selected) object
+            //
+            // Deliberately re-read on every push rather than cached alongside the selection above.
+            // getLeadObjectPrimSelections() is an inline accessor returning a reference, so there is
+            // nothing to save by caching it -- and the lead does not only change on a selection
+            // change: it can resolve later, when a data producer scene index carrying it is added
+            // (see updatePrimSelections() above). That path now flags the outline inputs, so a cache
+            // would in fact be refreshed, but reading fresh costs nothing and keeps this correct for
+            // any future path that resolves the lead without flagging.
             if (_leadObjectPathTracker) {
                 const auto& leadSelections = _leadObjectPathTracker->getLeadObjectPrimSelections();
                 if (!leadSelections.empty()) {
+                    // Only the first: OutlineInputs::leadPath is a single path, so a lead UFE path
+                    // mapping to several prim selections gets lead colouring on one of them and
+                    // active colouring on the rest. See the doc's Limitations.
                     inputs.leadPath = leadSelections.front().primPath;
                 }
             }
@@ -1749,11 +1879,9 @@ MStatus MtohRenderOverride::Render(
             if (!wantedHoverPath.IsEmpty()) {
                 inputs.hoverPaths = { wantedHoverPath };
                 // A hovered prim already in the selection uses the selected-hover color.
-                inputs.isHoverSelected = std::any_of(
-                    inputs.selectedPaths.begin(), inputs.selectedPaths.end(),
-                    [&wantedHoverPath](const SdfPath& sel) {
-                        return wantedHoverPath == sel || wantedHoverPath.HasPrefix(sel);
-                    });
+                // Binary search rather than a scan: selectedPaths is sorted (asserted where the
+                // selection is fetched), and this runs on every hover change.
+                inputs.isHoverSelected = isPathInSelection(inputs.selectedPaths, wantedHoverPath);
             }
 
             _outlineManager->SetInputs(std::move(inputs));
@@ -2426,6 +2554,11 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // the first post-install comparison whenever the cursor is still over the same prim, and so
     // suppress the push that would have re-established the hover.
     _pushedOutlineHoverPath = SdfPath();
+    // The pushed-selection cache goes with it. Unlike the hover path this is only read on a push
+    // where selectionChanged is false, which cannot be the first push after a reinstall -- but
+    // leaving a scene's worth of paths alive across a File New would be a real leak.
+    _pushedOutlineSelectedPaths.clear();
+    _pushedOutlineSelectedPaths.shrink_to_fit();
     // Reset the legacy wireframe selection-highlight scene indices so stale RefPtrs do not
     // survive across a clear/reinit cycle (e.g. when toggling the selection-highlight mode).
     _geomSubsetWhSi.Reset();
@@ -2436,7 +2569,15 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _piPrototypeWhSi.Reset();
     _oldDisplayStyles.clear();
     _appliedRenderItemTreatment.reset();
-    _oldRefineLevel = 0;
+    // The repr scene index is recreated by _CreateSceneIndicesChainAfterMergingSceneIndex, which
+    // pushes Default and re-seeds this. Resetting here keeps a stale value from suppressing that.
+    _appliedReprTreatment.reset();
+    // The selection delta is computed against this, so carrying paths from the previous scene across
+    // a reinit makes the first post-reinit delta dirty prims that no longer exist. Harmless today --
+    // a dirty entry for a missing prim is walked and discarded -- but every other memo here is reset
+    // and this one silently was not.
+    _previouslySelectedPaths.clear();
+    _previouslySelectedPaths.shrink_to_fit();
 
     // Cleanup passes
 
@@ -2547,6 +2688,11 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
                                                  _wireframeColorInterfaceImp);
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
+    // Record what was just pushed so the first Render() in a shaded panel does not re-push it. A
+    // re-push is a _DirtyAllPrims() over the whole scene, so it is not free.
+    _appliedReprTreatment = ReprTreatment { Fvp::ReprSelectorSceneIndex::RepSelectorType::Default,
+                                            /*needsReprChanged=*/false,
+                                            _globals.delegateParams.refineLevel };
 
     // Setup selection highlight scene indices
     //
@@ -2694,17 +2840,34 @@ void MtohRenderOverride::SelectionChanged(
     _selectionColorsDirty = true;
 }
 
-void MtohRenderOverride::ColorPreferencesChanged()
+void MtohRenderOverride::ColorPreferencesChanged(const TfToken& token)
 {
+    const bool isSelectionColor = (token == FvpColorPreferencesTokens->wireframeSelection)
+        || (token == FvpColorPreferencesTokens->wireframeSelectionSecondary);
+
     // The outline style is derived from the host color preferences; flag it for a rebuild
     // on the next Render and request a redraw so the change is reflected immediately.
-    _outlineStyleDirty = true;
+    //
+    // _BuildOutlineStyle() only reads the two selection colors, so a dormant-color edit cannot change
+    // the style. SetStyle() early-outs on equality anyway, but flagging it would still queue a rebuild
+    // and a comparison per frame until consumed.
+    if (isSelectionColor) {
+        _outlineStyleDirty = true;
+    }
 
     // The legacy wireframe highlighting caches the same preferences, so its cache has to be
     // refreshed and the prims that read from it dirtied: they only re-pull their color when
     // something dirties them, and a color preference change is not otherwise a dirtying event.
     // Both happen in Render(), for the reason given where this flag is consumed.
-    _wireframeColorsDirty = true;
+    //
+    // Split by reach. The two selection colors are pulled only by prims that are selected and by the
+    // *WhSi highlight prims under _highlightHierarchyPrefix; polymeshDormant is pulled by every prim,
+    // but only in a display style that pulls a wireframe color at all.
+    if (isSelectionColor) {
+        _selectionWireframeColorsDirty = true;
+    } else {
+        _dormantWireframeColorDirty = true;
+    }
 
     // Refresh only the panels this override drives, so that one color edit does not queue a full
     // refresh of every viewport once per override. Every MtohRenderOverride has its own

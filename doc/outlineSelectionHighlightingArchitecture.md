@@ -163,10 +163,15 @@ no API to ask it not to. By the time the item reaches
 is an ordinary `MRenderItem` in the `MViewportScene` snapshot, indistinguishable from real geometry
 except by inspection.
 
-Suppression is therefore downstream, in the translator. `isWireframeItemReplacedByOutline()` decides
-whether a given render item is a selection highlight that the outline replaces:
+Suppression is therefore downstream, in the translator. Three tests decide whether a given render item
+is a selection highlight the outline replaces. They are split across two functions plus the caller,
+and the split is deliberate: `MRenderItem::name()` and `MRenderItem::sourceDagPath()` both return *by
+value*, so each is a real object construction per changed item per frame. `UpdateRenderItems()` runs
+the cheap name test first and only materializes the `MDagPath` once the name has matched — which for
+almost every item it never does.
 
-1. **The item is identified by name**, from a deliberately short allowlist:
+1. **The item is identified by name** — `isSelectionHighlightWireName()`, which touches no Maya DAG
+   state — from a deliberately short allowlist:
 
    ```cpp
    constexpr std::array<std::string_view, 2> kSelectionHighlightWireNames = {
@@ -184,14 +189,29 @@ whether a given render item is a selection highlight that the outline replaces:
    The allowlist is not exhaustive on purpose. An unrecognized item is left alone, which means at
    worst a double highlight rather than missing geometry.
 
-2. **The shape must actually be selected**: `MGeometryUtilities::displayStatus()` is `kActive` *or*
-   `kLead` — both are needed, because a single selected object reports `kLead` rather than `kActive`.
-   Component statuses such as `kHilite` are excluded: that wire is component feedback, which the
-   outline does not replace. The status is queried on the shape, resolving a transform through
-   `extendToShape()` rather than rejecting the item, since an unrecognized item keeps VP2's selection
-   colour and double-highlights.
+2. **The shape must actually be selected, and not templated** —
+   `isReplaceableHighlightWireShape()`, the half that costs Maya DAG queries.
+   `MGeometryUtilities::displayStatus()` is `kActive` *or* `kLead` — both are needed, because a single
+   selected object reports `kLead` rather than `kActive`. Component statuses such as `kHilite` are
+   excluded: that wire is component feedback, which the outline does not replace. The status is
+   queried on the shape, resolving a transform through `extendToShape()` rather than rejecting the
+   item, since an unrecognized item keeps VP2's selection colour and double-highlights.
 
-3. **The viewport must draw no wireframes of its own.** `viewportDrawsWireframes()` in
+   A templated shape is rejected before the status query: it is drawn wireframe-only, so its wire *is*
+   the object rather than a highlight over it, and suppressing it would remove the object from the
+   viewport. The same item name serves both roles — on a normally displayed surface the wire appears
+   only once selected, which is what makes it the highlight there.
+
+   The result is cached on the adapter
+   (`MayaHydraRenderItemAdapter::SetIsReplaceableHighlightWire()`), because
+   `RefreshRenderItemLegacyHighlightTreatment()` re-evaluates every adapter and would otherwise repeat
+   this DAG query per item — on every frame, for two panels in different display styles. The cache
+   cannot go stale: a change to the shape's selection state arrives as a delta for this very wire, and
+   a highlight-mode switch recreates every adapter.
+
+3. **The viewport must draw no wireframes of its own** — the caller's decision, not the
+   classification's, which is why it is not folded into either function above.
+   `viewportDrawsWireframes()` in
    [`renderOverride.cpp`](../lib/mayaHydra/mayaPlugin/renderOverride.cpp) tests
    `kWireFrame | kShadeActiveOnly` — the latter counts because it shades only the active object, so
    unselected ones are wireframe whether or not Maya also sets `kWireFrame`. Whenever the viewport
@@ -316,10 +336,23 @@ notification still returns the old one.
 On the next frame `Render()` then:
 
 - rebuilds and pushes the outline style, and
-- refreshes `MhWireframeColorInterfaceImp`'s cached legacy wireframe colours via `RefreshColors()`
-  and dirties from the root, so dormant and selection colours both repaint at once instead of waiting
-  for the next selection change. Those colours are cached because they are queried once per prim
-  whose `displayColor` is re-evaluated, which on a large selection change is a lot of queries.
+- refreshes `MhWireframeColorInterfaceImp`'s cached legacy wireframe colours via `RefreshColors()`,
+  then invalidates the prims that actually pull the colour that changed, so it repaints immediately
+  instead of waiting for the next selection change. Those colours are cached because they are queried
+  once per prim whose `displayColor` is re-evaluated, which on a large selection change is a lot of
+  queries.
+
+  The scope differs by preference, because the consumers do — which is why
+  `ColorPreferencesChanged()` takes the changed token rather than a bare "something changed" flag.
+  `wireframeSelection` and `wireframeSelectionSecondary` are pulled only by the `*WhSi` highlight
+  prims under `_highlightHierarchyPrefix` and by prims that are selected, so only those are dirtied.
+  `polymeshDormant` is pulled by every prim — but only by `ReprSelectorSceneIndex::GetPrim` while
+  `needsReprChanged` (wireframe, wireframe-on-shaded) and by `BboxSceneIndex` in bounding box mode.
+  In shaded and textured modes nothing pulls it, and the whole-scene walk is *dropped* rather than
+  deferred: entering a style that does pull it goes through `SetReprType()` or
+  `BboxSceneIndex::Enable()`, both of which dirty every prim anyway. Scoping matters because Maya's
+  colour UI notifies continuously while a swatch is dragged, so an unscoped root walk repaints the
+  whole scene many times per second.
 
 ### Invalidating selection colours
 
@@ -358,10 +391,24 @@ thread.
   whole-scene prim-ID pass runs every frame and its cost scales with the scene rather than with the
   selection. It remains reachable through the `mayaHydraEnableDefaultOutlines` render global, by
   command, and is deliberately absent from the option box.
-- **`_oldDisplayStyle` is per-override, not per-panel.** With several panels in different display
-  styles, the highlight treatment tracks whichever panel rendered last. This converges rather than
-  churning, because skipping only ever applies to items that were never translated and nothing is
-  removed: an item translated once stays translated.
+- **Shared per-viewport state is re-pointed at the panel being drawn, not memoized per panel.** One
+  `MtohRenderOverride` serves every panel using the renderer, and the render item adapters, the repr
+  selector and the outline manager are all shared by those panels. Each is therefore keyed on *what
+  is currently installed* — `_appliedRenderItemTreatment`, `_appliedReprTreatment`,
+  `_pushedOutlineHoverPath` — and re-pushed when the panel being drawn wants something else. A
+  per-panel display-style memo cannot drive these: each panel's style stops changing after its own
+  first frame, so the shared state would freeze at whatever the last panel to transition set, and a
+  wireframe panel would draw shaded. `_oldDisplayStyles` is kept only for the questions that really
+  are per-panel — `reconsiderSkippedHighlightWires`, and the union behind
+  `anyViewportDrawsWireframes`.
+
+  With several panels in different display styles, re-pushing on every panel switch is the cost of
+  correctness. The treatment memo normalizes away the cases where the re-push would be a no-op:
+  `viewportDrawsWireframes` is excluded from it while the legacy highlight is enabled, because the
+  classification is skipped entirely in that mode and every adapter's bit ends up `true` either way.
+- **Only one lead path is outlined.** `OutlineInputs::leadPath` is a single `SdfPath`, so a lead UFE
+  path that maps to several prim selections gets the lead colour on `leadSelections.front()` and the
+  active colour on the rest. Uncommon, and an HVT API shape rather than a maya-hydra choice.
 - **Component statuses are not treated as selected.** `kActiveTemplate`, `kActiveComponent` and
   `kActiveAffected` all fall through to "keep the wire", the safe direction. An object selected and
   then put into component mode may show both the outline and its VP2 wire.

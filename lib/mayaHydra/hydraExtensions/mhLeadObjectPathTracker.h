@@ -60,8 +60,16 @@ public:
     MAYAHYDRALIB_API
     void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
 
+    /// Resolves the lead object's prim selections if they could not be resolved when the lead was
+    /// set -- for example when the lead object lives in a data producer scene index that had not yet
+    /// been added to the merging scene index. Called after those scene indices are loaded.
+    ///
+    /// \return True if the prim selections changed, i.e. this call is what resolved the lead. Callers
+    ///         holding anything derived from the lead object must refresh it when this returns true:
+    ///         the lead can resolve frames after the selection change that produced it, and no
+    ///         selection notification accompanies that resolution.
     MAYAHYDRALIB_API
-    void updatePrimSelections(); // For example : this is called after the data producer scene indices are loaded
+    bool updatePrimSelections();
 
 private:
     Fvp::PrimSelections             _leadObjectPrimSelections;

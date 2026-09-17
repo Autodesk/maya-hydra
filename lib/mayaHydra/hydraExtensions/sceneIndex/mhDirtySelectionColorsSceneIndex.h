@@ -101,6 +101,10 @@ protected:
     /// shared across every path in one call: a delta can legitimately contain both a prim and its
     /// descendant, and without a call-wide set the shared subtree is walked once per ancestor and
     /// emits duplicate dirty entries.
+    ///
+    /// Instancer prototypes are only followed explicitly when \p primPath is not the absolute root.
+    /// From the root the child walk already reaches them, and the per-prim GetPrim() that finds
+    /// instancers would otherwise be paid for every prim in the scene.
     MAYAHYDRALIB_API
     void _DirtyPrimPathRecursively(
         const PXR_NS::SdfPath&                                      primPath,

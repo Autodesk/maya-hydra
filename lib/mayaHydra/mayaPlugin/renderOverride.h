@@ -178,9 +178,14 @@ public:
     /// hydra viewport.
     void ClearHydraResources(bool fullReset);
     void SelectionChanged(const Ufe::SelectionChanged& notification);
-    /// Called when a host color preference changes, so the outline style can be
-    /// rebuilt and pushed to the OutlineManager on the next Render.
-    void ColorPreferencesChanged();
+    /// Called when a host color preference changes, so the outline style can be rebuilt and pushed
+    /// to the OutlineManager on the next Render.
+    ///
+    /// \param token The preference that changed. Which prims have to be invalidated depends on it:
+    ///        the two selection colors reach only selected prims and the highlight hierarchy, while
+    ///        polymeshDormant is pulled by every prim -- but only in the display styles that pull a
+    ///        wireframe color at all.
+    void ColorPreferencesChanged(const PXR_NS::TfToken& token);
     void SetRenderPurposeTags(const MayaHydraParams& delegateParams)
     {
         _SetRenderPurposeTags(delegateParams);
@@ -425,15 +430,32 @@ private:
     // OutlineManager style only when needed rather than every frame.
     std::atomic<bool>                     _outlineStyleDirty = { true };
 
-    // Set whenever a host color preference changes, so Render invalidates every prim that pulls a
-    // wireframe color rather than only the ones whose selection state changed.
-    std::atomic<bool>                     _wireframeColorsDirty = { false };
+    // Set when a color preference that only reaches *selected* prims changes -- wireframeSelection
+    // or wireframeSelectionSecondary. Render re-reads the cache and invalidates the selection plus
+    // the highlight hierarchy, not the whole scene: nothing else pulls those two colors.
+    std::atomic<bool>                     _selectionWireframeColorsDirty = { false };
+
+    // Set when polymeshDormant changes. That color is pulled by every prim, but only in the display
+    // styles that pull a wireframe color at all -- wireframe, wireframe-on-shaded, bounding box.
+    // In shaded and textured modes nothing pulls it, and Render drops the walk rather than deferring
+    // it: entering a style that does pull one goes through SetReprType() or BboxSceneIndex::Enable(),
+    // both of which dirty every prim anyway.
+    std::atomic<bool>                     _dormantWireframeColorDirty = { false };
 
     /// The hover path currently pushed into the (shared) OutlineManager. Everything else in
     /// OutlineInputs is global -- selection, lead object, excludes -- and at most one panel holds
     /// the cursor, so the hover contribution is the only part that differs between panels.
     /// Comparing it is what replaces pushing inputs every frame. Render thread only.
     PXR_NS::SdfPath                       _pushedOutlineHoverPath;
+
+    /// The selection currently pushed into the OutlineManager, kept so a hover-only push does not
+    /// rebuild it. A hover push happens every time the cursor crosses an object boundary, and
+    /// Selection::GetFullySelectedPaths() walks the whole selection map to construct a fresh vector,
+    /// so rebuilding it there scales the per-mouse-move cost with the selection size.
+    /// Refreshed only on the pushes where the selection actually changed. Render thread only.
+    ///
+    /// The lead path is deliberately *not* cached alongside it; see the push site for why.
+    PXR_NS::SdfPathVector                 _pushedOutlineSelectedPaths;
 
     /// Keyed by panel name. Entries are created and destroyed alongside the hover event filter,
     /// both on the main thread, so the map structure is never mutated concurrently. The fields are
@@ -580,7 +602,32 @@ private:
     };
     std::optional<RenderItemTreatment> _appliedRenderItemTreatment;
 
-    int        _oldRefineLevel {0};
+    /// The repr currently pushed into _reprSelectorSceneIndex, recorded for the same reason as
+    /// _appliedRenderItemTreatment above: one scene index serves every panel, so the trigger has to
+    /// be "the panel being drawn wants something other than what is installed", not "this panel's
+    /// display style changed". Keyed on a per-panel style memo instead, the shared repr keeps
+    /// whatever the last panel to transition set, and a wireframe panel draws shaded from its
+    /// second frame on.
+    ///
+    /// refineLevel is part of the memo rather than a separate member, so a refinement change is the
+    /// same kind of transition as a display-style change.
+    ///
+    /// Empty when nothing has been pushed (fresh resources).
+    struct ReprTreatment
+    {
+        Fvp::ReprSelectorSceneIndex::RepSelectorType reprType;
+        bool                                         needsReprChanged;
+        int                                          refineLevel;
+
+        bool operator==(const ReprTreatment& o) const
+        {
+            return reprType == o.reprType && needsReprChanged == o.needsReprChanged
+                && refineLevel == o.refineLevel;
+        }
+        bool operator!=(const ReprTreatment& o) const { return !(*this == o); }
+    };
+    std::optional<ReprTreatment> _appliedReprTreatment;
+
     bool       _useDefaultMaterial;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
