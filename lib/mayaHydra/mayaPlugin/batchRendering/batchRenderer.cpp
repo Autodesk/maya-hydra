@@ -586,7 +586,14 @@ void BatchRenderer::_ClearHydraResources()
 
     // Only remove information for our dummy batch render viewport, to avoid
     // affecting interactive viewports.
+#ifndef CODE_COVERAGE_WORKAROUND
+    // Removing the render view data drops the last reference on the custom
+    // filtering scene indices chain, which triggers the same
+    // scene-index/render-index destructor crash seen under Windows clang
+    // code coverage builds (see the render index deletion workaround
+    // below), so this is skipped in that configuration.
     Fvp::RenderViewDataManager::Get().RemoveRenderViewData(kBatchRenderDummyPanelName);
+#endif
     
     //Remove the data producer scene indices that apply to all views
     Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViews();
