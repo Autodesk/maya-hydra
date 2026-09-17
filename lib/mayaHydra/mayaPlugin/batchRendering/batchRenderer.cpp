@@ -21,6 +21,7 @@
 
 #include "pluginDebugCodes.h"
 #include "renderSettingsUtils.h"
+#include "envSettings.h"
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/mayaUtils.h>
@@ -537,7 +538,7 @@ void BatchRenderer::_InitHydraResources()
     
     // At time of writing (2026-06-02) only Hydra Arnold understands this
     // token, requires further testing.
-    if (TfGetenvBool("MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS", false)) {
+    if (hdArnoldUseV2RenderSettings()) {
         TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
                      "Render setting " + BatchRenderTokens->renderSettingsSrc.GetString() + " set to " + BatchRenderTokens->hydraSceneRenderSettingsSrc.GetString() + "\n");
 
