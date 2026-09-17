@@ -68,7 +68,7 @@ private:
      *  otherwise. Callers must either pass -renderer/-r explicitly or
      *  author that attribute.
      */
-    PXR_NS::TfToken GetRenderer() const;
+    PXR_NS::TfToken GetRenderer();
 
     std::unique_ptr<BatchRenderer>  _batchRenderer;
     std::unique_ptr<GLRenderWindow> _renderWindow;
