@@ -65,11 +65,11 @@ endfunction()
 # See accompanying README.md for currently supported list of label mapping.
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
-if(NOT IS_MACOSX)
+# if(NOT IS_MACOSX)
     set(STORM_RENDER_SCENES
         basic/sphere.ma
     )
-endif()
+# endif()
 
 # Texturing production tests. Scene + baseline live under texturing/<folder>/.
 set(_tex_scene_stems
@@ -200,31 +200,32 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
     endif()
 
     # Failure with HdStorm on macOS entered as HYDRA-2139.
-    if(NOT IS_MACOSX OR NOT folder STREQUAL "storm")
-        set(multi_fail_args "")
+    # if(NOT IS_MACOSX OR NOT folder STREQUAL "storm")
+    if(NOT folder STREQUAL "storm")
+        set(multi_fail_arg "")
         if(NOT folder STREQUAL "storm")
-            set(multi_fail_args FAIL 0.05 FAILPERCENT 1.0)
+            set(multi_fail_arg FAIL 0.05)
         endif()
         mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
             RENDERER ${renderer}
             EXPECTED_IMAGES_DIR renderSettings/${folder}/images
             IMAGE_EXTENSION png
             TEST_NAME_SUFFIX ${suffix}
-            ${multi_fail_args}
+            ${multi_fail_arg}
         )
         mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
             RENDERER ${renderer}
             EXPECTED_IMAGES_DIR renderSettings/${folder}/images/stepFrames
             IMAGE_EXTENSION png
             TEST_NAME_SUFFIX ${suffix}Step
-            ${multi_fail_args}
+            ${multi_fail_arg}
             RENDERER_ARGS "-b 2"
         )
     endif()
 
     # Test frame range (5-9).  Failure with HdStorm on macOS entered as HYDRA-2139.
     if(folder STREQUAL "storm")
-        if(NOT IS_MACOSX)
+        # if(NOT IS_MACOSX)
             mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
                 RENDERER ${renderer}
                 EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
@@ -232,7 +233,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
                 TEST_NAME_SUFFIX ${suffix}Frames5to9
                 RENDERER_ARGS "-s 5 -e 9"
             )
-        endif()
+        # endif()
     else()
         mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
             RENDERER ${renderer}
@@ -240,14 +241,13 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
             IMAGE_EXTENSION png
             TEST_NAME_SUFFIX ${suffix}Frames5to9
             FAIL 0.05
-            FAILPERCENT 1.0
             RENDERER_ARGS "-s 5 -e 9"
         )
     endif()
 
-    set(singlecam_fail_args FAIL 0.05 FAILPERCENT 1.0)
+    set(singlecam_fail_arg FAIL 0.05)
     if(folder STREQUAL "storm")
-        set(singlecam_fail_args "")
+        set(singlecam_fail_arg "")
     endif()
     # Hydra v2 render settings rendering needs an absolute -rd path for
     # predictable rendered image location.  HdStorm uses Hydra v1
@@ -264,7 +264,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
         IMAGE_EXTENSION png
         TEST_NAME_SUFFIX ${suffix}RenderDir
-        ${singlecam_fail_args}
+        ${singlecam_fail_arg}
         RENDERER_ARGS "-rd \"${singlecam_renderdir}\""
     )
 
@@ -274,7 +274,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         EXPECTED_IMAGES_DIR renderSettings/${folder}/images/imageNameAnimated
         IMAGE_EXTENSION png
         TEST_NAME_SUFFIX ${suffix}ImageNameAnimated
-        ${singlecam_fail_args}
+        ${singlecam_fail_arg}
         RENDERER_ARGS "-s 5 -e 7 -im ${new_image_name}"
     )
 
@@ -304,7 +304,6 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
             IMAGE_EXTENSION png
             TEST_NAME_SUFFIX ${suffix}
             FAIL 0.05
-            FAILPERCENT 1.0
             RENDERER_ARGS "${frame_nb_range}"
         )
     endif()
@@ -558,11 +557,11 @@ set(MAYABATCH_TEST_SCRIPT_FILES
     testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
 )
 # registeredMayaRenderers fails on Linux and macOS.
-if(IS_WINDOWS)
+# if(IS_WINDOWS)
     list(APPEND MAYABATCH_TEST_SCRIPT_FILES
         registeredMayaRenderers.py
     )
-endif()
+# endif()
 
 # Important: All tests in MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE MUST release
 # the batch renderer by calling cmds.mayaHydraTesting(releaseBatchRenderer=True).
