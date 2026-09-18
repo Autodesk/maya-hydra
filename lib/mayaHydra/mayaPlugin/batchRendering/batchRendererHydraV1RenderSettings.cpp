@@ -55,6 +55,23 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
+// The matrices computed here have two known limitations, both specific to
+// Hydra v1 render settings.  Hydra v2 render settings are unaffected: there the
+// camera is consumed from the Hydra scene, where the proxy shape transform is
+// already composed in and attributes are sampled at the frame being rendered.
+//
+// 1. The frustum comes from the UsdGeomCamera alone, so the MayaUsdProxyShape
+//    node's Maya transform is not applied.  A proxy shape with a non-identity
+//    transform therefore renders its geometry with that transform while
+//    positioning the camera without it.  For example, in
+//    test/lib/cmdLineRender/scenes/renderSettings/*/AnimCubeRenderSettings.ma
+//    the AnimCubeCustomMultipleRS transform carries a -90 degree X rotation as
+//    the manual correction for its stage's upAxis = "Z".
+//
+// 2. Attributes are read at UsdTimeCode::Default(), so an animated camera
+//    (transform, focal length, clipping range, ...) is not sampled at the
+//    frame being rendered and keeps its default sample for every frame of the
+//    sequence.
 bool GetUsdCameraMatricesFromPrim(
     const UsdPrim& cameraPrim,
     const Ufe::Path& ufeCameraPath,
