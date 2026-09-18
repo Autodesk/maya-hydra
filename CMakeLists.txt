@@ -165,6 +165,14 @@ if(NOT "${MAYAHYDRA_RESOLVED_USD_LOCATION}" STREQUAL "${PXR_USD_LOCATION}")
         "OpenUSD runtime installation used by MayaHydra"
         FORCE
     )
+    # find_package(USD) (via cmake/modules/FindUSD.cmake) already set PXR_USD_LOCATION
+    # as an ordinary (non-cache) variable pointing at the standalone USD install. An
+    # ordinary variable shadows a cache entry of the same name in this scope, so the
+    # CACHE ... FORCE above updates the cache but NOT what ${PXR_USD_LOCATION} resolves
+    # to here. Unset the ordinary variable so subsequent reads (below, and in
+    # cmake/test.cmake) fall through to the resolved cache value instead of the stale
+    # standalone path.
+    unset(PXR_USD_LOCATION)
     set(
         USD_LIBRARY_DIR
         "${PXR_USD_LOCATION}/lib"
@@ -187,17 +195,14 @@ include(cmake/usd.cmake)
 # which can lead to duplicate imported targets like TBB::tbb.
 set(pxr_FOUND TRUE)
 
+# Header-based feature detection must use USD_INCLUDE_DIR from find_package(USD),
+# not PXR_USD_LOCATION. On macOS, PXR_USD_LOCATION is retargeted to MayaUSD's
+# runtime bundle (libs only, no include/) so duplicate Tf registration is avoided.
 set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE FALSE)
-if (DEFINED PXR_USD_LOCATION)
-    file(GLOB_RECURSE STRING_UTILS_HEADER_PATH
-        LIST_DIRECTORIES FALSE
-        "${PXR_USD_LOCATION}/include/**stringUtils.h")
-
-    file(READ ${STRING_UTILS_HEADER_PATH} STRING_UTILS_HEADER_CONTENTS)
-
-    string(REGEX MATCH "struct TfDecimalToStringConfig" DECIMAL_TO_STRING_MATCH ${STRING_UTILS_HEADER_CONTENTS})
-
-    if (DECIMAL_TO_STRING_MATCH)
+set(_string_utils_header "${USD_INCLUDE_DIR}/pxr/base/tf/stringUtils.h")
+if (USD_INCLUDE_DIR AND EXISTS "${_string_utils_header}")
+    file(READ "${_string_utils_header}" STRING_UTILS_HEADER_CONTENTS)
+    if (STRING_UTILS_HEADER_CONTENTS MATCHES "struct TfDecimalToStringConfig")
         set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE TRUE)
     endif()
 endif()
