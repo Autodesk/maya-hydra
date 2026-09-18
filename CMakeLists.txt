@@ -195,17 +195,14 @@ include(cmake/usd.cmake)
 # which can lead to duplicate imported targets like TBB::tbb.
 set(pxr_FOUND TRUE)
 
+# Header-based feature detection must use USD_INCLUDE_DIR from find_package(USD),
+# not PXR_USD_LOCATION. On macOS, PXR_USD_LOCATION is retargeted to MayaUSD's
+# runtime bundle (libs only, no include/) so duplicate Tf registration is avoided.
 set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE FALSE)
-if (DEFINED PXR_USD_LOCATION)
-    file(GLOB_RECURSE STRING_UTILS_HEADER_PATH
-        LIST_DIRECTORIES FALSE
-        "${PXR_USD_LOCATION}/include/**stringUtils.h")
-
-    file(READ ${STRING_UTILS_HEADER_PATH} STRING_UTILS_HEADER_CONTENTS)
-
-    string(REGEX MATCH "struct TfDecimalToStringConfig" DECIMAL_TO_STRING_MATCH ${STRING_UTILS_HEADER_CONTENTS})
-
-    if (DECIMAL_TO_STRING_MATCH)
+set(_string_utils_header "${USD_INCLUDE_DIR}/pxr/base/tf/stringUtils.h")
+if (USD_INCLUDE_DIR AND EXISTS "${_string_utils_header}")
+    file(READ "${_string_utils_header}" STRING_UTILS_HEADER_CONTENTS)
+    if (STRING_UTILS_HEADER_CONTENTS MATCHES "struct TfDecimalToStringConfig")
         set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE TRUE)
     endif()
 endif()
