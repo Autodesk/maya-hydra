@@ -1,0 +1,120 @@
+//
+// Copyright 2024 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+//Local headers
+#include "mhDirtySelectionColorsSceneIndex.h"
+
+#include <flowViewport/tokens.h>
+
+// Hydra headers
+#include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/usd/sdf/path.h>
+
+#include <stack>
+#include <unordered_set>
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace MAYAHYDRA_NS_DEF {
+
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
+
+static const HdDataSourceLocatorSet primvarsColorsLocatorSet{ primvarsOverrideWireframeColorLocator,
+                                                            HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)
+                                                         };
+
+void MhDirtySelectionColorsSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections)
+{
+    // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
+
+    // One set for the whole call: the previous and current lead selections routinely share a
+    // subtree, and so can two paths within either of them.
+    std::unordered_set<SdfPath, SdfPath::Hash> visited;
+
+    for (const auto& previousLeadObjectPrimSelection : previousLeadObjectPrimSelections) {
+        _DirtyPrimPathRecursively(
+            previousLeadObjectPrimSelection.primPath, dirtiedPrimEntries, visited);
+    }
+    for (const auto& currentLeadObjectPrimSelection : currentLeadObjectPrimSelections) {
+        _DirtyPrimPathRecursively(
+            currentLeadObjectPrimSelection.primPath, dirtiedPrimEntries, visited);
+    }
+
+    if (! dirtiedPrimEntries.empty()){
+        _SendPrimsDirtied(dirtiedPrimEntries);
+    }
+}
+
+void MhDirtySelectionColorsSceneIndex::dirtySelectionRelatedPrims(const SdfPathVector& primPaths)
+{
+    HdSceneIndexObserver::DirtiedPrimEntries   dirtiedPrimEntries;
+    std::unordered_set<SdfPath, SdfPath::Hash> visited;
+    for (const auto& primPath : primPaths) {
+        _DirtyPrimPathRecursively(primPath, dirtiedPrimEntries, visited);
+    }
+
+    if (! dirtiedPrimEntries.empty()){
+        _SendPrimsDirtied(dirtiedPrimEntries);
+    }
+}
+
+void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(
+    const SdfPath&                              primPath,
+    HdSceneIndexObserver::DirtiedPrimEntries&   inoutDirtiedPrimEntries,
+    std::unordered_set<SdfPath, SdfPath::Hash>& inoutVisited) const
+{
+    // Instancer prototypes are ordinary prims in the scene index namespace, so a walk seeded at the
+    // absolute root already reaches them through GetChildPrimPaths below. The probe further down
+    // earns its cost only for a subtree whose instancer points at prototypes outside that subtree,
+    // which cannot happen from the root -- and it costs one GetPrim() per prim visited, each
+    // traversing the whole filtering chain. Skipping it is what keeps the whole-scene invalidation
+    // from paying that per prim.
+    const bool followInstancerPrototypes = (primPath != SdfPath::AbsoluteRootPath());
+
+    // path can be a hierarchy of prim paths so we need to get all children prim paths
+    std::stack<SdfPath> pathsToDirty({ primPath });
+    while (!pathsToDirty.empty()) {
+        auto currPathToDirty = pathsToDirty.top();
+        pathsToDirty.pop();
+        if (!inoutVisited.insert(currPathToDirty).second)
+            continue;
+
+        inoutDirtiedPrimEntries.emplace_back(currPathToDirty, primvarsColorsLocatorSet);
+
+        for (const auto& childPath : GetChildPrimPaths(currPathToDirty)) {
+            pathsToDirty.push(childPath);
+        }
+
+        if (!followInstancerPrototypes) {
+            continue;
+        }
+
+        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPathToDirty);
+        if (currPrim.primType == HdPrimTypeTokens->instancer) {
+            HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
+            if (auto prototypes = instancerTopology.GetPrototypes()) {
+                for (const auto& prototypePath : prototypes->GetTypedValue(0)) {
+                    pathsToDirty.push(prototypePath);
+                }
+            }
+        }
+    }
+}
+
+}//end of namespace MAYAHYDRA_NS_DEF

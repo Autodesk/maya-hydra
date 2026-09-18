@@ -39,11 +39,13 @@
 #include <mayaHydraLib/sceneIndex/mayaViewportSceneIndex.h>
 #include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
 #include <mayaHydraLib/mhLeadObjectPathTracker.h>
-#include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mhDirtySelectionColorsSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
+
+#include <hvt/tasks/outline/outlineManager.h>
 
 #include <flowViewport/fvpFramePassData.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
@@ -80,12 +82,14 @@
 
 #include <maya/MCallbackIdArray.h>
 #include <maya/MDagPath.h>
+#include <maya/MMatrix.h>
 #include <maya/MString.h>
 
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 #include <map>
@@ -97,6 +101,10 @@ UFE_NS_DEF {
 class Path;
 class SelectionChanged;
 class Selection;
+}
+
+namespace MAYAHYDRA_NS_DEF {
+class HoverEventFilter;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -170,6 +178,14 @@ public:
     /// hydra viewport.
     void ClearHydraResources(bool fullReset);
     void SelectionChanged(const Ufe::SelectionChanged& notification);
+    /// Called when a host color preference changes, so the outline style can be rebuilt and pushed
+    /// to the OutlineManager on the next Render.
+    ///
+    /// \param token The preference that changed. Which prims have to be invalidated depends on it:
+    ///        the two selection colors reach only selected prims and the highlight hierarchy, while
+    ///        polymeshDormant is pulled by every prim -- but only in the display styles that pull a
+    ///        wireframe color at all.
+    void ColorPreferencesChanged(const PXR_NS::TfToken& token);
     void SetRenderPurposeTags(const MayaHydraParams& delegateParams)
     {
         _SetRenderPurposeTags(delegateParams);
@@ -184,7 +200,8 @@ public:
     // Utility function to get GPU memory usage stats
     static int GetUsedGPUMemory();
 
-    // Returns scene statistics as a map for the currently active render delegate from Hydra primitives
+    // Returns scene statistics as a map for the currently active render delegate from Hydra
+    // primitives
     static std::map<std::string, int> GetSceneStatistics();
 
     bool                         startOperationIterator() override;
@@ -224,6 +241,64 @@ private:
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
     HdSceneIndexBaseRefPtr _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
     VtValue _GetUsedGPUMemory() const;
+    HVT_NS::Outline::OutlineStyle _BuildOutlineStyle() const;
+
+    /// Whether the pixel outline is the selection-highlight mechanism for this override. Not the
+    /// same as the render global: a non-Storm delegate cannot host the outline tasks.
+    bool _UseOutlineSelectionHighlighting() const;
+
+    /// Whether no selection highlight at all is drawn: neither the outline manager nor the legacy
+    /// wireframe scene indices are installed, while the selection itself is still tracked. The
+    /// no-highlight floor a highlight cost is measured against.
+    bool _SuppressLegacySelectionHighlight() const;
+
+    /// Whether any panel this override drives is currently drawing wireframes.
+    bool _AnyPanelDrawsWireframes(const std::string& currentPanel, unsigned int currentStyle) const;
+
+    /// Whether the per-mouse-move pick runs. Implied by hover highlighting, which consumes the
+    /// resolved path, and additionally forced on by mayaHydraForceEnableInteractiveHitTest, so
+    /// the pick cost is measurable with the draw off. Never gates hover off.
+    bool _HitTestEnabled() const;
+
+    /// Whether the resolved hover path is drawn using outlines.
+    bool _OutlineHoverHightlightingEnabled() const;
+
+    /// Viewport hover state, kept per panel: one MtohRenderOverride serves every panel using the
+    /// renderer, as do _outlineManager and the frame passes, so a single shared state would highlight
+    /// every viewport at once.
+    struct HoverState
+    {
+        // Device pixels, Qt top-left origin; -1 means no hover. _ResolveHoverPath() flips the y.
+        std::atomic<int>  deviceX { -1 };
+        std::atomic<int>  deviceY { -1 };
+        std::atomic<bool> active { false }; // cursor inside viewport, no button held
+        std::atomic<bool> dirty { true };   // re-resolve/re-push hover on the next Render()
+
+        /// View-projection matrix from the last frame that resolved a hover for this panel. A
+        /// stationary cursor sits over a different prim once the view moves, with no mouse event to
+        /// signal it, so Render() compares against this to dirty the hover. Per panel because each
+        /// has its own camera. Render thread only.
+        MMatrix lastViewProjMatrix;
+
+        /// The prim path the last pick resolved for this panel. Reused on frames where nothing
+        /// dirtied the hover, so HdxPickTask does not run again, and across panel switches, so
+        /// returning to the hovered panel costs no pick. Render thread only.
+        PXR_NS::SdfPath resolvedPath;
+    };
+
+    /// The hover state for \p panelName, or nullptr when that panel has none.
+    HoverState* _GetHoverState(const std::string& panelName);
+
+    // Install / remove the hover event filter on a model panel's viewport widget.
+    void _InstallHoverEventFilter(const MString& panelName);
+    void _RemoveHoverEventFilter(const MString& panelName);
+    // Called by the hover event filter (UI thread) with the cursor position in device
+    // pixels; records it and schedules a viewport refresh so Render() picks it up.
+    void _SetHoverPosition(const std::string& panelName, int deviceX, int deviceY, bool active);
+    // Resolve the prim under the cursor into a Hydra prim path with a small pick at the
+    // cursor pixel (HdxPickTask via the outline frame pass). Returns an empty path when
+    // not hovering or the cursor is over background. Drives path-based hover highlighting.
+    PXR_NS::SdfPath _ResolveHoverPath(const MHWRender::MDrawContext& drawContext);
 
     void _PickByRegion(
         MayaHydra::PickHitVector& outHits,
@@ -331,6 +406,69 @@ private:
     std::atomic<bool>                     _playBlasting = { false };
     std::atomic<bool>                     _isConverged = { false };
     std::atomic<bool>                     _needsClear = { false };
+    
+    // These flags exist because OutlineManager is render-thread-only: HVT documents that Install /
+    // SetInputs / SetStyle must all be called from the thread driving the frame pass commit, with
+    // no internal synchronization. Observers (selection, color preferences, the hover event filter)
+    // may therefore only flag work here; the manager itself is touched exclusively from Render().
+
+    // Set whenever the selection (and thus the outline inputs) changes, so Render only
+    // rebuilds and pushes OutlineManager inputs when needed rather than every frame.
+    std::atomic<bool>                     _outlineInputsDirty = { true };
+
+    // Set whenever the selection changes, so Render invalidates the wireframe colors of the prims
+    // involved. Separate from _outlineInputsDirty because this is needed in both highlight modes,
+    // whereas that one is only consumed when the outline is installed.
+    std::atomic<bool>                     _selectionColorsDirty = { true };
+
+    // The fully-selected paths as of the last color invalidation, so the prims that just became
+    // deselected can be dirtied too -- they need to drop the selection color, not only acquire it.
+    // Kept sorted, as one side of the std::set_symmetric_difference that decides what to dirty.
+    PXR_NS::SdfPathVector                 _previouslySelectedPaths;
+
+    // Set whenever a host color preference changes, so Render rebuilds and pushes the
+    // OutlineManager style only when needed rather than every frame.
+    std::atomic<bool>                     _outlineStyleDirty = { true };
+
+    // Set when a color preference that only reaches *selected* prims changes -- wireframeSelection
+    // or wireframeSelectionSecondary. Render re-reads the cache and invalidates the selection plus
+    // the highlight hierarchy, not the whole scene: nothing else pulls those two colors.
+    std::atomic<bool>                     _selectionWireframeColorsDirty = { false };
+
+    // Set when polymeshDormant changes. That color is pulled by every prim, but only in the display
+    // styles that pull a wireframe color at all -- wireframe, wireframe-on-shaded, bounding box.
+    // In shaded and textured modes nothing pulls it, and Render drops the walk rather than deferring
+    // it: entering a style that does pull one goes through SetReprType() or BboxSceneIndex::Enable(),
+    // both of which dirty every prim anyway.
+    std::atomic<bool>                     _dormantWireframeColorDirty = { false };
+
+    /// The hover path currently pushed into the (shared) OutlineManager. Everything else in
+    /// OutlineInputs is global -- selection, lead object, excludes -- and at most one panel holds
+    /// the cursor, so the hover contribution is the only part that differs between panels.
+    /// Comparing it is what replaces pushing inputs every frame. Render thread only.
+    PXR_NS::SdfPath                       _pushedOutlineHoverPath;
+
+    /// The selection currently pushed into the OutlineManager, kept so a hover-only push does not
+    /// rebuild it. A hover push happens every time the cursor crosses an object boundary, and
+    /// Selection::GetFullySelectedPaths() walks the whole selection map to construct a fresh vector,
+    /// so rebuilding it there scales the per-mouse-move cost with the selection size.
+    /// Refreshed only on the pushes where the selection actually changed. Render thread only.
+    ///
+    /// The lead path is deliberately *not* cached alongside it; see the push site for why.
+    PXR_NS::SdfPathVector                 _pushedOutlineSelectedPaths;
+
+    /// Keyed by panel name. Entries are created and destroyed alongside the hover event filter,
+    /// both on the main thread, so the map structure is never mutated concurrently. The fields are
+    /// individually atomic rather than snapshot-consistent: a frame can pair an x from before a
+    /// mouse move with a y from after, which is one frame of one pixel and not worth a lock.
+    std::map<std::string, std::unique_ptr<HoverState>> _hoverStates;
+
+    /// The destination panel of the render about to happen, recorded in setup(). This is the key
+    /// _hoverStates and _hoverEventFilters use, because _InstallHoverEventFilter runs in setup(),
+    /// before any frame context exists. Render() prefers the frame context's
+    /// renderingDestination() where it has one (see panelNameStr) -- the two agree for a model
+    /// panel, and this member is the fallback.
+    MString _currentPanelName;
 
     /// Hgi and HdDriver should be constructed before HdEngine to ensure they
     /// are destructed last. Hgi may be used during engine/delegate destruction.
@@ -390,6 +528,9 @@ private:
     class SelectionObserver;
     using SelectionObserverPtr = std::shared_ptr<SelectionObserver>;
     SelectionObserverPtr                      _mayaSelectionObserver;
+    class ColorPreferencesObserver;
+    using ColorPreferencesObserverPtr = std::shared_ptr<ColorPreferencesObserver>;
+    ColorPreferencesObserverPtr               _colorPreferencesObserver;
     HdRprimCollection                         _renderCollection { HdTokens->geometry,
                                           HdReprSelector(HdReprTokens->refined),
                                           SdfPath::AbsoluteRootPath() };
@@ -408,7 +549,16 @@ private:
     //Lead object selection and wireframe color for selection highlight
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
-    MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
+    MAYAHYDRA_NS_DEF::MhDirtySelectionColorsSceneIndexRefPtr
+        _dirtySelectionColorsSceneIndex { nullptr };
+
+    std::unique_ptr<HVT_NS::Outline::OutlineManager> _outlineManager;
+
+#ifdef MAYAHYDRA_HAS_QT
+    // One hover event filter per model panel, keyed by panel name.
+    std::map<std::string, std::unique_ptr<MAYAHYDRA_NS_DEF::HoverEventFilter>>
+        _hoverEventFilters;
+#endif
 
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC
     *   specific scene index data classes without knowing their content in Flow viewport.
@@ -428,8 +578,56 @@ private:
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
     bool       _currentlyTextured = false;
-    unsigned int _oldDisplayStyle {0};
-    int        _oldRefineLevel {0};
+
+    // Per panel: one MtohRenderOverride serves every model panel using this renderer, and the
+    // render item adapters it re-treats are shared, so a single memo would make two panels with
+    // different display styles flip the treatment against each other every frame.
+    std::map<std::string, unsigned int> _oldDisplayStyles;
+
+    /// The legacy-highlight treatment currently pushed into the render item adapters. The adapters
+    /// are shared by every panel and carry one visibility bit each, so this records what they are
+    /// set to, not what any one panel wants -- that is what lets a panel switch re-push it.
+    /// Empty when no treatment has been applied (fresh resources, adapters dropped).
+    struct RenderItemTreatment
+    {
+        bool legacyMayaNativeHighlightEnabled;
+        bool viewportDrawsWireframes;
+
+        bool operator==(const RenderItemTreatment& o) const
+        {
+            return legacyMayaNativeHighlightEnabled == o.legacyMayaNativeHighlightEnabled
+                && viewportDrawsWireframes == o.viewportDrawsWireframes;
+        }
+        bool operator!=(const RenderItemTreatment& o) const { return !(*this == o); }
+    };
+    std::optional<RenderItemTreatment> _appliedRenderItemTreatment;
+
+    /// The repr currently pushed into _reprSelectorSceneIndex, recorded for the same reason as
+    /// _appliedRenderItemTreatment above: one scene index serves every panel, so the trigger has to
+    /// be "the panel being drawn wants something other than what is installed", not "this panel's
+    /// display style changed". Keyed on a per-panel style memo instead, the shared repr keeps
+    /// whatever the last panel to transition set, and a wireframe panel draws shaded from its
+    /// second frame on.
+    ///
+    /// refineLevel is part of the memo rather than a separate member, so a refinement change is the
+    /// same kind of transition as a display-style change.
+    ///
+    /// Empty when nothing has been pushed (fresh resources).
+    struct ReprTreatment
+    {
+        Fvp::ReprSelectorSceneIndex::RepSelectorType reprType;
+        bool                                         needsReprChanged;
+        int                                          refineLevel;
+
+        bool operator==(const ReprTreatment& o) const
+        {
+            return reprType == o.reprType && needsReprChanged == o.needsReprChanged
+                && refineLevel == o.refineLevel;
+        }
+        bool operator!=(const ReprTreatment& o) const { return !(*this == o); }
+    };
+    std::optional<ReprTreatment> _appliedReprTreatment;
+
     bool       _useDefaultMaterial;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API

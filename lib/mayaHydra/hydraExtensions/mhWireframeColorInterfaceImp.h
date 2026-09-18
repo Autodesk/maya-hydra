@@ -53,6 +53,13 @@ public:
     MAYAHYDRALIB_API
     PXR_NS::GfVec4f getWireframeColor(const Fvp::PrimSelection& primSelection) const override;
 
+    /// Re-read the lead / active / dormant colors from the host color preferences.
+    ///
+    /// Call whenever the host reports a color preference change. The caller is responsible for
+    /// dirtying the affected prims so they re-pull.
+    MAYAHYDRALIB_API
+    void RefreshColors();
+
 private:
     enum SelectionState {kLead, kActive, kDormant};
 
@@ -61,7 +68,9 @@ private:
     SelectionState _getSelectionState(const PXR_NS::SdfPath& primPath) const;
     SelectionState _getSelectionState(const Fvp::PrimSelection& primSelection) const;
 
-    //Colors used by wireframe selection highlighting
+    // Colors used by wireframe selection highlighting. Cached because they are queried once per
+    // prim whose displayColor is re-evaluated, which on a large selection change is a lot of
+    // queries.
     PXR_NS::GfVec4f _activeWireframeColor;
     PXR_NS::GfVec4f _leadWireframeColor;
     PXR_NS::GfVec4f _dormantWireframeColor;

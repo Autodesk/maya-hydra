@@ -40,6 +40,17 @@
 // This file is where we build the UI and expose to MEL the global parameters from this plug-in and
 // the parameters from the chosen render delegate.
 
+// The Outline selection-highlight mode is not offered in these configurations: the
+// mayaHydraSelectionHighlightMode enum lists "Legacy Selection" only, and it is the default.
+//  - USD <= 24.11: HgiGL corrupts the non-zero integer prim ids the outline compute shader samples.
+//  - macOS: outline selection highlighting is not supported.
+// Keep this in sync with MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in
+// test/testUtils/mtohUtils.py and MAYAHYDRA_OUTLINE_MODE_AVAILABLE in
+// test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
+#if PXR_VERSION <= 2411 || defined(__APPLE__)
+#define MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
 // The following code currently lives inside the pxr namespace, but it would make more sense to 
@@ -744,6 +755,24 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                         // Attribute name
            << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
            << ", $fromAE);\n";
+
+        // Enum attribute: renders as a dropdown (Outline Selection / Legacy Selection).
+        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
+           << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
+           << quote(_MangleName(MtohTokens->mayaHydraSelectionHighlightMode).GetString())
+           << ','                                                          // Attribute name
+           << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
+           << ", $fromAE);\n";
+
+        // Bool attribute: renders as a checkbox.
+        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
+           << ',' << quote("Outline the object under the cursor. Requires the Outline selection "
+                           "highlight mode.")
+           << ','                                                             // Description
+           << quote(_MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting).GetString())
+           << ','                                                             // Attribute name
+           << quote(MtohTokens->mayaHydraOutlineHoverHighlighting.GetText()) // Label
+           << ", $fromAE);\n";
     }
 
     {
@@ -955,6 +984,69 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             return mayaObject;
         }
     }
+    if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
+#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+        static const TfTokenVector kSelectionHighlightModes = { TfToken("Legacy Selection") };
+#else
+        static const TfTokenVector kSelectionHighlightModes
+            = { TfToken("Outline Selection"), TfToken("Legacy Selection") };
+#endif
+        _CreateEnumAttribute(
+            node,
+            filter.mayaString(),
+            kSelectionHighlightModes,
+            kSelectionHighlightModes[0], // default = first entry, Legacy where Outline is unavailable
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only: deliberately absent from BuildOptionsMenu. Additive only --
+    // mayaHydraOutlineHoverHighlighting on its own still runs the pick and draws the hover, exactly
+    // as shipped. This attribute force the interactive hit test even if outline drawing is disabled,
+    // so the two costs can be split for performance profiling purposes.
+    if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.forceEnableInteractiveHitTest,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.outlineHoverHighlighting,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only: deliberately absent from BuildOptionsMenu.
+    if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.forceDisableSelectionHighlight,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only: deliberately absent from BuildOptionsMenu.
+    if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.enableDefaultOutlines,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
 
     for (const auto& rit : MtohGetRendererSettings()) {
         const auto rendererName = rit.first;
@@ -1153,6 +1245,62 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             node,
             filter.mayaString(),
             globals.delegateParams.refineLevel,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
+#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+        TfToken mode("Legacy Selection");
+#else
+        TfToken mode("Outline Selection");
+#endif
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            mode,
+            storeUserSetting);
+        globals.outlineSelectionHighlight = (mode == TfToken("Outline Selection"));
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.outlineHoverHighlighting,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.enableDefaultOutlines,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.forceEnableInteractiveHitTest,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.forceDisableSelectionHighlight,
             storeUserSetting);
         if (filter.attributeFilter()) {
             return globals;

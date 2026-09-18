@@ -50,9 +50,12 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
             raise ValueError("Subclasses of MayaHydraBaseTestCase must "
                              "define `_file = __file__`")
 
-        # Set up the custom suffix for this test
+        # Set up the custom suffix for this test. The selection highlighting
+        # mode contributes to it as well, since this script is registered once
+        # per mode too and each run needs its own output directory.
         meshAdapter = os.getenv('MAYA_HYDRA_USE_MESH_ADAPTER', 0)
         customSuffix = '_meshAdapter' if meshAdapter else ''
+        customSuffix += cls.selectionHighlightOutputSuffix()
         
         # Call fixturesUtils.setUpClass with our custom suffix
         inputPath = fixturesUtils.setUpClass(
@@ -114,10 +117,11 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
         cmds.polySphere(r=1, sx=20, sy=20, ax=[0, 1, 0], cuv=2 , ch=1)
         cmds.refresh()
 
-        # There should be two rprims from the poly sphere, one for the mesh and
-        # another wireframe for selection highlighting.
+        # There should be one rprim for the poly sphere mesh, plus one more in
+        # legacy mode, where the selection highlight of the newly created (and so
+        # selected) sphere is drawn as wireframe geometry.
         rprims = self.getIndex()
-        self.assertEqual(2, len(rprims))
+        self.assertEqual(1 + self.selectionHighlightRprimCount(), len(rprims))
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
