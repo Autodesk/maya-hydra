@@ -149,7 +149,26 @@ std::string ResolveRenderProductImagePath(
     return (baseDir / imagePath).lexically_normal().string();
 }
 
-Ufe::Path GetUfeCameraPathFromUsdRenderSettings(const UsdRenderSettings& usdRenderSettings)
+// Build the UFE path of a camera prim that is in the same stage as the active
+// render settings prim.  \p rsAppPath supplies the proxy shape segment: the
+// camera must be read from the same proxy shape the render settings came from.
+Ufe::Path GetSameStageUfeCameraPath(const Ufe::Path& rsAppPath, const SdfPath& usdCameraPath)
+{
+    if (rsAppPath.nbSegments() < 2) {
+        TF_WARN(
+            "GetSameStageUfeCameraPath: Active render settings path '%s' has no proxy shape "
+            "segment; cannot resolve camera %s.",
+            Ufe::PathString::string(rsAppPath).c_str(),
+            usdCameraPath.GetText());
+        return Ufe::Path();
+    }
+
+    return rsAppPath.popSegment() + MayaUsdAPI::usdPathToUfePathSegment(usdCameraPath);
+}
+
+Ufe::Path GetUfeCameraPathFromUsdRenderSettings(
+    const UsdRenderSettings& usdRenderSettings,
+    const Ufe::Path&         rsAppPath)
 {
     if (!usdRenderSettings) {
         TF_WARN("GetUfeCameraPathFromUsdRenderSettings: UsdRenderSettings invalid; "
@@ -179,13 +198,7 @@ Ufe::Path GetUfeCameraPathFromUsdRenderSettings(const UsdRenderSettings& usdRend
             MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
             "Render settings camera target: %s\n",
             cameraTargets[0].GetText());
-        const SdfPath usdCameraPath = cameraTargets[0];
-        UsdStageRefPtr stage = usdRenderSettings.GetPrim().GetStage();
-        auto stagePath = MayaUsdAPI::stagePath(stage);
-        Ufe::Path ufeCameraPath
-            = Ufe::Path::Segments { stagePath.getSegments()[0],
-                                    MayaUsdAPI::usdPathToUfePathSegment(usdCameraPath) };
-        return ufeCameraPath;
+        return GetSameStageUfeCameraPath(rsAppPath, cameraTargets[0]);
     }
 
     TF_DEBUG_MSG(
@@ -197,7 +210,8 @@ Ufe::Path GetUfeCameraPathFromUsdRenderSettings(const UsdRenderSettings& usdRend
 }
 
 Ufe::Path GetUfeCameraPathFromUsdRenderProductOverride(
-    const UsdRenderProduct&  renderProduct)
+    const UsdRenderProduct&  renderProduct,
+    const Ufe::Path&         rsAppPath)
 {
     Ufe::Path ufeCameraPath;
     if (!renderProduct) {
@@ -231,11 +245,7 @@ Ufe::Path GetUfeCameraPathFromUsdRenderProductOverride(
             "Render product camera override target (%s): %s\n",
             renderProduct.GetPrim().GetPath().GetText(),
             usdCameraPath.GetText());
-        UsdStageRefPtr  stage = renderProduct.GetPrim().GetStage();
-        auto      stagePath = MayaUsdAPI::stagePath(stage);
-        return 
-            Ufe::Path::Segments { stagePath.getSegments()[0],
-                                    MayaUsdAPI::usdPathToUfePathSegment(usdCameraPath) };
+        return GetSameStageUfeCameraPath(rsAppPath, usdCameraPath);
     } else {
         TF_DEBUG_MSG(
             MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
@@ -412,11 +422,11 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
 
     // Get the render settings from the scene
     UsdRenderSettings usdRenderSettings;
-    const auto psPath = ExtractUsdRenderSettingsFromScene(usdRenderSettings);
-    if (psPath.empty()) {
+    const auto rsAppPath = ExtractUsdRenderSettingsFromScene(usdRenderSettings);
+    if (rsAppPath.empty()) {
         TF_DEBUG_MSG(
             MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-            "No USD render settings found in Maya USD proxy shapes.\n");
+            "No usable USD render settings at the active render description path.\n");
         return false;
     }
     BatchRenderer::InputParams inputParams;
@@ -443,7 +453,8 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
     }
 
     // Resolve default camera once from render settings (used for products without overrides).
-    const Ufe::Path defaultUfeCameraPath = GetUfeCameraPathFromUsdRenderSettings(usdRenderSettings);
+    const Ufe::Path defaultUfeCameraPath
+        = GetUfeCameraPathFromUsdRenderSettings(usdRenderSettings, rsAppPath);
     if (!defaultUfeCameraPath.empty()) {
         TF_DEBUG_MSG(
             MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
@@ -566,7 +577,7 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
                 // Get UFE camera path: default from render settings, override per render product if present
                 Ufe::Path ufeCameraPath = defaultUfeCameraPath;
                 const Ufe::Path productOverrideCameraPath =
-                    GetUfeCameraPathFromUsdRenderProductOverride(renderProduct);
+                    GetUfeCameraPathFromUsdRenderProductOverride(renderProduct, rsAppPath);
                 if (!productOverrideCameraPath.empty()) {
                     ufeCameraPath = productOverrideCameraPath;
                     TF_DEBUG_MSG(

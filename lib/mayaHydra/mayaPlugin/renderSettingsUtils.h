@@ -21,7 +21,7 @@
 
 #include <maya/MTime.h>
 
-#include <ufe/sceneItemList.h>
+#include <ufe/ufe.h>
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
@@ -72,15 +72,10 @@ enum class RenderSettingsType
 /// Determine the RenderSettingsType from the render delegate.
 RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const PXR_NS::TfToken& rendererName);
 
-Ufe::SceneItemList GetAllMayaUsdProxyShapes();
-
-// Find UsdRenderSettings on the given stage.
-bool FindUsdRenderSettingsOnStage(
-    const PXR_NS::UsdStageRefPtr& stage,
-    PXR_NS::UsdRenderSettings&    outSettings);
-
-// Extract UsdRenderSettings from all MayaUsdProxyShapes in the scene.
-// Returns the path to the proxy shape node if found, empty path if not.
+// Extract the UsdRenderSettings named by the active render description path.
+// Returns the two-segment UFE path (proxy shape, then render settings prim) of
+// the active render settings prim, or an empty path when it does not resolve to
+// a UsdRenderSettings prim with at least one render product.
 Ufe::Path ExtractUsdRenderSettingsFromScene(PXR_NS::UsdRenderSettings& usdRenderSettings);
 
 // Get the UFE application path to the active render settings prim from the Maya scene.

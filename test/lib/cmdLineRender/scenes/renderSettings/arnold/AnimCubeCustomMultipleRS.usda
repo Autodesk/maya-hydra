@@ -127,7 +127,10 @@ def Scope "Render"
             </Render/ProductMainCam>,
             </Render/ProductSecondCam>,
         ]
-        int2 resolution = (2048, 2048)
+        # HdArnold renderer limitation: multiple render products with different
+        # resolutions are not supported.  Set the resolution on the render
+        # settings prim so that it applies to all render products.
+        uniform int2 resolution = (1024, 768)
         custom double2[] adsk:frames = [(1,10)]
     }
 
@@ -150,7 +153,6 @@ def Scope "Render"
                 10: "./images/mainCamFrame10.png",
             }
         uniform token productType = "raster"
-        uniform int2 resolution = (512, 512)
     }
 
     def RenderProduct "ProductSecondCam"
@@ -172,7 +174,6 @@ def Scope "Render"
                 10: "./images/secondCamFrame10.png",
             }
         uniform token productType = "raster"
-        uniform int2 resolution = (1024, 768)
     }
 
     def Scope "Vars"

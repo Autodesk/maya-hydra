@@ -30,6 +30,11 @@ TF_DEFINE_ENV_SETTING(
     "Pass camera prim to Hydra instead of populating the free camera parameters."
     "Camera prim may expose additional render parameters but its usage must be well tested before we can enable it by default.");
 
+TF_DEFINE_ENV_SETTING(
+    MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS,
+    true,
+    "Set HdArnold render delegate to use Hydra v2 render settings.");
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -46,6 +51,13 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useCameraPrim
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_USE_CAMERA_PRIM);
         return _useCameraPrim;
+    }
+
+    bool hdArnoldUseV2RenderSettings()
+    {
+        static const bool _hdArnoldUseV2RenderSettings
+            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS);
+        return _hdArnoldUseV2RenderSettings;
     }
 
 } // namespace MAYAHYDRA_NS_DEF

@@ -17,6 +17,7 @@
 #include "renderSettingsUtils.h"
 
 #include "pluginDebugCodes.h"
+#include "envSettings.h"
 
 #include <mayaHydraLib/mayaUtils.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
@@ -27,8 +28,6 @@
 #include <maya/MRenderUtil.h>
 #include <maya/MTime.h>
 
-#include <ufe/runTimeMgr.h>
-#include <ufe/sceneSegmentHandler.h>
 #include <ufe/pathString.h>
 
 #include <pxr/base/gf/vec2d.h>
@@ -41,7 +40,6 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/utils.h>
 #include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdRender/tokens.h>
 #include <pxr/usd/usdRender/pass.h>
 
@@ -66,8 +64,7 @@ bool HdArnoldUseHydraV2RenderSettings(const TfToken& rendererName)
         return false;
     }
 
-    // Default is use Hydra v1 render settings.
-    return TfGetenvBool("MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS", false);
+    return hdArnoldUseV2RenderSettings();
 }
 
 // returns true if the env var HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS is set to true
@@ -150,9 +147,33 @@ namespace MAYAHYDRA_NS_DEF {
 Ufe::Path ExtractUsdRenderSettingsFromScene(UsdRenderSettings& usdRenderSettings)
 {
     const auto rsAppPath = GetActiveRenderSettingsAppPath();
-    const auto stage     = MayaUsdAPI::getStage(rsAppPath);
-    return FindUsdRenderSettingsOnStage(stage, usdRenderSettings) ?
-        rsAppPath : Ufe::Path();
+
+    // A render settings prim path is a proxy shape segment followed by a USD
+    // segment.  Callers rely on both being present to rebuild sibling prim
+    // paths (e.g. the render settings camera).
+    if (rsAppPath.nbSegments() < 2) {
+        return Ufe::Path();
+    }
+
+    const UsdPrim rsPrim = MayaUsdAPI::ufePathToPrim(rsAppPath);
+    if (!rsPrim.IsValid() || !rsPrim.IsA<UsdRenderSettings>()) {
+        return Ufe::Path();
+    }
+
+    // USD documentation
+    // https://openusd.org/release/user_guides/schemas/usdRender/RenderSettings.html#properties
+    // says that if no render products are supplied, renderer should still
+    // output an image. At least one renderer (Hydra Arnold) does not do this
+    // and renders nothing.  Catch the no render products case and return an
+    // empty path, so that the caller reports the render settings as unusable.
+    const UsdRenderSettings candidate(rsPrim);
+    SdfPathVector           targets;
+    if (!candidate.GetProductsRel().GetTargets(&targets) || targets.empty()) {
+        return Ufe::Path();
+    }
+
+    usdRenderSettings = candidate;
+    return rsAppPath;
 }
 
 // Read the RenderSettingsType from the render delegate (renderer)
@@ -170,8 +191,8 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     
     // Check if the scene contains Usd render settings
     UsdRenderSettings dummyUsdRenderSettings;// Pass a dummy UsdRenderSettings to just check for presence
-    const auto psPath = ExtractUsdRenderSettingsFromScene(dummyUsdRenderSettings); 
-    if (!psPath.empty()) {
+    const auto rsAppPath = ExtractUsdRenderSettingsFromScene(dummyUsdRenderSettings);
+    if (!rsAppPath.empty()) {
         TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
                      "Using Hydra v1 render settings.\n");
         return RenderSettingsType::HydraV1;
@@ -179,67 +200,6 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
 
     TF_WARN("No USD render settings found, or USD render settings had no render products.");
     return RenderSettingsType::Unknown;
-}
-        
-Ufe::SceneItemList GetAllMayaUsdProxyShapes()
-{
-    Ufe::SceneItemList proxyShapes;
-
-    const auto mayaSceneSegmentHandler
-        = Ufe::RunTimeMgr::instance().sceneSegmentHandler(MayaUsdAPI::getMayaRunTimeId());
-    if (!mayaSceneSegmentHandler) {
-        return proxyShapes;
-    }
-    const auto mayaRootPath = mayaSceneSegmentHandler->rootSceneSegmentRootPath();
-    const auto gatewayItems
-        = Ufe::SceneSegmentHandler::findGatewayItems(mayaRootPath, MayaUsdAPI::getUsdRunTimeId());
-    
-    std::copy(
-        gatewayItems.begin(),
-        gatewayItems.end(),
-        std::back_inserter(proxyShapes)
-    );
-    
-    return proxyShapes;
-}
-
-bool FindUsdRenderSettingsOnStage(
-    const UsdStageRefPtr& stage,
-    UsdRenderSettings&    outSettings)
-{
-    if (!stage) {
-        return false;
-    }
-
-    // USD documentation
-    // https://openusd.org/release/user_guides/schemas/usdRender/RenderSettings.html#properties
-    // says that if no render products are supplied, renderer should still
-    // output an image. At least one renderer (Hydra Arnold) does not do this
-    // and renders nothing.  Catch the no render products case and return
-    // false, so that Maya render settings default is used.
-    auto hasProducts = [](const UsdRenderSettings& rs) {
-        SdfPathVector targets;
-        return rs.GetProductsRel().GetTargets(&targets) && !targets.empty();
-    };
-
-    // This is when at the global level of a usd file/stage is defined the render settings in renderSettingsPrimPath such as :
-    //  renderSettingsPrimPath = "/Render/Settings"
-    outSettings = UsdRenderSettings::GetStageRenderSettings(stage);
-    if (outSettings.GetPrim().IsValid() && hasProducts(outSettings)) {
-        return true;
-    }
-
-    UsdPrimRange range = stage->Traverse();
-    for (UsdPrim prim : range) {
-        if (prim.GetTypeName() == TfToken("RenderSettings")) {
-            outSettings = UsdRenderSettings(prim);
-            if (outSettings.GetPrim().IsValid() && hasProducts(outSettings)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 Ufe::Path GetDefaultRenderSettingsAppPath()
