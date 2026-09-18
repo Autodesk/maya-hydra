@@ -20,6 +20,9 @@
 #include "flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h"
 #include "flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h"
 #include "flowViewport/API/renderViewData/fvpIsolateSelectManager.h"
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
@@ -116,8 +119,20 @@ void RenderViewDataManager::RemoveRenderViewData(const std::string& viewId)
             const auto& filteringSceneIndex = findResult->GetLastFilteringSceneIndex();
             if (filteringSceneIndex){
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
+#ifdef CODE_COVERAGE_WORKAROUND
+                Fvp::leakSceneIndex(filteringSceneIndex);
+#endif
             }
         }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+        // Keep a heap copy so ~RenderViewData does not drop the last ref on scene
+        // indices whose destructors crash under Windows clang code coverage builds.
+        // Matches RemoveAllRenderViewData()'s leakViewData() pattern.
+        RenderViewDataVector leakedCopy;
+        leakedCopy.push_back(*findResult);
+        leakViewData(leakedCopy);
+#endif
             
         _renderViewsData.erase(findResult);
     }
@@ -192,7 +207,9 @@ void RenderViewDataManager::RemoveAllRenderViewData()
             //Destroy the custom filtering scene indices chain
             const auto& filteringSceneIndex = viewData.GetLastFilteringSceneIndex();
             if (filteringSceneIndex){
+#ifndef CODE_COVERAGE_WORKAROUND
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
+#endif
             }
         }
     }

@@ -161,7 +161,42 @@ HydraRenderCmd::~HydraRenderCmd()
 
 bool HydraRenderCmd::parseDatabase(const MArgDatabase& db)
 {
+    if (db.isFlagSet(_renderer)) {
+        MString rn;
+        CHECK_MSTATUS_AND_RETURN(db.getFlagArgument(_renderer, 0, rn), false);
+
+        _rendererFlagSet   = true;
+        _rendererFromFlag  = TfToken(rn.asChar());
+    }
+
     return true;
+}
+
+TfToken HydraRenderCmd::GetRenderer()
+{
+    if (_rendererFlagSet) {
+        if (_rendererFromFlag.IsEmpty()) {
+            // Use MPxCommand::displayError() (not just a Tf diagnostic) so the
+            // specific message reliably reaches the MStatus/Python-visible
+            // command error text on every platform.
+            displayError(
+                "hydraRender: the -renderer/-r flag was set to an empty renderer name.",
+                true);
+            return TfToken();
+        }
+        return _rendererFromFlag;
+    }
+
+    const TfToken currentRenderer = GetCurrentRenderer();
+    if (currentRenderer.IsEmpty()) {
+        displayError(
+            "hydraRender: no renderer specified. Pass -renderer/-r, or author the "
+            "currentRenderer attribute on the USD render-description node.",
+            true);
+        return TfToken();
+    }
+
+    return currentRenderer;
 }
 
 bool HydraRenderCmd::initialize()
@@ -222,11 +257,12 @@ bool HydraRenderCmd::hydraRender()
         return hydraRenderFromHydraV2RenderSettings();
     }
 
-TF_RUNTIME_ERROR(
-    "Batch rendering requires USD render settings (with at least one render product) "
-    "or a render-delegate-owned render pass. No usable USD render settings were found, "
-    "and render delegate '%s' does not drive the render pass.",
-    _batchRenderer->GetRendererName().GetText());
+    displayError(
+        MString("Batch rendering requires USD render settings (with at least one render "
+                 "product) or a render-delegate-owned render pass. No usable USD render "
+                 "settings were found, and render delegate '")
+            + _batchRenderer->GetRendererName().GetText() + "' does not drive the render pass.",
+        true);
     return false;
 }
 
@@ -243,15 +279,6 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
       return MS::kFailure;
     }
 
-    // By default the renderer is Hydra Storm.
-    TfToken rendererName("HdStormRendererPlugin");
-    if (db.isFlagSet(_renderer)) {
-        MString rn;
-        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_renderer, 0, rn));
-
-        rendererName = TfToken(rn.asChar());
-    }
-
     if (db.isFlagSet(_gpuEnabledFlag)) {
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_gpuEnabledFlag, 0, _gpuEnabled));
     }
@@ -259,6 +286,11 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
     // Create the batch renderer.  The second and third arguments of
     // the renderer description are the unused override name and
     // display name, respectively.
+    TfToken rendererName = GetRenderer();
+    if (rendererName.IsEmpty()) {
+        // GetRenderer() has already called displayError() with the specific reason.
+        return MS::kFailure;
+    }
     _batchRenderer = std::make_unique<BatchRenderer>(
         MtohRendererDescription(rendererName, {}, {}));
 

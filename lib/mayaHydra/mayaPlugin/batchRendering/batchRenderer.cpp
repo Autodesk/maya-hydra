@@ -398,12 +398,24 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
 
 void BatchRenderer::_ClearMayaHydraSceneIndex()
 {
+    // _InitHydraResources() sets _initializationAttempted before it can bail out on an
+    // unusable renderer plugin, render delegate or render index, so teardown also runs
+    // for a partially initialized BatchRenderer, with no Maya scene index created.
+    if (!_mayaHydraSceneIndex) {
+        return;
+    }
+
 #ifdef CODE_COVERAGE_WORKAROUND
     // Leak the Maya scene index for code coverage, as its base class
     // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
+    // Explicitly leak it (rather than relying on some other owner keeping a
+    // reference alive) so the .Reset() below can never drop the last ref and
+    // run the crashy dtor, matching the pattern used elsewhere for the same
+    // class of crash (see Fvp::leakSceneIndex()).
     _mayaHydraSceneIndex->_Destroy();
+    Fvp::leakSceneIndex(_mayaHydraSceneIndex);
 #else
-    if (_dataProducerMergingSceneIndexProxy && _mayaHydraSceneIndex) {
+    if (_dataProducerMergingSceneIndexProxy) {
         _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
     }
 #endif
@@ -420,16 +432,29 @@ void BatchRenderer::_InitHydraResources()
     GlfContextCaps::InitInstance();
     _rendererPlugin
         = HdRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererDesc.rendererName);
-    if (!_rendererPlugin)
+    if (!_rendererPlugin) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: unknown or unregistered renderer \"%s\"; no matching Hydra "
+            "renderer plugin was found.",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
 
     _renderDelegate = HdRendererPluginRegistry::GetInstance().CreateRenderDelegate(_rendererDesc.rendererName);
-    if (!_renderDelegate)
+    if (!_renderDelegate) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: failed to create the render delegate for renderer \"%s\".",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
 
     _renderIndex = HdRenderIndex::New(_renderDelegate.Get(), {&_hgiDriver});
-    if (!_renderIndex)
+    if (!_renderIndex) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: failed to create the render index for renderer \"%s\".",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
 
     _taskController = std::make_unique<HdxTaskController>(
@@ -569,6 +594,9 @@ void BatchRenderer::_ClearHydraResources()
         _timeChangeCallbackId = 0;
     }
 
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_sceneGlobalsSceneIndex);
+#endif
     _sceneGlobalsSceneIndex.Reset();
 
     // Only remove information for our dummy batch render viewport, to avoid
@@ -595,15 +623,35 @@ void BatchRenderer::_ClearHydraResources()
         // The render index destructor crashes under Windows clang code
         // coverage builds, so deletion is skipped in that configuration.
         delete _renderIndex;
+#else
+        static std::vector<PXR_NS::HdRenderIndex*>* leakedRenderIndices{nullptr};
+        if (!leakedRenderIndices) {
+            leakedRenderIndices = new std::vector<PXR_NS::HdRenderIndex*>;
+        }
+        leakedRenderIndices->push_back(_renderIndex);
 #endif
         _renderIndex = nullptr;
     }
 
     if (_rendererPlugin != nullptr) {
         _renderDelegate = nullptr;
+#ifndef CODE_COVERAGE_WORKAROUND
         HdRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
+#endif
         _rendererPlugin = nullptr;
     }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
+    Fvp::leakSceneIndex(_renderingColorSpaceSceneIndex);
+    Fvp::leakSceneIndex(_frameNbResolvingSceneIndex);
+    if (_dataProducerMergingSceneIndexProxy) {
+        Fvp::leakSceneIndex(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex());
+    }
+#endif
+    _lastFilteringSceneIndexBeforeCustomFiltering.Reset();
+    _renderingColorSpaceSceneIndex.Reset();
+    _frameNbResolvingSceneIndex.Reset();
 
     // Decrease ref count on the render index proxy which owns the merging scene index at the end of
     // this function as some previous calls may likely use it to remove some scene indices
