@@ -225,7 +225,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
 
     # Test frame range (5-9).  Failure with HdStorm on macOS entered as HYDRA-2139.
     if(folder STREQUAL "storm")
-        if(NOT IS_MACOSX)
+        # if(NOT IS_MACOSX)
             mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
                 RENDERER ${renderer}
                 EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
@@ -233,7 +233,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
                 TEST_NAME_SUFFIX ${suffix}Frames5to9
                 RENDERER_ARGS "-s 5 -e 9"
             )
-        endif()
+        # endif()
     else()
         mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
             RENDERER ${renderer}
