@@ -37,7 +37,6 @@
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
-#include <pxr/base/tf/stringUtils.h> // [DEBUG-hydra2445] TfStringPrintf for diagnostic logging
 
 #include <mayaUsdAPI/utils.h>
 
@@ -341,38 +340,8 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
 #if MAYA_API_VERSION >= 20270000
     // Register Hydra renderers as Maya production renderers.
-    {
-        const auto& descs = MayaHydra::MtohGetRendererDescriptions();
-        // [DEBUG-hydra2445] Diagnose HYDRA-2445: confirm how many renderer
-        // descriptions are seen at this call site, and whether registerRenderer()
-        // succeeds for each of them.
-        MGlobal::displayWarning(MString(PXR_NS::TfStringPrintf(
-            "[DEBUG-hydra2445] plugin.cpp registration loop: descs.size()=%zu",
-            descs.size()).c_str()));
-        for (const auto& desc : descs) {
-            const bool ok = registerRenderer(desc);
-            MGlobal::displayWarning(MString(PXR_NS::TfStringPrintf(
-                "[DEBUG-hydra2445] registerRenderer(%s) returned %s",
-                desc.rendererName.GetText(),
-                ok ? "true" : "FALSE").c_str()));
-        }
-
-        // [DEBUG-hydra2445] Final snapshot: for every discovered renderer
-        // description, log 'renderer -exists' right before initializePlugin()
-        // returns, so we know whether it was registered and still exists at
-        // the moment control returns to the caller (e.g. Render.exe's preMel),
-        // before Maya's own currentRenderer()/mayaBatchRenderProcedure MEL
-        // logic runs.
-        for (const auto& desc : descs) {
-            bool existsAtExit = false;
-            std::ostringstream existsCmd;
-            existsCmd << "renderer -exists " << desc.rendererName;
-            MGlobal::executeCommand(existsCmd.str().c_str(), existsAtExit);
-            MGlobal::displayWarning(MString(PXR_NS::TfStringPrintf(
-                "[DEBUG-hydra2445] end-of-registration-loop snapshot: renderer -exists %s = %s",
-                desc.rendererName.GetText(),
-                existsAtExit ? "true" : "FALSE").c_str()));
-        }
+    for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
+        registerRenderer(desc);
     }
 #endif
 
@@ -412,14 +381,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret.perror(msg.str().c_str());
         return ret;
     }
-
-    // [DEBUG-hydra2445] Final marker: confirms initializePlugin() reached its
-    // normal (successful) return path, and lets us order this against Maya's
-    // own subsequent currentRenderer()/mayaBatchRenderProcedure MEL logic in
-    // the CI log.
-    MGlobal::displayWarning(MString(PXR_NS::TfStringPrintf(
-        "[DEBUG-hydra2445] initializePlugin returning, ret.errorString()=%s",
-        ret.errorString().asChar()).c_str()));
 
     return ret;
 }

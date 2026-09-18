@@ -20,6 +20,9 @@
 #include "flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h"
 #include "flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h"
 #include "flowViewport/API/renderViewData/fvpIsolateSelectManager.h"
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
@@ -107,7 +110,6 @@ void RenderViewDataManager::RemoveRenderViewData(const std::string& viewId)
                 [&viewId](const RenderViewData& other) { return other.GetViewDesc()._viewId == viewId;});
     if (findResult != _renderViewsData.end()){
 
-#ifndef CODE_COVERAGE_WORKAROUND
         InformationInterfaceImp::Get().SceneIndexRemoved(findResult->GetViewDesc());
 
         auto renderIndex = findResult->GetRenderIndex();//Get the pointer on the renderIndex
@@ -117,9 +119,13 @@ void RenderViewDataManager::RemoveRenderViewData(const std::string& viewId)
             const auto& filteringSceneIndex = findResult->GetLastFilteringSceneIndex();
             if (filteringSceneIndex){
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
+#ifdef CODE_COVERAGE_WORKAROUND
+                Fvp::leakSceneIndex(filteringSceneIndex);
+#endif
             }
         }
-#else
+
+#ifdef CODE_COVERAGE_WORKAROUND
         // Keep a heap copy so ~RenderViewData does not drop the last ref on scene
         // indices whose destructors crash under Windows clang code coverage builds.
         // Matches RemoveAllRenderViewData()'s leakViewData() pattern.
