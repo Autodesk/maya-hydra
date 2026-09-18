@@ -587,18 +587,14 @@ void BatchRenderer::_ClearHydraResources()
         _timeChangeCallbackId = 0;
     }
 
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_sceneGlobalsSceneIndex);
+#endif
     _sceneGlobalsSceneIndex.Reset();
 
     // Only remove information for our dummy batch render viewport, to avoid
     // affecting interactive viewports.
-#ifndef CODE_COVERAGE_WORKAROUND
-    // Removing the render view data drops the last reference on the custom
-    // filtering scene indices chain, which triggers the same
-    // scene-index/render-index destructor crash seen under Windows clang
-    // code coverage builds (see the render index deletion workaround
-    // below), so this is skipped in that configuration.
     Fvp::RenderViewDataManager::Get().RemoveRenderViewData(kBatchRenderDummyPanelName);
-#endif
     
     //Remove the data producer scene indices that apply to all views
     Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViews();
@@ -620,15 +616,35 @@ void BatchRenderer::_ClearHydraResources()
         // The render index destructor crashes under Windows clang code
         // coverage builds, so deletion is skipped in that configuration.
         delete _renderIndex;
+#else
+        static std::vector<PXR_NS::HdRenderIndex*>* leakedRenderIndices{nullptr};
+        if (!leakedRenderIndices) {
+            leakedRenderIndices = new std::vector<PXR_NS::HdRenderIndex*>;
+        }
+        leakedRenderIndices->push_back(_renderIndex);
 #endif
         _renderIndex = nullptr;
     }
 
     if (_rendererPlugin != nullptr) {
         _renderDelegate = nullptr;
+#ifndef CODE_COVERAGE_WORKAROUND
         HdRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
+#endif
         _rendererPlugin = nullptr;
     }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
+    Fvp::leakSceneIndex(_renderingColorSpaceSceneIndex);
+    Fvp::leakSceneIndex(_frameNbResolvingSceneIndex);
+    if (_dataProducerMergingSceneIndexProxy) {
+        Fvp::leakSceneIndex(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex());
+    }
+#endif
+    _lastFilteringSceneIndexBeforeCustomFiltering.Reset();
+    _renderingColorSpaceSceneIndex.Reset();
+    _frameNbResolvingSceneIndex.Reset();
 
     // Decrease ref count on the render index proxy which owns the merging scene index at the end of
     // this function as some previous calls may likely use it to remove some scene indices

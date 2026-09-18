@@ -107,6 +107,7 @@ void RenderViewDataManager::RemoveRenderViewData(const std::string& viewId)
                 [&viewId](const RenderViewData& other) { return other.GetViewDesc()._viewId == viewId;});
     if (findResult != _renderViewsData.end()){
 
+#ifndef CODE_COVERAGE_WORKAROUND
         InformationInterfaceImp::Get().SceneIndexRemoved(findResult->GetViewDesc());
 
         auto renderIndex = findResult->GetRenderIndex();//Get the pointer on the renderIndex
@@ -118,6 +119,14 @@ void RenderViewDataManager::RemoveRenderViewData(const std::string& viewId)
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
             }
         }
+#else
+        // Keep a heap copy so ~RenderViewData does not drop the last ref on scene
+        // indices whose destructors crash under Windows clang code coverage builds.
+        // Matches RemoveAllRenderViewData()'s leakViewData() pattern.
+        RenderViewDataVector leakedCopy;
+        leakedCopy.push_back(*findResult);
+        leakViewData(leakedCopy);
+#endif
             
         _renderViewsData.erase(findResult);
     }
@@ -192,7 +201,9 @@ void RenderViewDataManager::RemoveAllRenderViewData()
             //Destroy the custom filtering scene indices chain
             const auto& filteringSceneIndex = viewData.GetLastFilteringSceneIndex();
             if (filteringSceneIndex){
+#ifndef CODE_COVERAGE_WORKAROUND
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
+#endif
             }
         }
     }

@@ -84,12 +84,15 @@ void FilteringSceneIndicesChainManager::destroyFilteringSceneIndicesChain(Render
 
     auto renderIndex = viewData.GetRenderIndex();
     TF_AXIOM(renderIndex);
+#ifdef CODE_COVERAGE_WORKAROUND
+    // Leak before dropping refs; RemoveSceneIndex can trigger crashy destructors
+    // under Windows clang code coverage builds.
+    Fvp::leakSceneIndex(lastSceneIndex);
+#else
     renderIndex->RemoveSceneIndex(lastSceneIndex);//Remove the whole chain from the render index
+#endif
 
     //Remove a ref on it which should cascade the same on its references
-#ifdef CODE_COVERAGE_WORKAROUND
-    Fvp::leakSceneIndex(lastSceneIndex);
-#endif
     lastSceneIndex.Reset();
 }
 
