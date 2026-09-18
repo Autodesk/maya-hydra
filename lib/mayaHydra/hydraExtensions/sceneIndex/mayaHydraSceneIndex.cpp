@@ -443,7 +443,6 @@ void MayaHydraSceneIndex::_Destroy()
     }
     _callbacks.clear();
 
-#ifndef CODE_COVERAGE_WORKAROUND
     _MapAdapter<MayaHydraAdapter>(
         [](MayaHydraAdapter* a) { a->RemoveCallbacks(); },
         _renderItemsAdapters,
@@ -460,13 +459,6 @@ void MayaHydraSceneIndex::_Destroy()
     _cameraAdapters.clear();
     _renderItemsAdaptersFast.clear();
     _customAdapters.clear();
-#else
-    // Adapter RemoveCallbacks() and ~MayaHydraAdapter() crash under Windows
-    // clang code coverage when MMessage::removeCallback synchronously re-enters
-    // Maya USD translation code. Callers leak the scene index so its dtor does
-    // not run; _isTearingDown ensures any remaining adapter callbacks no-op via
-    // ShouldSkipHydraUpdates().
-#endif
 
     // Unregister the fallback path mapper.
     Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);

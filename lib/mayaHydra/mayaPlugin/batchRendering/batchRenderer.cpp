@@ -398,6 +398,13 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
 
 void BatchRenderer::_ClearMayaHydraSceneIndex()
 {
+    // _InitHydraResources() sets _initializationAttempted before it can bail out on an
+    // unusable renderer plugin, render delegate or render index, so teardown also runs
+    // for a partially initialized BatchRenderer, with no Maya scene index created.
+    if (!_mayaHydraSceneIndex) {
+        return;
+    }
+
 #ifdef CODE_COVERAGE_WORKAROUND
     // Leak the Maya scene index for code coverage, as its base class
     // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
@@ -408,7 +415,7 @@ void BatchRenderer::_ClearMayaHydraSceneIndex()
     _mayaHydraSceneIndex->_Destroy();
     Fvp::leakSceneIndex(_mayaHydraSceneIndex);
 #else
-    if (_dataProducerMergingSceneIndexProxy && _mayaHydraSceneIndex) {
+    if (_dataProducerMergingSceneIndexProxy) {
         _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
     }
 #endif
