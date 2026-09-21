@@ -220,24 +220,13 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
     endif()
 
     # Test frame range (5-9).
-    if(folder STREQUAL "storm")
-        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
-            RENDERER ${renderer}
-            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
-            IMAGE_EXTENSION png
-            TEST_NAME_SUFFIX ${suffix}Frames5to9
-            RENDERER_ARGS "-s 5 -e 9"
-        )
-    else()
-        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
-            RENDERER ${renderer}
-            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
-            IMAGE_EXTENSION png
-            TEST_NAME_SUFFIX ${suffix}Frames5to9
-            # FAIL 0.05
-            RENDERER_ARGS "-s 5 -e 9"
-        )
-    endif()
+    mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+        RENDERER ${renderer}
+        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX ${suffix}Frames5to9
+        RENDERER_ARGS "-s 5 -e 9"
+    )
 
     set(singlecam_fail_arg FAIL 0.05)
     if(folder STREQUAL "storm")
