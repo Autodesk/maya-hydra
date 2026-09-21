@@ -771,7 +771,9 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                             // Description
            << quote(_MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting).GetString())
            << ','                                                             // Attribute name
-           << quote(MtohTokens->mayaHydraOutlineHoverHighlighting.GetText()) // Label
+           << quote(
+                  MtohTokens->mayaHydraOutlineHoverHighlighting.GetString(),
+                  " (Experimental)") // Label
            << ", $fromAE);\n";
     }
 
