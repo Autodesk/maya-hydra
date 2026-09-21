@@ -34,7 +34,7 @@ If you want to <B>be able to import usd data in maya through [MayaUSD](https://g
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
->NOTE: Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
+>NOTE: Make sure that you don't have any older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
 
 #### 3. Download and Build MayaUSD 
 
@@ -55,11 +55,11 @@ To build the project with UFE support, you will need to use the headers and libr
 https://www.autodesk.com/developer-network/platform-technologies/maya
 
 #### 5. Hydra Viewport Toolbox (HVT)
-[Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) is a set of utilities to help you build hydra-based viewport. HVT is included as a submodule of the maya-hydra repository, and is built automatically when you build maya-hydra.
+[Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) is a set of utilities to help you build a Hydra-based viewport. HVT is included as a submodule of the maya-hydra repository, and is built automatically when you build maya-hydra.
 
 #### 6. Download the source code
 
-Start by cloning the repository and udpate the sub-modules :
+Start by cloning the repository and update the submodules:
 ```
 git clone https://github.com/Autodesk/maya-hydra 
 git submodule update --init --recursive
@@ -70,7 +70,7 @@ cd maya-hydra
 
 | Location      | Description                                                                                   |
 |-------------  |---------------------------------------------------------------------------------------------  |
-| [lib/adskHydraSceneBrowser](https://github.com/Autodesk/maya-hydra/tree/dev/lib/adskHydraSceneBrowser)| Contains the hydra scene browser to help you debugging the scene indices and usd data |
+| [lib/adskHydraSceneBrowser](https://github.com/Autodesk/maya-hydra/tree/dev/lib/adskHydraSceneBrowser)| Contains the Hydra scene browser to help you debug the scene indices and USD data |
 | [lib/flowViewport](https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport)| Contains the [Flow Viewport Toolkit](https://github.com/Autodesk/maya-hydra/blob/dev/doc/flowViewportToolkit.md) to add hydra primitives scene indices or add filtering scene indices to the viewport.<BR>What you retrieve in this folder is <B>the code that is not maya dependent and could be re-used by another hydra project</B>|
 | [lib/mayaHydra/](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra)| Contains code that is dependent from Maya |
 | [lib/mayaHydra/flowViewportAPIExamples](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples) | Contains samples on how to use the [Flow Viewport Toolkit](https://github.com/Autodesk/maya-hydra/blob/dev/doc/flowViewportToolkit.md) to add hydra primitives scene indices or add filtering scene indices to the viewport|
