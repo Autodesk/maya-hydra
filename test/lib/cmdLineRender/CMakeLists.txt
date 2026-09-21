@@ -234,7 +234,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
             EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
             IMAGE_EXTENSION png
             TEST_NAME_SUFFIX ${suffix}Frames5to9
-            FAIL 0.05
+            # FAIL 0.05
             RENDERER_ARGS "-s 5 -e 9"
         )
     endif()
