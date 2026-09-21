@@ -8,8 +8,7 @@
     "prmanOutputFormat",
     "mayaSphereMaterialXPRMan",
     "mayaSphereMayaMaterialPRMan",
-    "usdCamera_PRMan",
-    "usdCamera_Arnold_v2_rs"
+    "usdCamera_PRMan"
   ],
   "plugins_to_include": [],
   "plugins_to_exclude": [],
