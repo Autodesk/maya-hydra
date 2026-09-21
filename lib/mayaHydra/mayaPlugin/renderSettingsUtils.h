@@ -21,6 +21,7 @@
 
 #include <maya/MTime.h>
 
+#include <ufe/sceneItemList.h>
 #include <ufe/ufe.h>
 
 #include <pxr/pxr.h>

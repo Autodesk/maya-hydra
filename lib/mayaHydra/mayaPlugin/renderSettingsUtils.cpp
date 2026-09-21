@@ -29,6 +29,8 @@
 #include <maya/MTime.h>
 
 #include <ufe/pathString.h>
+#include <ufe/runTimeMgr.h>
+#include <ufe/sceneSegmentHandler.h>
 
 #include <pxr/base/gf/vec2d.h>
 #include <pxr/base/tf/diagnostic.h>
