@@ -371,10 +371,9 @@ mayaHydra_add_cmd_line_render_test(${scene}
 # render settings, same as testCurrentRendererSelection.py's Arnold cases).
 # Baseline is a copy of renderCurrentFrame_UsdCurrentRendererHonored.png: same
 # scene geometry/lighting, same renderer, so identical expected pixels.
-_mayaHydra_add_hydra_v2_cmd_line_render_test(${scene}
+mayaHydra_add_cmd_line_render_test(${scene}
     COPY_SCENE
     RENDERER HdArnoldRendererPlugin
-    OUTPUT_NAME ${sceneFileNameNoExt}_ArnoldOverridesStorm
     RENDERED_IMAGE_SUBDIR projects/default/images
     RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_ArnoldOverridesStorm
     RENDERER_ARGS "-im ${sceneFileNameNoExt}_ArnoldOverridesStorm"
