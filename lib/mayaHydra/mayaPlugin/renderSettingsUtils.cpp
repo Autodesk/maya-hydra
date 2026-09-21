@@ -17,6 +17,7 @@
 #include "renderSettingsUtils.h"
 
 #include "pluginDebugCodes.h"
+#include "envSettings.h"
 
 #include <mayaHydraLib/mayaUtils.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
@@ -24,10 +25,9 @@
 #include <mayaUsdAPI/utils.h>
 
 #include <maya/MAnimControl.h>
+#include <maya/MRenderUtil.h>
 #include <maya/MTime.h>
 
-#include <ufe/runTimeMgr.h>
-#include <ufe/sceneSegmentHandler.h>
 #include <ufe/pathString.h>
 
 #include <pxr/base/gf/vec2d.h>
@@ -40,11 +40,11 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/utils.h>
 #include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdRender/tokens.h>
 #include <pxr/usd/usdRender/pass.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 
@@ -64,8 +64,7 @@ bool HdArnoldUseHydraV2RenderSettings(const TfToken& rendererName)
         return false;
     }
 
-    // Default is use Hydra v1 render settings.
-    return TfGetenvBool("MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS", false);
+    return hdArnoldUseV2RenderSettings();
 }
 
 // returns true if the env var HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS is set to true
@@ -138,6 +137,26 @@ UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
     return MayaUsdAPI::ufePathToPrim(outPath);
 }
 
+// Percentage of frames completed, once renderedTime has been rendered.
+int RenderProgressPercentage(const RenderTimes& renderTimes, const MTime& renderedTime)
+{
+    const double startFrame = renderTimes.startTime.as(MTime::uiUnit());
+    const double endFrame   = renderTimes.endTime.as(MTime::uiUnit());
+    // GetRenderTimes() only ever returns a positive increment, but a
+    // SetRenderTimes() caller could pass zero.
+    const double incr = (renderTimes.timeIncr > 0.0f) ? renderTimes.timeIncr : 1.0;
+
+    // The frame loop accumulates the increment, so allow for drift when
+    // counting frames.
+    constexpr double epsilon = 1e-6;
+    const double     span = std::max(0.0, endFrame - startFrame);
+    const int        frameCount = 1 + static_cast<int>(std::floor(span / incr + epsilon));
+    const int        framesDone = 1 + static_cast<int>(std::floor(
+        std::max(0.0, renderedTime.as(MTime::uiUnit()) - startFrame) / incr + epsilon));
+
+    return std::clamp((framesDone * 100) / frameCount, 0, 100);
+}
+
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
@@ -145,9 +164,33 @@ namespace MAYAHYDRA_NS_DEF {
 Ufe::Path ExtractUsdRenderSettingsFromScene(UsdRenderSettings& usdRenderSettings)
 {
     const auto rsAppPath = GetActiveRenderSettingsAppPath();
-    const auto stage     = MayaUsdAPI::getStage(rsAppPath);
-    return FindUsdRenderSettingsOnStage(stage, usdRenderSettings) ?
-        rsAppPath : Ufe::Path();
+
+    // A render settings prim path is a proxy shape segment followed by a USD
+    // segment.  Callers rely on both being present to rebuild sibling prim
+    // paths (e.g. the render settings camera).
+    if (rsAppPath.nbSegments() < 2) {
+        return Ufe::Path();
+    }
+
+    const UsdPrim rsPrim = MayaUsdAPI::ufePathToPrim(rsAppPath);
+    if (!rsPrim.IsValid() || !rsPrim.IsA<UsdRenderSettings>()) {
+        return Ufe::Path();
+    }
+
+    // USD documentation
+    // https://openusd.org/release/user_guides/schemas/usdRender/RenderSettings.html#properties
+    // says that if no render products are supplied, renderer should still
+    // output an image. At least one renderer (Hydra Arnold) does not do this
+    // and renders nothing.  Catch the no render products case and return an
+    // empty path, so that the caller reports the render settings as unusable.
+    const UsdRenderSettings candidate(rsPrim);
+    SdfPathVector           targets;
+    if (!candidate.GetProductsRel().GetTargets(&targets) || targets.empty()) {
+        return Ufe::Path();
+    }
+
+    usdRenderSettings = candidate;
+    return rsAppPath;
 }
 
 // Read the RenderSettingsType from the render delegate (renderer)
@@ -165,8 +208,8 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     
     // Check if the scene contains Usd render settings
     UsdRenderSettings dummyUsdRenderSettings;// Pass a dummy UsdRenderSettings to just check for presence
-    const auto psPath = ExtractUsdRenderSettingsFromScene(dummyUsdRenderSettings); 
-    if (!psPath.empty()) {
+    const auto rsAppPath = ExtractUsdRenderSettingsFromScene(dummyUsdRenderSettings);
+    if (!rsAppPath.empty()) {
         TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
                      "Using Hydra v1 render settings.\n");
         return RenderSettingsType::HydraV1;
@@ -175,7 +218,6 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     TF_WARN("No USD render settings found, or USD render settings had no render products.");
     return RenderSettingsType::Unknown;
 }
-        
 // Read the raw currentRenderer value from the UsdDefaultRenderDescription node.
 // No validation is performed on the returned value.
 TfToken GetCurrentRenderer()
@@ -466,6 +508,23 @@ RenderTimes GetRenderTimes()
     // Fallback: single frame at current time.
     const auto currentTime = MAnimControl::currentTime();
     return RenderTimes(false, currentTime, currentTime, 1.0f);
+}
+
+void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime)
+{
+    // The following function is fairly inflexible.  The first string is
+    // printed between parentheses in the script editor as a batch render
+    // progress report.  In Hydra v2 render settings mode the render delegate
+    // writes render product output to the file system, and in a render with
+    // multiple render products has full control on the order in which render
+    // products are rendered.  We therefore have no visibility in the
+    // application as to which render product is being written out at any given
+    // time.  For a single render product repetitively printing out the render
+    // product name provides little value.  Printing out an empty string is not
+    // possible, as Maya fills out such a string with a "starting" message.  We
+    // therefore print out a single space.
+    MRenderUtil::sendRenderProgressInfo(
+        " ", RenderProgressPercentage(renderTimes, renderedTime));
 }
 
 } // namespace MAYAHYDRA_NS_DEF

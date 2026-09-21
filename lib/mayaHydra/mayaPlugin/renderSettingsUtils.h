@@ -21,7 +21,7 @@
 
 #include <maya/MTime.h>
 
-#include <ufe/sceneItemList.h>
+#include <ufe/ufe.h>
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
@@ -94,8 +94,10 @@ bool FindUsdRenderSettingsOnStage(
     const PXR_NS::UsdStageRefPtr& stage,
     PXR_NS::UsdRenderSettings&    outSettings);
 
-// Extract UsdRenderSettings from all MayaUsdProxyShapes in the scene.
-// Returns the path to the proxy shape node if found, empty path if not.
+// Extract the UsdRenderSettings named by the active render description path.
+// Returns the two-segment UFE path (proxy shape, then render settings prim) of
+// the active render settings prim, or an empty path when it does not resolve to
+// a UsdRenderSettings prim with at least one render product.
 Ufe::Path ExtractUsdRenderSettingsFromScene(PXR_NS::UsdRenderSettings& usdRenderSettings);
 
 // Get the UFE application path to the active render settings prim from the Maya scene.
@@ -127,6 +129,10 @@ struct RenderTimes
 
 // Get the render times from the Maya scene.
 RenderTimes GetRenderTimes();
+
+// Report to Maya the progress of a batch render, as an integer percentage of
+// the frames in renderTimes, given the frame that has just finished rendering.
+void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime);
 
 } // namespace MAYAHYDRA_NS_DEF
 
