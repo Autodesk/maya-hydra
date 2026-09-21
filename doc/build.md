@@ -59,7 +59,7 @@ https://www.autodesk.com/developer-network/platform-technologies/maya
 
 #### 6. Download the source code
 
-Start by cloning the repository and update the submodules:
+Start by cloning the repository and updating the submodules:
 ```
 git clone https://github.com/Autodesk/maya-hydra 
 git submodule update --init --recursive
