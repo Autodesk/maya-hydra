@@ -65,11 +65,9 @@ endfunction()
 # See accompanying README.md for currently supported list of label mapping.
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
-# if(NOT IS_MACOSX)
-    set(STORM_RENDER_SCENES
-        basic/sphere.ma
-    )
-# endif()
+set(STORM_RENDER_SCENES
+    basic/sphere.ma
+)
 
 # Texturing production tests. Scene + baseline live under texturing/<folder>/.
 set(_tex_scene_stems
@@ -199,8 +197,6 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         )
     endif()
 
-    # Failure with HdStorm on macOS entered as HYDRA-2139.
-    # if(NOT IS_MACOSX OR NOT folder STREQUAL "storm")
     if(NOT folder STREQUAL "storm")
         set(multi_fail_arg "")
         if(NOT folder STREQUAL "storm")
@@ -223,17 +219,15 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         )
     endif()
 
-    # Test frame range (5-9).  Failure with HdStorm on macOS entered as HYDRA-2139.
+    # Test frame range (5-9).
     if(folder STREQUAL "storm")
-        # if(NOT IS_MACOSX)
-            mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
-                RENDERER ${renderer}
-                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
-                IMAGE_EXTENSION png
-                TEST_NAME_SUFFIX ${suffix}Frames5to9
-                RENDERER_ARGS "-s 5 -e 9"
-            )
-        # endif()
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}Frames5to9
+            RENDERER_ARGS "-s 5 -e 9"
+        )
     else()
         mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
             RENDERER ${renderer}
@@ -556,12 +550,11 @@ set(MAYABATCH_TEST_SCRIPT_FILES
     testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
     testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
 )
-# registeredMayaRenderers fails on Linux and macOS.
-# if(IS_WINDOWS)
-    list(APPEND MAYABATCH_TEST_SCRIPT_FILES
-        registeredMayaRenderers.py
-    )
-# endif()
+
+
+list(APPEND MAYABATCH_TEST_SCRIPT_FILES
+    registeredMayaRenderers.py
+)
 
 # Important: All tests in MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE MUST release
 # the batch renderer by calling cmds.mayaHydraTesting(releaseBatchRenderer=True).
