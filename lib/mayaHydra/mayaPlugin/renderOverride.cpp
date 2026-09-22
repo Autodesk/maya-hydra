@@ -3343,7 +3343,7 @@ _LogPrimSelectionsForViewSelectedIsolate(const char* ufePathCStr, const Fvp::Pri
     if (primSelections.empty()) {
         TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
             .Msg(
-                "    ufePathToPrimSelections returned 0 mapping(s) for %s — isolate will not include this "
+                "    ufePathToPrimSelections returned 0 mapping(s) for %s - isolate will not include this "
                 "object.\n",
                 ufePathCStr);
         return;
@@ -3710,7 +3710,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     }
 
     // Every MtohRenderOverride registers this callback; all of them fire for each panel. Only the
-    // override that is actually driving the panel may call ReplaceIsolateSelection — otherwise a
+    // override that is actually driving the panel may call ReplaceIsolateSelection - otherwise a
     // different instance can overwrite the isolate set without USD-camera native rprim expansion
     // (wrong HdRenderIndex / scene index), hiding e.g. Camera1_cameraBody_* under MAYA_NATIVE_ROOT.
     MStatus panelRoStatus;
@@ -3818,7 +3818,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     // Loop over the view selected objects and try to create UFE paths from
     // them.  When objectStrings has a single element it is a regular object
     // selection.  When it has more than one element, Maya is using a component
-    // representation — this happens for point instances of the same
+    // representation - this happens for point instances of the same
     // PointInstancer when multiple are selected simultaneously (each string is
     // the UFE path of one instance).  We handle both cases by iterating over
     // all strings in the array.  The single-element case where that one string

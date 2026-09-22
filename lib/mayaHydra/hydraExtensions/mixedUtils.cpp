@@ -28,6 +28,7 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <mutex>
 #include <set>
 #include <string>
 
@@ -78,8 +79,6 @@
 #include <maya/MPointArray.h>
 #include <maya/MStringArray.h>
 #include <maya/MVectorArray.h>
-
-#include <atomic>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

@@ -313,10 +313,14 @@ The chain is:
    genuinely hovering, so a non-hovering viewport pays nothing.
 
 Because one `OutlineManager` is shared by every panel, the manager holds whatever the last panel
-pushed. While hover is enabled, each panel therefore pushes its inputs *every* frame rather than
-relying on the dirty flag, or it would draw the previous panel's hover. The dirty-flag optimisation
-stays valid for the selection-only case, since the selection is global and every panel wants the same
-paths.
+pushed, so a panel switch has to push even when nothing about the selection changed. `Render()`
+therefore pushes when the selection changed, or when the hover contribution this panel wants
+differs from `_pushedOutlineHoverPath` -- the hover path the manager already holds. Everything else
+in `OutlineInputs` is global and at most one panel can hold the cursor, so that second test is what
+narrows "a panel switch" down to the switches that matter: two non-hovering panels both want an
+empty hover and need no push, while switching to or from the hovered panel does. An earlier design
+pushed every frame while hover was enabled; it is not needed, and the comment above the push in
+`renderOverride.cpp` tracks the current rule.
 
 `_RemovePanel()` uninstalls the filter and clears the state *before* any teardown, so a queued mouse
 move cannot push hover inputs into a half-removed scene index chain.
