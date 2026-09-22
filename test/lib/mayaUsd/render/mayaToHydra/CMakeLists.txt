@@ -61,7 +61,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testIsolateSelectWithGeomSubset.py
     testMayaReference.py
     testTexturedMode.py
-    testSelectionColorPreferences.py
+    testSelectionColorPreferences.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testUsdDeleteCamera.py
     testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
