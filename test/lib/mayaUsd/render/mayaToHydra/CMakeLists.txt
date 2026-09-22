@@ -61,6 +61,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testIsolateSelectWithGeomSubset.py
     testMayaReference.py
     testTexturedMode.py
+    testSelectionColorPreferences.py
     testUsdDeleteCamera.py
     testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
