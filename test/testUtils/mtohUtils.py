@@ -572,6 +572,12 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.cubeTrans = cmds.polyCube()[0]
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
         self.setHdStormRenderer()
+        # openNewScene() above replaced defaultRenderGlobals, dropping the dynamic
+        # attribute setUp() wrote, so the mode has to be re-applied here. Before the
+        # assertions below, not after: the DormantPolyWire prim they filter out only
+        # exists in the legacy mode. Idempotent -- applySelectionHighlightMode()
+        # early-outs when the plug already holds the wanted index.
+        self.applySelectionHighlightMode()
         self.assertNodeNameInIndex(self.cubeShape)
         index_list = self.getIndex()
         # Get the cube prim by ignoring the prims whose name contains DormantPolywire
@@ -648,8 +654,37 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             return modeImage
         return os.path.join(self._inputDir, tail)
 
+    def assertSelectionHighlightModeApplied(self):
+        '''Fail if the mode this run was registered for is not the one in effect.
+
+        A subclass setUp() that does not chain to MayaHydraBaseTestCase.setUp(), or
+        that loads a scene after it, leaves defaultRenderGlobals at the plugin
+        default. Both modes then run identically and compare cleanly against the
+        shared reference image, so the lost coverage is otherwise invisible. Checked
+        here rather than in setUp() so it also covers a scene loaded mid-test.
+        '''
+        wantedEnumName = SELECTION_HIGHLIGHT_MODE_ENUM_NAMES[self.selectionHighlightMode()]
+        self.assertTrue(
+            cmds.objExists(SELECTION_HIGHLIGHT_MODE_ATTR),
+            "{} does not exist; this run is not in a known selection highlighting "
+            "mode. Does setUp() chain to MayaHydraBaseTestCase.setUp()?".format(
+                SELECTION_HIGHLIGHT_MODE_ATTR))
+        enumNames = cmds.attributeQuery(
+            SELECTION_HIGHLIGHT_MODE_NAME,
+            node=SELECTION_HIGHLIGHT_MODE_NODE,
+            listEnum=True)[0].split(':')
+        actualEnumName = enumNames[cmds.getAttr(SELECTION_HIGHLIGHT_MODE_ATTR)]
+        self.assertEqual(
+            actualEnumName, wantedEnumName,
+            "This run was registered for the {!r} selection highlighting mode but "
+            "the viewport is in {!r}. A setUp() override, or a scene loaded after "
+            "the mode was applied, dropped it -- call "
+            "self.applySelectionHighlightMode() after the scene load.".format(
+                wantedEnumName, actualEnumName))
+
     def assertImagesClose(self, image1, image2, fail, failpercent, image1Version=None, image2Version=None, 
                 hardfail=None, failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+        self.assertSelectionHighlightModeApplied()
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
         try:
@@ -716,5 +751,6 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.setHdStormRenderer()
 
     def runCppTest(self, testFilter):
+        self.assertSelectionHighlightModeApplied()
         with PluginLoaded("mayaHydraCppTests"):
             cmds.mayaHydraCppTest(f=testFilter, inputDir=self._inputDir, outputDir=self._testDir)

@@ -473,15 +473,6 @@ class TestMayaNodesAttributes(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _requiredPlugins = ['mtoa']
 
-    # Ensure a clean, unmodified Maya scene for each test.
-    def setUp(self):
-        mayaUtils.openNewScene()
-        modified = cmds.file(query=True, modified=True)
-        self.assertFalse(
-            modified,
-            'Internal test framework error: scene left as modified by mayaUtils.openNewScene()')
-        cmds.file(modified=False)
-
     # Create scene geometry and custom attributes for tests.
     def setupScene(self):
         cmds.polyCube()
