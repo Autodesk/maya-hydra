@@ -26,7 +26,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
-    testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
     testUSDLights.py
@@ -221,6 +220,27 @@ else()
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)
 endif()
 
+# Hover highlighting needs two things this test cannot skip its way around.
+# The plugin only builds hoverEventFilter.cpp and defines MAYAHYDRA_HAS_QT under
+# Qt6_FOUND (lib/mayaHydra/mayaPlugin/CMakeLists.txt), so without Qt the option
+# exists but nothing ever feeds it a cursor position. And the test drives the
+# viewport widget through PySide6/shiboken6 imported at module scope, so on a
+# Maya that ships PySide2 it fails at import, before setUp() can skipTest().
+# Same gate as the C++ test suite in cpp/CMakeLists.txt.
+if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
+    )
+endif()
+
+# Scripts that get no _legacy counterpart, because there is nothing for legacy
+# mode to cover -- as opposed to OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES, whose
+# primary run is forced to legacy. Without this, testOutlineHover_legacy launches
+# interactive Maya only to skipTest() every method.
+set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
+    testOutlineHover.py
+)
+
 # These scripts cannot run in outline mode, so their primary run is forced to
 # legacy and they get no _legacy counterpart.
 set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
@@ -338,6 +358,9 @@ function(mayaHydra_add_legacy_mode_test script name_suffix)
     endif()
     get_testfile_and_labels(all_labels test_filename ${script})
     if(${test_filename} IN_LIST OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES)
+        return()
+    endif()
+    if(${test_filename} IN_LIST NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES)
         return()
     endif()
     mayaUsd_get_unittest_target(target ${test_filename})
