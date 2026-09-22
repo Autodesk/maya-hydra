@@ -29,8 +29,6 @@
 #include <maya/MTime.h>
 
 #include <ufe/pathString.h>
-#include <ufe/runTimeMgr.h>
-#include <ufe/sceneSegmentHandler.h>
 
 #include <pxr/base/gf/vec2d.h>
 #include <pxr/base/tf/diagnostic.h>
@@ -84,21 +82,12 @@ bool IsPrmanRenderSettingsDriveRenderPassEnabled(const TfToken& rendererName)
 
 MPlug _GetUsdDefaultRenderDescriptionPlug(const char* attrName)
 {
-    MObject nodeObj;
+    MPlug plug;
     if (!TF_VERIFY(
-            GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj),
-            "Could not find %s node.",
-            kUsdDefaultRenderDescriptionNodeName.data())) {
-        return {};
-    }
-
-    MFnDependencyNode depNode(nodeObj);
-    MPlug plug = depNode.findPlug(attrName, true);
-    if (!TF_VERIFY(
-            !plug.isNull(),
-            "Could not find %s attribute on %s.",
-            attrName,
-            kUsdDefaultRenderDescriptionNodeName.data())) {
+            GetPlug(kUsdDefaultRenderDescriptionNodeName.data(), attrName, plug),
+            "Could not find %s node or %s attribute.",
+            kUsdDefaultRenderDescriptionNodeName.data(),
+            attrName)) {
         return {};
     }
 
@@ -239,67 +228,6 @@ TfToken GetCurrentRenderer()
     }
 
     return TfToken(rendererStr.asChar());
-}
-
-Ufe::SceneItemList GetAllMayaUsdProxyShapes()
-{
-    Ufe::SceneItemList proxyShapes;
-
-    const auto mayaSceneSegmentHandler
-        = Ufe::RunTimeMgr::instance().sceneSegmentHandler(MayaUsdAPI::getMayaRunTimeId());
-    if (!mayaSceneSegmentHandler) {
-        return proxyShapes;
-    }
-    const auto mayaRootPath = mayaSceneSegmentHandler->rootSceneSegmentRootPath();
-    const auto gatewayItems
-        = Ufe::SceneSegmentHandler::findGatewayItems(mayaRootPath, MayaUsdAPI::getUsdRunTimeId());
-    
-    std::copy(
-        gatewayItems.begin(),
-        gatewayItems.end(),
-        std::back_inserter(proxyShapes)
-    );
-    
-    return proxyShapes;
-}
-
-bool FindUsdRenderSettingsOnStage(
-    const UsdStageRefPtr& stage,
-    UsdRenderSettings&    outSettings)
-{
-    if (!stage) {
-        return false;
-    }
-
-    // USD documentation
-    // https://openusd.org/release/user_guides/schemas/usdRender/RenderSettings.html#properties
-    // says that if no render products are supplied, renderer should still
-    // output an image. At least one renderer (Hydra Arnold) does not do this
-    // and renders nothing.  Catch the no render products case and return
-    // false, so that Maya render settings default is used.
-    auto hasProducts = [](const UsdRenderSettings& rs) {
-        SdfPathVector targets;
-        return rs.GetProductsRel().GetTargets(&targets) && !targets.empty();
-    };
-
-    // This is when at the global level of a usd file/stage is defined the render settings in renderSettingsPrimPath such as :
-    //  renderSettingsPrimPath = "/Render/Settings"
-    outSettings = UsdRenderSettings::GetStageRenderSettings(stage);
-    if (outSettings.GetPrim().IsValid() && hasProducts(outSettings)) {
-        return true;
-    }
-
-    UsdPrimRange range = stage->Traverse();
-    for (UsdPrim prim : range) {
-        if (prim.GetTypeName() == TfToken("RenderSettings")) {
-            outSettings = UsdRenderSettings(prim);
-            if (outSettings.GetPrim().IsValid() && hasProducts(outSettings)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 Ufe::Path GetDefaultRenderSettingsAppPath()

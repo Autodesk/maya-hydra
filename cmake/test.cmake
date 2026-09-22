@@ -1025,8 +1025,9 @@ endfunction()
 # The first argument is the Maya scene file to render.  It can be a relative
 # path, and it may have appended labels after a | separator. 
 #
-#   RENDERER           - Name of renderer to be passed to the Render
-#                        (default hydraStorm).
+#   RENDERER           - If set, passed to Render.exe as -renderer <name>.
+#                        If omitted, no -renderer flag is passed and Render.exe
+#                        resolves the renderer via Maya's currentRenderer().
 #   IMAGE_EXTENSION    - Image file extension, without the dot (default png).
 #                        This is appended to the test name.
 #   FAIL               - idiff fail value (default 0.01)
@@ -1041,24 +1042,6 @@ endfunction()
 #   TEST_NAME_SUFFIX   - Suffix to append to the Maya scene file name to create the test name.
 #   COPY_SCENE         - If set, copies the scene file to the temporary project
 #                        before rendering.
-#   NO_RENDERER_FLAG   - If set, the -renderer <RENDERER> flag is NOT passed
-#                        on the Render.exe command line at all (RENDERER is
-#                        otherwise unused).  This exercises Render.exe's own
-#                        no-flag renderer resolution: Maya's currentRenderer()
-#                        MEL proc, which reads the UsdDefaultRenderDescription
-#                        currentRenderer attribute if authored, falling back
-#                        to defaultRenderGlobals.currentRenderer otherwise.
-#                        That fallback is Maya's Render.exe resolution only;
-#                        hydraRender itself only reads the USD currentRenderer
-#                        attribute when -renderer is omitted (see
-#                        doc/batchRenderSettings.md).
-#                        Since no renderDesc/*.xml <melheader> runs without an
-#                        explicit -renderer flag, mayaHydra never gets
-#                        loadPlugin'd (and its Hydra renderers never get
-#                        registered with Maya's `renderer` command) unless
-#                        the scene itself forces it, e.g. via
-#                        defaultRenderGlobals.preMel = "loadPlugin -quiet
-#                        mayaHydra;".
 #   ENV                - Set or append the indicated environment variables;
 #                        Similar to mayaUsd_add_test, this function manages
 #                        the same environment variables.
@@ -1069,7 +1052,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # -----------------
 
     cmake_parse_arguments(ARG
-        "COPY_SCENE;NO_RENDERER_FLAG"             # Boolean options.
+        "COPY_SCENE"                             # Boolean options.
         "RENDERER;SCENE_FILE;WORKING_DIRECTORY;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS;TEST_NAME_SUFFIX" # one_value keywords
         "ENV"                                    # multi_value keywords
         ${ARGN}
@@ -1086,11 +1069,6 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # 2) Create test
     # --------------
 
-    set(RENDERER "HdStormRendererPlugin")
-    if(ARG_RENDERER)
-        set(RENDERER "${ARG_RENDERER}")
-    endif()
-       
     if(ARG_SCENE_FILE_LABELED)
         set(SCENE_FILE_LABELED "${ARG_SCENE_FILE_LABELED}")
     endif()
@@ -1163,6 +1141,9 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     if(NOT ARG_RENDERER_ARGS MATCHES "(^| )-rd( |$)")
         set(ARG_RENDERER_ARGS "${ARG_RENDERER_ARGS} -rd \"${RENDERED_IMAGE_DIR}\"")
     endif()
+    if(ARG_RENDERER)
+        set(ARG_RENDERER_ARGS "-renderer \"${ARG_RENDERER}\" ${ARG_RENDERER_ARGS}")
+    endif()
     file(MAKE_DIRECTORY "${RENDERED_IMAGE_DIR}")
 
     # Our test command is a trivial script that invokes the Render executable
@@ -1172,11 +1153,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # The command needs to be the name of an executable, without any
     # arguments, as CMake calls an executable with that string unparsed.
 
-    if(ARG_NO_RENDERER_FLAG)
-        set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-    else()
-        set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-    endif()
+    set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
 
     # Always use the discovered idiff binary; do not fall back to PATH
     if (IMAGE_DIFF_TOOL)
@@ -1195,11 +1172,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     if (WIN32)
         set(CMD PowerShell)
 		# Windows (PowerShell)
-		if(ARG_NO_RENDERER_FLAG)
-			set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-		else()
-			set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-		endif()
+		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
         set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
 		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
@@ -1240,7 +1213,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # Set environment variables as test properties.
     _mayaHydra_setup_test_finalize_env("${test_name}")
 
-    if("${RENDERER}" STREQUAL "HdPrmanLoaderRendererPlugin")
+    if(ARG_RENDERER STREQUAL "HdPrmanLoaderRendererPlugin")
         _mayaHydra_append_prman_production_render_env("${test_name}")
     endif()
 

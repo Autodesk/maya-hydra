@@ -21,12 +21,10 @@
 
 #include <maya/MTime.h>
 
-#include <ufe/sceneItemList.h>
 #include <ufe/ufe.h>
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
-#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdRender/settings.h>
 
 #include <vector>
@@ -87,13 +85,6 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const PXR_NS::TfToke
  *  to always be present.
  */
 PXR_NS::TfToken GetCurrentRenderer();
-
-Ufe::SceneItemList GetAllMayaUsdProxyShapes();
-
-// Find UsdRenderSettings on the given stage.
-bool FindUsdRenderSettingsOnStage(
-    const PXR_NS::UsdStageRefPtr& stage,
-    PXR_NS::UsdRenderSettings&    outSettings);
 
 // Extract the UsdRenderSettings named by the active render description path.
 // Returns the two-segment UFE path (proxy shape, then render settings prim) of

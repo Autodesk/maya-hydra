@@ -110,36 +110,8 @@ the legacy (non-Hydra) `render`/`Render` command path.
 ### Version-contract requirement
 
 The `UsdDefaultRenderDescription` node and its `currentRenderer` attribute
-are looked up unconditionally, without feature-detecting whether they
-exist.  In every supported production configuration, MayaUSD's
-`UsdDefaultRenderDescription` singleton (and its `currentRenderer`
-attribute) is always present, so a missing node or attribute is treated as
-a coding error, not as "the feature is disabled".  Either that case or an
-unauthored (empty) attribute value is reported as "no renderer specified".
-
-### Error posture
-
-Resolution failures always produce a clear error and abort the batch
-render — there is no silent fallback to a default renderer:
-
-- **No flag and an empty/missing `currentRenderer`:** fails with "no
-  renderer specified..." before any render delegate is created.
-- **An unrecognized renderer name** (from either the flag or the
-  attribute): resolution itself does not validate the name against Maya's
-  registered renderers.  Instead, the name is looked up against the
-  registered Hydra render delegates when the batch renderer initializes;
-  if no matching render delegate plugin is found, it fails with "unknown
-  or unregistered renderer...".  Either way, the failure surfaces as a
-  Python `RuntimeError` from `cmds.hydraRender()` and does not crash or
-  otherwise disturb the Maya session — a subsequent `hydraRender` call
-  with a valid renderer succeeds normally.
-
-### No hardcoded default renderer
-
-This is intentional: `hydraRender` never falls back to a hardcoded renderer
-(e.g. Storm) on its own.  Callers must either pass `-renderer`/`-r`
-explicitly or author the `currentRenderer` attribute (see "No flag and an
-empty/missing `currentRenderer`" above).
+are guaranteed to be present in every supported configuration.
+There is no silent fallback to a default renderer.
 
 ## Strategy Selection
 
