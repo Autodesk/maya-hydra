@@ -765,6 +765,14 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ", $fromAE);\n";
 
         // Bool attribute: renders as a checkbox.
+        //
+        // Offered only where it can do something. Without Qt in the devkit the plugin does not
+        // build hoverEventFilter.cpp (see MAYAHYDRA_HAS_QT in mayaPlugin/CMakeLists.txt), so
+        // nothing ever feeds a cursor position; and where the outline mode is not offered at all
+        // the enum above lists legacy only, which hover does not apply to. The attribute itself
+        // is still created unconditionally in CreateAttributes(), so a scene authored on a
+        // capable build still loads here.
+#if defined(MAYAHYDRA_HAS_QT) && !defined(MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT)
         ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
            << ',' << quote("Outline the object under the cursor. Requires the Outline selection "
                            "highlight mode.")
@@ -775,6 +783,7 @@ void MtohRenderGlobals::BuildOptionsMenu(
                   MtohTokens->mayaHydraOutlineHoverHighlighting.GetString(),
                   " (Experimental)") // Label
            << ", $fromAE);\n";
+#endif
     }
 
     {
