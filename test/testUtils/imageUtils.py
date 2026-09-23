@@ -19,6 +19,7 @@ import platform
 import maya.cmds as cmds
 import shutil
 import subprocess
+import sys
 
 KNOWN_FORMATS = {
     'gif': 0,
@@ -120,48 +121,64 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
     cmd.extend([imagePath1, imagePath2])
     
     if verbose:
-        import sys
         sys.__stdout__.write("\nimage diffing with {0}".format(cmd))
         sys.__stdout__.flush()
 
-    try:
-        # Run idiff command
-        #
-        # On some Windows 11 machines we were randomly getting a failure when
-        # launching the subprocess.run().
-        #   OSError: [WinError 50] The request is not supported
-        #
-        # The cause appeared to come from the subprocess.run() call where it
-        # was only capturing stdout. In subprocess the error occured when trying
-        # to duplicate the stderr handle.
-        #proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
-        # When using flag 'capture_output=True' to capture both (stdout/stderr) the
-        # random error disappeared.
-        #
-        # On Windows 11 24H2 (Windows Terminal as the default console host),
-        # launching a console child like idiff.exe from a Maya UI process (which
-        # has no inherited console) hangs subprocess.run forever -- Windows
-        # fails the console-pipe handshake with ERROR_NO_DATA (0x800700E8).
-        # CREATE_NO_WINDOW skips that handshake.
-        creation_flags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            shell=False,
-            env=os.environ.copy(),
-            creationflags=creation_flags,
-        )
-    except OSError as e:
-        # If its not the random WinError 50 we re-raise it.
-        if '[WinError 50]' not in str(e):
-            raise
+    # Run idiff command
+    #
+    # On some Windows 11 machines we were randomly getting a failure when
+    # launching the subprocess.run().
+    #   OSError: [WinError 50] The request is not supported
+    #
+    # The cause appeared to come from the subprocess.run() call where it
+    # was only capturing stdout. In subprocess the error occured when trying
+    # to duplicate the stderr handle.
+    #proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
+    # When using flag 'capture_output=True' to capture both (stdout/stderr) the
+    # random error disappeared.
+    #
+    # On Windows 11 24H2 (Windows Terminal as the default console host),
+    # launching a console child like idiff.exe from a Maya UI process (which
+    # has no inherited console) hangs subprocess.run forever -- Windows
+    # fails the console-pipe handshake with ERROR_NO_DATA (0x800700E8).
+    # CREATE_NO_WINDOW skips that handshake.
+    creation_flags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
 
-        if verbose:
-            sys.__stdout__.write('\nimageDiff failed with: {0}'.format(str(e)))
-            sys.__stdout__.flush()
-    else:
-        # Successfully executed imageDiff.
-        return proc
+    timeoutSeconds = 20
+    maxAttempts = 3
+
+    for attempt in range(1, maxAttempts + 1):
+        try:
+            # https://github.com/python/cpython/issues/88693#issuecomment-3177334016
+            # suggests setting stdin to DEVNULL to avoid hanging waiting on
+            # stdin, though for idiff this seems unlikely.
+            proc = subprocess.run(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                shell=False,
+                env=os.environ.copy(),
+                creationflags=creation_flags,
+                timeout=timeoutSeconds,
+            )
+        except subprocess.TimeoutExpired:
+            sys.__stderr__.write(
+                '\nWarning: imageDiff timed out after {0} seconds '
+                '(attempt {1} of {2}): {3}'.format(timeoutSeconds, attempt,
+                                                   maxAttempts, cmd))
+            sys.__stderr__.flush()
+        except OSError as e:
+            # If its not the random WinError 50 we re-raise it.
+            if '[WinError 50]' not in str(e):
+                raise
+
+            if verbose:
+                sys.__stdout__.write('\nimageDiff failed with: {0}'.format(str(e)))
+                sys.__stdout__.flush()
+            break
+        else:
+            # Successfully executed imageDiff.
+            return proc
 
     return None # Running of imageDiff failed.
 
