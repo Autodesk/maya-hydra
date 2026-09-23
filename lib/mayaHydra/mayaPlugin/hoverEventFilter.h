@@ -27,23 +27,20 @@
 namespace MAYAHYDRA_NS_DEF {
 
 /// \class HoverEventFilter
-/// A passive Qt event filter installed on a Maya 3D viewport widget to track the mouse cursor
-/// position for viewport hover highlighting. It never consumes events, so Maya's own interaction is
-/// unaffected, and it enables mouse tracking so move events arrive with no button held.
+/// Passive Qt event filter on a Maya viewport widget that reports the cursor position for hover
+/// highlighting. It never consumes events.
 ///
-/// Deliberately no Q_OBJECT macro: no signals or slots are needed, so this target does not have to
-/// enable CMake's AUTOMOC. Adding one would require enabling it.
+/// No Q_OBJECT macro, so the target does not need CMake's AUTOMOC; adding one would require it.
 class HoverEventFilter : public QObject
 {
 public:
-    /// Callback signature: (deviceX, deviceY, active). Coordinates are device pixels -- the logical
-    /// position scaled by the widget's device-pixel ratio -- and keep Qt's top-left origin, which
-    /// the consumer converts to Maya's bottom-left. \p active is true only for a genuine hover:
-    /// cursor inside the widget with no button held. When false the coordinates are (-1, -1).
+    /// Callback signature: (deviceX, deviceY, active). Coordinates are device pixels with Qt's
+    /// top-left origin; the consumer converts to Maya's bottom-left. \p active is true only when
+    /// the cursor is inside the widget with no button held. On leave the coordinates are (-1, -1).
     using PositionCallback = std::function<void(int, int, bool)>;
 
-    /// Installs the filter on \p widget and enables mouse tracking. The callback is
-    /// invoked on the UI thread for each mouse-move and leave event.
+    /// Installs the filter on \p widget and enables mouse tracking. The callback is invoked on the
+    /// UI thread for mouse move, press, release and leave events.
     HoverEventFilter(QWidget* widget, PositionCallback callback);
     ~HoverEventFilter() override;
 
@@ -51,8 +48,8 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    /// QPointer, not a raw pointer: on plugin unload and Maya shutdown the widget can be destroyed
-    /// before this filter is, and the destructor touches the widget.
+    /// QPointer: the widget can be destroyed before this filter (plugin unload, Maya shutdown), and
+    /// the destructor touches it.
     QPointer<QWidget> _widget;
     PositionCallback  _callback;
     bool              _mouseTrackingWasEnabled { false };

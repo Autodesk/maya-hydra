@@ -199,45 +199,30 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
     cpp/testHydraGenerativeProcedural.py
 )
 
-# Every interactive test runs in both selection highlighting modes, so that both
-# shipping modes stay covered. The primary run uses outline, the mode the plugin
-# ships as its default, and a _legacy counterpart runs the wireframe highlight.
+# Every interactive test runs in both selection highlighting modes: the primary
+# run uses outline (the plugin default) and a _legacy counterpart uses the
+# wireframe highlight. Per-mode reference images live in a "<mode>" subfolder and
+# are only needed where the output differs (see MayaHydraBaseTestCase).
 #
-# A test only needs its own reference images per mode when its output actually
-# depends on the mode: MayaHydraBaseTestCase uses a "<mode>" subfolder when the
-# test supplies one and the shared images otherwise. So a mode-independent test
-# needs no entry in any list and no second set of images - and if it turns out to
-# be mode-sensitive after all, one of its two runs fails against the shared image
-# instead of silently losing coverage.
-#
-# Outline is not offered everywhere: on USD <= 24.11 HgiGL corrupts the prim ids the
-# outline compute shader samples, and it is unsupported on macOS. In both cases the
-# render global has a single "Legacy Selection" entry, so every primary run is the
-# legacy one and there are no _legacy counterparts. Keep this in sync with
-# MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT in lib/mayaHydra/mayaPlugin/renderGlobals.cpp.
+# Outline is unavailable on USD <= 24.11 (HgiGL corrupts the prim ids the outline
+# shader samples) and on macOS; there every primary run is legacy and there are no
+# _legacy counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+# (renderGlobals.cpp) and outlineSelectionHighlightSupported() (mtohUtils.py).
 if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX)
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
 else()
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)
 endif()
 
-# Hover highlighting needs two things this test cannot skip its way around.
-# The plugin only builds hoverEventFilter.cpp and defines MAYAHYDRA_HAS_QT under
-# Qt6_FOUND (lib/mayaHydra/mayaPlugin/CMakeLists.txt), so without Qt the option
-# exists but nothing ever feeds it a cursor position. And the test drives the
-# viewport widget through PySide6/shiboken6 imported at module scope, so on a
-# Maya that ships PySide2 it fails at import, before setUp() can skipTest().
-# Same gate as the C++ test suite in cpp/CMakeLists.txt.
+# Hover needs Qt6: without it the plugin has no hover event filter, and the test
+# imports PySide6 at module scope, so it cannot skip itself.
 if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
     )
 endif()
 
-# Scripts that get no _legacy counterpart, because there is nothing for legacy
-# mode to cover -- as opposed to OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES, whose
-# primary run is forced to legacy. Without this, testOutlineHover_legacy launches
-# interactive Maya only to skipTest() every method.
+# Outline-only scripts: no _legacy counterpart, as legacy mode has nothing to cover.
 set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineHover.py
 )
@@ -249,17 +234,13 @@ set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
     testNativeInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
     testPointInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
     testStageInstanceablePrimsSelHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
-    # TODO: revisit with HYDRA-2457 (wireframe-on-shaded). Outline skips translating a selected
-    # object's wireframe render item until it is actually needed, so toggling wireframeOnShaded adds
-    # a new prim in outline mode instead of just dirtying an existing one, as legacy does.
+    # TODO: revisit with HYDRA-2457 (wireframe-on-shaded). Outline defers translating a selected
+    # object's wireframe render item, so toggling wireframeOnShaded adds a prim instead of dirtying one.
     cpp/testSceneIndexDirtying.py
-    # Intentionally excluded: asserts the legacy highlight prim's material binding is blocked.
-    # Outline never creates a highlight prim to bind a material to in the first place.
+    # Legacy-only by design: checks the material binding of the legacy highlight prim.
     cpp/testMaterialBlocking.py
-    # Intentionally excluded: asserts pass routing of the legacy dormant-wireframe and
-    # FlowViewportSelectionHighlights prims specifically, which only exist in legacy mode. The
-    # mode-agnostic pass-routing assertions were split out into testPassFiltering, which runs in
-    # both modes.
+    # Legacy-only by design: checks pass routing of highlight prims that only exist in legacy
+    # mode. The mode-independent pass-routing checks are in testPassFiltering.
     cpp/testLegacyHighlightPassRouting.py
 )
 
@@ -348,8 +329,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
 
 endforeach()
 
-# The legacy counterpart of each interactive test. A script whose primary run is
-# already the legacy one gets none, so nothing is registered twice.
+# Registers the legacy counterpart of an interactive test, unless its primary
+# run is already legacy.
 #   name_suffix - appended before "_legacy", to keep the target unique for
 #                 scripts registered by more than one configuration.
 #   ARGN        - the ENV entries of the configuration being mirrored.

@@ -211,17 +211,11 @@ public:
     MAYAHYDRALIB_API
     bool GetIsRenderITemAnaiSkydomeLightTriangleShape() const {return _isArnoldSkyDomeLightTriangleShape;}
 
-    /// Whether this item is the wireframe VP2 uses as the object-level selection highlight, and so
-    /// carries nothing the pixel outline does not already draw.
-    ///
-    /// Cached rather than recomputed because RefreshRenderItemLegacyHighlightTreatment re-evaluates
-    /// every adapter, and computing it needs MGeometryUtilities::displayStatus() -- a Maya DAG query
-    /// per item. With two panels in different display styles that walk runs on every frame.
-    ///
-    /// Written by UpdateRenderItems, which sees a delta for the wire whenever the shape's selection
-    /// state changes, so the cached value cannot go stale. Always false while the legacy highlight is
-    /// enabled, since no wire is replaceable then; a highlight-mode switch recreates every adapter
-    /// anyway, so the value cannot outlive the mode it was computed in.
+    /// Whether this item is the VP2 selection-highlight wireframe that the outline replaces.
+    /// Cached because computing it needs a Maya DAG query (displayStatus()), and
+    /// RefreshRenderItemLegacyHighlightTreatment reads it for every adapter. Set by
+    /// UpdateRenderItems, which receives a delta for the wire whenever the shape's selection state
+    /// changes. Always false while the legacy highlight is enabled.
     MAYAHYDRALIB_API
     void SetIsReplaceableHighlightWire(bool val) { _isReplaceableHighlightWire = val; }
 

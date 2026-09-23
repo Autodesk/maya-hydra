@@ -84,22 +84,10 @@ PruneTexturesSceneIndex::MarkTexturesDirty(bool pruneTextures)
 {
     _pruneTextures = pruneTextures;
 
-    // Storm does not re-resolve a mesh's primvar requirements from a material dirty alone, so
-    // toggling the viewport's Textured mode needs more than the material locator to take effect.
-    //
-    // The primvars entry is the long-standing HYDRA-1061 workaround and is sufficient for a
-    // UsdPreviewSurface network. It is NOT sufficient for a MaterialX network: the surface shader
-    // is code-generated, and the UV primvar it consumes through a geompropvalue node is only
-    // re-requested when the rprim re-initialises its repr -- which is what the displayStyle dirty
-    // triggers. Without it the restored texture connections sample a UV set the mesh no longer
-    // provides, and the surface renders black.
-    //
-    // That displayStyle dirty used to arrive by accident: ReprSelectorSceneIndex::SetReprType()
-    // fired on any display-style change, including the Textured bit, and dirties every prim with
-    // {displayStyle, primvars, purpose, visibility, xform}. Once that push became conditional on
-    // the repr actually changing, the texture toggle lost its invalidation and testTexturedMode
-    // began rendering a black sphere on USD 24.11. Requesting it here makes the toggle
-    // self-sufficient rather than dependent on an unrelated scene index firing on the same frame.
+    // A material dirty alone does not make Storm re-resolve a mesh's primvar requirements.
+    // The primvars locator is enough for UsdPreviewSurface, but a MaterialX shader only
+    // re-requests its UV primvar when the rprim re-initializes its repr, which the displayStyle
+    // locator triggers. Without it, MaterialX surfaces render black after the Textured toggle.
     const HdDataSourceLocatorSet locators {
         HdMaterialSchema::GetDefaultLocator().Append(HdMaterialSchemaTokens->material),
         // Workaround for HYDRA-1061, see https://forum.aousd.org/t/primvars-and-material-dirtying-issue-in-storm/1675

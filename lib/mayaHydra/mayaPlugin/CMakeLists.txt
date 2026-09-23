@@ -119,9 +119,8 @@ target_link_libraries(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 # hover highlighting (Qt)
 # -----------------------------------------------------------------------------
-# The mouse-move source for hover highlighting is a Qt event filter on the
-# viewport widget. Qt6 is found only when the Maya devkit ships it, so a build
-# without Qt is expected: everything else works, minus hover highlighting.
+# Hover highlighting reads the cursor through a Qt event filter. Qt6 is found
+# only when the Maya devkit ships it; without it, everything but hover works.
 if(Qt6_FOUND)
     target_sources(${TARGET_NAME}
         PRIVATE

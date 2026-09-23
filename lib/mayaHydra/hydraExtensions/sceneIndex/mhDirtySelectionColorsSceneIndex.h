@@ -38,10 +38,8 @@ typedef PXR_NS::TfRefPtr<const MhDirtySelectionColorsSceneIndex> MhDirtySelectio
 
 
 /// \class MhDirtySelectionColorsSceneIndex
-/// Invalidates the wireframe colors of prims whose selection state changed, so they re-pull a
-/// color that reflects it. A color is only re-pulled when its prim is dirtied, and nothing else
-/// does that on a selection change, so without this a marquee selection leaves every non-lead
-/// prim miscolored.
+/// Dirties the wireframe and display colors of prims whose selection state changed, so they
+/// re-pull a color that reflects it.
 ///
 /// dirtyLeadObjectRelatedSelections() handles a change of which object is the lead;
 /// dirtySelectionRelatedPrims() a change of what is selected.
@@ -70,8 +68,7 @@ public:
     MAYAHYDRALIB_API
     void dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections);
 
-    /// Call with the prims that were selected or deselected: both need re-pulling, one to pick up
-    /// the selection color and one to drop it.
+    /// Call with the prims that were selected or deselected.
     MAYAHYDRALIB_API
     void dirtySelectionRelatedPrims(const PXR_NS::SdfPathVector& primPaths);
 
@@ -96,15 +93,9 @@ protected:
         _SendPrimsRemoved(entries);
     }
 
-    /// Appends a primvar-colors dirty entry for \p primPath and everything below it, following
-    /// instancer prototypes as well as child paths. \p inoutVisited is owned by the caller and
-    /// shared across every path in one call: a delta can legitimately contain both a prim and its
-    /// descendant, and without a call-wide set the shared subtree is walked once per ancestor and
-    /// emits duplicate dirty entries.
-    ///
-    /// Instancer prototypes are only followed explicitly when \p primPath is not the absolute root.
-    /// From the root the child walk already reaches them, and the per-prim GetPrim() that finds
-    /// instancers would otherwise be paid for every prim in the scene.
+    /// Appends a primvar-colors dirty entry for \p primPath and everything below it, including
+    /// instancer prototypes. \p inoutVisited is shared across all paths of one call to avoid
+    /// duplicate entries when paths overlap.
     MAYAHYDRALIB_API
     void _DirtyPrimPathRecursively(
         const PXR_NS::SdfPath&                                      primPath,

@@ -105,19 +105,15 @@ public:
         bool legacyMayaNativeHighlightEnabled = true;
 
         /// Whether the panel being drawn draws wireframes. Decides whether a highlight wire is
-        /// *visible*, and so must be re-pushed whenever the panel being drawn changes.
+        /// visible.
         bool viewportDrawsWireframes = false;
 
-        /// Whether any panel this override drives draws wireframes. Decides whether a highlight
-        /// wire is *translated at all*. Has to be the union across panels rather than the current
-        /// panel's value: one MtohRenderOverride serves every panel using the renderer and the
-        /// render item prims are shared, so a wire skipped for a shaded panel is gone for good --
-        /// Maya does not re-send it, and RefreshRenderItemLegacyHighlightTreatment cannot recover
-        /// an adapter that was never created.
+        /// Whether any panel using this override draws wireframes. Decides whether a highlight
+        /// wire is translated at all. A union across panels because render item prims are shared
+        /// between panels, and Maya does not re-send a skipped wire.
         bool anyViewportDrawsWireframes = false;
 
-        /// Reconsider the wires a previous update skipped, for one update, instead of forcing Maya to
-        /// re-send them.
+        /// Reconsider, for this update only, the wires a previous update skipped.
         bool reconsiderSkippedHighlightWires = false;
     };
 

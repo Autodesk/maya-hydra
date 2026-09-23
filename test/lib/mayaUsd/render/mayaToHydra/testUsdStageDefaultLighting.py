@@ -34,8 +34,7 @@ class TestUsdStageDefaultLighting(mtohUtils.MayaHydraBaseTestCase): #Subclassing
         testFile = mayaUtils.openTestScene(
                 "testUsdStageDefaultLighting",
                 "testUsdStageDefaultLighting.ma")
-        # Opening a scene replaces defaultRenderGlobals, which drops the dynamic
-        # attribute super().setUp() wrote, so re-apply the mode to the loaded scene.
+        # Opening a scene resets defaultRenderGlobals, so re-apply the mode.
         self.applySelectionHighlightMode()
         cmds.refresh()
     

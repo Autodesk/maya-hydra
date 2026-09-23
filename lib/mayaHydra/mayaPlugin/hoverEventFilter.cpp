@@ -39,8 +39,8 @@ HoverEventFilter::HoverEventFilter(QWidget* widget, PositionCallback callback)
     , _callback(std::move(callback))
 {
     if (_widget) {
-        // Without mouse tracking a widget only receives move events while a button is
-        // held; hover needs button-less moves, so enable it (restored on destruction).
+        // Without mouse tracking, move events arrive only while a button is held. Restored on
+        // destruction.
         _mouseTrackingWasEnabled = _widget->hasMouseTracking();
         _widget->setMouseTracking(true);
         _widget->installEventFilter(this);
@@ -59,12 +59,9 @@ bool HoverEventFilter::eventFilter(QObject* watched, QEvent* event)
 {
     if (watched == _widget && _callback) {
         switch (event->type()) {
-        // Press and release are handled by the same code as a move: Qt reports buttons() with the
-        // pressed button already included on a press and the released one already removed on a
-        // release, so `active` below comes out right for all three. Without them, pressing a button
-        // without moving the cursor leaves the hover outline drawn through the click -- the start
-        // of a tumble or a marquee drag -- and releasing without moving leaves it off until the
-        // next move.
+        // Press and release are handled like a move, so the hover turns off as soon as a click
+        // starts (tumble, marquee) and back on at release, without waiting for the cursor to move.
+        // buttons() already reflects the pressed or released button, so `active` is correct.
         case QEvent::MouseButtonPress:
         case QEvent::MouseButtonRelease:
         case QEvent::MouseMove: {

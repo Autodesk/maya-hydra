@@ -1121,8 +1121,7 @@ PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token)
     PXR_NS::GfVec4f color(0.0f, 0.0f, 0.0f, 1.0f);
 
     if (!Fvp::ColorPreferences::getInstance().getColor(token, color)) {
-        // Per token, not per function. Guarded because RefreshColors() can be driven
-        // from a preference notification off the render thread.
+        // Warn once per token. Guarded because this can run off the render thread.
         static std::mutex                warnedMutex;
         static std::set<PXR_NS::TfToken> warnedTokens;
         bool                             firstForThisToken = false;

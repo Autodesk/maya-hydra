@@ -40,13 +40,13 @@
 // This file is where we build the UI and expose to MEL the global parameters from this plug-in and
 // the parameters from the chosen render delegate.
 
-// The Outline selection-highlight mode is not offered in these configurations: the
-// mayaHydraSelectionHighlightMode enum lists "Legacy Selection" only, and it is the default.
-//  - USD <= 24.11: HgiGL corrupts the non-zero integer prim ids the outline compute shader samples.
-//  - macOS: outline selection highlighting is not supported.
-// Keep this in sync with MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in
-// test/testUtils/mtohUtils.py and MAYAHYDRA_OUTLINE_MODE_AVAILABLE in
-// test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
+// Configurations where the Outline selection-highlight mode is not offered (the enum lists
+// "Legacy Selection" only):
+//  - USD <= 24.11: HgiGL corrupts the integer prim ids the outline compute shader samples.
+//  - macOS: not supported.
+// Keep in sync with outlineSelectionHighlight's default in renderGlobals.h,
+// MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in test/testUtils/mtohUtils.py and
+// MAYAHYDRA_OUTLINE_MODE_AVAILABLE in test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
 #if PXR_VERSION <= 2411 || defined(__APPLE__)
 #define MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
 #endif
@@ -756,7 +756,7 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
            << ", $fromAE);\n";
 
-        // Enum attribute: renders as a dropdown (Outline Selection / Legacy Selection).
+        // Dropdown: Outline Selection / Legacy Selection.
         ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
            << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
            << quote(_MangleName(MtohTokens->mayaHydraSelectionHighlightMode).GetString())
@@ -764,14 +764,9 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
            << ", $fromAE);\n";
 
-        // Bool attribute: renders as a checkbox.
-        //
-        // Offered only where it can do something. Without Qt in the devkit the plugin does not
-        // build hoverEventFilter.cpp (see MAYAHYDRA_HAS_QT in mayaPlugin/CMakeLists.txt), so
-        // nothing ever feeds a cursor position; and where the outline mode is not offered at all
-        // the enum above lists legacy only, which hover does not apply to. The attribute itself
-        // is still created unconditionally in CreateAttributes(), so a scene authored on a
-        // capable build still loads here.
+        // Checkbox, shown only where hover can work: it needs Qt for the cursor position
+        // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
+        // everywhere, so scenes saved on a capable build load on any build.
 #if defined(MAYAHYDRA_HAS_QT) && !defined(MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT)
         ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
            << ',' << quote("Outline the object under the cursor. Requires the Outline selection "
@@ -1006,16 +1001,14 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             node,
             filter.mayaString(),
             kSelectionHighlightModes,
-            kSelectionHighlightModes[0], // default = first entry, Legacy where Outline is unavailable
+            kSelectionHighlightModes[0], // Outline, or Legacy where Outline is unavailable
             userDefaults);
         if (filter.attributeFilter()) {
             return mayaObject;
         }
     }
-    // Script-only: deliberately absent from BuildOptionsMenu. Additive only --
-    // mayaHydraOutlineHoverHighlighting on its own still runs the pick and draws the hover, exactly
-    // as shipped. This attribute force the interactive hit test even if outline drawing is disabled,
-    // so the two costs can be split for performance profiling purposes.
+    // Script-only profiling switch, deliberately absent from BuildOptionsMenu: runs the hover hit
+    // test without drawing the hover, so pick cost can be measured apart from draw cost.
     if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
         _CreateBoolAttribute(
             node,

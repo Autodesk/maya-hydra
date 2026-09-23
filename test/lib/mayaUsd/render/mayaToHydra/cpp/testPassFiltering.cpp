@@ -42,10 +42,8 @@ bool findSphereMeshPredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPat
 
 } // namespace
 
-// Pass routing for ordinary (non-highlight) prims: materials, meshes and lights. Kept separate from
-// testLegacyHighlightPassRouting, which asserts on FlowViewportSelectionHighlights prims that only
-// exist in legacy selection-highlight mode -- this test's prims exist, and are expected to route the
-// same way, regardless of selection-highlight mode.
+// Pass routing for non-highlight prims (materials, meshes, lights), which is the same in both
+// selection-highlight modes. See testLegacyHighlightPassRouting for the legacy highlight prims.
 TEST(PassFiltering, testPassFiltering)
 {
     std::vector<HdSceneIndexBasePtr> passSceneIndices = {

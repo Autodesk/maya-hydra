@@ -28,33 +28,26 @@ class TestDeferredHighlightWireInit(mtohUtils.MayaHydraBaseTestCase):
         self.setHdStormRenderer()
         panel = self.activeEditor
 
-        # Shaded only -- no wireframe-on-shaded, no shade-active-only -- so
-        # viewportDrawsWireframes() is false and a selected shape's wireframe
-        # render item is skipped rather than translated.
+        # Shaded only, so a selected shape's wireframe render item is skipped.
         cmds.modelEditor(panel, edit=True, displayAppearance='smoothShaded',
                          wireframeOnShaded=False, activeOnly=False)
         cmds.refresh(force=True)
 
-        # Off the origin, so a zero or uninitialized transform is distinguishable
-        # from the correct one.
+        # Off the origin, so an identity transform is distinguishable.
         cube = cmds.polyCube(w=2, h=2, d=2)[0]
         cmds.move(10, 5, -3, cube, absolute=True)
         cmds.select(cube, replace=True)
         shape = cmds.listRelatives(cube, shapes=True, fullPath=True)[0]
 
-        # Drop every render-item adapter and re-send while the shape is selected:
-        # this is what makes the DormantPolyWire reach the scene index for the
-        # first time in the state that takes the skip. Without it the adapter may
-        # already exist from a dormant frame and the deferred path is never
-        # exercised -- selecting an already-translated object and then switching
-        # display style does NOT reproduce the defect.
+        # Re-send all render items while the shape is selected, so the
+        # DormantPolyWire is first seen in the state that skips it. Otherwise
+        # its adapter may already exist and the deferred path is not exercised.
         cmds.ogs(reset=True)
         maya.utils.processIdleEvents()
         cmds.refresh(force=True)
 
-        # Now make the panel draw wireframes. This is the transition that sets
-        # reconsiderSkippedHighlightWires, so the adapter is created from a delta
-        # that carries only visibility bits.
+        # Switching to wireframe sets reconsiderSkippedHighlightWires, so the
+        # adapter is created from a delta carrying only visibility bits.
         cmds.modelEditor(panel, edit=True, displayAppearance='wireframe')
         cmds.refresh(force=True)
 

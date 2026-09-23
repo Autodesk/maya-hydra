@@ -27,8 +27,7 @@ class TestVisibility(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestVisibility, self).setUp()
-        # makeCubeScene() re-applies the selection highlighting mode itself, since
-        # it opens a new scene.
+        # makeCubeScene() opens a new scene and re-applies the highlighting mode.
         self.makeCubeScene(camDist=6)
         self.assertTrue(cmds.getAttr("{}.visibility".format(self.cubeTrans)))
         self.assertTrue(cmds.getAttr("{}.visibility".format(self.cubeShape)))

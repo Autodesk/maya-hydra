@@ -508,10 +508,9 @@ class TestMayaNodesAttributes(mtohUtils.MayaHydraBaseTestCase):
     # primvars removed when reset to default.
     def test_aiPrimvarsAppearAndRemovedWhenReset(self):
         if self.selectionHighlightMode() == mtohUtils.SELECTION_HIGHLIGHT_MODE_LEGACY:
-            # Switching to legacy in setUp() rebuilds the Hydra resources, which leaks the previous
-            # MayaHydraSceneIndex with its Maya callbacks still live and its render index freed.
-            # The ai* attribute changes below then reach it and intermittently crash. Pre-existing
-            # on dev; to be fixed separately, at which point this skip goes.
+            # The mode switch in setUp() leaks the previous MayaHydraSceneIndex with its Maya
+            # callbacks still live, and the ai* attribute changes below can crash in it. Remove
+            # this skip once the leak is fixed.
             self.skipTest("MayaHydraSceneIndex leak across a selection highlight mode switch "
                           "(use-after-free on attribute change); tracked separately.")
         self.setupSceneWithLight()

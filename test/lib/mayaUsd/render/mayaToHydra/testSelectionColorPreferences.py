@@ -22,17 +22,11 @@ import mayaUtils
 import mtohUtils
 
 class TestSelectionColorPreferences(mtohUtils.MayaHydraBaseTestCase):
-    '''A colour preference edit must repaint what is already on screen.
+    '''A colour preference edit must repaint what is already on screen on the next frame.
 
-    MtohRenderOverride::ColorPreferencesChanged() only sets dirty flags; the outline
-    style rebuild, MhWireframeColorInterfaceImp::RefreshColors() and the prim
-    invalidation all happen on the next Render(). Nothing else asserts that, and the
-    invalidation is split by reach -- the two selection colours reach only selected
-    prims and the *WhSi highlight prims, polymeshDormant reaches every prim -- so a
-    test has to cover both halves or an inverted split passes.
-
-    Deliberately never re-selects between the edit and the capture: a selection change
-    dirties the prims by itself and would mask the bug this guards.
+    The selection colours dirty only selected prims and highlight prims, while
+    polymeshDormant dirties every prim, so both cases are tested. The selection is
+    never changed between edit and capture, since that would dirty the prims by itself.
     '''
 
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -49,7 +43,7 @@ class TestSelectionColorPreferences(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestSelectionColorPreferences, self).setUp()
-        # makeCubeScene() re-applies the selection highlighting mode itself.
+        # makeCubeScene() opens a new scene and re-applies the highlighting mode.
         self.makeCubeScene(camDist=8)
         self.secondCube = cmds.polyCube()[0]
         cmds.setAttr(self.secondCube + '.translateX', 3)
@@ -61,11 +55,7 @@ class TestSelectionColorPreferences(mtohUtils.MayaHydraBaseTestCase):
         super(TestSelectionColorPreferences, self).tearDown()
 
     def setPref(self, name, r, g, b):
-        '''Change a colour preference and hand the viewport one frame to react.
-
-        No selection change in between: the repaint has to come from
-        ColorPreferencesChanged()'s flags alone.
-        '''
+        '''Change a colour preference and render one frame.'''
         cmds.displayRGBColor(name, r, g, b)
         cmds.refresh(force=True)
 
@@ -85,9 +75,8 @@ class TestSelectionColorPreferences(mtohUtils.MayaHydraBaseTestCase):
                                  self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_dormantColorAppliesImmediately(self):
-        # Wireframe: the display style that actually pulls polymeshDormant. Nothing
-        # selected, so this exercises the other side of the reach split -- the
-        # every-prim colour, with no selected prim involved.
+        # Wireframe is the display style that uses polymeshDormant. Nothing is
+        # selected, so only the every-prim colour is involved.
         cmds.select(clear=True)
         cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True,
                          displayAppearance='wireframe')

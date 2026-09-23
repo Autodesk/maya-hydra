@@ -43,8 +43,7 @@ void MhDirtySelectionColorsSceneIndex::dirtyLeadObjectRelatedSelections(const Fv
     // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
 
-    // One set for the whole call: the previous and current lead selections routinely share a
-    // subtree, and so can two paths within either of them.
+    // Shared across all paths, since the selections can overlap.
     std::unordered_set<SdfPath, SdfPath::Hash> visited;
 
     for (const auto& previousLeadObjectPrimSelection : previousLeadObjectPrimSelections) {
@@ -79,12 +78,8 @@ void MhDirtySelectionColorsSceneIndex::_DirtyPrimPathRecursively(
     HdSceneIndexObserver::DirtiedPrimEntries&   inoutDirtiedPrimEntries,
     std::unordered_set<SdfPath, SdfPath::Hash>& inoutVisited) const
 {
-    // Instancer prototypes are ordinary prims in the scene index namespace, so a walk seeded at the
-    // absolute root already reaches them through GetChildPrimPaths below. The probe further down
-    // earns its cost only for a subtree whose instancer points at prototypes outside that subtree,
-    // which cannot happen from the root -- and it costs one GetPrim() per prim visited, each
-    // traversing the whole filtering chain. Skipping it is what keeps the whole-scene invalidation
-    // from paying that per prim.
+    // From the absolute root the child walk already reaches every instancer prototype, so skip
+    // the per-prim GetPrim() needed to follow them.
     const bool followInstancerPrototypes = (primPath != SdfPath::AbsoluteRootPath());
 
     // path can be a hierarchy of prim paths so we need to get all children prim paths

@@ -38,9 +38,8 @@ class TestNamespaces(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-        # There should be one rprim for the poly sphere mesh, plus one more in
-        # legacy mode, where the selection highlight of the newly created (and so
-        # selected) sphere is drawn as wireframe geometry.
+        # One rprim for the sphere mesh, plus its wireframe selection highlight
+        # in legacy mode (a newly created object is selected).
         expectedRprims = 1 + self.selectionHighlightRprimCount()
         rprims = self.getIndex()
         self.assertEqual(expectedRprims, len(rprims))

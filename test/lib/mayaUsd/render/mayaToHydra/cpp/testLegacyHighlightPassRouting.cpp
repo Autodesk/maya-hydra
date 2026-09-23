@@ -43,10 +43,8 @@ bool findSphereWireframePredicate(const HdSceneIndexBasePtr& sceneIndex, const S
 } // namespace
 
 // Pass routing for prims that only exist in legacy selection-highlight mode: the dormant wireframe
-// item VP2 sends for a selected shape, and the FlowViewportSelectionHighlights duplicate-geometry
-// prims the legacy highlight scene indices add. Outline mode never creates either -- it samples prim
-// IDs from the original, unmodified render instead -- so this test does not apply there. See
-// testPassFiltering for the pass-routing assertions that hold regardless of selection-highlight mode.
+// item of a selected shape and the FlowViewportSelectionHighlights prims. testPassFiltering covers
+// the prims that exist in both modes.
 TEST(PassFiltering, testLegacyHighlightPassRouting)
 {
     std::vector<HdSceneIndexBasePtr> passSceneIndices = {
@@ -87,9 +85,7 @@ TEST(PassFiltering, testLegacyHighlightPassRouting)
         {1}
     );
 
-    // This material is only in pass 1 because the highlight instancer above needs it there too;
-    // confirmed by empirical outline-mode test run, where it is pass-0-only since outline creates no
-    // such instancer.
+    // In pass 1 only because the highlight instancer above uses it; in outline mode it is pass 0 only.
     testPrim(
         SdfPath("/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/mtl/UsdPreviewSurface1"),
         HdPrimTypeTokens->material,

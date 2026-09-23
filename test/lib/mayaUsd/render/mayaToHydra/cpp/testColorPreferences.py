@@ -35,7 +35,6 @@ class TestColorPreferences(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestColorPreferences, self).setUp()
-        # setHdStormRenderer() is already done by the base setUp (_setHdStormRenderer).
         self.resetColorPrefs()
     
     def tearDown(self):

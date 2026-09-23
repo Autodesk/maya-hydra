@@ -38,8 +38,7 @@ class TestDagChanges(DagChangesBaseTestCase):
 
     def setUp(self):
         super(TestDagChanges, self).setUp()
-        # makeCubeScene() re-applies the selection highlighting mode itself, since
-        # it opens a new scene.
+        # makeCubeScene() opens a new scene and re-applies the highlighting mode.
         self.makeCubeScene()
 
         self.grp1 = cmds.createNode('transform', name='group1')

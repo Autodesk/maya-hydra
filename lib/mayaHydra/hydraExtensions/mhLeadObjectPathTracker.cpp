@@ -134,9 +134,7 @@ bool MhLeadObjectPathTracker::updatePrimSelections()
    // Update the lead object prim paths in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimSelections.empty()) {
         _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
-        // The only transition possible here is empty -> resolved, so a non-empty result is by
-        // definition a change. Reported because nothing else signals it: this is not driven by a
-        // selection notification, so a caller caching lead-derived state has no other way to know.
+        // The only possible transition is empty -> resolved, so a non-empty result is a change.
         return !_leadObjectPrimSelections.empty();
     }
     return false;

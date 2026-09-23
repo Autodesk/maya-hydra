@@ -30,21 +30,17 @@ from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication, QWidget
 import shiboken6
 
-# Script-only render global toggling outline mode's hover cue, off by default. See
-# lib/mayaHydra/mayaPlugin/tokens.h and renderGlobals.cpp.
+# Render global enabling the outline mode's hover highlight, off by default.
 HOVER_ATTR_NAME = "mayaHydraOutlineHoverHighlighting"
 HOVER_ATTR = "defaultRenderGlobals.{}".format(HOVER_ATTR_NAME)
 
-# Hover state is cached as absolute device pixel coordinates (renderOverride.cpp's
-# _SetHoverPosition()/HoverState), and _ResolveHoverPath() bounds-checks them against whatever
-# render's viewport dimensions are current. So the viewport panel's pixel size has to match between
-# firing and capture, and has to be reproducible across machines for the reference images to compare
-# cleanly -- neither holds for the panel's ambient size, hence forcing it to a fixed target.
+# The hover position is kept in device pixels and dropped if it falls outside the rendered
+# viewport, so the panel size must match between hovering and capture, and be the same on every
+# machine for the reference images to compare.
 TARGET_VIEWPORT_SIZE = (400, 400)
 
-# First guess for the main window size; how much of it the panel actually gets depends on the
-# machine/theme/DPI/layout, so _forceDeterministicMainWindowSize() corrects toward the target
-# empirically rather than assuming this reaches it directly.
+# First guess for the main window size; _forceDeterministicMainWindowSize() then corrects it
+# until the panel reaches TARGET_VIEWPORT_SIZE.
 _INITIAL_MAIN_WINDOW_SIZE = (
     TARGET_VIEWPORT_SIZE[0] + 1200, TARGET_VIEWPORT_SIZE[1] + 700)
 
@@ -59,13 +55,9 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_PERCENT = 0.5
 
     def compareSnapshot(self, referenceFilename):
-        """Compare snapshot and collect failures instead of stopping on first failure, so one bad
-        frame in this long sequence does not hide failures in the rest of it.
+        """Compare a snapshot, collecting failures so one bad frame does not hide the rest.
 
-        Captures at the viewport panel's actual size (forced to TARGET_VIEWPORT_SIZE by
-        buildScene(), see the comment there) instead of a capture size independent of it -- a
-        mismatch pushes hover's cached device-pixel coordinates out of bounds, silently dropping the
-        hover cue rather than rescaling it.
+        Captures at the panel's actual size; see TARGET_VIEWPORT_SIZE.
         """
         try:
             widget = self._viewWidget(self._activeView())
@@ -86,7 +78,6 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         self._failures = []
         self._hoverEnabled = False
 
-        # Hover only exists in outline mode: nothing to test under legacy.
         if self.selectionHighlightMode() != mtohUtils.SELECTION_HIGHLIGHT_MODE_OUTLINE:
             self.skipTest("Hover highlighting only exists in the outline selection-highlight mode.")
 
@@ -104,9 +95,7 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         super(TestOutlineHover, self).tearDown()
 
     def enableHover(self):
-        # Setting the plug alone is not enough: the render override only re-reads the globals when
-        # 'mayaHydra -updateRenderGlobals' is called (same caveat as the selection-highlight mode
-        # enum, see mtohUtils.applySelectionHighlightMode()).
+        # The render override only re-reads the plug on 'mayaHydra -updateRenderGlobals'.
         cmds.setAttr(HOVER_ATTR, True)
         cmds.mayaHydra(updateRenderGlobals=HOVER_ATTR_NAME)
         cmds.refresh(force=True)
@@ -123,9 +112,8 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
             QApplication.processEvents()
             cmds.refresh(force=True)
 
-        # Correct by whatever gap remains each attempt, rather than assuming a single fixed offset
-        # between window size and panel size: that relationship need not be linear (e.g. a
-        # fixed-width side panel can leave the panel's width unmoved by the window's width).
+        # Correct by the remaining gap on each attempt: panel size need not track window size
+        # linearly.
         size = list(_INITIAL_MAIN_WINDOW_SIZE)
         for _ in range(_MAX_SIZE_CONVERGENCE_ATTEMPTS):
             resizeAndSettle(size)
@@ -151,11 +139,8 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         spheres = []
         for i in range(4):
             name = cmds.polySphere(radius=1.5, name="hoverSphere{}".format(i + 1))[0]
-            # Staggered along the view axis and offset laterally, so each sphere partially overlaps
-            # its neighbours on screen once framed -- nearer, unselected spheres act as occluders for
-            # farther, hovered/selected ones. Lateral drift is kept small relative to the depth step
-            # so viewFit's zoom-to-fit-all-4 doesn't shrink the chain apart -- s1 (dead center, no
-            # lateral offset) needs to still overlap s2 after framing accounts for s4's total offset.
+            # Staggered in depth with a small lateral offset, so each sphere partially overlaps
+            # its neighbours on screen and nearer spheres occlude farther ones.
             cmds.move(i * 0.4, i * 0.15, -i * 2.5, name)
             spheres.append(name)
         cmds.viewFit(spheres)
@@ -163,25 +148,20 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         return spheres
 
     def _activeView(self):
-        # self.activeEditor (from cmds.playblast(activeEditor=1), set by setHdStormRenderer()) is
-        # whatever editor currently has UI focus, which is not reliably the 3D viewport --
-        # mayaUtils.activeModelPanel() specifically finds the model panel.
+        # Not self.activeEditor: the editor with focus is not reliably the model panel.
         panel = mayaUtils.activeModelPanel()
         view = omui.M3dView()
         omui.M3dView.getM3dViewFromModelPanel(panel, view)
         return view
 
     def _viewWidget(self, view):
-        # view.widget() -- the exact widget HoverEventFilter is installed on and calls
-        # setMouseTracking(true) on (renderOverride.cpp's _InstallHoverEventFilter()) -- is not the
-        # same widget as MQtUtil.findControl(panelName), which returns the outer panel frame (full of
-        # toolbar buttons); the real render surface is a QStackedWidget nested inside it. view.widget()
-        # returns a raw SWIG QWidget* that needs int()-converting before shiboken6 can wrap it.
+        # view.widget() is the render surface the hover event filter is installed on, unlike
+        # MQtUtil.findControl(panelName), which returns the outer panel frame.
         return shiboken6.wrapInstance(int(view.widget()), QWidget)
 
     def _worldToViewportPixel(self, objName):
-        """Port of cpp/testUtils.cpp's getPrimMouseCoords() to Python, using the object's world
-        translation directly instead of a scene-index prim's xform data source."""
+        """Viewport pixel of the object's world translation (Python version of
+        cpp/testUtils.cpp's getPrimMouseCoords())."""
         view = self._activeView()
 
         pos = cmds.xform(objName, query=True, worldSpace=True, translation=True)
@@ -220,9 +200,8 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         self.hoverAt(QPoint(5, 5))
 
     def test_HoverDisabled(self):
-        """Negative control: with mayaHydraOutlineHoverHighlighting left at its default (False),
-        hovering does nothing -- neither against an empty selection nor on top of an existing one.
-        Guards against a broken "off" state silently producing a false pass in the other two tests."""
+        """Negative control: with hover highlighting at its default (off), hovering draws
+        nothing, with or without a selection."""
         s1, s2, s3, s4 = self.buildScene()
         cmds.select(clear=True)
 
@@ -234,12 +213,9 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("hover_disabled_with_selection_no_extra_cue.png")
 
     def test_HoverForwardPassAndOcclusion(self):
-        """Select farthest-to-nearest, hovering the next sphere before adding it each time. Every
-        sphere added is nearer than everything already selected, and the sphere being hovered right
-        before its own turn is always the nearer, still-unselected one relative to what's already
-        selected -- so this demonstrates the outline surviving occlusion by nearer, UNSELECTED
-        spheres. s4 (furthest) hovered alone is also occluded on screen by the nearer, unselected
-        s1-s3, so the hover cue should already be unbroken across that overlap in the first step."""
+        """Select farthest-to-nearest, hovering each sphere before adding it. Covers hover alone,
+        hover over lead and non-lead selections, and outlines occluded by nearer unselected
+        spheres. Ends by hovering each already-selected sphere."""
         s1, s2, s3, s4 = self.buildScene()
         cmds.select(clear=True)
         self.enableHover()
@@ -272,8 +248,7 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(s1, add=True)
         self.compareSnapshot("select_s1_lead_allNonlead.png")
 
-        # Hover each already-selected sphere in turn without touching the selection, to isolate the
-        # hover-on-lead vs hover-on-non-lead cues.
+        # Hover on lead vs non-lead, with the selection unchanged.
         self.hoverObject(s1)
         self.compareSnapshot("hover_on_lead_s1.png")
 
@@ -287,16 +262,10 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("hover_on_nonlead_s4.png")
 
     def test_HoverReverseOcclusion(self):
-        """Select nearest-to-farthest -- the mirror image of the forward pass. Every sphere selected
-        here is nearer than everything selected after it, and each step hovers s4 (farthest, still
-        unselected) -- so a nearer SELECTED sphere now occludes the farther, unselected, hovered one
-        on screen: the reverse-occlusion case the forward pass structurally can't produce (it always
-        selects the farthest sphere first, so a nearer sphere is never selected while a farther one
-        remains unselected). Per lib/hydra-viewport-toolbox/docs/outline.md:42-77, cross-layer
-        priority is Base (selected) > Default (unselected) unconditionally -- not depth-based, and
-        not covered by the same-layer hover-protection rule -- so this could plausibly suppress the
-        hover cue at the overlap where the forward pass's arrangement does not. Whichever result
-        actually happens is a useful fact worth pinning down, not a presumed pass/fail."""
+        """Select nearest-to-farthest and hover the farthest, unselected sphere each time, so a
+        nearer selected sphere occludes the hovered one (a case the forward pass cannot produce).
+        HVT gives selected outlines priority over unselected ones regardless of depth, so the images
+        pin down how the hover highlight is drawn at the overlap."""
         s1, s2, s3, s4 = self.buildScene()
         cmds.select(clear=True)
         self.enableHover()
