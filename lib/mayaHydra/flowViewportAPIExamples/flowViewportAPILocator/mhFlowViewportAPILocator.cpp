@@ -230,14 +230,30 @@ private:
 
 MhFlowViewportAPILocator* getLocator(const Ufe::Path& cubePath)
 {
-    if (cubePath.size() <= 1) {
+    // Reject anything that is not one of our cube paths, and do so silently.
+    //
+    // This plugin claims '/' as its UFE path-component separator (see initializePlugin), a
+    // character mayaUsd's USD run-time also claims. When several run-times claim the same
+    // character, UFE resolves the ambiguity by building a candidate path with each claimant's
+    // run-time id, in id order -- which is plugin load order -- and keeping the first
+    // createItem() that succeeds. Being handed a foreign path here is therefore the designed,
+    // expected outcome: it happens on every successful parse of somebody else's path string,
+    // before UFE falls through to the run-time that owns it.
+    //
+    // Note that the candidate path carries OUR run-time id, by construction, so a run-time id
+    // check cannot identify it. The shape checks are what reject it: a cube path is exactly
+    // what getCubeUfePath() builds, namely the locator's Maya DAG segment followed by a single
+    // cube-name component in our run-time.
+    const auto& segments = cubePath.getSegments();
+    if (segments.size() != 2
+        || segments[0].runTimeId() != UfeExtensions::getMayaRunTimeId()
+        || segments[1].runTimeId() != ufeRunTimeId
+        || segments[1].size() != 1) {
         return nullptr;
     }
+
     auto locatorDagPath = UfeExtensions::ufeToDagPath(cubePath.pop());
     if (!locatorDagPath.isValid()) {
-        TF_WARN(
-            "Failed to convert UFE path %s to a valid Maya DAG path.",
-            Ufe::PathString::string(cubePath).c_str());
         return nullptr;
     }
     MFnDependencyNode fn(locatorDagPath.node());
