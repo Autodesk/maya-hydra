@@ -1188,6 +1188,15 @@ MStatus initializePlugin( MObject obj )
         return status;
     }
 
+    // Ensure mayaHydra is initialized.
+    {
+        int isLoaded = false;
+        MGlobal::executeCommand("pluginInfo -query -loaded mayaHydra", isLoaded);
+        if (!isLoaded) {
+            MGlobal::executeCommand("loadPlugin -quiet mayaHydra");
+        }
+    }
+
     // Register a UFE run-time for the locator node type.  The Hierarchy
     // handler is supported for scene item creation only.
     //
