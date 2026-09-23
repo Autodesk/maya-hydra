@@ -358,6 +358,21 @@ foreach(folder storm arnold)
     )
 endforeach()
 
+# Animated rig render.  As frame number resolution is only available for
+# Hydra v2 render settings renderers, HdStorm is excluded here.
+set(scene basic/basicAnimRig.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    mayaHydra_add_cmd_line_render_multi_image_test(${scene}
+        IMAGE_EXTENSION png
+        EXPECTED_IMAGES_DIR basic/${folder}/images/basicAnimRig
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        RENDERER_ARGS "-x 960 -y 540 -s 1 -e 10 -cam \"|camera1_group|camera1\""
+    )
+endforeach()
+
 # PRMan production rendering tests (Windows only).  Hydra V2 render settings and
 # isolated RenderMan config are applied automatically in cmake/test.cmake when
 # RENDERER is HdPrmanLoaderRendererPlugin.
