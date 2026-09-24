@@ -211,51 +211,110 @@ def imageDiff(baselinePath, actualPath, verbose, fail, failpercent, hardfail=Non
         sys.__stdout__.write("\nimage diffing with {0}".format(cmd))
         sys.__stdout__.flush()
 
-    try:
-        # Run idiff command
-        #
-        # On some Windows 11 machines we were randomly getting a failure when
-        # launching the subprocess.run().
-        #   OSError: [WinError 50] The request is not supported
-        #
-        # The cause appeared to come from the subprocess.run() call where it
-        # was only capturing stdout. In subprocess the error occured when trying
-        # to duplicate the stderr handle.
-        #proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
-        # When using flag 'capture_output=True' to capture both (stdout/stderr) the
-        # random error disappeared.
-        #
-        # On Windows 11 24H2 (Windows Terminal as the default console host),
-        # launching a console child like idiff.exe from a Maya UI process (which
-        # has no inherited console) hangs subprocess.run forever -- Windows
-        # fails the console-pipe handshake with ERROR_NO_DATA (0x800700E8).
-        # CREATE_NO_WINDOW skips that handshake.
-        creation_flags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
-        # cmd's first element (the idiff/imageDiffTool binary) is sourced
-        # either from the IMAGE_DIFF_TOOL environment variable (exported by
-        # cmake/test.cmake for every test) or from an explicit imageDiffTool
-        # argument validated by validate_executable() in callers. The
-        # argument-list form (shell=False) is used throughout, so this
-        # satisfies Bandit B603 / PYTH-INJC-30.
-        proc = subprocess.run(  # nosec B603
-            cmd,
-            capture_output=True,
-            shell=False,
-            text=True,
-            env=_subprocessEnv(),
-            creationflags=creation_flags,
-        )
-    except OSError as e:
-        # If its not the random WinError 50 we re-raise it.
-        if '[WinError 50]' not in str(e):
-            raise
+    # Run idiff command
+    #
+    # On some Windows 11 machines we were randomly getting a failure when
+    # launching the subprocess.run().
+    #   OSError: [WinError 50] The request is not supported
+    #
+    # The cause appeared to come from the subprocess.run() call where it
+    # was only capturing stdout. In subprocess the error occured when trying
+    # to duplicate the stderr handle.
+    #proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
+    # When using flag 'capture_output=True' to capture both (stdout/stderr) the
+    # random error disappeared.
+    #
+    # On Windows 11 24H2 (Windows Terminal as the default console host),
+    # launching a console child like idiff.exe from a Maya UI process (which
+    # has no inherited console) hangs subprocess.run forever -- Windows
+    # fails the console-pipe handshake with ERROR_NO_DATA (0x800700E8).
+    # CREATE_NO_WINDOW skips that handshake.
+    #
+    # As of 2026-09-22, Windows-only hangs in subprocess.run() are still
+    # occuring for unit test runs on build machines.  We have implemented a
+    # timeout and retry mechanism to compensate for this.  If the problem
+    # persists, the following suggestions can be tried:
+    #
+    # - This is the only subprocess.run() call site in this module that
+    #   implements mitigation measures against hangs.  We could factor out
+    #   the code below and have all call sites use it.  For example,
+    #   generateDiffImage()'s subprocess.run() calls do not use hang
+    #   mitigation, though it seems unlikely that this is a problem, as this
+    #   is reached only after an image comparison failure and is used for
+    #   visualization only.
+    #
+    #   A call site in test/testUtils/mtohUtils.py runs the taskkill
+    #   executable, and does not use the code below either.  There has been at
+    #   least one recorded instance of a test run of testSceneStat.py hanging,
+    #   and that test performs no image comparison whatsoever (the automated
+    #   retry of the complete test succeeded).  It seems possible that this
+    #   hang might have been caused by the mtohUtils.py subprocess.run()
+    #   invocation.
+    #
+    # - Microsoft documents
+    #   https://learn.microsoft.com/en-us/windows/win32/ipc/pipe-handle-inheritance
+    #   that all processes holding a pipe handle must close it for the pipe to
+    #   reach End Of File.  If a subprocess started by subprocess.run(), or a
+    #   subprocess of that process, holds on to a pipe without closing it,
+    #   subprocess.run() will hang on Windows.  The capture_output=True
+    #   argument means both stdout and stderr are anonymous pipes.  For best
+    #   robustness, redirecting stdout and stderr to temporary files means
+    #   subprocess.run() will return when the child process completes, not when
+    #   the pipes are closed.  The temporary files can then be read for output.
+    #
+    #   However, idiff itself does not spawn subprocesses (from inspection of
+    #   its open source code).  Unless idiff itself hangs, it will not hold on
+    #   to stdout / stderr pipes, so the likelihood that using temporary files
+    #   will reduce the occurrence of hangs seems low.
+    #
+    #   The taskkill executable is closed source, and it might create one or
+    #   more subprocess(es), and any of these processes might hold on to stdout
+    #   / stderr, or taskkill itself may hang, but this seems unlikely as well.
+    creation_flags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
 
-        if verbose:
-            sys.__stdout__.write('\nimageDiff failed with: {0}'.format(str(e)))
-            sys.__stdout__.flush()
-    else:
-        # Successfully executed imageDiff.
-        return proc
+    timeoutSeconds = 20
+    maxAttempts = 3
+
+    for attempt in range(1, maxAttempts + 1):
+        try:
+            # https://github.com/python/cpython/issues/88693#issuecomment-3177334016
+            # suggests setting stdin to DEVNULL to avoid hanging waiting on
+            # stdin, though for idiff this seems unlikely.
+            #
+            # cmd's first element (the idiff/imageDiffTool binary) is sourced
+            # either from the IMAGE_DIFF_TOOL environment variable (exported by
+            # cmake/test.cmake for every test) or from an explicit
+            # imageDiffTool argument validated by validate_executable() in
+            # callers. The argument-list form (shell=False) is used
+            # throughout, so this satisfies Bandit B603 / PYTH-INJC-30.
+            proc = subprocess.run(  # nosec B603
+                cmd,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                shell=False,
+                text=True,
+                env=_subprocessEnv(),
+                creationflags=creation_flags,
+                timeout=timeoutSeconds,
+            )
+        except subprocess.TimeoutExpired:
+            sys.__stderr__.write(
+                '\nWarning: imageDiff timed out after {0} seconds '
+                '(attempt {1} of {2}): {3}'.format(timeoutSeconds, attempt,
+                                                    maxAttempts, cmd))
+            sys.__stderr__.flush()
+        except OSError as e:
+            # If its not the random WinError 50 we re-raise it.
+            if '[WinError 50]' not in str(e):
+                raise
+
+            if verbose:
+                sys.__stdout__.write('\nimageDiff failed with: {0}'.format(str(e)))
+                sys.__stdout__.flush()
+            break
+        else:
+            # Successfully executed imageDiff.
+            return proc
 
     return None  # Running of imageDiff failed.
 
