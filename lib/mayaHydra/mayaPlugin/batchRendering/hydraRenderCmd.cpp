@@ -27,7 +27,9 @@
 
 #include <maya/MArgDatabase.h>
 #include <maya/MAnimControl.h>
+#include <maya/MCommandResult.h>
 #include <maya/MGlobal.h>
+#include <maya/MStringArray.h>
 #include <maya/MSyntax.h>
 #include <maya/MTime.h>
 
@@ -57,6 +59,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <set>
+#include <string>
 #include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -95,6 +99,58 @@ using namespace MAYAHYDRA_NS_DEF;
 constexpr auto _helpText = R"HELP(For details on args usage please see 
 https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
 )HELP";
+
+bool isHydraCapable(const MString& rendererName)
+{
+    MString cmd;
+    cmd.format("renderer -query -capability \"isHydra\" \"^1s\"", rendererName);
+
+    // Renderers that don't report the "isHydra" capability at all return no
+    // value (MCommandResult::kInvalid) rather than a boolean false.
+    MCommandResult result;
+    MStatus        status = MGlobal::executeCommand(cmd, result);
+    if (!status || (result.resultType() != MCommandResult::kString)) {
+        return false;
+    }
+
+    MString value;
+    result.getResult(value);
+    return value == "true";
+}
+
+// Renderers can be registered after plugin load, so the set is rebuilt on
+// each call rather than cached.
+std::set<std::string> hydraRenderers()
+{
+    std::set<std::string> renderers;
+
+    MStringArray rendererNames;
+    MStatus      status
+        = MGlobal::executeCommand("renderer -query -namesOfAvailableRenderers", rendererNames);
+    if (!status) {
+        MGlobal::displayWarning("Unable to retrieve available renderers.");
+        return renderers;
+    }
+
+    for (const auto& rendererName : rendererNames) {
+        if (isHydraCapable(rendererName)) {
+            renderers.insert(rendererName.asChar());
+        }
+    }
+
+    return renderers;
+}
+
+bool validRenderer(const TfToken& rendererName)
+{
+    if (rendererName.IsEmpty()) {
+        return false;
+    }
+
+    const auto renderers = hydraRenderers();
+    return renderers.find(rendererName.GetString()) != renderers.end();
+}
+
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
@@ -161,42 +217,7 @@ HydraRenderCmd::~HydraRenderCmd()
 
 bool HydraRenderCmd::parseDatabase(const MArgDatabase& db)
 {
-    if (db.isFlagSet(_renderer)) {
-        MString rn;
-        CHECK_MSTATUS_AND_RETURN(db.getFlagArgument(_renderer, 0, rn), false);
-
-        _rendererFlagSet   = true;
-        _rendererFromFlag  = TfToken(rn.asChar());
-    }
-
     return true;
-}
-
-TfToken HydraRenderCmd::GetRenderer()
-{
-    if (_rendererFlagSet) {
-        if (_rendererFromFlag.IsEmpty()) {
-            // Use MPxCommand::displayError() (not just a Tf diagnostic) so the
-            // specific message reliably reaches the MStatus/Python-visible
-            // command error text on every platform.
-            displayError(
-                "hydraRender: the -renderer/-r flag was set to an empty renderer name.",
-                true);
-            return TfToken();
-        }
-        return _rendererFromFlag;
-    }
-
-    const TfToken currentRenderer = GetCurrentRenderer();
-    if (currentRenderer.IsEmpty()) {
-        displayError(
-            "hydraRender: no renderer specified. Pass -renderer/-r, or author the "
-            "currentRenderer attribute on the USD render-description node.",
-            true);
-        return TfToken();
-    }
-
-    return currentRenderer;
 }
 
 bool HydraRenderCmd::initialize()
@@ -279,6 +300,23 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
       return MS::kFailure;
     }
 
+    TfToken rendererName;
+    if (db.isFlagSet(_renderer)) {
+        MString rn;
+        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_renderer, 0, rn));
+
+        rendererName = TfToken(rn.asChar());
+    }
+    else {
+        // Get renderer from the scene.
+        rendererName = GetCurrentRenderer();
+    }
+
+    // Validate the renderer
+    if (!validRenderer(rendererName)) {
+        return MS::kFailure;
+    }
+
     if (db.isFlagSet(_gpuEnabledFlag)) {
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_gpuEnabledFlag, 0, _gpuEnabled));
     }
@@ -286,11 +324,6 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
     // Create the batch renderer.  The second and third arguments of
     // the renderer description are the unused override name and
     // display name, respectively.
-    TfToken rendererName = GetRenderer();
-    if (rendererName.IsEmpty()) {
-        // GetRenderer() has already called displayError() with the specific reason.
-        return MS::kFailure;
-    }
     _batchRenderer = std::make_unique<BatchRenderer>(
         MtohRendererDescription(rendererName, {}, {}));
 
