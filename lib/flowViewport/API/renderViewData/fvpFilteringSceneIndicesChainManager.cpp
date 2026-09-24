@@ -88,8 +88,6 @@ void FilteringSceneIndicesChainManager::destroyFilteringSceneIndicesChain(Render
 
     //Remove a ref on it which should cascade the same on its references
 #ifdef CODE_COVERAGE_WORKAROUND
-    // Keep refs alive so scene-index destructors do not run during coverage
-    // teardown (Windows clang code coverage builds).
     Fvp::leakSceneIndex(lastSceneIndex);
 #endif
     lastSceneIndex.Reset();

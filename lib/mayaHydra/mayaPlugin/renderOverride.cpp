@@ -1444,12 +1444,7 @@ void MtohRenderOverride::_ClearMayaHydraSceneIndex()
 #ifdef CODE_COVERAGE_WORKAROUND
     // Leak the Maya scene index for code coverage, as its base class
     // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
-    // Explicitly leak it (rather than relying on some other owner keeping a
-    // reference alive) so the .Reset() below can never drop the last ref and
-    // run the crashy dtor, matching the pattern used elsewhere for the same
-    // class of crash (see Fvp::leakSceneIndex()).
     _mayaHydraSceneIndex->_Destroy();
-    Fvp::leakSceneIndex(_mayaHydraSceneIndex);
 #else
     _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
 #endif

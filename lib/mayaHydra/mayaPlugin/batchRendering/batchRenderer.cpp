@@ -409,12 +409,7 @@ void BatchRenderer::_ClearMayaHydraSceneIndex()
 #ifdef CODE_COVERAGE_WORKAROUND
     // Leak the Maya scene index for code coverage, as its base class
     // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
-    // Explicitly leak it (rather than relying on some other owner keeping a
-    // reference alive) so the .Reset() below can never drop the last ref and
-    // run the crashy dtor, matching the pattern used elsewhere for the same
-    // class of crash (see Fvp::leakSceneIndex()).
     _mayaHydraSceneIndex->_Destroy();
-    Fvp::leakSceneIndex(_mayaHydraSceneIndex);
 #else
     if (_dataProducerMergingSceneIndexProxy) {
         _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
@@ -595,9 +590,6 @@ void BatchRenderer::_ClearHydraResources()
         _timeChangeCallbackId = 0;
     }
 
-#ifdef CODE_COVERAGE_WORKAROUND
-    Fvp::leakSceneIndex(_sceneGlobalsSceneIndex);
-#endif
     _sceneGlobalsSceneIndex.Reset();
 
     // Only remove information for our dummy batch render viewport, to avoid
@@ -620,39 +612,15 @@ void BatchRenderer::_ClearHydraResources()
 
     if (_renderIndex != nullptr) {
         GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
-#ifndef CODE_COVERAGE_WORKAROUND
-        // The render index destructor crashes under Windows clang code
-        // coverage builds, so deletion is skipped in that configuration.
         delete _renderIndex;
-#else
-        static std::vector<PXR_NS::HdRenderIndex*>* leakedRenderIndices{nullptr};
-        if (!leakedRenderIndices) {
-            leakedRenderIndices = new std::vector<PXR_NS::HdRenderIndex*>;
-        }
-        leakedRenderIndices->push_back(_renderIndex);
-#endif
         _renderIndex = nullptr;
     }
 
     if (_rendererPlugin != nullptr) {
         _renderDelegate = nullptr;
-#ifndef CODE_COVERAGE_WORKAROUND
         HdRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
-#endif
         _rendererPlugin = nullptr;
     }
-
-#ifdef CODE_COVERAGE_WORKAROUND
-    Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
-    Fvp::leakSceneIndex(_renderingColorSpaceSceneIndex);
-    Fvp::leakSceneIndex(_frameNbResolvingSceneIndex);
-    if (_dataProducerMergingSceneIndexProxy) {
-        Fvp::leakSceneIndex(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex());
-    }
-#endif
-    _lastFilteringSceneIndexBeforeCustomFiltering.Reset();
-    _renderingColorSpaceSceneIndex.Reset();
-    _frameNbResolvingSceneIndex.Reset();
 
     // Decrease ref count on the render index proxy which owns the merging scene index at the end of
     // this function as some previous calls may likely use it to remove some scene indices

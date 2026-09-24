@@ -18,9 +18,6 @@
 #include "fvpDataProducerSceneIndexInterfaceImp.h"
 #include "fvpInformationInterfaceImp.h"
 #include "flowViewport/API/renderViewData/fvpRenderViewDataManager.h"
-#ifdef CODE_COVERAGE_WORKAROUND
-#include <flowViewport/fvpUtils.h>
-#endif
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
@@ -126,11 +123,7 @@ void DataProducerSceneIndexInterfaceImp::removeAllDataProducerSceneIndicesFromVi
         if (dataProducerSceneIndicesData){
             const auto& sceneIndex = dataProducerSceneIndicesData->GetDataProducerLastSceneIndexChain();
             if (sceneIndex){
-#ifdef CODE_COVERAGE_WORKAROUND
-                Fvp::leakSceneIndex(sceneIndex);
-#else
                 dataProducerMergingSceneIndexProxy->RemoveSceneIndex(sceneIndex);
-#endif
             }else{
                 TF_CODING_ERROR("dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain() is a nullptr, that should never happen here.");
             }
