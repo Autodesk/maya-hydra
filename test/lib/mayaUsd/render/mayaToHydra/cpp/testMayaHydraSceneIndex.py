@@ -36,5 +36,13 @@ class TestMayaHydraSceneIndex(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="MayaHydraSceneIndex.PrimAncestors")
 
+    def test_ReleasedOnHydraRebuild(self):
+        """The scene index must be destroyed when Hydra resources are rebuilt (HYDRA-2019)"""
+        self.setHdStormRenderer()
+        cmds.polySphere(name="sphere1", subdivisionsX=8, subdivisionsY=8)
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="MayaHydraSceneIndex.releasedOnHydraRebuild")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals()) 

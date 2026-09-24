@@ -98,4 +98,32 @@ TEST(MayaHydraSceneIndex, PrimAncestors)
     // Cleanup
     ASSERT_EQ(MGlobal::executeCommand("delete group1"), MS::kSuccess);
     ASSERT_EQ(MGlobal::executeCommand("refresh"), MS::kSuccess);
+}
+
+TEST(MayaHydraSceneIndex, releasedOnHydraRebuild)
+{
+    const auto& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+
+    // Weak pointer only: holding a RefPtr here would itself keep the scene index alive.
+    HdSceneIndexBasePtr oldSceneIndex = FindMayaHydraSceneIndex(sceneIndices.front());
+    ASSERT_TRUE(oldSceneIndex) << "Could not find MayaHydraSceneIndex in scene index tree";
+
+    // Switching the only Hydra panel to VP2 runs ClearHydraResources(); switching it back
+    // builds a new generation. Some filtering scene indices are only replaced by the next
+    // _InitHydraResources(), so check after coming back to Hydra, not while on VP2.
+    ASSERT_EQ(
+        MGlobal::executeCommand(
+            "{ string $ed = `playblast -activeEditor`;"
+            " string $ovr = `modelEditor -q -rendererOverrideName $ed`;"
+            " modelEditor -e -rendererOverrideName \"\" $ed; refresh -f;"
+            " modelEditor -e -rendererOverrideName $ovr $ed; refresh -f; }"),
+        MS::kSuccess);
+
+    const auto& newSceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(newSceneIndices.size(), 0u) << "Hydra did not come back after the VP2 round trip";
+
+    EXPECT_TRUE(oldSceneIndex.IsExpired())
+        << "MayaHydraSceneIndex survived a Hydra rebuild (HYDRA-2019): its Maya callbacks stay "
+           "registered while the render index it points to has been freed";
 } 
