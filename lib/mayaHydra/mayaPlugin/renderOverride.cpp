@@ -1441,13 +1441,18 @@ MtohRenderOverride* MtohRenderOverride::GetByName(TfToken rendererName)
 
 void MtohRenderOverride::_ClearMayaHydraSceneIndex()
 {
-#ifdef CODE_COVERAGE_WORKAROUND
-    // Leak the Maya scene index for code coverage, as its base class
-    // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
-    _mayaHydraSceneIndex->_Destroy();
-#else
+#ifndef CODE_COVERAGE_WORKAROUND
+    // Under code coverage the scene index is deliberately leaked instead, as its base
+    // class HdRetainedSceneIndex dtor crashes in the Windows clang code coverage build.
     _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
 #endif
+    // Tear down explicitly rather than trusting the refcount to reach zero before
+    // ClearHydraResources() frees the render index (HYDRA-2019). _Destroy() removes every
+    // adapter's Maya callbacks and latches _isTearingDown, so any holder that outlives this
+    // call gets an inert object. Idempotent.
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->_Destroy();
+    }
     _mayaHydraSceneIndex.Reset();
 }
 
@@ -1753,8 +1758,10 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     _ClearMayaHydraSceneIndex();
 
-    // HYDRA-2019 : We need to manually call the destruction code, as we have some 
-    // lifetime management issues preventing the destructor from being called.
+    // Tear down explicitly rather than waiting for the destructor: the downstream filtering
+    // scene indices still hold this one through their input until the next
+    // _InitHydraResources() replaces them. Destroy() is idempotent, so the later destructor
+    // call is a no-op (HYDRA-2019).
     _mayaViewportSceneIndex->Destroy();
     _mayaViewportSceneIndex.Reset();
 

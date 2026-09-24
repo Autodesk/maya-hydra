@@ -321,10 +321,8 @@ private:
     _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
     SdfPath _GetRenderItemPrimPath(const MRenderItem& ri);
     SdfPath GetMaterialPath(const MObject& obj);
-#ifdef CODE_COVERAGE_WORKAROUND
     friend class MtohRenderOverride;
     friend class MAYAHYDRA_NS_DEF::BatchRenderer;
-#endif
     void _Destroy();
 
 private:

@@ -190,11 +190,22 @@ MayaViewportSceneIndex::~MayaViewportSceneIndex()
 
 void MayaViewportSceneIndex::Destroy()
 {
-    // Remove our pick handler from the pick handler registry.
+    // Remove our pick handler from the pick handler registry. Destroy() runs twice:
+    // explicitly from ClearHydraResources() and again from the destructor, possibly after a
+    // new instance has registered its own handler under the same rprim path, which must not
+    // be removed.
     if (_hasPickHandlerRegistered) {
         auto& phr = MayaHydra::PickHandlerRegistry::Instance();
         TF_AXIOM(phr.Unregister(_mayaDataSceneIndex->GetRprimPath()));
+        _hasPickHandlerRegistered = false;
     }
+
+    // Stop receiving notifications, so a late upstream PrimsAdded cannot reach _PrimsAdded()
+    // on a torn-down instance.
+    if (_mergingSceneIndex) {
+        _mergingSceneIndex->RemoveObserver(HdSceneIndexObserverPtr(&_observer));
+    }
+    _lightsManagementSceneIndex = nullptr;
 }
 
 HdSceneIndexPrim MayaViewportSceneIndex::GetPrim(const SdfPath& primPath) const

@@ -219,8 +219,10 @@ protected:
     // X-Ray
     bool _isXRayEnabled{false};
 
-    // Active viewport lights
-    Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    // Active viewport lights. Weak: the lights management scene index is downstream of this
+    // one in the filtering chain and so already holds us through its input. A strong pointer
+    // here is a reference cycle that leaks the whole chain on every Hydra rebuild (HYDRA-2019).
+    PXR_NS::TfWeakPtr<Fvp::LightsManagementSceneIndex> _lightsManagementSceneIndex;
 };
 
 } // namespace MAYAHYDRA_NS_DEF
