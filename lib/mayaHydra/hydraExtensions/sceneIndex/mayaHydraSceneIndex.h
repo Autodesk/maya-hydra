@@ -177,8 +177,10 @@ public:
 
     GfInterval GetCurrentTimeSamplingInterval() const;
 
-    /// True while _Destroy() is in progress. Reentrant Maya callbacks during teardown must
-    /// no-op (see ShouldSkipHydraUpdates()); this is expected, not an error.
+    /// True once _Destroy() has started, and for the rest of this object's life: after an
+    /// explicit _Destroy() the object may outlive its render index as an inert shell.
+    /// Reentrant Maya callbacks during teardown must no-op (see ShouldSkipHydraUpdates());
+    /// this is expected, not an error.
     bool IsTearingDown() const { return _isTearingDown; }
 
     /// Returns the non-owning render index pointer. Must not be called while tearing down;

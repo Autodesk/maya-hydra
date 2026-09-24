@@ -100,7 +100,7 @@ TEST(MayaHydraSceneIndex, PrimAncestors)
     ASSERT_EQ(MGlobal::executeCommand("refresh"), MS::kSuccess);
 }
 
-TEST(MayaHydraSceneIndex, releasedOnHydraRebuild)
+TEST(MayaHydraSceneIndex, ReleasedOnHydraRebuild)
 {
     const auto& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
@@ -110,18 +110,29 @@ TEST(MayaHydraSceneIndex, releasedOnHydraRebuild)
     ASSERT_TRUE(oldSceneIndex) << "Could not find MayaHydraSceneIndex in scene index tree";
 
     // Switching the only Hydra panel to VP2 runs ClearHydraResources(); switching it back
-    // builds a new generation. Some filtering scene indices are only replaced by the next
-    // _InitHydraResources(), so check after coming back to Hydra, not while on VP2.
+    // builds a new generation. While on VP2, edit and then delete the sphere: before the fix
+    // the old scene index's adapter callbacks were still registered and fired against the
+    // freed render index. The release is checked after coming back to Hydra, the latest point
+    // by which the old generation must be gone.
     ASSERT_EQ(
-        MGlobal::executeCommand(
-            "{ string $ed = `playblast -activeEditor`;"
-            " string $ovr = `modelEditor -q -rendererOverrideName $ed`;"
-            " modelEditor -e -rendererOverrideName \"\" $ed; refresh -f;"
-            " modelEditor -e -rendererOverrideName $ovr $ed; refresh -f; }"),
+        MGlobal::executeCommand("{ string $ed = `playblast -activeEditor`;"
+                                " string $ovr = `modelEditor -q -rendererOverrideName $ed`;"
+                                " modelEditor -e -rendererOverrideName \"\" $ed; refresh -f;"
+                                " setAttr sphere1.translateX 2; delete sphere1; refresh -f;"
+                                " modelEditor -e -rendererOverrideName $ovr $ed; refresh -f; }"),
         MS::kSuccess);
 
     const auto& newSceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(newSceneIndices.size(), 0u) << "Hydra did not come back after the VP2 round trip";
+
+    // Tells "no rebuild happened" apart from "the old scene index leaked". Weak-to-weak
+    // comparison is by remnant identity, which oldSceneIndex keeps alive, so a new object
+    // allocated at the old address still compares unequal.
+    const HdSceneIndexBasePtr newSceneIndex = FindMayaHydraSceneIndex(newSceneIndices.front());
+    ASSERT_TRUE(newSceneIndex) << "Could not find the rebuilt MayaHydraSceneIndex";
+    ASSERT_TRUE(newSceneIndex != oldSceneIndex)
+        << "Hydra resources were not rebuilt: the VP2 round trip did not reach "
+           "ClearHydraResources()";
 
     EXPECT_TRUE(oldSceneIndex.IsExpired())
         << "MayaHydraSceneIndex survived a Hydra rebuild (HYDRA-2019): its Maya callbacks stay "

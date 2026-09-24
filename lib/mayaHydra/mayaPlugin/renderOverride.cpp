@@ -1452,7 +1452,9 @@ void MtohRenderOverride::_ClearMayaHydraSceneIndex()
 #ifndef CODE_COVERAGE_WORKAROUND
     // Under code coverage the scene index is deliberately leaked instead, as its base
     // class HdRetainedSceneIndex dtor crashes in the Windows clang code coverage build.
-    _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    if (_dataProducerMergingSceneIndexProxy && _mayaHydraSceneIndex) {
+        _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    }
 #endif
     // Tear down explicitly rather than trusting the refcount to reach zero before
     // ClearHydraResources() frees the render index (HYDRA-2019). _Destroy() removes every
@@ -1770,8 +1772,10 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // scene indices still hold this one through their input until the next
     // _InitHydraResources() replaces them. Destroy() is idempotent, so the later destructor
     // call is a no-op (HYDRA-2019).
-    _mayaViewportSceneIndex->Destroy();
-    _mayaViewportSceneIndex.Reset();
+    if (_mayaViewportSceneIndex) {
+        _mayaViewportSceneIndex->Destroy();
+        _mayaViewportSceneIndex.Reset();
+    }
 
     _displayStyleSceneIndex = nullptr;
     _pruneTexturesSceneIndex = nullptr;

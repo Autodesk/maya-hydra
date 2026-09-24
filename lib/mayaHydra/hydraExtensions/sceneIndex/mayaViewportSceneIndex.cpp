@@ -201,10 +201,9 @@ void MayaViewportSceneIndex::Destroy()
     }
 
     // Stop receiving notifications, so a late upstream PrimsAdded cannot reach _PrimsAdded()
-    // on a torn-down instance.
-    if (_mergingSceneIndex) {
-        _mergingSceneIndex->RemoveObserver(HdSceneIndexObserverPtr(&_observer));
-    }
+    // on a torn-down instance. _mergingSceneIndex is created in the constructor's initializer
+    // list, and removing an observer that is already gone is a no-op.
+    _mergingSceneIndex->RemoveObserver(HdSceneIndexObserverPtr(&_observer));
 }
 
 HdSceneIndexPrim MayaViewportSceneIndex::GetPrim(const SdfPath& primPath) const

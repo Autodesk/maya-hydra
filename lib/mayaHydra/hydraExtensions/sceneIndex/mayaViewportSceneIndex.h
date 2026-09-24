@@ -67,9 +67,10 @@ public:
     MAYAHYDRALIB_API
     ~MayaViewportSceneIndex() override;
 
-    // HYDRA-2019 : This method should not exist and is what the destructor should be. 
-    // However, since we have some lifetime management issues with our scene index chain, 
-    // we need to manually call the dtor for the time being, so we expose it as this method.
+    // Deterministic teardown, called from MtohRenderOverride::ClearHydraResources() while the
+    // render index still exists: unregisters the pick handler and stops upstream notifications,
+    // even if something still holds this scene index. The destructor calls it again; the
+    // second call is a no-op (HYDRA-2019).
     MAYAHYDRALIB_API
     void Destroy();
 
