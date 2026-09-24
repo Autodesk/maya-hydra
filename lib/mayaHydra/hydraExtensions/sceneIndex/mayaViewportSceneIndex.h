@@ -28,7 +28,7 @@
 #include <maya/MApiNamespace.h>
 #include <ufe/ufe.h>
 
-#include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
+#include <set>
 
 UFE_NS_DEF { class Path; }
 
@@ -122,8 +122,13 @@ public:
         return _defaultMaterialPath;
     }
 
+    // Maya light prims that are not active in the viewport, as computed by the last Update().
+    // The owner of the filtering chain forwards them to its lights management scene index.
     MAYAHYDRALIB_API
-    void SetLightsManagementSceneIndex(const Fvp::LightsManagementSceneIndexRefPtr& lightsManagementSceneIndex); // Can be a nullptr
+    const std::set<PXR_NS::SdfPath>& GetDisabledLightPrims() const
+    {
+        return _disabledLightPrims;
+    }
 
 protected:
     MayaViewportSceneIndex(PXR_NS::HdSceneIndexBaseRefPtr const& inputSceneIndex, PXR_NS::MayaHydraSceneIndexRefPtr const& mayaDataSceneIndex);
@@ -219,10 +224,8 @@ protected:
     // X-Ray
     bool _isXRayEnabled{false};
 
-    // Active viewport lights. Weak: the lights management scene index is downstream of this
-    // one in the filtering chain and so already holds us through its input. A strong pointer
-    // here is a reference cycle that leaks the whole chain on every Hydra rebuild (HYDRA-2019).
-    PXR_NS::TfWeakPtr<Fvp::LightsManagementSceneIndex> _lightsManagementSceneIndex;
+    // Inactive viewport lights, see GetDisabledLightPrims()
+    std::set<PXR_NS::SdfPath> _disabledLightPrims;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

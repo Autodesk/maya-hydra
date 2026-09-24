@@ -205,7 +205,6 @@ void MayaViewportSceneIndex::Destroy()
     if (_mergingSceneIndex) {
         _mergingSceneIndex->RemoveObserver(HdSceneIndexObserverPtr(&_observer));
     }
-    _lightsManagementSceneIndex = nullptr;
 }
 
 HdSceneIndexPrim MayaViewportSceneIndex::GetPrim(const SdfPath& primPath) const
@@ -316,9 +315,9 @@ void MayaViewportSceneIndex::Update(const MDrawContext& viewportDrawContext)
 
 void MayaViewportSceneIndex::_UpdateActiveLights(const MDrawContext& viewportDrawContext)
 {
-    // This code removes light prims in one case and disables them through
-    // the _lightsManagementSceneIndex in the other.  It may be possible to
-    // simplify by always using the _lightsManagementSceneIndex.
+    // This code removes light prims in one case and, in the other, records them in
+    // _disabledLightPrims for the lights management scene index to disable.  It may be
+    // possible to simplify by always using the lights management scene index.
 
     MayaHydraSceneIndex::LightDagPathMap globalLightPaths = _mayaDataSceneIndex->GetGlobalLightPaths();
     MayaHydraSceneIndex::LightDagPathMap activeLightPaths;
@@ -361,25 +360,22 @@ void MayaViewportSceneIndex::_UpdateActiveLights(const MDrawContext& viewportDra
         }
     }
 
-    if (_lightsManagementSceneIndex) {
-        std::set<SdfPath> disabledLights;
-
-        // Store disabled lights to pass them to the lights management scene index
-        auto lightAdapters = _mayaDataSceneIndex->GetAdapterMap<MayaHydraLightAdapter>();
-        for (const auto& [id, adapter] : lightAdapters) {
-            auto itActiveLightPath = activeLightPaths.find(adapter->GetDagPath().fullPathName().asChar());
-            if (itActiveLightPath != activeLightPaths.end()) {
-                activeLightPaths.erase(itActiveLightPath);
-            } else {
-                // Skip dome lights as Maya numberOfActiveLights API doesn't count active dome lights
-                if (adapter->LightType() != HdPrimTypeTokens->domeLight) {
-                    disabledLights.insert(adapter->GetID());
-                }
+    // Store disabled lights, for the lights management scene index
+    std::set<SdfPath> disabledLights;
+    auto lightAdapters = _mayaDataSceneIndex->GetAdapterMap<MayaHydraLightAdapter>();
+    for (const auto& [id, adapter] : lightAdapters) {
+        auto itActiveLightPath = activeLightPaths.find(adapter->GetDagPath().fullPathName().asChar());
+        if (itActiveLightPath != activeLightPaths.end()) {
+            activeLightPaths.erase(itActiveLightPath);
+        } else {
+            // Skip dome lights as Maya numberOfActiveLights API doesn't count active dome lights
+            if (adapter->LightType() != HdPrimTypeTokens->domeLight) {
+                disabledLights.insert(adapter->GetID());
             }
         }
-
-        _lightsManagementSceneIndex->SetDisabledLightsPrims(disabledLights);
     }
+
+    _disabledLightPrims = std::move(disabledLights);
 }
 
 const SdfPath& MayaViewportSceneIndex::DefaultLightPath()
@@ -482,11 +478,6 @@ bool MayaViewportSceneIndex::AddPickHitToSelectionList(
         hit.hdxPickHit.worldSpaceHitPoint[1],
         hit.hdxPickHit.worldSpaceHitPoint[2]);
     return true;
-}
-
-void MayaViewportSceneIndex::SetLightsManagementSceneIndex(const Fvp::LightsManagementSceneIndexRefPtr& lightsManagementSceneIndex)
-{
-    _lightsManagementSceneIndex = lightsManagementSceneIndex;
 }
 
 } // namespace FVP_NS_DEF

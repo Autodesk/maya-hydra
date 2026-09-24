@@ -863,6 +863,14 @@ MStatus MtohRenderOverride::Render(
 
         if (_mayaViewportSceneIndex) {
             _mayaViewportSceneIndex->Update(drawContext);
+
+            // The viewport scene index is upstream of the lights management scene index and
+            // must not reference it, so forward its disabled lights from here.
+            if (_lightsManagementSceneIndex)
+            {
+                _lightsManagementSceneIndex->SetDisabledLightsPrims(
+                    _mayaViewportSceneIndex->GetDisabledLightPrims());
+            }
         }
 
         // Update shadow collection for lights
@@ -1917,7 +1925,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaViewportSceneIndex->DefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
-    _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);//Should this be on the frame pass filtering scene index ?
