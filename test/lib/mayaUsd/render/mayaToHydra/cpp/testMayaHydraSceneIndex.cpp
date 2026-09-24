@@ -105,7 +105,7 @@ TEST(MayaHydraSceneIndex, releasedOnHydraRebuild)
     const auto& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    // Weak pointer only: holding a RefPtr here would itself keep the scene index alive.
+    // HdSceneIndexBasePtr is a TfWeakPtr: holding a RefPtr here would keep the scene index alive.
     HdSceneIndexBasePtr oldSceneIndex = FindMayaHydraSceneIndex(sceneIndices.front());
     ASSERT_TRUE(oldSceneIndex) << "Could not find MayaHydraSceneIndex in scene index tree";
 
