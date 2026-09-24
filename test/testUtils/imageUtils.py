@@ -142,6 +142,49 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
     # has no inherited console) hangs subprocess.run forever -- Windows
     # fails the console-pipe handshake with ERROR_NO_DATA (0x800700E8).
     # CREATE_NO_WINDOW skips that handshake.
+
+    # As of 2026-09-22, Windows-only hangs in subprocess.run() are still
+    # occuring for unit test runs on build machines.  We have implemented a
+    # timeout and retry mechanism to compensate for this.  If the problem
+    # persists, the following suggestions can be tried:
+    #
+    # - This is the only subprocess.run() call site that implements mitigation
+    #   measures against hangs.  We could factor out the code below and have
+    #   all call sites use it.  For example, in this module the image diff
+    #   error path does not use hang mitigation, though it seems unlikely 
+    #   that this is a problem, as this would mean an image comparison failure
+    #   occurred.  This does not seem possible, as hanging tests most often
+    #   pass.  Since rendering is deterministic, the image diff error path most
+    #   likely is unused.
+    #
+    #   A call site in test/testUtils/mtohUtils.py runs the taskkill
+    #   executable, and does not use the code below either.  There has been at
+    #   least one recorded instance of a test run of testSceneStat.py hanging,
+    #   and that test performs no image comparison whatsoever (the automated
+    #   retry of the complete test succeeded).  It seems possible that this
+    #   hang might have been caused by the mtohUtils.py subprocess.run()
+    #   invocation.
+    #
+    # - Microsoft documents 
+    #   https://learn.microsoft.com/en-us/windows/win32/ipc/pipe-handle-inheritance
+    #   that all processes holding a pipe handle must close it for the pipe to
+    #   reach End Of File.  If a subprocess started by subprocess.run(), or a
+    #   subprocess of that process, holds on to a pipe without closing it, 
+    #   subprocess.run() will hang on Window.  The capture_output=True
+    #   argument means both stdout and stderr are anonymous pipes.  For best 
+    #   robustness, redirecting stdout and stderr to temporary files means
+    #   subprocess.run() will return when the child process completes, not when
+    #   the pipes are closed.  The temporary files can then be read for output.
+    #
+    #   However, idiff itself does not spawn subprocesses (from inspection of
+    #   its open source code).  Unless idiff itself hangs, it will not hold on
+    #   to stdout / stderr pipes, so the likelihood that using temporary files
+    #   will reduce the occurrence of hangs seems low.
+    #
+    #   The taskkill executable is closed source, and it might create one or
+    #   more subprocess(es), and any of these processes might hold on to stdout
+    #   / stderr, or taskkill itself may hang, but this seems unlikely as well.
+    #
     creation_flags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
 
     timeoutSeconds = 20

@@ -351,6 +351,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                       file=sys.stderr)
             else:
                 try:
+                    # For Windows subprocess.run() possible hang documentation,
+                    # and remediation measures, see comments in imageUtils.py.
+                    # These measures could be applied here, or a single,
+                    # centralized Python subprocess.run() wrapper could be
+                    # created to be used from all call sites.  PPT, 2026-09-23.
                     subprocess.run(  # nosec B603
                         [taskkill_exe, '/f', '/im', 'ADPClientService.exe'],
                         check=True, capture_output=True, text=True)
