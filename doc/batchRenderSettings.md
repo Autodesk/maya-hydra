@@ -88,6 +88,31 @@ So `-reg 0 W-1 0 H-1` covers the full image, `-reg p p p p` selects exactly
 one pixel at `(p, p)`, and a region with `right < left` or `top < bottom`
 raises a Python `RuntimeError`.
 
+## Renderer Selection
+
+Before any render settings strategy is chosen, `hydraRender` must first
+resolve **which render delegate** to use.  Resolution follows a two-step
+precedence:
+
+1. **Explicit `-renderer`/`-r` flag.**  If the flag is set, its value is
+   used directly as the Hydra render delegate's plugin id.  An explicitly
+   empty flag value (`-renderer ""`) is a hard error.
+2. **The `currentRenderer` attribute on the `UsdDefaultRenderDescription`
+   singleton node.**  If no flag is given, this USD-authored string
+   attribute is read and, if non-empty, used as the render delegate's
+   plugin id.
+
+`defaultRenderGlobals.currentRenderer` (the classic Maya Render Settings
+renderer, e.g. `"arnold"` for MtoA's legacy renderer) is never read by this
+resolution logic — it is a separate, unrelated attribute consulted only by
+the legacy (non-Hydra) `render`/`Render` command path.
+
+### Version-contract requirement
+
+The `UsdDefaultRenderDescription` node and its `currentRenderer` attribute
+are guaranteed to be present in every supported configuration.
+There is no silent fallback to a default renderer.
+
 ## Strategy Selection
 
 The render settings strategy is determined at render time by
@@ -104,10 +129,10 @@ The render settings strategy is determined at render time by
 
 | File | Description |
 |------|-------------|
-| `renderSettingsUtils.h / .cpp` | `RenderSettingsType` enum and strategy selection logic |
-| `batchRenderer.h / .cpp` | Core batch renderer (shared infrastructure) |
+| `renderSettingsUtils.h / .cpp` | `RenderSettingsType` enum and strategy selection logic; reading the USD `currentRenderer` attribute |
+| `batchRenderer.h / .cpp` | Core batch renderer (shared infrastructure); validates the selected renderer against the registered Hydra render delegates |
 | `batchRendererHydraV1RenderSettings.h / .cpp` | Hydra V1 render settings strategy |
 | `batchRendererHydraV2RenderSettings.h / .cpp` | Hydra V2 render settings strategy |
-| `hydraRenderCmd.h / .cpp` | `hydraRender` command entry point |
+| `hydraRenderCmd.h / .cpp` | `hydraRender` command entry point; resolves which renderer to use (`-renderer`/`-r` flag, then `currentRenderer`) |
 | `hydraRenderCmdHydraV1RenderSettings.cpp` | Command-level logic for Hydra V1 strategy |
 | `hydraRenderCmdHydraV2RenderSettings.cpp` | Command-level logic for Hydra V2 strategy |

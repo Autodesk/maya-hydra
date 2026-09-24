@@ -25,7 +25,6 @@
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
-#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdRender/settings.h>
 
 #include <vector>
@@ -71,6 +70,21 @@ enum class RenderSettingsType
 
 /// Determine the RenderSettingsType from the render delegate.
 RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const PXR_NS::TfToken& rendererName);
+
+/*! \brief Read the raw currentRenderer value from the UsdDefaultRenderDescription node.
+ *
+ *  This reads whatever string is currently stored in the currentRenderer
+ *  attribute of the UsdDefaultRenderDescription singleton node in the Maya
+ *  scene, and returns it as a TfToken. No validation is performed on the
+ *  returned value.
+ *
+ *  \return The raw currentRenderer value, or an empty TfToken if the
+ *  attribute has no value set. A missing UsdDefaultRenderDescription node,
+ *  or a missing currentRenderer attribute on it, also returns an empty
+ *  TfToken, but additionally triggers a TF_VERIFY, since both are expected
+ *  to always be present.
+ */
+PXR_NS::TfToken GetCurrentRenderer();
 
 // Extract the UsdRenderSettings named by the active render description path.
 // Returns the two-segment UFE path (proxy shape, then render settings prim) of
