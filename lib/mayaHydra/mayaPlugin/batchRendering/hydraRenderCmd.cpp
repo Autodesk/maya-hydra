@@ -27,7 +27,9 @@
 
 #include <maya/MArgDatabase.h>
 #include <maya/MAnimControl.h>
+#include <maya/MCommandResult.h>
 #include <maya/MGlobal.h>
+#include <maya/MStringArray.h>
 #include <maya/MSyntax.h>
 #include <maya/MTime.h>
 
@@ -57,6 +59,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <set>
+#include <string>
 #include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -95,6 +99,58 @@ using namespace MAYAHYDRA_NS_DEF;
 constexpr auto _helpText = R"HELP(For details on args usage please see 
 https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
 )HELP";
+
+bool isHydraCapable(const MString& rendererName)
+{
+    MString cmd;
+    cmd.format("renderer -query -capability \"isHydra\" \"^1s\"", rendererName);
+
+    // Renderers that don't report the "isHydra" capability at all return no
+    // value (MCommandResult::kInvalid) rather than a boolean false.
+    MCommandResult result;
+    MStatus        status = MGlobal::executeCommand(cmd, result);
+    if (!status || (result.resultType() != MCommandResult::kString)) {
+        return false;
+    }
+
+    MString value;
+    result.getResult(value);
+    return value == "true";
+}
+
+// Renderers can be registered after plugin load, so the set is rebuilt on
+// each call rather than cached.
+std::set<std::string> hydraRenderers()
+{
+    std::set<std::string> renderers;
+
+    MStringArray rendererNames;
+    MStatus      status
+        = MGlobal::executeCommand("renderer -query -namesOfAvailableRenderers", rendererNames);
+    if (!status) {
+        MGlobal::displayWarning("Unable to retrieve available renderers.");
+        return renderers;
+    }
+
+    for (const auto& rendererName : rendererNames) {
+        if (isHydraCapable(rendererName)) {
+            renderers.insert(rendererName.asChar());
+        }
+    }
+
+    return renderers;
+}
+
+bool validRenderer(const TfToken& rendererName)
+{
+    if (rendererName.IsEmpty()) {
+        return false;
+    }
+
+    const auto renderers = hydraRenderers();
+    return renderers.find(rendererName.GetString()) != renderers.end();
+}
+
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
@@ -222,11 +278,12 @@ bool HydraRenderCmd::hydraRender()
         return hydraRenderFromHydraV2RenderSettings();
     }
 
-TF_RUNTIME_ERROR(
-    "Batch rendering requires USD render settings (with at least one render product) "
-    "or a render-delegate-owned render pass. No usable USD render settings were found, "
-    "and render delegate '%s' does not drive the render pass.",
-    _batchRenderer->GetRendererName().GetText());
+    displayError(
+        MString("Batch rendering requires USD render settings (with at least one render "
+                 "product) or a render-delegate-owned render pass. No usable USD render "
+                 "settings were found, and render delegate '")
+            + _batchRenderer->GetRendererName().GetText() + "' does not drive the render pass.",
+        true);
     return false;
 }
 
@@ -243,13 +300,26 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
       return MS::kFailure;
     }
 
-    // By default the renderer is Hydra Storm.
-    TfToken rendererName("HdStormRendererPlugin");
+    TfToken rendererName;
     if (db.isFlagSet(_renderer)) {
         MString rn;
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_renderer, 0, rn));
 
         rendererName = TfToken(rn.asChar());
+    }
+    else {
+        // Get renderer from the scene.
+        rendererName = GetCurrentRenderer();
+    }
+
+    // Validate the renderer
+    if (!validRenderer(rendererName)) {
+        displayError(
+            MString("hydraRender: \"") + rendererName.GetText()
+                + "\" is not a registered Hydra renderer. Pass a valid -renderer/-r, or "
+                  "author the currentRenderer attribute on UsdDefaultRenderDescription.",
+            true);
+        return MS::kFailure;
     }
 
     if (db.isFlagSet(_gpuEnabledFlag)) {
