@@ -228,6 +228,29 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         RENDERER_ARGS "-s 5 -e 9"
     )
 
+    # Frame set or frame range rendering is not renderer-specific, so can be
+    # tested with a single renderer.
+    if(folder STREQUAL "arnold")
+        # Test frames set (1, 3, 5-8, 9, 11-14).
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSet
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}FramesSet
+            RENDERER_ARGS "-frames \"1, 3, 5-8, 9, 11-14\""
+        )
+
+        # With step.  The step is applied at each range, so frames 1, 3, 5,
+        # 7, 9, 11 and 13 will be rendered.
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSetStep
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}FramesSetStep
+            RENDERER_ARGS "-frames \"1, 3, 5-8, 9, 11-14\" -b 2"
+        )
+    endif()
+
     set(singlecam_fail_arg FAIL 0.05)
     if(folder STREQUAL "storm")
         set(singlecam_fail_arg "")

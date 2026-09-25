@@ -736,9 +736,7 @@ void BatchRenderer::SetRenderTimes(const RenderTimes& renderTimes)
 {
     // Cannot assign, as all RenderTimes data members are const.
     _renderTimes.emplace(
-        renderTimes.isAnimated, 
-        renderTimes.startTime,
-        renderTimes.endTime,
+        renderTimes.timeRanges,
         renderTimes.timeIncr
     );
 }
