@@ -31,72 +31,15 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Argv validators (validate_executable/validate_existing_file/
+# validate_existing_dir/validate_float) and compareImagePair() live in
+# imageDiffUtils, shared with compareRenderedImage.py and the viewport
+# tests. cmake/test.cmake adds test/testUtils to PYTHONPATH for this test.
+import imageDiffUtils
+
 
 DEFAULT_RENDERED_IMAGE_SUBDIR = "projects/default/images"
 
-
-def _validate_executable(label, raw_path):
-    """Return a resolved absolute Path for an executable supplied on argv.
-
-    Rejects relative paths (so subprocess.run() can never search PATH for a
-    same-named binary), missing files, non-regular files (directories,
-    dangling symlinks) and non-executable files. Exits the process with a
-    descriptive message on any failure. This is the runtime mitigation for
-    Bandit B603 / PYTH-INJC-30 on the subprocess.run() call sites below.
-    """
-    candidate = Path(raw_path)
-    if not candidate.is_absolute():
-        print("%s path must be absolute: %s" % (label, raw_path), file=sys.stderr)
-        sys.exit(1)
-    try:
-        resolved = candidate.resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        print("%s not found: %s (%s)" % (label, raw_path, exc), file=sys.stderr)
-        sys.exit(1)
-    if not resolved.is_file():
-        print("%s is not a regular file: %s" % (label, resolved), file=sys.stderr)
-        sys.exit(1)
-    if not os.access(str(resolved), os.X_OK):
-        print("%s is not executable: %s" % (label, resolved), file=sys.stderr)
-        sys.exit(1)
-    return resolved
-
-
-def _validate_existing_file(label, raw_path):
-    """Resolve a required input file path, exiting on any validation failure."""
-    candidate = Path(raw_path)
-    try:
-        resolved = candidate.resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        print("%s not found: %s (%s)" % (label, raw_path, exc), file=sys.stderr)
-        sys.exit(1)
-    if not resolved.is_file():
-        print("%s is not a regular file: %s" % (label, resolved), file=sys.stderr)
-        sys.exit(1)
-    return resolved
-
-
-def _validate_existing_dir(label, raw_path):
-    """Resolve a required input directory path, exiting on any failure."""
-    candidate = Path(raw_path)
-    try:
-        resolved = candidate.resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        print("%s not found: %s (%s)" % (label, raw_path, exc), file=sys.stderr)
-        sys.exit(1)
-    if not resolved.is_dir():
-        print("%s is not a directory: %s" % (label, resolved), file=sys.stderr)
-        sys.exit(1)
-    return resolved
-
-
-def _validate_float(label, raw_value):
-    """Parse a numeric threshold supplied on argv, exiting on failure."""
-    try:
-        return float(raw_value)
-    except ValueError:
-        print("%s must be a number, got: %s" % (label, raw_value), file=sys.stderr)
-        sys.exit(1)
 
 #Is used because we use relative paths render products for rendered images
 def _copy_scene_and_usd(scene_path, work_dir):
@@ -147,6 +90,9 @@ def _find_output_match(expected_path, output_dir):
 def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
     expected_dir = Path(expected_dir)
     output_dir = Path(output_dir)
+    # Sibling of the images output dir, e.g. .../projects/default/diffs when
+    # output_dir is .../projects/default/images.
+    diff_dir = output_dir.parent / "diffs"
 
     expected_images = sorted(expected_dir.glob("*"))
     expected_images = [p for p in expected_images if p.is_file()]
@@ -162,34 +108,24 @@ def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
             success = False
             continue
 
-        # idiff has been validated by _validate_executable() in main(): it
-        # is an absolute path to an existing executable regular file.
-        # Combined with the argument list form (no shell=True), this
-        # satisfies Bandit B603 / PYTH-INJC-30.
-        # Match single-image cmdLineRender tests (HYDRA-2304): treat WARN like FAIL
-        # so idiff's default ~1e-6 warning threshold does not fail "roughly same"
-        # images that already pass -fail / -failpercent.
-        result = subprocess.run(  # nosec B603
-            [
-                str(idiff),
-                "-fail",
-                str(fail),
-                "-failpercent",
-                str(failpercent),
-                "-warn",
-                str(fail),
-                "-warnpercent",
-                str(failpercent),
-                str(output),
-                str(expected),
-            ],
-            capture_output=True,
-            text=True,
+        # Match single-image cmdLineRender tests (HYDRA-2304): compareImagePair()
+        # mirrors warn/warnpercent to fail/failpercent when omitted, so idiff's
+        # default ~1e-6 warning threshold does not fail "roughly same" images
+        # that already pass -fail / -failpercent. passReturnCodes=(0,) keeps
+        # this test's historical strict policy (only an exact match passes).
+        result = imageDiffUtils.compareImagePair(
+            str(expected),
+            str(output),
+            fail,
+            failpercent,
+            imageDiffTool=str(idiff),
+            diffOutputDir=diff_dir,
+            passReturnCodes=(0,),
+            verbose=True,
         )
-        if result.returncode != 0:
+        if not result.passed:
             print(f"idiff failed for {expected.name}:", file=sys.stderr)
-            print(result.stdout, file=sys.stderr)
-            print(result.stderr, file=sys.stderr)
+            print(result.message, file=sys.stderr)
             success = False
 
     expected_names = {p.name for p in expected_images}
@@ -246,17 +182,17 @@ def main(argv):
         )
         return 1
 
-    # Validate every argv entry up front so that downstream code (and in
-    # particular the two subprocess.run() calls below) only ever sees
-    # well-formed, existing paths and parsed numeric values. This is the
-    # runtime mitigation for Bandit B603 / PYTH-INJC-30.
-    render_exe   = _validate_executable("Render executable", argv[1])
+    # Validate every argv entry up front so that downstream code (the
+    # _run_render() subprocess.run() call and imageDiffUtils.compareImagePair()'s
+    # idiff invocation) only ever sees well-formed, existing paths and parsed
+    # numeric values. This is the runtime mitigation for Bandit B603 / PYTH-INJC-30.
+    render_exe   = imageDiffUtils.validate_executable("Render executable", argv[1])
     renderer     = argv[2]
-    scene_path   = _validate_existing_file("Scene path", argv[3])
-    expected_dir = _validate_existing_dir("Expected images directory", argv[4])
-    idiff        = _validate_executable("idiff executable", argv[5])
-    fail         = _validate_float("fail threshold", argv[6])
-    failpercent  = _validate_float("failpercent threshold", argv[7])
+    scene_path   = imageDiffUtils.validate_existing_file("Scene path", argv[3])
+    expected_dir = imageDiffUtils.validate_existing_dir("Expected images directory", argv[4])
+    idiff        = imageDiffUtils.validate_executable("idiff executable", argv[5])
+    fail         = imageDiffUtils.validate_float("fail threshold", argv[6])
+    failpercent  = imageDiffUtils.validate_float("failpercent threshold", argv[7])
     rendered_subdir = argv[8] if len(argv) > 8 and argv[8] else DEFAULT_RENDERED_IMAGE_SUBDIR
     extra_renderer_args = argv[9] if len(argv) > 9 else None
 
