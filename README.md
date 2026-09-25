@@ -26,6 +26,12 @@ As an example, when paired with
 render delegate), it provides an Arnold render of the viewport, where both maya
 objects and USD objects (through proxies) can be modified interactively.
 
+Dependent/third-party Hydra render delegates like these (distributed separately
+from MayaUSD) are discovered through the `MAYA_PXR_PLUGINPATH_NAME` environment
+variable rather than the standard `PXR_PLUGINPATH_NAME`, so that MayaUSD can run
+its version-matching checks before registering them. See
+[Building the mayaHydra.mll plugin](./doc/build.md) for details.
+
 This could also be particularly useful for newer renderers, like Radeon
 ProRender (which already has a
 [render delegate](https://github.com/GPUOpen-LibrariesAndSDKs/RadeonProRenderUSD)),

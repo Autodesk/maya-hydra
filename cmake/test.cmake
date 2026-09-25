@@ -3,6 +3,13 @@ set(MAYA_HYDRA_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 # Paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold plugin).
 # Sources (first wins): -DADDITIONAL_PXR_PLUGINPATH_NAME=... or $ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}
 # On Windows use forward slashes or escaped backslashes.
+# NOTE: these are dependent/third-party USD plugins (render delegates built and
+# distributed separately from maya-hydra/MayaUSD). At test-execution time these
+# paths are also propagated to MAYA_PXR_PLUGINPATH_NAME (see
+# _mayaHydra_setup_test_finalize_env below), which is the variable MayaUSD's
+# version-matching (mayaUsdPlugInfo.json + VersionCheck) actually reads. The
+# ADDITIONAL_PXR_PLUGINPATH_NAME CMake variable name is kept for backward
+# compatibility with existing build pipelines.
 if(NOT DEFINED ADDITIONAL_PXR_PLUGINPATH_NAME)
     set(ADDITIONAL_PXR_PLUGINPATH_NAME "" CACHE STRING
         "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)")
@@ -410,7 +417,10 @@ function(_mayaHydra_setup_test_plugins)
              "${MAYAUSD_LOCATION}/libraries")
     endif()
 
-    # Additional plugin paths (e.g. HdArnold) for tests that need them.
+    # Additional plugin paths (e.g. HdArnold) for tests that need them. These are
+    # dependent/third-party USD plugins; they are also propagated to
+    # MAYA_PXR_PLUGINPATH_NAME below (see _mayaHydra_setup_test_finalize_env) so
+    # they go through MayaUSD's version-matching before registration.
     # On macOS, exclude PRMan and MtoA/Arnold paths to avoid TfType redefinition errors.
     # On Linux, only exclude PRMan paths (MtoA/Arnold tests are supported there).
     if(ADDITIONAL_PXR_PLUGINPATH_NAME)
@@ -651,9 +661,12 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # explicit paths (MTOA_LOCATION, PRMAN_DELEGATE_PLUGIN_PATH, etc.) are already
     # added above where applicable; there is no need to also inherit ambient env.
 
-    # Maya USD's Plug may read MAYA_PXR_PLUGINPATH_NAME (when built with
-    # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
-    # value so HdArnold and other Hydra plugins are discovered regardless.
+    # MayaUSD's Plug reads MAYA_PXR_PLUGINPATH_NAME (when built with
+    # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME) to discover
+    # dependent/third-party USD plugins (e.g. HdArnold, HdPrman) via
+    # mayaUsdPlugInfo.json + VersionCheck, rather than raw PXR_PLUGINPATH_NAME.
+    # Set it to the same value so those Hydra plugins are discovered regardless
+    # of which variable name the running MayaUSD build actually reads.
     list(APPEND ALL_PATH_VARS MAYA_PXR_PLUGINPATH_NAME)
     set(MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
 

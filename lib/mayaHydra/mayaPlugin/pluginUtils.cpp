@@ -97,9 +97,10 @@ MtohInitializeRenderPlugins()
             }
 #endif
 
-            // CreateRenderDelegate may fail without GPU context (e.g. Arnold from
-            // PXR_PLUGINPATH_NAME). Still register the override; delegate is created
-            // at render time. Use empty settings when delegate creation fails.
+            // CreateRenderDelegate may fail without GPU context (e.g. Arnold, a
+            // dependent USD plugin discovered via MAYA_PXR_PLUGINPATH_NAME). Still
+            // register the override; delegate is created at render time. Use empty
+            // settings when delegate creation fails.
             HdRenderDelegate* delegate = plugin->CreateRenderDelegate();
             HdRenderSettingDescriptorList rendererSettingDescriptors;
             if (delegate) {
