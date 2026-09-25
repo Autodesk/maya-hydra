@@ -28,7 +28,7 @@
 #include <maya/MApiNamespace.h>
 #include <ufe/ufe.h>
 
-#include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
+#include <set>
 
 UFE_NS_DEF { class Path; }
 
@@ -67,9 +67,10 @@ public:
     MAYAHYDRALIB_API
     ~MayaViewportSceneIndex() override;
 
-    // HYDRA-2019 : This method should not exist and is what the destructor should be. 
-    // However, since we have some lifetime management issues with our scene index chain, 
-    // we need to manually call the dtor for the time being, so we expose it as this method.
+    // Deterministic teardown, called from MtohRenderOverride::ClearHydraResources() while the
+    // render index still exists: unregisters the pick handler and stops upstream notifications,
+    // even if something still holds this scene index. The destructor calls it again; the
+    // second call is a no-op (HYDRA-2019).
     MAYAHYDRALIB_API
     void Destroy();
 
@@ -122,8 +123,13 @@ public:
         return _defaultMaterialPath;
     }
 
+    // Maya light prims that are not active in the viewport, as computed by the last Update().
+    // The owner of the filtering chain forwards them to its lights management scene index.
     MAYAHYDRALIB_API
-    void SetLightsManagementSceneIndex(const Fvp::LightsManagementSceneIndexRefPtr& lightsManagementSceneIndex); // Can be a nullptr
+    const std::set<PXR_NS::SdfPath>& GetDisabledLightPrims() const
+    {
+        return _disabledLightPrims;
+    }
 
 protected:
     MayaViewportSceneIndex(PXR_NS::HdSceneIndexBaseRefPtr const& inputSceneIndex, PXR_NS::MayaHydraSceneIndexRefPtr const& mayaDataSceneIndex);
@@ -219,8 +225,8 @@ protected:
     // X-Ray
     bool _isXRayEnabled{false};
 
-    // Active viewport lights
-    Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    // Inactive viewport lights, see GetDisabledLightPrims()
+    std::set<PXR_NS::SdfPath> _disabledLightPrims;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

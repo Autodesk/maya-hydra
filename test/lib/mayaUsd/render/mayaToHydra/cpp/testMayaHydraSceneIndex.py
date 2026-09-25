@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import os
+import unittest
+
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
@@ -35,6 +38,18 @@ class TestMayaHydraSceneIndex(mtohUtils.MayaHydraBaseTestCase):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="MayaHydraSceneIndex.PrimAncestors")
+
+    # Coverage builds deliberately leak the scene index and its filtering chain
+    # (CODE_COVERAGE_WORKAROUND), so the old scene index can never expire there.
+    @unittest.skipIf(os.environ.get("MAYAHYDRA_CODE_COVERAGE"),
+                     "Coverage builds leak the scene index on purpose (CODE_COVERAGE_WORKAROUND)")
+    def test_ReleasedOnHydraRebuild(self):
+        """The scene index must be destroyed when Hydra resources are rebuilt (HYDRA-2019)"""
+        self.setHdStormRenderer()
+        cmds.polySphere(name="sphere1", subdivisionsX=8, subdivisionsY=8)
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="MayaHydraSceneIndex.ReleasedOnHydraRebuild")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals()) 

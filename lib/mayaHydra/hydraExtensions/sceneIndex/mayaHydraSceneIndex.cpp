@@ -429,6 +429,13 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex() { _Destroy(); }
 
 void MayaHydraSceneIndex::_Destroy()
 {
+    // _Destroy() runs explicitly from _ClearMayaHydraSceneIndex() and again from the
+    // destructor, which may fire later, after a replacement instance exists. The second
+    // pass must be a no-op.
+    if (_isTearingDown) {
+        return;
+    }
+
     // All Maya callbacks fire on the main thread only (no render thread here), but
     // _Destroy() removes adapters incrementally, so removing adapter N's callbacks can
     // synchronously re-enter adapter M (not yet reached) — same-thread reentrancy, not a
@@ -460,8 +467,12 @@ void MayaHydraSceneIndex::_Destroy()
     _renderItemsAdaptersFast.clear();
     _customAdapters.clear();
 
-    // Unregister the fallback path mapper.
-    Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
+    // Unregister the fallback path mapper, but only if it is still ours: a replacement
+    // scene index may already have registered its own.
+    auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
+    if (pathMapperRegistry.GetFallbackMapper() == _mayaPathMapper) {
+        pathMapperRegistry.SetFallbackMapper(nullptr);
+    }
 }
 
 void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewportScene& scene)
