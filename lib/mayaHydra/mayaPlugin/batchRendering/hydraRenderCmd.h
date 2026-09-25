@@ -20,8 +20,6 @@
 
 #include <maya/MPxCommand.h>
 
-#include <pxr/base/tf/token.h>
-
 #include <memory>
 
 namespace MAYAHYDRA_NS_DEF {
@@ -53,26 +51,9 @@ private:
     bool hydraRenderFromHydraV1RenderSettings();
     bool hydraRenderFromHydraV2RenderSettings();
 
-    /*! \brief Resolve and validate the renderer to use for this batch render.
-     *
-     *  Resolution order: the -renderer/-r flag if set, otherwise the
-     *  currentRenderer attribute on the USD render-description node.
-     *  There is no hardcoded default renderer, so a no-flag invocation
-     *  requires that attribute to be authored.
-     *
-     *  The resolved name is checked against the registered Hydra renderer
-     *  plugins; an unregistered name is a hard error here, before
-     *  BatchRenderer is constructed. This does not guarantee the plugin can
-     *  actually be instantiated (e.g. missing GPU context): that is still
-     *  reported separately by BatchRenderer::_InitHydraResources().
-     */
-    PXR_NS::TfToken GetRenderer();
-
     std::unique_ptr<BatchRenderer>  _batchRenderer;
     std::unique_ptr<GLRenderWindow> _renderWindow;
     bool                            _gpuEnabled{false};
-    bool                            _rendererFlagSet{false};
-    PXR_NS::TfToken                 _rendererFromFlag;
 };
 
 }
