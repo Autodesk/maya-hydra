@@ -65,6 +65,11 @@ global proc mayaHydraSetStep(float $step)
     python("import mayaHydra.renderSettings.frames as mhFrames; mhFrames.setStep(" + $step + ")");
 }
 
+global proc mayaHydraSetFrames(string $frames)
+{
+    python("import mayaHydra.renderSettings.frames as mhFrames; mhFrames.setFrames(" + "\"" + $frames + "\")");
+}
+
 global proc mayaHydraSetRenderCamera(string $cameraPath)
 {
     python("import mayaHydra.renderSettings.camera as mhCamera; mhCamera.setCamera(" + "\"" + $cameraPath + "\")");

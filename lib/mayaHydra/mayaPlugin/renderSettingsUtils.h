@@ -28,6 +28,7 @@
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdRender/settings.h>
 
+#include <string>
 #include <vector>
 
 namespace UFE_VERSIONED_NS {
@@ -96,21 +97,35 @@ PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
 
 struct RenderTimes
 {
-    const bool  isAnimated;
-    const MTime startTime;
-    const MTime endTime;
+    /// Inclusive frame range, in Maya UI time units.
+    struct TimeRange
+    {
+        MTime startTime;
+        MTime endTime;
+    };
+
+    const std::vector<TimeRange> timeRanges;
     /// Frame increment, in frames.
     const float timeIncr;
 
-    RenderTimes(bool isAnimated, const MTime& startTime, const MTime& endTime, float timeIncr);
+    RenderTimes(std::vector<TimeRange> timeRanges, float timeIncr);
+
+    /// Total number of frames over all ranges, with the increment applied.
+    int FrameCount() const;
+
+    /// The frames to render, in range order, with the increment applied.
+    std::vector<MTime> FrameTimes() const;
 };
 
 // Get the render times from the Maya scene.
 RenderTimes GetRenderTimes();
 
+// Single-line description of the render times, for debug output.
+std::string RenderTimesDescription(const RenderTimes& renderTimes);
+
 // Report to Maya the progress of a batch render, as an integer percentage of
-// the frames in renderTimes, given the frame that has just finished rendering.
-void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime);
+// the frames in renderTimes, given the number of frames rendered so far.
+void SendRenderProgress(const RenderTimes& renderTimes, int framesDone);
 
 } // namespace MAYAHYDRA_NS_DEF
 

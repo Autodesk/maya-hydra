@@ -265,7 +265,7 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
     if (db.isFlagSet(_currentFrame)) {
         const auto currentTime = MAnimControl::currentTime();
         _batchRenderer->SetRenderTimes(
-            RenderTimes(false, currentTime, currentTime, 1.0f));
+            RenderTimes({ { currentTime, currentTime } }, 1.0f));
     }
 
     if (db.isFlagSet(_frameShort)) {
@@ -273,7 +273,7 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_frameShort, 0, frameValue));
         const MTime frameTime(frameValue, MTime::uiUnit());
         _batchRenderer->SetRenderTimes(
-            RenderTimes(false, frameTime, frameTime, 1.0f));
+            RenderTimes({ { frameTime, frameTime } }, 1.0f));
     }
 
     // Initialize Hydra renderer.

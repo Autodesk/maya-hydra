@@ -151,6 +151,11 @@ def Scope "Render"
                 8: "./images/mainCamFrame8.png",
                 9: "./images/mainCamFrame9.png",
                 10: "./images/mainCamFrame10.png",
+                11: "./images/mainCamFrame11.png",
+                12: "./images/mainCamFrame12.png",
+                13: "./images/mainCamFrame13.png",
+                14: "./images/mainCamFrame14.png",
+                15: "./images/mainCamFrame15.png",
             }
         uniform token productType = "raster"
     }
@@ -172,6 +177,11 @@ def Scope "Render"
                 8: "./images/secondCamFrame8.png",
                 9: "./images/secondCamFrame9.png",
                 10: "./images/secondCamFrame10.png",
+                11: "./images/secondCamFrame11.png",
+                12: "./images/secondCamFrame12.png",
+                13: "./images/secondCamFrame13.png",
+                14: "./images/secondCamFrame14.png",
+                15: "./images/secondCamFrame15.png",
             }
         uniform token productType = "raster"
     }
@@ -215,4 +225,3 @@ def Scope "Render"
         }
     }
 }
-
