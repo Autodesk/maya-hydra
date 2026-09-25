@@ -38,6 +38,7 @@
 #include <pxr/imaging/garch/glApi.h>
 #include <pxr/imaging/garch/glDebugWindow.h>
 #include <pxr/imaging/hd/renderDelegate.h>
+#include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/usd/usdRender/settings.h>
 #include <pxr/usd/usdRender/product.h>
 #include <pxr/usd/usdRender/var.h>
@@ -174,29 +175,44 @@ bool HydraRenderCmd::parseDatabase(const MArgDatabase& db)
 
 TfToken HydraRenderCmd::GetRenderer()
 {
+    // Use MPxCommand::displayError() (not just a Tf diagnostic) so the
+    // specific message reliably reaches the MStatus/Python-visible
+    // command error text on every platform.
+    TfToken rendererName;
     if (_rendererFlagSet) {
         if (_rendererFromFlag.IsEmpty()) {
-            // Use MPxCommand::displayError() (not just a Tf diagnostic) so the
-            // specific message reliably reaches the MStatus/Python-visible
-            // command error text on every platform.
             displayError(
                 "hydraRender: the -renderer/-r flag was set to an empty renderer name.",
                 true);
             return TfToken();
         }
-        return _rendererFromFlag;
+        rendererName = _rendererFromFlag;
+    } else {
+        rendererName = GetCurrentRenderer();
+        if (rendererName.IsEmpty()) {
+            displayError(
+                "hydraRender: no renderer specified. Pass -renderer/-r, or author the "
+                "currentRenderer attribute on the USD render-description node.",
+                true);
+            return TfToken();
+        }
     }
 
-    const TfToken currentRenderer = GetCurrentRenderer();
-    if (currentRenderer.IsEmpty()) {
+    // Cheap existence check against the registered Hydra renderer plugins:
+    // GetPluginDesc() only consults plugin metadata, it does not instantiate
+    // the plugin/render delegate (unlike GetRendererPlugin()/
+    // CreateRenderDelegate(), which BatchRenderer::_InitHydraResources()
+    // still uses to catch instantiation failures, e.g. no GPU context).
+    HfPluginDesc pluginDesc;
+    if (!HdRendererPluginRegistry::GetInstance().GetPluginDesc(rendererName, &pluginDesc)) {
         displayError(
-            "hydraRender: no renderer specified. Pass -renderer/-r, or author the "
-            "currentRenderer attribute on the USD render-description node.",
+            MString("hydraRender: unknown or unregistered renderer \"")
+                + rendererName.GetText() + "\"; no matching Hydra renderer plugin was found.",
             true);
         return TfToken();
     }
 
-    return currentRenderer;
+    return rendererName;
 }
 
 bool HydraRenderCmd::initialize()

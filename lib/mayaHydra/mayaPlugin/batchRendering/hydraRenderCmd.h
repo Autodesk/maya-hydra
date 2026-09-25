@@ -53,20 +53,18 @@ private:
     bool hydraRenderFromHydraV1RenderSettings();
     bool hydraRenderFromHydraV2RenderSettings();
 
-    /*! \brief Resolve the renderer to use for this batch render.
+    /*! \brief Resolve and validate the renderer to use for this batch render.
      *
-     *  This function does not validate that the resolved renderer name
-     *  corresponds to a registered/known Hydra render delegate: that
-     *  validation is performed downstream by the renderer-plugin lookup
-     *  in BatchRenderer::_InitHydraResources(), which reports an error
-     *  and fails initialization if the name does not resolve to a
-     *  registered render delegate.
+     *  Resolution order: the -renderer/-r flag if set, otherwise the
+     *  currentRenderer attribute on the USD render-description node.
+     *  There is no hardcoded default renderer, so a no-flag invocation
+     *  requires that attribute to be authored.
      *
-     *  Intentional: there is no hardcoded default renderer. A no-flag
-     *  invocation requires the currentRenderer attribute on the USD
-     *  render-description node to be authored; it is a hard error
-     *  otherwise. Callers must either pass -renderer/-r explicitly or
-     *  author that attribute.
+     *  The resolved name is checked against the registered Hydra renderer
+     *  plugins; an unregistered name is a hard error here, before
+     *  BatchRenderer is constructed. This does not guarantee the plugin can
+     *  actually be instantiated (e.g. missing GPU context): that is still
+     *  reported separately by BatchRenderer::_InitHydraResources().
      */
     PXR_NS::TfToken GetRenderer();
 
