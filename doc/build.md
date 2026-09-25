@@ -255,7 +255,11 @@ The same variable can be set in the environment before running CMake (e.g. from 
 
 **RenderMan (PRMan):** For HdPrman tests, provide the RenderMan locations via CMake cache variables (`-DRMANTREE=...`, `-DRENDERMAN_LOCATION=...` (optional), `-DPIXAR_LICENSE_FILE=...` (license server, format: `port@hostname`), `-DPRMAN_DELEGATE_PLUGIN_PATH=...` (path containing HdPrman `plugInfo.json`)) or via environment variables of the same names. CMake variables take precedence. On Windows, the test harness adds `${RMANTREE}/bin` and `${RMANTREE}/lib` to `PATH` when `RMANTREE` is set.
 
-**Local development:** If `PXR_PLUGINPATH_NAME` or `MAYA_PXR_PLUGINPATH_NAME` is set in your environment when you run CMake, those paths are automatically appended to the test environment. This allows locally-installed Hydra plugins (e.g. HdArnold, HdPrman) to be discovered when running tests. On Windows, use forward slashes or escaped backslashes in the path.
+**Local development:** If `MAYA_PXR_PLUGINPATH_NAME` is set in your environment when you run CMake, that path is automatically appended to the test environment. This allows locally-installed, dependent Hydra render delegate plugins (e.g. HdArnold, HdPrman) to be discovered when running tests. On Windows, use forward slashes or escaped backslashes in the path.
+
+`MAYA_PXR_PLUGINPATH_NAME` is the correct variable for such dependent/third-party USD plugins: it points to a folder containing a `mayaUsdPlugInfo.json` file, which MayaUSD uses to run a `VersionCheck` (Python/USD/MayaUsd) before registering the plugin with `PlugRegistry`. This avoids loading a plugin that was built against a mismatched USD/MayaUsd/Python version. See maya-usd's [tutorials/import-export-plugin/README.md](https://github.com/Autodesk/maya-usd/blob/dev/tutorials/import-export-plugin/README.md) and [tutorials/import-export-plugin-c++/README.md](https://github.com/Autodesk/maya-usd/blob/dev/tutorials/import-export-plugin-c%2B%2B/README.md) for the full mechanism.
+
+The raw `PXR_PLUGINPATH_NAME` variable is still set internally by the test harness for paths that are compiled together with maya-hydra (no version-mismatch risk), but it should not be used to add dependent/third-party render delegates, since it skips MayaUSD's version check entirely.
 
 ### Using Visual Studio as the generator
 
