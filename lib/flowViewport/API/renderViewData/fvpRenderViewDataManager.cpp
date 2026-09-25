@@ -118,7 +118,7 @@ void RenderViewDataManager::RemoveRenderViewData(const std::string& viewId)
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
             }
         }
-
+            
         _renderViewsData.erase(findResult);
     }
 }
