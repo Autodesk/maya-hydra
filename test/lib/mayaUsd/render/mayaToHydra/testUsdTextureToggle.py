@@ -29,10 +29,13 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     IMAGE_DIFF_FAIL_PERCENT = 1.5
 
     def setUp(self):
+        super(TestUsdTextureToggle, self).setUp()
         # Open simple Maya scene
         testFile = mayaUtils.openTestScene(
                 "testUsdTextureToggle",
                 "testUsdTextureToggle.ma", useTestSettings=False)
+        # Opening a scene resets defaultRenderGlobals, so re-apply the mode.
+        self.applySelectionHighlightMode()
         cmds.grid(toggle=False)
         cmds.refresh()
     

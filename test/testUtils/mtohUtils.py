@@ -43,6 +43,28 @@ HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
+# Selection highlighting mode: a defaultRenderGlobals enum attribute. Only
+# "Legacy Selection" is offered on USD <= 24.11 and on macOS (see
+# renderGlobals.cpp), so enum indices differ between configurations and are
+# resolved by name.
+SELECTION_HIGHLIGHT_MODE_NAME = "mayaHydraSelectionHighlightMode"
+SELECTION_HIGHLIGHT_MODE_NODE = "defaultRenderGlobals"
+SELECTION_HIGHLIGHT_MODE_ATTR = "{}.{}".format(
+    SELECTION_HIGHLIGHT_MODE_NODE, SELECTION_HIGHLIGHT_MODE_NAME)
+
+# Set in a test's CTest environment to pick its mode. Defaults to outline.
+SELECTION_HIGHLIGHT_MODE_ENV_VAR = "MAYAHYDRA_SELECTION_HIGHLIGHT_MODE"
+
+# A mode's name is also its reference-image subfolder, so it must not collide
+# with an existing imageVersion ("wireframe" is taken).
+SELECTION_HIGHLIGHT_MODE_LEGACY = "legacy"
+SELECTION_HIGHLIGHT_MODE_OUTLINE = "outline"
+
+SELECTION_HIGHLIGHT_MODE_ENUM_NAMES = {
+    SELECTION_HIGHLIGHT_MODE_LEGACY: "Legacy Selection",
+    SELECTION_HIGHLIGHT_MODE_OUTLINE: "Outline Selection",
+}
+
 class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     '''Base class for mayaHydra unit tests.'''
 
@@ -70,17 +92,69 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit', 'mayaUsdPlugin']
 
     @classmethod
+    def outlineSelectionHighlightSupported(cls):
+        '''Whether the outline mode is offered in this configuration.
+
+        Must match MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT in renderGlobals.cpp
+        and MAYAHYDRA_OUTLINE_MODE_AVAILABLE in the mayaToHydra CMakeLists.txt.
+        '''
+        if platform.system() == "Darwin":
+            return False
+        return Usd.GetVersion() > (0, 24, 11)
+
+    @classmethod
+    def selectionHighlightMode(cls):
+        '''Return the selection highlighting mode this run should use.
+
+        Taken from MAYAHYDRA_SELECTION_HIGHLIGHT_MODE. Defaults to outline where
+        supported, legacy otherwise.
+        '''
+        mode = os.environ.get(SELECTION_HIGHLIGHT_MODE_ENV_VAR, '').strip().lower()
+        if not mode:
+            return (SELECTION_HIGHLIGHT_MODE_OUTLINE
+                    if cls.outlineSelectionHighlightSupported()
+                    else SELECTION_HIGHLIGHT_MODE_LEGACY)
+        if mode not in SELECTION_HIGHLIGHT_MODE_ENUM_NAMES:
+            raise ValueError(
+                "Unknown {} value {!r}; expected one of {}.".format(
+                    SELECTION_HIGHLIGHT_MODE_ENV_VAR, mode,
+                    sorted(SELECTION_HIGHLIGHT_MODE_ENUM_NAMES)))
+        return mode
+
+    @classmethod
+    def selectionHighlightRprimCount(cls, selectedObjectCount=1):
+        '''Rprims the active mode adds for the selection highlight: one wireframe
+        rprim per selected object in legacy mode, none for the screen-space outline.
+        '''
+        if cls.selectionHighlightMode() == SELECTION_HIGHLIGHT_MODE_LEGACY:
+            return selectedObjectCount
+        return 0
+
+    @classmethod
+    def selectionHighlightOutputSuffix(cls):
+        '''Output-directory suffix distinguishing the active mode.
+
+        fixturesUtils.setUpClass() deletes its output directory on startup, so
+        the two modes, which may run in parallel, need separate directories. A
+        test that builds its own suffix in setUpClass (see testMeshes.py) must
+        include this.
+        '''
+        return '_' + cls.selectionHighlightMode()
+
+    @classmethod
     def setUpClass(cls):
         if cls._file is None:
             raise ValueError("Subclasses of MayaHydraBaseTestCase must define "
                              "`_file = __file__`")
 
+        outputSuffix = '_' + cls.__name__ + cls.selectionHighlightOutputSuffix()
+
         # The Python unittest framework does not support passing arguments to
         # setUpClass, so we use class-level members for _file and
         # _initializeStandalone.
         inputPath = fixturesUtils.setUpClass(
-            cls._file, 'mayaHydra', initializeStandalone=cls._initializeStandalone, 
-            suffix=('_' + cls.__name__))
+            cls._file, 'mayaHydra', initializeStandalone=cls._initializeStandalone,
+            suffix=outputSuffix)
 
         if cls._inputDir is None:
             inputDirName = os.path.splitext(os.path.basename(cls._file))[0]
@@ -295,11 +369,66 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         if self._setHdStormRenderer:
             self.setHdStormRenderer()
 
+        # Before cmds.file(modified=False): setting the mode modifies the scene.
+        self.applySelectionHighlightMode()
+
         # We've just opened a new scene, so we should not be modified.  Setting
         # Storm as the renderer should conceptually not change that status, but
         # unfortunately in automated tests it does (see setHdStormRender()
         # method documentation).  Restore modified status to false.
         cmds.file(modified=False)
+
+    def applySelectionHighlightMode(self):
+        '''Set the selection highlighting mode for this test run.
+
+        Applied even for the plugin's default mode, so results do not depend on
+        what that default is.
+        '''
+        mode = self.selectionHighlightMode()
+        wantedEnumName = SELECTION_HIGHLIGHT_MODE_ENUM_NAMES[mode]
+
+        if not cmds.objExists(SELECTION_HIGHLIGHT_MODE_ATTR):
+            # Scoped to Storm: an unfiltered createRenderGlobals instantiates
+            # every render delegate, and an unlicensed HdPrman hangs Maya.
+            cmds.mayaHydra(createRenderGlobals=True, renderer=HD_STORM)
+
+        if not cmds.objExists(SELECTION_HIGHLIGHT_MODE_ATTR):
+            raise RuntimeError(
+                "{} does not exist even after 'mayaHydra -createRenderGlobals'; "
+                "cannot select the {!r} selection highlighting mode.".format(
+                    SELECTION_HIGHLIGHT_MODE_ATTR, mode))
+
+        # Enum indices differ between configurations: resolve by name.
+        enumNames = cmds.attributeQuery(
+            SELECTION_HIGHLIGHT_MODE_NAME,
+            node=SELECTION_HIGHLIGHT_MODE_NODE,
+            listEnum=True)[0].split(':')
+
+        if wantedEnumName not in enumNames:
+            # Outline requested where it is not offered: skip rather than
+            # compare outline reference images against a legacy render.
+            self.skipTest(
+                "Selection highlighting mode {!r} ({!r}) is not available on "
+                "{} with USD {}; available modes: {}.".format(
+                    mode, wantedEnumName, platform.system(),
+                    str(self._usdVersion), enumNames))
+
+        wantedIndex = enumNames.index(wantedEnumName)
+        if cmds.getAttr(SELECTION_HIGHLIGHT_MODE_ATTR) == wantedIndex:
+            # Already set: avoid updateRenderGlobals re-initializing Hydra.
+            return
+
+        cmds.setAttr(SELECTION_HIGHLIGHT_MODE_ATTR, wantedIndex)
+
+        # The render override only re-reads the globals on updateRenderGlobals.
+        cmds.mayaHydra(updateRenderGlobals=SELECTION_HIGHLIGHT_MODE_NAME)
+
+        # The first refresh performs the mode switch, which queues "ogs -reset" on
+        # the idle queue to re-send the VP2 render items. Drain it and refresh
+        # again, or the viewport has no Maya-native geometry.
+        cmds.refresh(force=True)
+        maya.utils.processIdleEvents()
+        cmds.refresh(force=True)
 
     def tearDown(self):
         # Restore Script Editor capture if we enabled it in setUp.
@@ -415,6 +544,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.cubeTrans = cmds.polyCube()[0]
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
         self.setHdStormRenderer()
+        # openNewScene() reset defaultRenderGlobals, so re-apply the mode before
+        # the assertions below (the DormantPolyWire prim only exists in legacy).
+        self.applySelectionHighlightMode()
         self.assertNodeNameInIndex(self.cubeShape)
         index_list = self.getIndex()
         # Get the cube prim by ignoring the prims whose name contains DormantPolywire
@@ -470,15 +602,46 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.trace(msg.format(str(self.getIndex())))
 
     def resolveRefImage(self, refImage, imageVersion):
-        if not os.path.isabs(refImage):
-            if imageVersion:
-                refImage = os.path.join(self._inputDir, imageVersion, refImage)
-            else:
-                refImage = os.path.join(self._inputDir, refImage)
-        return refImage
+        if os.path.isabs(refImage):
+            return refImage
+
+        # Prefer <inputDir>/<mode>/[imageVersion/]image and fall back to the
+        # shared image: tests only supply per-mode images where output differs.
+        tail = os.path.join(imageVersion, refImage) if imageVersion else refImage
+        modeImage = os.path.join(
+            self._inputDir, self.selectionHighlightMode(), tail)
+        if os.path.isfile(modeImage):
+            return modeImage
+        return os.path.join(self._inputDir, tail)
+
+    def assertSelectionHighlightModeApplied(self):
+        '''Fail if the mode this run was registered for is not the one in effect.
+
+        Catches a setUp() override or a later scene load that drops the mode,
+        which would otherwise make both mode runs silently identical.
+        '''
+        wantedEnumName = SELECTION_HIGHLIGHT_MODE_ENUM_NAMES[self.selectionHighlightMode()]
+        self.assertTrue(
+            cmds.objExists(SELECTION_HIGHLIGHT_MODE_ATTR),
+            "{} does not exist; this run is not in a known selection highlighting "
+            "mode. Does setUp() chain to MayaHydraBaseTestCase.setUp()?".format(
+                SELECTION_HIGHLIGHT_MODE_ATTR))
+        enumNames = cmds.attributeQuery(
+            SELECTION_HIGHLIGHT_MODE_NAME,
+            node=SELECTION_HIGHLIGHT_MODE_NODE,
+            listEnum=True)[0].split(':')
+        actualEnumName = enumNames[cmds.getAttr(SELECTION_HIGHLIGHT_MODE_ATTR)]
+        self.assertEqual(
+            actualEnumName, wantedEnumName,
+            "This run was registered for the {!r} selection highlighting mode but "
+            "the viewport is in {!r}. A setUp() override, or a scene loaded after "
+            "the mode was applied, dropped it -- call "
+            "self.applySelectionHighlightMode() after the scene load.".format(
+                wantedEnumName, actualEnumName))
 
     def assertImagesClose(self, image1, image2, fail, failpercent, image1Version=None, image2Version=None, 
                 hardfail=None, failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+        self.assertSelectionHighlightModeApplied()
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
         try:
@@ -545,5 +708,6 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.setHdStormRenderer()
 
     def runCppTest(self, testFilter):
+        self.assertSelectionHighlightModeApplied()
         with PluginLoaded("mayaHydraCppTests"):
             cmds.mayaHydraCppTest(f=testFilter, inputDir=self._inputDir, outputDir=self._testDir)

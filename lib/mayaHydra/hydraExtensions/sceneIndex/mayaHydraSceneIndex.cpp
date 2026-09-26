@@ -52,11 +52,16 @@
 #include <ufe/pathString.h>
 
 #include <mayaHydraLib/adapters/mhDirtyNotifier.h>
+
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 #include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <ufeExtensions/Global.h>
+
+#include <algorithm>
+#include <array>
+#include <string_view>
 
 namespace {
 
@@ -127,6 +132,56 @@ bool filterMesh(const MRenderItem& ri, bool useMeshAdapter)
                             // using the name is more appropriate.
         (ri.name() == "StandardShadedItem")
                             : false;
+}
+
+// Names of the VP2 wireframe items used as the object-level selection highlight. Deliberately
+// not exhaustive, so no other visual cue is hidden. Matched by name rather than primitive type
+// because VP2 can reuse an item after changing its type.
+constexpr std::array<std::string_view, 2> kSelectionHighlightWireNames = {
+    "DormantPolyWire",     // polygon mesh
+    "DormantIsoparmWire"   // NURBS surface
+};
+
+// Whether the item name is in kSelectionHighlightWireNames. Kept free of Maya DAG access so the
+// hot loop can reject non-candidates before constructing an MDagPath.
+bool isSelectionHighlightWireName(const char* itemName)
+{
+    if (!itemName) {
+        return false;
+    }
+    const std::string_view name(itemName);
+    return std::any_of(
+        kSelectionHighlightWireNames.begin(),
+        kSelectionHighlightWireNames.end(),
+        [name](std::string_view candidate) { return candidate == name; });
+}
+
+// For a wire whose name already matched, whether its shape is selected so the outline replaces
+// it. Independent of the panel display style, which the caller applies (see
+// RenderItemUpdateOptions).
+bool isReplaceableHighlightWireShape(const MDagPath& itemDagPath)
+{
+    if (!itemDagPath.isValid()) {
+        return false;
+    }
+
+    // Resolve a transform to its shape: an unrecognized item would double-highlight.
+    MDagPath shapeDagPath = itemDagPath;
+    if (!shapeDagPath.hasFn(MFn::kShape)) {
+        shapeDagPath.extendToShape();
+    }
+
+    // A templated shape is drawn wireframe-only, so this wire is the object itself, not a
+    // highlight. Hiding it would remove the object from the viewport.
+    if (shapeDagPath.isTemplated()) {
+        return false;
+    }
+
+    // A single selected object reports kLead rather than kActive. Component statuses such as
+    // kHilite are excluded: that wire is component feedback the outline does not replace.
+    const MHWRender::DisplayStatus displayStatus
+        = MHWRender::MGeometryUtilities::displayStatus(shapeDagPath);
+    return (MHWRender::kActive == displayStatus) || (MHWRender::kLead == displayStatus);
 }
 
 bool isRenderItem_aiSkyDomeLightTriangleShape(const MRenderItem& renderItem)
@@ -464,7 +519,9 @@ void MayaHydraSceneIndex::_Destroy()
     Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
 }
 
-void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewportScene& scene)
+void MayaHydraSceneIndex::UpdateRenderItems(
+    const MDataServerOperation::MViewportScene& scene,
+    const RenderItemUpdateOptions&              options)
 {
     MH_PROFILE_FUNCTION();
 
@@ -486,8 +543,12 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
     // nothing to lose unless there is some internal contention in USD.
     for (size_t i = 0; i < scene.mCount; i++) {
         using MVS = MDataServerOperation::MViewportScene;
-        auto flags = scene.mFlags[i];
-        if (flags == 0) {
+        auto       flags = scene.mFlags[i];
+        const bool unchanged = (0 == flags);
+
+        // Unflagged items have nothing to update, except in a reconsider pass, which picks up
+        // wires an earlier pass skipped.
+        if (unchanged && !options.reconsiderSkippedHighlightWires) {
             continue;
         }
 
@@ -496,13 +557,64 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
 
+        // Cached null adapter: an item Hydra deliberately does not translate.
+        if (!isNewRenderitem && ria == nullptr) {
+            continue;
+        }
+
+        if (unchanged && !isNewRenderitem) {
+            continue;
+        }
+
+        // MRenderItem::name() returns by value, so only fetch it when it is read.
+        const bool classifyHighlightWire = !options.legacyMayaNativeHighlightEnabled;
+        MString    riName;
+        if (isNewRenderitem || classifyHighlightWire) {
+            riName = ri.name();
+        }
+
+        // VP2 highlights a selected shape by showing its wireframe item in the selection color.
+        // When the outline owns the highlight, that wire must be hidden or the object is
+        // highlighted twice. The name is tested first because sourceDagPath() returns by value.
+        bool isHighlightWire = false;
+        if (classifyHighlightWire && isSelectionHighlightWireName(riName.asChar())) {
+            isHighlightWire = isReplaceableHighlightWireShape(ri.sourceDagPath());
+        }
+        const bool neededByAnyPanel = !isHighlightWire || options.anyViewportDrawsWireframes;
+        const bool visibleInThisPanel = !isHighlightWire || options.viewportDrawsWireframes;
+
+        // Storm still syncs invisible rprims, so skip translating an unneeded wire instead of
+        // hiding it. A wire already translated is hidden through the adapter below instead of
+        // removed, which is cheaper across selection changes.
+        //
+        // Must not be recorded as a null adapter: a later delta or the reconsider pass has to be
+        // able to translate it.
+        if (isNewRenderitem && !neededByAnyPanel) {
+            continue;
+        }
+
+        // Maya sent no visibility bits for an unchanged item, so take them from the item.
+        if (unchanged) {
+            flags |= MDataServerOperation::MViewportScene::MVS_changedVisibility;
+            if (ri.isEnabled()) {
+                flags |= MDataServerOperation::MViewportScene::MVS_visible;
+            }
+        }
+
+        // A previously skipped wire is first translated on a later delta (a deselection, or the
+        // reconsider pass), which may omit the matrix and effect bits. Force them so a new
+        // adapter is always fully initialized; otherwise the wire would draw at the origin.
+        if (isNewRenderitem) {
+            flags |= MDataServerOperation::MViewportScene::MVS_changedMatrix
+                | MDataServerOperation::MViewportScene::MVS_changedEffect;
+        }
+
         if (isNewRenderitem) {
             // First check if the new render item should have a null adapter
             bool createNullRenderItemAdapter = false;
 
             // ProxyGeometryItems are a special type of dummy render item created internally by Maya
             // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
-            const MString riName = ri.name();
             if (riName == "ProxyGeometryItem") {
                 createNullRenderItemAdapter = true;
             }
@@ -552,10 +664,6 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             // Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(
                 isRenderItem_aiSkyDomeLightTriangleShape(ri));
-        } else if (ria == nullptr) {
-            // This is a case of null render item adapter.
-            // Used for render items that don't need to be transfered to Hydra.
-            continue;
         }
 
         // _GetRenderItemMaterial is expensive: it ultimately calls
@@ -595,6 +703,32 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         }
         const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColorDirty);
         ria->UpdateFromDelta(data);
+
+        // Cached for RefreshRenderItemLegacyHighlightTreatment. A selection state change always
+        // arrives as a delta for this wire, so writing it only on deltas keeps it current.
+        ria->SetIsReplaceableHighlightWire(isHighlightWire);
+
+        // After UpdateFromDelta, so a VP2 visibility change in this delta does not override it.
+        ria->SetWireframeSelectionHighlightEnabled(visibleInThisPanel);
+    }
+}
+
+void MayaHydraSceneIndex::RefreshRenderItemLegacyHighlightTreatment(
+    const RenderItemUpdateOptions& options)
+{
+    MH_PROFILE_FUNCTION();
+
+    for (auto& entry : _renderItemsAdaptersFast) {
+        const MayaHydraRenderItemAdapterPtr& ria = entry.second;
+        if (!ria) {
+            continue;
+        }
+
+        // Uses the classification cached by UpdateRenderItems, avoiding a DAG query per item.
+        const bool replaceable
+            = !options.legacyMayaNativeHighlightEnabled && ria->GetIsReplaceableHighlightWire();
+        ria->SetWireframeSelectionHighlightEnabled(
+            !replaceable || options.viewportDrawsWireframes);
     }
 }
 

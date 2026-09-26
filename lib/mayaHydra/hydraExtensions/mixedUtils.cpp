@@ -28,6 +28,7 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <mutex>
 #include <set>
 #include <string>
 
@@ -1116,8 +1117,25 @@ SdfPath sceneIndexPathPrefix(
 // Read a color preference token into a GfVec4f.
 PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token)
 {
-    PXR_NS::GfVec4f color;
-    Fvp::ColorPreferences::getInstance().getColor(token, color);
+    // GfVec4f's default constructor does no initialization.
+    PXR_NS::GfVec4f color(0.0f, 0.0f, 0.0f, 1.0f);
+
+    if (!Fvp::ColorPreferences::getInstance().getColor(token, color)) {
+        // Warn once per token. Guarded because this can run off the render thread.
+        static std::mutex                warnedMutex;
+        static std::set<PXR_NS::TfToken> warnedTokens;
+        bool                             firstForThisToken = false;
+        {
+            std::lock_guard<std::mutex> lock(warnedMutex);
+            firstForThisToken = warnedTokens.insert(token).second;
+        }
+        if (firstForThisToken) {
+            TF_WARN(
+                "No color preference found for '%s', using a fallback color. Further occurrences "
+                "of this preference will not be reported.",
+                token.GetText());
+        }
+    }
     return color;
 }
 

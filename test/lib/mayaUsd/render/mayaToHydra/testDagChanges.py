@@ -37,6 +37,8 @@ class TestDagChanges(DagChangesBaseTestCase):
     _file = __file__
 
     def setUp(self):
+        super(TestDagChanges, self).setUp()
+        # makeCubeScene() opens a new scene and re-applies the highlighting mode.
         self.makeCubeScene()
 
         self.grp1 = cmds.createNode('transform', name='group1')

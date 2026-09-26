@@ -18,7 +18,7 @@
 
 //Local headers
 #include "mayaHydraLib/api.h"
-#include "mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h"
+#include "mayaHydraLib/sceneIndex/mhDirtySelectionColorsSceneIndex.h"
 
 //Flow viewport headers
 #include "flowViewport/selection/fvpSelectionTypes.h"
@@ -40,7 +40,7 @@ class MhLeadObjectPathTracker
 {
 public:
     MAYAHYDRALIB_API
-    MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyPreviousLeadObjectSceneIndex);
+    MhLeadObjectPathTracker(MhDirtySelectionColorsSceneIndexRefPtr& dirtySelectionColorsSceneIndex);
 
     MAYAHYDRALIB_API
     ~MhLeadObjectPathTracker();
@@ -55,16 +55,24 @@ public:
     Ufe::Path getLeadObjectUfePath() const {return _leadObjectUfePath;}
 
     MAYAHYDRALIB_API
-    void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
+    const Fvp::PrimSelections& getLeadObjectPrimSelections() const {return _leadObjectPrimSelections;}
 
     MAYAHYDRALIB_API
-    void updatePrimSelections(); // For example : this is called after the data producer scene indices are loaded
+    void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
+
+    /// Resolves the lead object's prim selections if they could not be resolved when the lead was
+    /// set, e.g. because its data producer scene index was not loaded yet.
+    ///
+    /// \return True if this call resolved the lead. No selection notification accompanies this,
+    ///         so callers caching lead-derived state must refresh it when this returns true.
+    MAYAHYDRALIB_API
+    bool updatePrimSelections();
 
 private:
     Fvp::PrimSelections             _leadObjectPrimSelections;
     Ufe::Observer::Ptr              _ufeSelectionObserver {nullptr};
     Ufe::Path                       _leadObjectUfePath;
-    const MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex;
+    const MhDirtySelectionColorsSceneIndexRefPtr _dirtySelectionColorsSceneIndex;
 };
 
 }//end of namespace MAYAHYDRA_NS_DEF
