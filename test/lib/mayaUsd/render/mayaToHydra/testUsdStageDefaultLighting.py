@@ -21,7 +21,7 @@ import mayaUtils
 
 import platform
 
-class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
+class TestUsdStageDefaultLighting(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -29,10 +29,13 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     IMAGE_DIFF_FAIL_PERCENT = 1.5
 
     def setUp(self):
+        super(TestUsdStageDefaultLighting, self).setUp()
         # Open simple Maya scene
         testFile = mayaUtils.openTestScene(
                 "testUsdStageDefaultLighting",
                 "testUsdStageDefaultLighting.ma")
+        # Opening a scene resets defaultRenderGlobals, so re-apply the mode.
+        self.applySelectionHighlightMode()
         cmds.refresh()
     
     def setTextureMode(self, enabled):

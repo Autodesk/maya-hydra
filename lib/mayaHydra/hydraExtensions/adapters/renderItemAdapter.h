@@ -114,6 +114,9 @@ public:
     void SetPlaybackState(bool isPlaybackRunning);
 
     MAYAHYDRALIB_API
+    void SetWireframeSelectionHighlightEnabled(bool enabled);
+
+    MAYAHYDRALIB_API
     bool GetVisible() override;
 
     MAYAHYDRALIB_API
@@ -208,6 +211,17 @@ public:
     MAYAHYDRALIB_API
     bool GetIsRenderITemAnaiSkydomeLightTriangleShape() const {return _isArnoldSkyDomeLightTriangleShape;}
 
+    /// Whether this item is the VP2 selection-highlight wireframe that the outline replaces.
+    /// Cached because computing it needs a Maya DAG query (displayStatus()), and
+    /// RefreshRenderItemLegacyHighlightTreatment reads it for every adapter. Set by
+    /// UpdateRenderItems, which receives a delta for the wire whenever the shape's selection state
+    /// changes. Always false while the legacy highlight is enabled.
+    MAYAHYDRALIB_API
+    void SetIsReplaceableHighlightWire(bool val) { _isReplaceableHighlightWire = val; }
+
+    MAYAHYDRALIB_API
+    bool GetIsReplaceableHighlightWire() const { return _isReplaceableHighlightWire; }
+
 private:
     MAYAHYDRALIB_API
     void _RemoveRprim();
@@ -233,6 +247,8 @@ private:
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
     bool                        _isHideOnPlayback = false;
     bool                        _isInPlayback = false;
+    bool                        _wireframeSelectionHighlightEnabled = true;
+    bool                        _isReplaceableHighlightWire = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;
