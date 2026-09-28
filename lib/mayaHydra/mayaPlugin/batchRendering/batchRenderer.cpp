@@ -399,15 +399,17 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
 
 void BatchRenderer::_ClearMayaHydraSceneIndex()
 {
-#ifdef CODE_COVERAGE_WORKAROUND
-    // Leak the Maya scene index for code coverage, as its base class
-    // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
-    _mayaHydraSceneIndex->_Destroy();
-#else
+#ifndef CODE_COVERAGE_WORKAROUND
+    // Under code coverage the scene index is deliberately leaked instead, as its base
+    // class HdRetainedSceneIndex dtor crashes in the Windows clang code coverage build.
     if (_dataProducerMergingSceneIndexProxy && _mayaHydraSceneIndex) {
         _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
     }
 #endif
+    // Tear down explicitly before the render index is freed (HYDRA-2019). Idempotent.
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->_Destroy();
+    }
     _mayaHydraSceneIndex.Reset();
 }
 
