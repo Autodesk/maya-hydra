@@ -27,9 +27,7 @@
 
 #include <maya/MArgDatabase.h>
 #include <maya/MAnimControl.h>
-#include <maya/MCommandResult.h>
 #include <maya/MGlobal.h>
-#include <maya/MStringArray.h>
 #include <maya/MSyntax.h>
 #include <maya/MTime.h>
 
@@ -40,6 +38,7 @@
 #include <pxr/imaging/garch/glApi.h>
 #include <pxr/imaging/garch/glDebugWindow.h>
 #include <pxr/imaging/hd/renderDelegate.h>
+#include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/usd/usdRender/settings.h>
 #include <pxr/usd/usdRender/product.h>
 #include <pxr/usd/usdRender/var.h>
@@ -59,8 +58,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <set>
-#include <string>
 #include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -100,55 +97,28 @@ constexpr auto _helpText = R"HELP(For details on args usage please see
 https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
 )HELP";
 
-bool isHydraCapable(const MString& rendererName)
-{
-    MString cmd;
-    cmd.format("renderer -query -capability \"isHydra\" \"^1s\"", rendererName);
-
-    // Renderers that don't report the "isHydra" capability at all return no
-    // value (MCommandResult::kInvalid) rather than a boolean false.
-    MCommandResult result;
-    MStatus        status = MGlobal::executeCommand(cmd, result);
-    if (!status || (result.resultType() != MCommandResult::kString)) {
-        return false;
-    }
-
-    MString value;
-    result.getResult(value);
-    return value == "true";
-}
-
-// Renderers can be registered after plugin load, so the set is rebuilt on
-// each call rather than cached.
-std::set<std::string> hydraRenderers()
-{
-    std::set<std::string> renderers;
-
-    MStringArray rendererNames;
-    MStatus      status
-        = MGlobal::executeCommand("renderer -query -namesOfAvailableRenderers", rendererNames);
-    if (!status) {
-        MGlobal::displayWarning("Unable to retrieve available renderers.");
-        return renderers;
-    }
-
-    for (const auto& rendererName : rendererNames) {
-        if (isHydraCapable(rendererName)) {
-            renderers.insert(rendererName.asChar());
-        }
-    }
-
-    return renderers;
-}
-
+// Cheap existence check against the registered Hydra renderer plugins:
+// GetPluginDesc() only consults plugin metadata, it does not instantiate the
+// plugin/render delegate (unlike GetRendererPlugin()/CreateRenderDelegate(),
+// which BatchRenderer::_InitHydraResources() still uses to catch
+// instantiation failures, e.g. no GPU context).
+//
+// Note: this deliberately does NOT go through Maya's `renderer -query
+// -namesOfAvailableRenderers`/`-capability "isHydra"` commands. Those only
+// reflect viewport renderer-override registration, which only happens if
+// MHWRender::MRenderer::theRenderer() is non-null (see plugin.cpp); in
+// headless/batch invocations (e.g. mayapy with no GPU/display context, as
+// on Linux CI) that is null, so a genuinely registered Hydra render
+// delegate like HdArnoldRendererPlugin would be wrongly reported as
+// unavailable.
 bool validRenderer(const TfToken& rendererName)
 {
     if (rendererName.IsEmpty()) {
         return false;
     }
 
-    const auto renderers = hydraRenderers();
-    return renderers.find(rendererName.GetString()) != renderers.end();
+    HfPluginDesc pluginDesc;
+    return HdRendererPluginRegistry::GetInstance().GetPluginDesc(rendererName, &pluginDesc);
 }
 
 } // namespace
@@ -306,10 +276,23 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_renderer, 0, rn));
 
         rendererName = TfToken(rn.asChar());
+        if (rendererName.IsEmpty()) {
+            displayError(
+                "hydraRender: the -renderer/-r flag was set to an empty renderer name.",
+                true);
+            return MS::kFailure;
+        }
     }
     else {
         // Get renderer from the scene.
         rendererName = GetCurrentRenderer();
+        if (rendererName.IsEmpty()) {
+            displayError(
+                "hydraRender: no renderer specified. Pass -renderer/-r, or author the "
+                "currentRenderer attribute on the USD render-description node.",
+                true);
+            return MS::kFailure;
+        }
     }
 
     // Validate the renderer
