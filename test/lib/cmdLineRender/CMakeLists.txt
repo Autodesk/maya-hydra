@@ -593,6 +593,26 @@ foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})
 
 endforeach()
 
+# Run as interactive test rather than under mayabatch. On Windows, commandPort is disabled
+# in batch mode, so batchRender (called by mayaBatchRender()) cannot receive progress from the
+# child render process and fails without starting it. Interactive mode behaves the same on
+# all platforms.
+set(INTERACTIVE_TEST_SCRIPT_FILES_RENDER_SETUP
+    testCancelBatchRender.py
+)
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_RENDER_SETUP})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYA_RENDER_DESC_PATH=${CMAKE_INSTALL_PREFIX}/renderDesc"
+    )
+    apply_labels_to_test("${all_labels}" ${target})
+endforeach()
+
 # Hydra scene index dump tests.  Render with the -hsd flag to produce a text
 # dump of the Hydra scene index, then compare the dump against an expected
 # baseline using compareTextFiles.py.  Using a Python script rather than fc (or

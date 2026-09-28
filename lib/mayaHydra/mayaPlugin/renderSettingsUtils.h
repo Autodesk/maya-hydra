@@ -108,7 +108,7 @@ struct RenderTimes
 // Get the render times from the Maya scene.
 RenderTimes GetRenderTimes();
 
-// Notify Maya that batch rendering has started.  On macOS and Linux this also
+// Notify Maya that batch rendering has started.  On macOS and Linux this
 // registers the renderer process so that Maya can cancel it.
 void SendRenderStarted();
 

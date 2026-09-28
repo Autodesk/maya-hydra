@@ -414,9 +414,11 @@ RenderTimes GetRenderTimes()
 
 void SendRenderStarted()
 {
-    // Maya uses -1111 as the batch-render frame-started notification.  On
-    // macOS and Linux this performs the PID handshake that lets Maya cancel
-    // the child renderer before its first frame has completed.
+    // On macOS and Linux, Maya cannot cancel a batch render until the child
+    // renderer registers its PID.  Each sendRenderProgressInfo() message
+    // includes the sender's PID, but our regular progress update is not sent
+    // until a frame completes.  Send Maya's FRAME_STARTED value so cancellation works 
+    // during the first frame.  Maya records the PID and reports this notification as 0% progress.
     constexpr int frameStarted = -1111;
     MRenderUtil::sendRenderProgressInfo(" ", frameStarted);
 }
