@@ -256,7 +256,7 @@ private:
     bool _HitTestEnabled() const;
 
     /// Whether the resolved hover path is drawn using outlines.
-    bool _OutlineHoverHightlightingEnabled() const;
+    bool _OutlineHoverHighlightingEnabled() const;
 
     /// Hover state, per panel: one MtohRenderOverride serves every panel using the renderer, so a
     /// shared state would highlight every viewport at once.

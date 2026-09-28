@@ -204,7 +204,7 @@ almost every item it never does.
 
    The result is cached on the adapter
    (`MayaHydraRenderItemAdapter::SetIsReplaceableHighlightWire()`), because
-   `RefreshRenderItemLegacyHighlightTreatment()` re-evaluates every adapter and would otherwise repeat
+   `RefreshRenderItemLegacyHighlightTreatment()` visits every adapter and would otherwise repeat
    this DAG query per item — on every frame, for two panels in different display styles. The cache
    cannot go stale: a change to the shape's selection state arrives as a delta for this very wire, and
    a highlight-mode switch recreates every adapter.
@@ -251,7 +251,8 @@ gated on the display-style bits that actually affect the treatment (`kWireFrame`
 display style without changing whether wireframes are drawn):
 
 - **Already-translated items**: `RefreshRenderItemLegacyHighlightTreatment()` walks the render item
-  adapters and re-evaluates the predicate for each, using the name and DAG path the adapter retains.
+  adapters and re-applies the treatment from each one's cached classification
+  (`GetIsReplaceableHighlightWire()`, see step 2 above), so no DAG query is made per item.
 - **Skipped items** are not represented in the adapter map at all, so they cannot be walked. Instead,
   `RenderItemUpdateOptions::reconsiderSkippedHighlightWires` makes the next `UpdateRenderItems()`
   look at items Maya flagged as unchanged, which it normally skips on `flags == 0`. This works

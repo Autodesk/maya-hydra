@@ -1711,7 +1711,7 @@ MStatus MtohRenderOverride::Render(
 
         // Empty unless this panel is hovered and hover highlighting is enabled.
         const SdfPath wantedHoverPath
-            = (hovering && _OutlineHoverHightlightingEnabled()) ? hover->resolvedPath : SdfPath();
+            = (hovering && _OutlineHoverHighlightingEnabled()) ? hover->resolvedPath : SdfPath();
 
         // The OutlineManager is shared by all panels. Push only when the selection changed or this
         // panel's hover differs from the one last pushed.
@@ -1810,11 +1810,11 @@ bool MtohRenderOverride::_HitTestEnabled() const
 {
     // Hover needs the pick. mayaHydraForceEnableInteractiveHitTest (script-only, off by default)
     // runs the pick without drawing hover, for profiling.
-    return _OutlineHoverHightlightingEnabled()
+    return _OutlineHoverHighlightingEnabled()
         || (_globals.forceEnableInteractiveHitTest && _UseOutlineSelectionHighlighting());
 }
 
-bool MtohRenderOverride::_OutlineHoverHightlightingEnabled() const
+bool MtohRenderOverride::_OutlineHoverHighlightingEnabled() const
 {
     return _globals.outlineHoverHighlighting && _UseOutlineSelectionHighlighting();
 }
