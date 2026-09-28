@@ -27,8 +27,9 @@ TF_DEFINE_ENV_SETTING(
 TF_DEFINE_ENV_SETTING(
     MAYA_HYDRA_USE_CAMERA_PRIM,
     true,
-    "Pass camera prim to Hydra instead of populating the free camera parameters."
-    "Camera prim may expose additional render parameters but its usage must be well tested before we can enable it by default.");
+    "Pass the Maya camera prim to non-Storm render delegates instead of populating the free "
+    "camera parameters. The camera prim exposes render parameters the free camera lacks. Storm "
+    "always uses the free camera, so that its draw matches the picking matrices.");
 
 TF_DEFINE_ENV_SETTING(
     MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS,

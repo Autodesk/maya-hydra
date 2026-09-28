@@ -1610,8 +1610,13 @@ MStatus MtohRenderOverride::Render(
         currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
     }
 
+    // Storm renders through the free camera, built from Maya's view and projection matrices. The
+    // camera prim does not translate every Maya projection input (overscan, resolution gate,
+    // film transforms, 2D pan/zoom), and Storm is picked with Maya's matrices, so binding the prim
+    // would desync the draw from the pick. Other delegates bind the prim for the render
+    // parameters the free camera lacks.
     SdfPath cameraPath;
-    if (useCameraPrim()) {
+    if (useCameraPrim() && !_isUsingHdSt) {
         MStatus        status;
         const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
         if (status == MStatus::kSuccess) {
@@ -1634,11 +1639,12 @@ MStatus MtohRenderOverride::Render(
             continue;
         }
         currentPass->params().renderParams.camera = cameraPath;
-        // A bound camera prim carries its own window policy, translated from 
-        // the Maya film fit. Disable the override in that case.
-        if (!cameraPath.IsEmpty()) {
-            currentPass->params().renderParams.overrideWindowPolicy = std::nullopt;
-        }
+        // A bound camera prim carries its own window policy, translated from the Maya film fit,
+        // so disable the override. The free camera needs the default override back, since the
+        // camera path goes empty again when switching to an ortho or USD camera.
+        currentPass->params().renderParams.overrideWindowPolicy = cameraPath.IsEmpty()
+            ? std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit)
+            : std::nullopt;
     }
 
     // Update all registered plugin before render.
