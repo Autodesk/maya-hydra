@@ -38,13 +38,14 @@ class TestNamespaces(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-        # There should be two rprims from the poly sphere, one for the mesh and
-        # another wireframe for selection highlighting.
+        # One rprim for the sphere mesh, plus its wireframe selection highlight
+        # in legacy mode (a newly created object is selected).
+        expectedRprims = 1 + self.selectionHighlightRprimCount()
         rprims = self.getIndex()
-        self.assertEqual(2, len(rprims))
+        self.assertEqual(expectedRprims, len(rprims))
 
         # Path sanitizing should leave the node name intact.
-        self.assertEqual(2, self.matchingRprims(rprims, 'pSphereShape1'))
+        self.assertEqual(expectedRprims, self.matchingRprims(rprims, 'pSphereShape1'))
 
         # Set the namespace back to the root.
         cmds.namespace(set=':')

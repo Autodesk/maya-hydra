@@ -34,8 +34,8 @@ class TestColorPreferences(mtohUtils.MayaHydraBaseTestCase):
         mel.eval("displayRGBColor -rf; displayColor -rf; colorIndex -rf;")
 
     def setUp(self):
+        super(TestColorPreferences, self).setUp()
         self.resetColorPrefs()
-        self.setHdStormRenderer()
     
     def tearDown(self):
         self.resetColorPrefs()

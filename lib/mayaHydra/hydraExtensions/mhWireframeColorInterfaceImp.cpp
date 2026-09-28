@@ -34,13 +34,18 @@ namespace MAYAHYDRA_NS_DEF {
 
 MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr<Fvp::Selection>& selection
                                                          , const std::weak_ptr<MhLeadObjectPathTracker>& leadObjectPathTracker) 
-    : _activeWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelectionSecondary))
-    , _leadWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelection))
-    , _dormantWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->polymeshDormant))
-    , _selection(selection)
+    : _selection(selection)
     , _leadObjectPathTracker(leadObjectPathTracker)
-{ 
+{
     TF_AXIOM(_selection);
+    RefreshColors();
+}
+
+void MhWireframeColorInterfaceImp::RefreshColors()
+{
+    _activeWireframeColor  = getPreferencesColor(FvpColorPreferencesTokens->wireframeSelectionSecondary);
+    _leadWireframeColor    = getPreferencesColor(FvpColorPreferencesTokens->wireframeSelection);
+    _dormantWireframeColor = getPreferencesColor(FvpColorPreferencesTokens->polymeshDormant);
 }
 
 MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath) const

@@ -69,9 +69,9 @@ class GlobalSelectionChangedObs : public Ufe::Observer
 }
 namespace MAYAHYDRA_NS_DEF {
 
-MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
+MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtySelectionColorsSceneIndexRefPtr& dirtySelectionColorsSceneIndex) 
     : _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
-    , _dirtyLeadObjectSceneIndex(dirtyLeadObjectSceneIndex)
+    , _dirtySelectionColorsSceneIndex(dirtySelectionColorsSceneIndex)
 {
     const Ufe::GlobalSelection::Ptr& ufeSelection = Ufe::GlobalSelection::get();
     if (ufeSelection->size() > 0){
@@ -124,17 +124,20 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
     _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
 
     // Dirty the previous lead object
-    if(_dirtyLeadObjectSceneIndex){
-        _dirtyLeadObjectSceneIndex->dirtyLeadObjectRelatedSelections(oldLeadObjectPrimSelections, _leadObjectPrimSelections);
+    if(_dirtySelectionColorsSceneIndex){
+        _dirtySelectionColorsSceneIndex->dirtyLeadObjectRelatedSelections(oldLeadObjectPrimSelections, _leadObjectPrimSelections);
     }
 }
 
-void MhLeadObjectPathTracker::updatePrimSelections() 
+bool MhLeadObjectPathTracker::updatePrimSelections() 
 { 
    // Update the lead object prim paths in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimSelections.empty()) {
         _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
+        // The only possible transition is empty -> resolved, so a non-empty result is a change.
+        return !_leadObjectPrimSelections.empty();
     }
+    return false;
 }
 
 }//End of MAYAHYDRA_NS_DEF

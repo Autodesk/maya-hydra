@@ -77,6 +77,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         testFile = mayaUtils.openTestScene(
                 "testWireframeSelectionHighlight",
                 "testSelectionHighlightMayaUsd.ma")
+        # Opening a scene resets defaultRenderGlobals, so re-apply the mode.
+        self.applySelectionHighlightMode()
 
         shapeStage = mayaUsdLib.GetPrim(self.shapeNode).GetStage()
         
