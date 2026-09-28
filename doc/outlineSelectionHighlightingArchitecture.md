@@ -33,11 +33,12 @@ The mode is a render global, `mayaHydraSelectionHighlightMode`, an enum whose va
 [`renderGlobals.cpp`](../lib/mayaHydra/mayaPlugin/renderGlobals.cpp) and exposed in the renderer's
 option box.
 
-`MtohRenderOverride::_UseOutlineSelectionHighlighting()` is the single predicate the rest of the
-code asks, and it is **not** the same thing as the render global:
+`MtohRenderOverride::_UseOutlineSelectionHighlighting()` is the predicate the outline code asks,
+and it is **not** the same thing as the render global:
 
 ```cpp
-return _isUsingHdSt && _globals.outlineSelectionHighlight;
+return _isUsingHdSt && _globals.outlineSelectionHighlight
+        && !_globals.forceDisableSelectionHighlight;
 ```
 
 - **Storm only.** HVT's outline tasks need a rasterizer to render prim IDs, Storm-specific render
@@ -46,6 +47,11 @@ return _isUsingHdSt && _globals.outlineSelectionHighlight;
 - **Not offered on USD 24.11**, where HgiGL corrupts the non-zero integer prim IDs the outline mask
   shader samples, **nor on macOS**, where outline selection highlighting is unsupported. In those
   configurations the enum lists *Legacy Selection* only, and it is the default.
+- **Not when force-disabled.** `mayaHydraForceDisableSelectionHighlight` (script-only, for
+  profiling) turns every selection highlight off while selection is still tracked, giving a
+  no-highlight baseline. It makes this predicate false without falling back to the legacy
+  highlight, so the legacy code paths ask `_SuppressLegacySelectionHighlight()` instead, which is
+  true in outline mode *or* when force-disabled.
 
 Switching mode changes the scene index chain, so it cannot be done in place: `UpdateRenderGlobals()`
 flags `_needsClear`, and `Render()` runs `ClearHydraResources()` / `_InitHydraResources()` and then
@@ -144,8 +150,8 @@ descendants. Since we create them, disabling them is a matter of not creating th
 
 ```cpp
 // lib/mayaHydra/mayaPlugin/renderOverride.cpp
-// These are only used when the pixel outline is not the highlight mechanism.
-if (!_UseOutlineSelectionHighlighting()) {
+// Only in legacy mode: not when the outline is the highlight, nor when force-disabled.
+if (!_SuppressLegacySelectionHighlight()) {
     ... _geomSubsetWhSi / _meshWhSi / _niInstanceWhSi / _niPrototypeWhSi
         / _piInstancerWhSi / _piPrototypeWhSi ...
 }
