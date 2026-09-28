@@ -8,6 +8,13 @@ The shaders defined in shadersDef.usda will be loaded by usd/hydra and available
 You can add the plugInfo.json file path in the environment variable PXR_PLUGINPATH_NAME or use another .json file to load it
 so USD/Hydra loads it at startup. By default if this project is present in the install folder, it is loaded by Usd.
 
+Note: PXR_PLUGINPATH_NAME is appropriate here because this shaders discovery plugin is
+compiled and shipped together with maya-hydra itself, so there is no risk of a USD/MayaUsd
+version mismatch. This is different from dependent/third-party USD plugins distributed
+separately (e.g. render delegates like HdArnold, HdPrman), which should be discovered via
+the MAYA_PXR_PLUGINPATH_NAME environment variable instead, so that MayaUSD can run its
+VersionCheck (Python/USD/MayaUsd) before registering them. See doc/build.md for details.
+
 How to use this custom GLSL shader on usd primitives :
 ------------------------------------------------------
 

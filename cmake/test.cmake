@@ -3,6 +3,13 @@ set(MAYA_HYDRA_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 # Paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold plugin).
 # Sources (first wins): -DADDITIONAL_PXR_PLUGINPATH_NAME=... or $ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}
 # On Windows use forward slashes or escaped backslashes.
+# NOTE: these are dependent/third-party USD plugins (render delegates built and
+# distributed separately from maya-hydra/MayaUSD). At test-execution time these
+# paths are also propagated to MAYA_PXR_PLUGINPATH_NAME (see
+# _mayaHydra_setup_test_finalize_env below), which is the variable MayaUSD's
+# version-matching (mayaUsdPlugInfo.json + VersionCheck) actually reads. The
+# ADDITIONAL_PXR_PLUGINPATH_NAME CMake variable name is kept for backward
+# compatibility with existing build pipelines.
 if(NOT DEFINED ADDITIONAL_PXR_PLUGINPATH_NAME)
     set(ADDITIONAL_PXR_PLUGINPATH_NAME "" CACHE STRING
         "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)")
@@ -200,6 +207,8 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
 
     # Adjust PYTHONPATH to include the path to our Python modules
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+    # renderSettingsMultiImageTest.py imports imageDiffUtils from here.
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/test/testUtils")
 
     _mayaHydra_setup_test_USD_paths()
     _mayaHydra_setup_test_finalize_env("${test_name}")
@@ -408,7 +417,10 @@ function(_mayaHydra_setup_test_plugins)
              "${MAYAUSD_LOCATION}/libraries")
     endif()
 
-    # Additional plugin paths (e.g. HdArnold) for tests that need them.
+    # Additional plugin paths (e.g. HdArnold) for tests that need them. These are
+    # dependent/third-party USD plugins; they are also propagated to
+    # MAYA_PXR_PLUGINPATH_NAME below (see _mayaHydra_setup_test_finalize_env) so
+    # they go through MayaUSD's version-matching before registration.
     # On macOS, exclude PRMan and MtoA/Arnold paths to avoid TfType redefinition errors.
     # On Linux, only exclude PRMan paths (MtoA/Arnold tests are supported there).
     if(ADDITIONAL_PXR_PLUGINPATH_NAME)
@@ -649,9 +661,12 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # explicit paths (MTOA_LOCATION, PRMAN_DELEGATE_PLUGIN_PATH, etc.) are already
     # added above where applicable; there is no need to also inherit ambient env.
 
-    # Maya USD's Plug may read MAYA_PXR_PLUGINPATH_NAME (when built with
-    # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
-    # value so HdArnold and other Hydra plugins are discovered regardless.
+    # MayaUSD's Plug reads MAYA_PXR_PLUGINPATH_NAME (when built with
+    # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME) to discover
+    # dependent/third-party USD plugins (e.g. HdArnold, HdPrman) via
+    # mayaUsdPlugInfo.json + VersionCheck, rather than raw PXR_PLUGINPATH_NAME.
+    # Set it to the same value so those Hydra plugins are discovered regardless
+    # of which variable name the running MayaUSD build actually reads.
     list(APPEND ALL_PATH_VARS MAYA_PXR_PLUGINPATH_NAME)
     set(MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
 
@@ -1168,19 +1183,24 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # but cmd "/c" does not: the cmd shell no longer interprets the /c as a
     # flag argument.  Use PowerShell instead.
     # Cross-platform command runner: PowerShell on Windows, POSIX sh elsewhere.
-    # HYDRA-2304: We will consider WARN and FAIL as equivalent.
-    set(IDIFF_ARGS  "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+    # Compare leg: compareRenderedImage.py runs idiff (same IDIFF_CMD binary as
+    # before) and adds the Baseline:/Actual:/Diff: failure report that viewport
+    # tests already produce (HYDRA-2517). It passes passReturnCodes=(0,)
+    # internally, so only an exact idiff match (rc 0) passes -- identical to
+    # today's shell exit code, since HYDRA-2304 already mirrors WARN onto FAIL.
+    set(COMPARE_SCRIPT "${MAYA_HYDRA_DIR}/test/lib/cmdLineRender/compareRenderedImage.py")
     if (WIN32)
         set(CMD PowerShell)
 		# Windows (PowerShell)
 		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-        set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+        set(COMPARE_ARGS "& \"${Python_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${IDIFF_CMD}\" \"${EXPECTED_IMAGE_PATH}\" \"${RENDERED_IMAGE_PATH}\" ${FAIL} ${FAILPERCENT}")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
-		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
+		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${COMPARE_ARGS} } \; exit \$LASTEXITCODE")
     else()
-        # Use POSIX shell; '&&' ensures idiff runs only on successful render
+        # Use POSIX shell; '&&' ensures the compare step runs only on successful render
         set(CMD /bin/sh)
-        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${IDIFF_ARGS}")
+        set(COMPARE_ARGS "\"${Python_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${IDIFF_CMD}\" \"${EXPECTED_IMAGE_PATH}\" \"${RENDERED_IMAGE_PATH}\" ${FAIL} ${FAILPERCENT}")
+        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${COMPARE_ARGS}")
     endif()
 
     add_test(
@@ -1207,6 +1227,8 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 
     # Adjust PYTHONPATH to include the path to our Python modules
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+    # compareRenderedImage.py (compare leg above) imports imageDiffUtils from here.
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/test/testUtils")
 
     # Adjust PATH and PYTHONPATH to include USD.
     _mayaHydra_setup_test_USD_paths()
@@ -1360,17 +1382,23 @@ function(mayaHydra_add_mayabatch_render_test SCENE_FILE_LABELED)
         message(FATAL_ERROR "idiff binary not discovered. Set IMAGE_DIFF_TOOL (e.g. via OIIO_idiff_BINARY).")
     endif()
 
+    # Compare leg: compareRenderedImage.py runs idiff (same IDIFF_CMD binary as
+    # before) and adds the Baseline:/Actual:/Diff: failure report that viewport
+    # tests already produce (HYDRA-2517). It passes passReturnCodes=(0,)
+    # internally, so only an exact idiff match (rc 0) passes -- identical to
+    # today's shell exit code, since HYDRA-2304 already mirrors WARN onto FAIL.
+    set(COMPARE_SCRIPT "${MAYA_HYDRA_DIR}/test/lib/cmdLineRender/compareRenderedImage.py")
     if (WIN32)
         set(CMD PowerShell)
         set(RENDER_ARGS "& \"${MAYA_BATCH_EXECUTABLE}\" -script \"${MEL_SCRIPT_PATH}\"")
-        set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+        set(COMPARE_ARGS "& \"${Python_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${IDIFF_CMD}\" \"${EXPECTED_IMAGE_PATH}\" \"${RENDERED_IMAGE_PATH}\" ${FAIL} ${FAILPERCENT}")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
-		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
+		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${COMPARE_ARGS} } \; exit \$LASTEXITCODE")
     else()
         set(CMD /bin/sh)
         set(RENDER_ARGS "\"${MAYA_EXECUTABLE}\" -batch -script \"${MEL_SCRIPT_PATH}\"")
-        set(IDIFF_ARGS "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
-        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${IDIFF_ARGS}")
+        set(COMPARE_ARGS "\"${Python_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${IDIFF_CMD}\" \"${EXPECTED_IMAGE_PATH}\" \"${RENDERED_IMAGE_PATH}\" ${FAIL} ${FAILPERCENT}")
+        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${COMPARE_ARGS}")
     endif()
 
     add_test(
@@ -1395,6 +1423,8 @@ function(mayaHydra_add_mayabatch_render_test SCENE_FILE_LABELED)
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+    # compareRenderedImage.py (compare leg above) imports imageDiffUtils from here.
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/test/testUtils")
 
     _mayaHydra_setup_test_USD_paths()
 

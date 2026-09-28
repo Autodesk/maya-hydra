@@ -967,7 +967,7 @@ bool MayaHydraLightAdapter::ShouldMarkPrimvarDirtyForAttributeChange(const MPlug
 void MayaHydraLightAdapter::AddExtraDirtyForPrimvarAttributeChange(Fvp::DirtyNotifier& notifier, const MPlug& plug)
 {
     // Lights expose extension-attribute primvars, but a light-param attribute change must also
-    // invalidate the light schema, visibility, and shadow collections — matching the full
+    // invalidate the light schema, visibility, and shadow collections - matching the full
     // SprimDirtyBitsToLocatorSet(DirtyParams) expansion used by _dirtyBuiltInLightParams.
     // The base class already added dirtyPrimvars() for the extension-attribute primvar path.
     // IsParamAttribute safely returns false for an invalid plug (e.g. kAttributeRemoved).

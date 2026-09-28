@@ -26,6 +26,8 @@ class TestVisibility(mtohUtils.MayaHydraBaseTestCase):
     IMAGEDIFF_FAIL_PERCENT = 0.1
 
     def setUp(self):
+        super(TestVisibility, self).setUp()
+        # makeCubeScene() opens a new scene and re-applies the highlighting mode.
         self.makeCubeScene(camDist=6)
         self.assertTrue(cmds.getAttr("{}.visibility".format(self.cubeTrans)))
         self.assertTrue(cmds.getAttr("{}.visibility".format(self.cubeShape)))

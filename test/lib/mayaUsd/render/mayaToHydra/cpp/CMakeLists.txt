@@ -66,6 +66,8 @@ target_sources(${TARGET_NAME}
         testCustomAttributeTypes.cpp
         testMaterialBlocking.cpp
         testPassFiltering.cpp
+        testLegacyHighlightPassRouting.cpp
+        testDeferredHighlightWireInit.cpp
         testSceneGlobalsCurrentFrame.cpp
         testHydraGenerativeProcedural.cpp
 )
