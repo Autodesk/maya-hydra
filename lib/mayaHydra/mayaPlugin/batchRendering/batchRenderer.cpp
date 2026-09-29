@@ -399,6 +399,13 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
 
 void BatchRenderer::_ClearMayaHydraSceneIndex()
 {
+    // _InitHydraResources() sets _initializationAttempted before it can bail out on an
+    // unusable renderer plugin, render delegate or render index, so teardown also runs
+    // for a partially initialized BatchRenderer, with no Maya scene index created.
+    if (!_mayaHydraSceneIndex) {
+        return;
+    }
+
 #ifndef CODE_COVERAGE_WORKAROUND
     // Under code coverage the scene index is deliberately leaked instead, as its base
     // class HdRetainedSceneIndex dtor crashes in the Windows clang code coverage build.
@@ -423,16 +430,29 @@ void BatchRenderer::_InitHydraResources()
     GlfContextCaps::InitInstance();
     _rendererPlugin
         = HdRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererDesc.rendererName);
-    if (!_rendererPlugin)
+    if (!_rendererPlugin) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: unknown or unregistered renderer \"%s\"; no matching Hydra "
+            "renderer plugin was found.",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
 
     _renderDelegate = HdRendererPluginRegistry::GetInstance().CreateRenderDelegate(_rendererDesc.rendererName);
-    if (!_renderDelegate)
+    if (!_renderDelegate) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: failed to create the render delegate for renderer \"%s\".",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
 
     _renderIndex = HdRenderIndex::New(_renderDelegate.Get(), {&_hgiDriver});
-    if (!_renderIndex)
+    if (!_renderIndex) {
+        TF_RUNTIME_ERROR(
+            "hydraRender: failed to create the render index for renderer \"%s\".",
+            _rendererDesc.rendererName.GetText());
         return;
+    }
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
 
     _taskController = std::make_unique<HdxTaskController>(
@@ -594,11 +614,7 @@ void BatchRenderer::_ClearHydraResources()
 
     if (_renderIndex != nullptr) {
         GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
-#ifndef CODE_COVERAGE_WORKAROUND
-        // The render index destructor crashes under Windows clang code
-        // coverage builds, so deletion is skipped in that configuration.
         delete _renderIndex;
-#endif
         _renderIndex = nullptr;
     }
 
@@ -738,9 +754,7 @@ void BatchRenderer::SetRenderTimes(const RenderTimes& renderTimes)
 {
     // Cannot assign, as all RenderTimes data members are const.
     _renderTimes.emplace(
-        renderTimes.isAnimated, 
-        renderTimes.startTime,
-        renderTimes.endTime,
+        renderTimes.timeRanges,
         renderTimes.timeIncr
     );
 }

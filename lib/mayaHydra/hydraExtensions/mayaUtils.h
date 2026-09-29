@@ -78,6 +78,18 @@ MAYAHYDRALIB_API
 MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNode);
 
 /**
+ * @brief Get a plug from a dependency node using its name and attribute name.
+ *
+ * @param[in] nodeName is the name of the node to query.
+ * @param[in] attrName is the name of the attribute plug to find.
+ * @param[out] outPlug is the plug on the node, if found.
+ *
+ * @return MS::kSuccess when the node and plug were found, MS::kFailure otherwise.
+ */
+MAYAHYDRALIB_API
+MStatus GetPlug(const MString& nodeName, const MString& attrName, MPlug& outPlug);
+
+/**
  * @brief Return the top-level plug for a child/array element plug.
  *
  * (e.g. aiLookAt[0].child(0) -> aiLookAt)

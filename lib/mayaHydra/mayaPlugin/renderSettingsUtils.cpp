@@ -33,6 +33,7 @@
 #include <pxr/base/gf/vec2d.h>
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/getenv.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/imaging/hd/renderIndex.h>
@@ -80,18 +81,26 @@ bool IsPrmanRenderSettingsDriveRenderPassEnabled(const TfToken& rendererName)
     return TfGetenvBool("HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS", false);
 }
 
+MPlug _GetUsdDefaultRenderDescriptionPlug(const char* attrName)
+{
+    MPlug plug;
+    if (!TF_VERIFY(
+            GetPlug(kUsdDefaultRenderDescriptionNodeName.data(), attrName, plug),
+            "Could not find %s node or %s attribute.",
+            kUsdDefaultRenderDescriptionNodeName.data(),
+            attrName)) {
+        return {};
+    }
+
+    return plug;
+}
+
 UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
 {
     constexpr const char* attrName = "activeRenderDescriptionPath";
 
-    MObject nodeObj;
-    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
-        return {};
-    }
-
-    MFnDependencyNode depNode(nodeObj);
-    MPlug plug = depNode.findPlug(attrName, true);
-    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
+    MPlug plug = _GetUsdDefaultRenderDescriptionPlug(attrName);
+    if (plug.isNull()) {
         return {};
     }
 
@@ -120,24 +129,24 @@ UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
     return MayaUsdAPI::ufePathToPrim(outPath);
 }
 
-// Percentage of frames completed, once renderedTime has been rendered.
-int RenderProgressPercentage(const RenderTimes& renderTimes, const MTime& renderedTime)
+// Number of frames in a single render time range, with the increment applied.
+int RangeFrameCount(const RenderTimes::TimeRange& timeRange, float timeIncr)
 {
-    const double startFrame = renderTimes.startTime.as(MTime::uiUnit());
-    const double endFrame   = renderTimes.endTime.as(MTime::uiUnit());
-    // GetRenderTimes() only ever returns a positive increment, but a
-    // SetRenderTimes() caller could pass zero.
-    const double incr = (renderTimes.timeIncr > 0.0f) ? renderTimes.timeIncr : 1.0;
+    const double span = std::max(
+        0.0, timeRange.endTime.as(MTime::uiUnit()) - timeRange.startTime.as(MTime::uiUnit()));
 
-    // The frame loop accumulates the increment, so allow for drift when
-    // counting frames.
+    // Frames are computed from the range start as a multiple of the increment,
+    // so allow for floating-point representation error when counting them.
     constexpr double epsilon = 1e-6;
-    const double     span = std::max(0.0, endFrame - startFrame);
-    const int        frameCount = 1 + static_cast<int>(std::floor(span / incr + epsilon));
-    const int        framesDone = 1 + static_cast<int>(std::floor(
-        std::max(0.0, renderedTime.as(MTime::uiUnit()) - startFrame) / incr + epsilon));
 
-    return std::clamp((framesDone * 100) / frameCount, 0, 100);
+    return 1 + static_cast<int>(std::floor(span / timeIncr + epsilon));
+}
+
+// Percentage of frames completed, once framesDone frames have been rendered.
+int RenderProgressPercentage(const RenderTimes& renderTimes, int framesDone)
+{
+    const int frameCount = renderTimes.FrameCount();
+    return (frameCount > 0) ? std::clamp((framesDone * 100) / frameCount, 0, 100) : 100;
 }
 
 } // namespace
@@ -200,6 +209,26 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
 
     TF_WARN("No USD render settings found, or USD render settings had no render products.");
     return RenderSettingsType::Unknown;
+}
+// Read the raw currentRenderer value from the UsdDefaultRenderDescription node.
+// No validation is performed on the returned value.
+TfToken GetCurrentRenderer()
+{
+    constexpr const char* attrName = "currentRenderer";
+
+    MPlug plug = _GetUsdDefaultRenderDescriptionPlug(attrName);
+    if (plug.isNull()) {
+        return TfToken();
+    }
+
+    // An empty value here just means the attribute has not been authored,
+    // not a coding error, so no TF_VERIFY/TF_WARN for this case.
+    MString rendererStr = plug.asString();
+    if (rendererStr.length() == 0) {
+        return TfToken();
+    }
+
+    return TfToken(rendererStr.asChar());
 }
 
 Ufe::Path GetDefaultRenderSettingsAppPath()
@@ -362,16 +391,42 @@ TfTokenVector GetRenderOutputsFromActiveRenderSettings(const HdRenderIndex* rend
     return renderOutputs;
 }
 
-RenderTimes::RenderTimes(
-    bool         isAnimatedIn,
-    const MTime& startTimeIn,
-    const MTime& endTimeIn,
-    float        timeIncrIn)
-    : isAnimated(isAnimatedIn)
-    , startTime(startTimeIn)
-    , endTime(endTimeIn)
-    , timeIncr(timeIncrIn)
+RenderTimes::RenderTimes(std::vector<TimeRange> timeRangesIn, float timeIncrIn)
+    : timeRanges(std::move(timeRangesIn))
+    // GetRenderTimes() only ever passes a positive increment, but a
+    // SetRenderTimes() caller could pass zero, which would never advance the
+    // frame loop.
+    , timeIncr((timeIncrIn > 0.0f) ? timeIncrIn : 1.0f)
 {
+}
+
+int RenderTimes::FrameCount() const
+{
+    int frameCount = 0;
+    for (const auto& timeRange : timeRanges) {
+        frameCount += RangeFrameCount(timeRange, timeIncr);
+    }
+
+    return frameCount;
+}
+
+std::vector<MTime> RenderTimes::FrameTimes() const
+{
+    std::vector<MTime> frameTimes;
+    frameTimes.reserve(static_cast<size_t>(FrameCount()));
+
+    const double incr = timeIncr;
+    for (const auto& timeRange : timeRanges) {
+        const double startFrame = timeRange.startTime.as(MTime::uiUnit());
+        const int    rangeFrameCount = RangeFrameCount(timeRange, timeIncr);
+
+        // Multiply rather than accumulate the increment, to avoid drift.
+        for (int i = 0; i < rangeFrameCount; ++i) {
+            frameTimes.emplace_back(startFrame + i * incr, MTime::uiUnit());
+        }
+    }
+
+    return frameTimes;
 }
 
 // Single point of truth for render times is USD render settings prim, for all
@@ -387,9 +442,13 @@ RenderTimes GetRenderTimes()
         if (framesAttr) {
             VtArray<GfVec2d> framesArray;
             if (framesAttr.Get(&framesArray) && !framesArray.empty()) {
-                const double startFrame = framesArray[0][0];
-                const double endFrame   = framesArray[0][1];
-                const bool isAnimated = (startFrame != endFrame);
+                std::vector<RenderTimes::TimeRange> timeRanges;
+                timeRanges.reserve(framesArray.size());
+                for (const GfVec2d& frames : framesArray) {
+                    timeRanges.push_back(
+                        { MTime(frames[0], MTime::uiUnit()), MTime(frames[1], MTime::uiUnit()) });
+                }
+
                 float timeIncr = 1.0f;
                 const UsdAttribute stepAttr = rsPrim.GetAttribute(TfToken("adsk:step"));
                 if (stepAttr) {
@@ -398,18 +457,29 @@ RenderTimes GetRenderTimes()
                         timeIncr = stepVal;
                     }
                 }
-                return RenderTimes(
-                    isAnimated,
-                    MTime(startFrame, MTime::uiUnit()),
-                    MTime(endFrame, MTime::uiUnit()),
-                    timeIncr);
+                return RenderTimes(std::move(timeRanges), timeIncr);
             }
         }
     }
 
     // Fallback: single frame at current time.
     const auto currentTime = MAnimControl::currentTime();
-    return RenderTimes(false, currentTime, currentTime, 1.0f);
+    return RenderTimes({ { currentTime, currentTime } }, 1.0f);
+}
+
+std::string RenderTimesDescription(const RenderTimes& renderTimes)
+{
+    std::string description
+        = TfStringPrintf("Render times: by=%.3f", static_cast<double>(renderTimes.timeIncr));
+
+    for (const auto& timeRange : renderTimes.timeRanges) {
+        description += TfStringPrintf(
+            ", start=%.3f end=%.3f",
+            timeRange.startTime.as(MTime::uiUnit()),
+            timeRange.endTime.as(MTime::uiUnit()));
+    }
+
+    return description;
 }
 
 void SendRenderStarted()
@@ -423,7 +493,7 @@ void SendRenderStarted()
     MRenderUtil::sendRenderProgressInfo(" ", frameStarted);
 }
 
-void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime)
+void SendRenderProgress(const RenderTimes& renderTimes, int framesDone)
 {
     // The following function is fairly inflexible.  The first string is
     // printed between parentheses in the script editor as a batch render
@@ -437,7 +507,7 @@ void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTim
     // possible, as Maya fills out such a string with a "starting" message.  We
     // therefore print out a single space.
     MRenderUtil::sendRenderProgressInfo(
-        " ", RenderProgressPercentage(renderTimes, renderedTime));
+        " ", RenderProgressPercentage(renderTimes, framesDone));
 }
 
 } // namespace MAYAHYDRA_NS_DEF
