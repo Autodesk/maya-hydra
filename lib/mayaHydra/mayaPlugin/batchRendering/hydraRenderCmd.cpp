@@ -183,8 +183,6 @@ bool HydraRenderCmd::render()
         return false;
     }
 
-    SendRenderStarted();
-
     if (!hydraRender()) {
         return false;
     }

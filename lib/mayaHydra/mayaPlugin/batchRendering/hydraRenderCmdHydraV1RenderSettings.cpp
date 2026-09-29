@@ -483,6 +483,9 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
         static_cast<double>(renderTimes.timeIncr),
         renderTimes.isAnimated);
 
+    // Send Maya's FRAME_STARTED value to register the PID of the child render process.
+    SendRenderStarted();
+
     for (MTime time = renderTimes.startTime; time <= renderTimes.endTime; time += renderTimes.timeIncr) {
         if (MAnimControl::currentTime() != time) {
             MAnimControl::setCurrentTime(time);
