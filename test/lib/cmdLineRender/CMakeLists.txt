@@ -229,6 +229,50 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         RENDERER_ARGS "-s 5 -e 9"
     )
 
+    # Frame set or frame range rendering is not renderer-specific, so can be
+    # tested with a single renderer.
+    if(folder STREQUAL "arnold")
+        # Test frames set (1, 3, 5-8, 9, 11-14).
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSet
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}FramesSet
+            RENDERER_ARGS "-frames \"1, 3, 5-8, 9, 11-14\""
+        )
+
+        # With step.  The step is applied at each range, so frames 1, 3, 5,
+        # 7, 9, 11 and 13 will be rendered.
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSetStep
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}FramesSetStep
+            RENDERER_ARGS "-frames \"1, 3, 5-8, 9, 11-14\" -b 2"
+        )
+
+        # Invalid frame set: the 8-5 range ends before it starts, which
+        # mayaHydra.renderSettings.frames._parseFrames() rejects, so Render
+        # exits non-zero and renderSettingsMultiImageTest.py returns 1.
+        # WILL_FAIL turns that non-zero exit into a pass.  The baseline
+        # directory is only supplied because the helper requires an existing
+        # one; image comparison is never reached.  Excluded on macOS, where
+        # bin/Render is a wrapper script that does not propagate the real
+        # exit code (see the registeredRenderRenderers comment below).
+        if(NOT IS_MACOSX)
+            cmake_path(GET animcube_scene STEM animcube_stem)
+            mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+                RENDERER ${renderer}
+                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSet
+                IMAGE_EXTENSION png
+                TEST_NAME_SUFFIX ${suffix}FramesSetInvalid
+                RENDERER_ARGS "-frames \"1, 3, 8-5, 9, 11-14\""
+            )
+            set_tests_properties("${animcube_stem}_${suffix}FramesSetInvalid"
+                PROPERTIES WILL_FAIL TRUE)
+        endif()
+    endif()
+
     set(singlecam_fail_arg FAIL 0.05)
     if(folder STREQUAL "storm")
         set(singlecam_fail_arg "")

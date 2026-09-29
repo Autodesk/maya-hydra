@@ -14,6 +14,7 @@
 #
 
 import logging
+import re
 
 from pxr import Gf, Sdf, Vt
 
@@ -23,6 +24,54 @@ _log = logging.getLogger(__name__)
 
 _FRAMES_ATTR = "adsk:frames"
 _STEP_ATTR = "adsk:step"
+
+# A single frame, or a hyphen-separated pair of frames.  Greedy matching binds
+# a leading sign to its number, so "-10--5" and "-10 - -5" both give (-10, -5).
+_NUM = r"[-+]?(?:\d+\.?\d*|\.\d+)"
+_ITEM_RE = re.compile(r"^(%s)(?:\s*-\s*(%s))?$" % (_NUM, _NUM))
+
+
+def _parseFrames(frames):
+    """Return a list of (start, end) float pairs from a frame list string.
+
+    The string is a comma-separated list of items, each item either a single
+    frame f, expanded into the pair (f, f), or a hyphen-separated pair of
+    frames.  Frames may be negative or zero.
+
+    Raises RuntimeError if the string is malformed, if a pair ends before it
+    starts, or if an item does not start strictly after the preceding item."""
+    if not isinstance(frames, str):
+        raise RuntimeError(
+            "Frames must be a string, got: %s" % frames)
+
+    if not frames.strip():
+        raise RuntimeError("Frames must not be empty.")
+
+    pairs = []
+    prevEnd = None
+    for item in frames.split(","):
+        item = item.strip()
+        match = _ITEM_RE.match(item)
+        if not match:
+            raise RuntimeError("Invalid frame item: %s" % item)
+
+        start = float(match.group(1))
+        end = start if match.group(2) is None else float(match.group(2))
+
+        if end < start:
+            raise RuntimeError(
+                "Frame range end (%s) cannot be less than start (%s)."
+                % (end, start))
+
+        if prevEnd is not None and start <= prevEnd:
+            raise RuntimeError(
+                "Frame (%s) must be greater than preceding frame (%s)."
+                % (start, prevEnd))
+
+        pairs.append((start, end))
+        prevEnd = end
+
+    return pairs
 
 
 def _getFramesPair(prim):
@@ -35,13 +84,18 @@ def _getFramesPair(prim):
     return None
 
 
-def _setFramesPair(prim, start, end):
-    """Write a single-element double2[] to adsk:frames on the prim."""
+def _setFramesArray(prim, pairs):
+    """Write a double2[] of (start, end) pairs to adsk:frames on the prim."""
     attr = prim.GetAttribute(_FRAMES_ATTR)
     if not attr:
         attr = prim.CreateAttribute(
             _FRAMES_ATTR, Sdf.ValueTypeNames.Double2Array, custom=True)
-    attr.Set(Vt.Vec2dArray([Gf.Vec2d(start, end)]))
+    attr.Set(Vt.Vec2dArray([Gf.Vec2d(start, end) for start, end in pairs]))
+
+
+def _setFramesPair(prim, start, end):
+    """Write a single-element double2[] to adsk:frames on the prim."""
+    _setFramesArray(prim, [(start, end)])
 
 
 def setStartFrame(frame):
@@ -126,3 +180,23 @@ def setStep(step):
     attr.Set(step_val)
 
     _log.info("Set step to %.4g", step_val)
+
+def setFrames(frames):
+    """Set the active render settings prim's adsk:frames attribute.
+
+    frames is a comma-separated list of items, e.g. "1, 2, 5-10, 15, 30-50".
+    Each item is either a single frame, expanded into a pair of identical
+    values, or a hyphen-separated pair of frames.  Frames may be negative or
+    zero.
+
+    If adsk:frames is already authored, it is replaced.  If not authored, 
+    it will be created.
+
+    Raises RuntimeError if the list is malformed, if a pair ends before it
+    starts, or if an item does not start strictly after the preceding item."""
+    pairs = _parseFrames(frames)
+
+    prim = getRenderSettingsPrim()
+    _setFramesArray(prim, pairs)
+
+    _log.info("Set frames to %s", pairs)
