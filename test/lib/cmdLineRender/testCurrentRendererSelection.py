@@ -102,6 +102,14 @@ class TestCurrentRendererSelection(mtohUtils.MayaHydraBaseTestCase):
             scenePath = _scenePath(_SCENE_FILE_NAME)
 
         cmds.file(scenePath, open=True, force=True)
+
+        # Opening the .ma replaces defaultRenderGlobals with the scene's own,
+        # which lacks the mayaHydra selection-highlight enum. Re-apply the mode
+        # so assertImagesClose()'s assertSelectionHighlightModeApplied() check
+        # passes even on the legacy render path (cmds.render), which -- unlike
+        # cmds.hydraRender -- never recreates the render globals via Hydra.
+        self.applySelectionHighlightMode()
+
         self._useAbsoluteRenderProductPath(scenePath)
         return scenePath
 
