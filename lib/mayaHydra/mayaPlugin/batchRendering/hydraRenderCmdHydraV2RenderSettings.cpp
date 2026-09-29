@@ -39,13 +39,11 @@ bool HydraRenderCmd::hydraRenderFromHydraV2RenderSettings()
     const auto renderTimes = _batchRenderer->GetRenderTimes();
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-        "Render time range: start=%.3f end=%.3f by=%.3f animated=%d\n",
-        renderTimes.startTime.as(MTime::uiUnit()),
-        renderTimes.endTime.as(MTime::uiUnit()),
-        static_cast<double>(renderTimes.timeIncr),
-        renderTimes.isAnimated);
+        "%s\n",
+        RenderTimesDescription(renderTimes).c_str());
 
-    for (MTime time = renderTimes.startTime; time <= renderTimes.endTime; time += renderTimes.timeIncr) {
+    int framesDone = 0;
+    for (const MTime& time : renderTimes.FrameTimes()) {
         if (MAnimControl::currentTime() != time) {
             MAnimControl::setCurrentTime(time);
         }
@@ -57,7 +55,7 @@ bool HydraRenderCmd::hydraRenderFromHydraV2RenderSettings()
             return false;
         }
 
-        SendRenderProgress(renderTimes, time);
+        SendRenderProgress(renderTimes, ++framesDone);
     }
 
     return true;
