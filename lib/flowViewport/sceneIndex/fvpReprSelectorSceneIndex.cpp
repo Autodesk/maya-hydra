@@ -32,7 +32,7 @@
 #include <pxr/imaging/hd/xformSchema.h>
 
 // This class is a filtering scene index that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
-// and also applies an overrideWireframecolor for HdStorm 
+// and also applies an overrideWireframecolor for HdStorm. The other meshes get the refined RepSelector.
 
 namespace FVP_NS_DEF {
 
@@ -70,6 +70,19 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
+
+//Shaded refined. The render collection already asks for refined, so this does not change the main
+//draw. Authoring it on the prim makes the passes that use a non-forced collection of their own
+//(where the prim's repr wins) draw the same refined surface. The HVT outline primId passes are such
+//passes: they use smoothHull, which never refines, and would otherwise outline the control cage of
+//a subdivided mesh instead of its visible surface.
+const HdRetainedContainerDataSourceHandle sRefinedDisplayStyleDataSource
+    = HdRetainedContainerDataSource::New(
+        HdLegacyDisplayStyleSchemaTokens->displayStyle,
+        HdRetainedContainerDataSource::New(
+            HdLegacyDisplayStyleSchemaTokens->reprSelector,
+            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
+                { HdReprTokens->refined, TfToken(), TfToken() })));
 
 }//End of namespace
 
@@ -130,9 +143,17 @@ ReprSelectorSceneIndex::_DirtyAllPrims(
 HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if ( (prim.dataSource && !_isExcluded(primPath)) && 
-         (prim.primType == HdPrimTypeTokens->mesh) && _needsReprChanged ) {
 
+    if (!prim.dataSource || prim.primType != HdPrimTypeTokens->mesh) {
+        return prim;
+    }
+
+    if (!_needsReprChanged || _isExcluded(primPath)) {
+        //Every mesh not getting a wireframe repr below gets refined, including the ones under the
+        //excluded scene roots: refined is what the render collection draws them with anyway.
+        //The input comes first so that a reprSelector already authored upstream keeps winning.
+        prim.dataSource = HdOverlayContainerDataSource::New(prim.dataSource, sRefinedDisplayStyleDataSource);
+    } else {
         //Edit the dataSource as an overlay will not replace any existing attribute value.
         // So we need to edit the _primVarsTokens->overrideWireframeColor attribute as they may already exist in the prim
         auto edited = HdContainerDataSourceEditor(prim.dataSource);

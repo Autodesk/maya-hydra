@@ -222,9 +222,20 @@ if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
     )
 endif()
 
+# Runs on both mesh paths: the mesh adapter is where Maya native meshes get refined by Storm.
+if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
+    )
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
+        testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
+    )
+endif()
+
 # Outline-only scripts: no _legacy counterpart, as legacy mode has nothing to cover.
 set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineHover.py
+    testOutlineRefinement.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to
