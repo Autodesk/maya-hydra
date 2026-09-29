@@ -244,12 +244,13 @@ def imageDiff(baselinePath, actualPath, verbose, fail, failpercent, hardfail=Non
     #   visualization only.
     #
     #   A call site in test/testUtils/mtohUtils.py runs the taskkill
-    #   executable, and does not use the code below either.  There has been at
-    #   least one recorded instance of a test run of testSceneStat.py hanging,
-    #   and that test performs no image comparison whatsoever (the automated
-    #   retry of the complete test succeeded).  It seems possible that this
-    #   hang might have been caused by the mtohUtils.py subprocess.run()
-    #   invocation.
+    #   executable.  There has been at least one recorded instance of a test
+    #   run of testSceneStat.py hanging, and that test performs no image
+    #   comparison whatsoever (the automated retry of the complete test
+    #   succeeded).  It seems possible that this hang was caused by the
+    #   mtohUtils.py subprocess.run() invocation, so as of 2026-09-28 that
+    #   call site duplicates the mitigation measures below instead of sharing
+    #   them; factoring out a common wrapper remains to be done.
     #
     # - Microsoft documents
     #   https://learn.microsoft.com/en-us/windows/win32/ipc/pipe-handle-inheritance

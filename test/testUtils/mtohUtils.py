@@ -479,22 +479,44 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                 print("Skipping ADPClientService cleanup: %s not found" % taskkill_exe,
                       file=sys.stderr)
             else:
-                try:
-                    # For Windows subprocess.run() possible hang documentation,
-                    # and remediation measures, see comments in imageUtils.py.
-                    # These measures could be applied here, or a single,
-                    # centralized Python subprocess.run() wrapper could be
-                    # created to be used from all call sites.  PPT, 2026-09-23.
-                    subprocess.run(  # nosec B603
-                        [taskkill_exe, '/f', '/im', 'ADPClientService.exe'],
-                        check=True, capture_output=True, text=True)
-                except subprocess.CalledProcessError as e:
-                    # ADPClientService may already have exited, or might not be
-                    # running (e.g. mayabatch), which is not an error.
-                    notAnError = 'The process "ADPClientService.exe" not found'
-                    if notAnError not in e.stderr:
-                        print("taskkill ADPClientService error: %s" % e.stderr,
+                # For Windows subprocess.run() possible hang documentation,
+                # and remediation measures, see comments in imageDiffUtils.py's
+                # imageDiff().  The same measures are applied here; a single,
+                # centralized Python subprocess.run() wrapper could be created
+                # to be used from all call sites.  PPT, 2026-09-23.
+                timeoutSeconds = 20
+                maxAttempts = 3
+                for attempt in range(1, maxAttempts + 1):
+                    try:
+                        # This code runs on Windows only, so CREATE_NO_WINDOW
+                        # always exists.  stdin is DEVNULL so that taskkill can
+                        # never block waiting on a console that isn't there.
+                        subprocess.run(  # nosec B603
+                            [taskkill_exe, '/f', '/im', 'ADPClientService.exe'],
+                            stdin=subprocess.DEVNULL,
+                            check=True, capture_output=True, text=True,
+                            shell=False,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                            timeout=timeoutSeconds)
+                    except subprocess.TimeoutExpired:
+                        print("Warning: taskkill ADPClientService timed out after "
+                              "%d seconds (attempt %d of %d)"
+                              % (timeoutSeconds, attempt, maxAttempts),
                               file=sys.stderr)
+                    except subprocess.CalledProcessError as e:
+                        # ADPClientService may already have exited, or might not be
+                        # running (e.g. mayabatch), which is not an error.
+                        notAnError = 'The process "ADPClientService.exe" not found'
+                        if notAnError not in e.stderr:
+                            print("taskkill ADPClientService error: %s" % e.stderr,
+                                  file=sys.stderr)
+                        break
+                    else:
+                        break
+                else:
+                    print("Skipping ADPClientService cleanup: taskkill did not "
+                          "complete after %d attempts" % maxAttempts,
+                          file=sys.stderr)
 
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)
