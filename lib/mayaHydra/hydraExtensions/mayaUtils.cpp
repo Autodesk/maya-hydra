@@ -55,6 +55,19 @@ MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNod
     return status;
 }
 
+MStatus GetPlug(const MString& nodeName, const MString& attrName, MPlug& outPlug)
+{
+    MObject nodeObj;
+    MStatus status = GetDependNodeFromNodeName(nodeName, nodeObj);
+    if (!status) {
+        return status;
+    }
+
+    MFnDependencyNode depNode(nodeObj);
+    outPlug = depNode.findPlug(attrName, true);
+    return outPlug.isNull() ? MS::kFailure : MS::kSuccess;
+}
+
 MPlug GetTopPlug(const MPlug& plug)
 {
     MPlug topPlug = plug;
