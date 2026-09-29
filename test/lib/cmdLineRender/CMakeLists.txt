@@ -108,6 +108,7 @@ foreach(scene ${STORM_RENDER_SCENES})
     cmake_path(GET scene STEM sceneFileNameNoExt)
     mayaHydra_add_cmd_line_render_test(${scene}
         COPY_SCENE
+        RENDERER HdStormRendererPlugin
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
         RENDERER_ARGS "-x 960 -y 540 -im ${sceneFileNameNoExt}"
@@ -317,6 +318,46 @@ foreach(scene ${ARNOLD_MAYABATCH_RENDER_SCENES})
     )
 endforeach()
 
+# Render.exe/CTest coverage for renderer resolution precedence around the
+# USD currentRenderer attribute.  No-flag resolution (Render.exe without
+# -renderer) is covered by testCurrentRendererSelection.py instead: without an
+# explicit -renderer flag, no renderDesc/*.xml <melheader> runs, so plugin
+# loading for that path is a Maya product concern, not something we bootstrap
+# from defaultRenderGlobals in a scene file.
+#
+# renderCurrentFrame_UsdCurrentRendererStorm.ma bakes
+# UsdDefaultRenderDescription.currentRenderer to "HdStormRendererPlugin"
+# directly in the scene file (rather than setting it at runtime, as the
+# Python test does), so pure Render.exe/CTest invocations can exercise the
+# explicit-flag cases below.
+set(scene basic/renderCurrentFrame_UsdCurrentRendererStorm.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+
+# Sanity check: explicit -renderer matches the scene's baked-in
+# currentRenderer attribute (Storm, Hydra V1 render settings). Baseline is the
+# scene's own renderCurrentFrame_UsdCurrentRendererStorm.png (also used by
+# test_UsdCurrentRendererStormIsHonored).
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-rd ../images -im ${sceneFileNameNoExt}"
+)
+
+# Override check: explicit -renderer HdArnoldRendererPlugin must win over the
+# scene's baked-in currentRenderer=HdStormRendererPlugin attribute (HdArnold uses
+# Hydra V2 render settings by default; same as testCurrentRendererSelection.py).
+# Baseline is a copy of renderCurrentFrame_UsdCurrentRendererHonored.png: same
+# scene geometry/lighting, same renderer, so identical expected pixels.
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_ArnoldOverridesStorm
+    RENDERER_ARGS "-im ${sceneFileNameNoExt}_ArnoldOverridesStorm"
+    TEST_NAME_SUFFIX ArnoldOverridesStorm
+)
 
 # Test a render using the fallback USD resolution settings
 set(scene basic/sphereFallbackResolution.ma)
@@ -553,6 +594,7 @@ set_tests_properties(
 set(MAYABATCH_TEST_SCRIPT_FILES
     testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
     testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
+    testCurrentRendererSelection.py|depOnPlugins:mtoa
 )
 
 

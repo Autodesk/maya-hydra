@@ -80,18 +80,26 @@ bool IsPrmanRenderSettingsDriveRenderPassEnabled(const TfToken& rendererName)
     return TfGetenvBool("HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS", false);
 }
 
+MPlug _GetUsdDefaultRenderDescriptionPlug(const char* attrName)
+{
+    MPlug plug;
+    if (!TF_VERIFY(
+            GetPlug(kUsdDefaultRenderDescriptionNodeName.data(), attrName, plug),
+            "Could not find %s node or %s attribute.",
+            kUsdDefaultRenderDescriptionNodeName.data(),
+            attrName)) {
+        return {};
+    }
+
+    return plug;
+}
+
 UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
 {
     constexpr const char* attrName = "activeRenderDescriptionPath";
 
-    MObject nodeObj;
-    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
-        return {};
-    }
-
-    MFnDependencyNode depNode(nodeObj);
-    MPlug plug = depNode.findPlug(attrName, true);
-    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
+    MPlug plug = _GetUsdDefaultRenderDescriptionPlug(attrName);
+    if (plug.isNull()) {
         return {};
     }
 
@@ -200,6 +208,26 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
 
     TF_WARN("No USD render settings found, or USD render settings had no render products.");
     return RenderSettingsType::Unknown;
+}
+// Read the raw currentRenderer value from the UsdDefaultRenderDescription node.
+// No validation is performed on the returned value.
+TfToken GetCurrentRenderer()
+{
+    constexpr const char* attrName = "currentRenderer";
+
+    MPlug plug = _GetUsdDefaultRenderDescriptionPlug(attrName);
+    if (plug.isNull()) {
+        return TfToken();
+    }
+
+    // An empty value here just means the attribute has not been authored,
+    // not a coding error, so no TF_VERIFY/TF_WARN for this case.
+    MString rendererStr = plug.asString();
+    if (rendererStr.length() == 0) {
+        return TfToken();
+    }
+
+    return TfToken(rendererStr.asChar());
 }
 
 Ufe::Path GetDefaultRenderSettingsAppPath()
