@@ -18,6 +18,9 @@
 
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
+#endif
 #include <mayaHydraLib/debugCodes.h>
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
@@ -537,6 +540,17 @@ void MayaHydraSceneIndex::UpdateRenderItems(
 {
     MH_PROFILE_FUNCTION();
 
+#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+    // The producer's frame spans this whole method, because that is what a
+    // shared buffer's write window is: every copy into consumer-visible memory
+    // happens in the loop below, and the consumer's frame does not begin until
+    // the render override runs its tasks. Opening the frame here waits out the
+    // reads still in flight from the last publish; closing it hands this
+    // frame's writes over before those tasks start, which is the order the
+    // arena requires.
+    MhExtGpuBufferBridge::BeginProducerFrame();
+#endif
+
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;
     for (size_t i = 0; i < scene.mRemovalCount; i++) {
@@ -742,7 +756,13 @@ void MayaHydraSceneIndex::RefreshRenderItemLegacyHighlightTreatment(
         ria->SetWireframeSelectionHighlightEnabled(
             !replaceable || options.viewportDrawsWireframes);
     }
+
+#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+    MhExtGpuBufferBridge::EndProducerFrame();
+#endif
 }
+
+
 
 void MayaHydraSceneIndex::Populate()
 {

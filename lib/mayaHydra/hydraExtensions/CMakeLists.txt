@@ -85,6 +85,13 @@ target_compile_definitions(${TARGET_NAME}
             $<$<BOOL:${IS_WINDOWS}>:WIN32>
 )
 
+# The Vulkan external buffer route reaches hgiVulkan directly, so it compiles
+# only against a USD package that exports it.
+if (USD_HAS_HGI_VULKAN)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE MAYAHYDRA_HAS_HGI_VULKAN=1)
+endif()
+
 if(DEFINED MAYAUSD_VERSION)
     target_compile_definitions(${TARGET_NAME}
         PRIVATE
@@ -109,6 +116,7 @@ target_link_libraries(${TARGET_NAME}
         hdGp
         hgi
         hgiGL
+        $<$<BOOL:${USD_HAS_HGI_VULKAN}>:hgiVulkan>
         $<$<BOOL:${CMAKE_WANT_MATERIALX_BUILD}>:hdMtlx>
         hdx
         js

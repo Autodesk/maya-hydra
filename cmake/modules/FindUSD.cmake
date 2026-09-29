@@ -129,6 +129,17 @@ if (USD_LIBRARY_DIR AND EXISTS "${USD_LIBRARY_DIR}/${USD_LIB_PREFIX}usdMtlx${CMA
     endif()
 endif()
 
+# See if this USD package was built with the Vulkan backend. Code reaching
+# hgiVulkan directly is compiled out when it is absent.
+set(USD_HAS_HGI_VULKAN FALSE CACHE INTERNAL "USD.Hgi.Vulkan")
+if (TARGET hgiVulkan)
+    set(USD_HAS_HGI_VULKAN TRUE CACHE INTERNAL "USD.Hgi.Vulkan")
+    message(STATUS "USD has the Vulkan Hgi backend")
+else()
+    message(STATUS "USD has no Vulkan Hgi backend: external GPU buffers are "
+                   "shared with an OpenGL consumer only")
+endif()
+
 message(STATUS "USD include dir: ${USD_INCLUDE_DIR}")
 message(STATUS "USD library dir: ${USD_LIBRARY_DIR}")
 message(STATUS "USD version: ${USD_VERSION}")

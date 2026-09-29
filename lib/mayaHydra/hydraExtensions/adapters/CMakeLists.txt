@@ -21,6 +21,7 @@ target_sources(${TARGET_NAME}
         materialAdapter.cpp
         materialNetworkConverter.cpp
         mayaAttrs.cpp
+        mhExtGpuBufferBridge.cpp
         meshAdapter.cpp
         nurbsCurveAdapter.cpp
         pointLightAdapter.cpp
@@ -47,6 +48,7 @@ set(HEADERS
     materialAdapter.h
     materialNetworkConverter.h
     mayaAttrs.h
+    mhExtGpuBufferBridge.h
     shapeAdapter.h
     tokens.h
     shadowMatrixComputation.h

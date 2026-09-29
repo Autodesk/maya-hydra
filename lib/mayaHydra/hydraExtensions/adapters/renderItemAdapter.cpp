@@ -1,4 +1,4 @@
-//
+﻿//
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,7 +42,7 @@
 #include <pxr/imaging/hgi/enums.h>
 #include <pxr/imaging/hgi/externalBuffer.h>
 #include <pxr/imaging/hgi/hgi.h>
-#include <pxr/imaging/hgiGL/externalBufferArena.h>
+#include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
 #include <pxr/imaging/hgi/tokens.h>
 #endif
 
@@ -216,45 +216,6 @@ _ExtractRawHandle(void *resourceHandle)
 #endif
 }
 
-// Whether VP2 is drawing through OpenGL, which is the only API whose buffers
-// we can hand over. An arena is typed on the producing API -- it takes a GL
-// name or a Vulkan handle, not an untyped pointer -- and there is no Metal
-// arena, so a Metal VP2 has nothing to register with and its streams take the
-// CPU path. Checking here rather than trusting the handle matters because
-// MVertexBuffer::resourceHandle() is an opaque void* either way: a Metal
-// buffer pointer passed to the GL arena would be read as a GL name and bind
-// some unrelated object.
-static bool
-_ProducerIsOpenGL()
-{
-    auto *renderer = MHWRender::MRenderer::theRenderer();
-    if (!renderer) {
-        return false;
-    }
-    const unsigned int api = renderer->drawAPI();
-    return api == MHWRender::kOpenGL || api == MHWRender::kOpenGLCoreProfile;
-}
-
-// The arena VP2's buffers are registered with, or null when this renderer
-// cannot consume them.
-//
-// Null is the entire negotiation, and it is settled once here rather than
-// rediscovered per buffer: a Vulkan-backed Storm gets null because OpenGL
-// cannot export an allocation for another API to import -- impossible rather
-// than unimplemented -- and the caller falls back to the CPU primvar.
-//
-// Get-or-create, so every call after the first is a lookup. The Hgi owns the
-// arena for its own lifetime, which outlives every adapter, so returning a raw
-// pointer does not drop ownership on the floor.
-static HgiGLExternalBufferArena *
-_GetExtGpuBufferArena(Hgi *hgi)
-{
-    if (!hgi || !_ProducerIsOpenGL()) {
-        return nullptr;
-    }
-    return hgi->GetExternalBufferArena<HgiGLExternalBufferArena>().get();
-}
-
 static HdTupleType
 _ToHdTupleType(MHWRender::MGeometry::DataType dataType, int dimension)
 {
@@ -299,6 +260,7 @@ struct _ExtLayout
     size_t byteOffset = 0;
     size_t byteStride = 0;
     size_t byteSize = 0;
+    size_t copyByteSize = 0;
 
     bool IsValid() const
     {
@@ -333,6 +295,19 @@ _GetExtLayout(MHWRender::MVertexBuffer *mvb)
     const size_t elemSize = HdDataSizeOfTupleType(layout.elementType);
     const size_t stride = layout.byteStride > 0 ? layout.byteStride : elemSize;
     layout.byteSize = layout.byteOffset + layout.numElements * stride;
+
+    // Where byteSize is what the consumer bounds checks against -- and so has
+    // to be at least the whole stream -- this is the exact span the stream
+    // occupies, which is what may be READ out of Maya's buffer.
+    //
+    // The two differ on an interleaved buffer, where byteSize rounds the last
+    // element up to a full stride and adds the offset on top, and so can
+    // exceed Maya's real allocation. That costs the consumer nothing, because
+    // it only ever compares. A copy out of Maya's buffer is not so forgiving:
+    // reading past the end is an out-of-range GL copy that fails the whole
+    // stream rather than clamping.
+    layout.copyByteSize =
+        layout.byteOffset + (layout.numElements - 1) * stride + elemSize;
     return layout;
 }
 
@@ -876,81 +851,110 @@ MayaHydraRenderItemAdapter::_PublishExtStream(
         return _ExtPublishResult::NoGpu;
     }
 
-    // Same buffer, same element count, same permission: the cached schema
-    // already describes this stream exactly. A byte-only deform lands here --
-    // VP2 rewrote the contents of a buffer we published earlier -- and there
-    // is nothing to do, because under direct binding the consumer's range
-    // still points at this buffer and picks up the new bytes at the next draw.
-    // This is the case that makes deforming geometry cost nothing on our side,
-    // so it is checked before anything that could allocate.
-    if (stream.schema
-        && stream.rawHandle == rawHandle
-        && stream.numElements == layout.numElements
-        && stream.byteOffset == layout.byteOffset
-        && stream.byteStride == layout.byteStride
-        && stream.allowDirectBind == allowDirectBind) {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s unchanged: same buffer %" PRIu64 ", %zu elements "
-                 "(bytes rewritten in place, nothing republished)\n",
-                 GetID().GetText(), _ExtStreamName(mvb),
-                 rawHandle, layout.numElements);
-        return _ExtPublishResult::Unchanged;
-    }
-
     MayaHydraSceneIndex *sceneIndex = GetMayaHydraSceneIndex();
-    HgiGLExternalBufferArena *arena = sceneIndex
-        ? _GetExtGpuBufferArena(sceneIndex->GetHgi())
-        : nullptr;
-    if (!arena) {
-        // The negotiation failing, not an error: a renderer that cannot
-        // consume VP2 GL buffers at all (a Vulkan-backed Storm), or a VP2
-        // that is not on GL.
+    const MhExtGpuBufferBridge bridge = sceneIndex
+        ? MhExtGpuBufferBridge::ForHgi(sceneIndex->GetHgi())
+        : MhExtGpuBufferBridge();
+    if (!bridge) {
+        // The negotiation failing, not an error: a VP2 that is not on GL, or
+        // an Hgi with no arena to share through.
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s -> CPU: no arena (VP2 on GL: %s, renderer Hgi: "
-                 "%s)\n",
+            .Msg("[%s] %s -> CPU: no bridge (renderer Hgi: %s)\n",
                  GetID().GetText(), _ExtStreamName(mvb),
-                 _ProducerIsOpenGL() ? "yes" : "no",
                  (sceneIndex && sceneIndex->GetHgi())
                      ? sceneIndex->GetHgi()->GetAPIName().GetText()
                      : "<none>");
         return _ExtPublishResult::NoGpu;
     }
 
-    // Reuse the existing wrapper when only the direct-bind permission
-    // changed: it describes the same allocation, and registering one GL name
-    // twice would hand the consumer two buffer objects with no way to tell
-    // they are the same memory, costing it the aggregation it keys on buffer
-    // identity.
+    // Whether Maya's buffer identity is part of what was published, which is
+    // the one place the two bridges genuinely disagree.
+    //
+    // A zero-copy bridge published Maya's buffer itself, so a new name is a
+    // different allocation and has to be republished. A copying bridge
+    // published its OWN allocation and only reads Maya's, so a new name
+    // changes where the bytes come from and nothing about what the consumer
+    // is bound to -- and VP2 hands out a new name routinely, recycling
+    // buffers from frame to frame during playback. Treating that as a new
+    // publication allocates a fresh exportable buffer per frame per object,
+    // which exhausts the device's allocation count and takes the geometry
+    // with it once the allocator starts refusing.
+    const bool sourceIdentityMatters = bridge.IsZeroCopy();
+    const bool layoutMatches = stream.numElements == layout.numElements
+        && stream.byteOffset == layout.byteOffset
+        && stream.byteStride == layout.byteStride;
+
+    // Same stream, same permission: the cached schema already describes it
+    // exactly. A byte-only deform lands here -- VP2 rewrote the contents of a
+    // buffer we published earlier.
+    //
+    // On a zero-copy bridge there is genuinely nothing to do: the consumer's
+    // range still points at Maya's buffer and picks up the new bytes at the
+    // next draw, which is what makes deforming geometry free on our side. A
+    // copying bridge is looking at its own allocation instead, so the rewrite
+    // has to be carried across -- but the layout is unchanged either way, so
+    // this still republishes nothing.
+    if (stream.schema
+        && layoutMatches
+        && stream.allowDirectBind == allowDirectBind
+        && (!sourceIdentityMatters || stream.rawHandle == rawHandle)) {
+        if (!bridge.IsZeroCopy()) {
+            if (!bridge.Refresh(stream.buffer, static_cast<uint32_t>(rawHandle),
+                                layout.copyByteSize)) {
+                TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
+                    .Msg("[%s] %s -> CPU: %s bridge could not refresh from "
+                         "buffer %" PRIu64 "\n",
+                         GetID().GetText(), _ExtStreamName(mvb),
+                         bridge.Describe(), rawHandle);
+                return _ExtPublishResult::NoGpu;
+            }
+            // Only bookkeeping: which buffer the next refresh reads from.
+            stream.rawHandle = rawHandle;
+        }
+        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
+            .Msg("[%s] %s unchanged: source buffer %" PRIu64 ", %zu elements "
+                 "(nothing republished)\n",
+                 GetID().GetText(), _ExtStreamName(mvb),
+                 rawHandle, layout.numElements);
+        return _ExtPublishResult::Unchanged;
+    }
+
+    // Reuse the existing buffer when what changed does not outgrow it -- the
+    // direct-bind permission, or the source Maya reads from. Publishing one
+    // stream twice would hand the consumer two buffer objects with no way to
+    // tell they are the same memory, costing it the aggregation it keys on
+    // buffer identity.
     HgiExternalBufferSharedPtr buffer = stream.buffer;
-    if (!buffer
-        || stream.rawHandle != rawHandle
-        || stream.numElements != layout.numElements) {
-        // REGISTER, never adopt. VP2 owns these buffers and recycles them on
-        // its own schedule, so the arena binds and reads them and must never
-        // delete one: that would be a double free, and GL may hand the freed
-        // name straight back out for an unrelated allocation.
-        //
-        // Registration is the weaker of the two contracts -- the producer
-        // promises the buffer outlives the renderer's use of it and nothing
-        // enforces that promise. What makes it sound here is that VP2 and
-        // Storm share a single GL context: commands on one context execute in
-        // issue order, so a recycle VP2 issues after the draw that read the
-        // buffer is ordered after that read, and glDeleteBuffers is deferred
-        // by the driver until the GPU is finished. Neither property survives
-        // moving the producer to its own context or queue -- that is what the
-        // arena's semaphore pair exists for, and a producer that pools and
-        // overwrites across a queue boundary would additionally need the
-        // post-retire release signal this API does not have yet.
-        buffer = arena->RegisterBuffer(
+    const bool needsNewBuffer = !buffer
+        || (sourceIdentityMatters
+                ? (stream.rawHandle != rawHandle
+                   || stream.numElements != layout.numElements)
+                // The copying bridge sized its allocation from the layout, so
+                // any layout change outgrows it.
+                : !layoutMatches);
+    if (needsNewBuffer) {
+        buffer = bridge.Create(
             static_cast<uint32_t>(rawHandle),
             layout.byteSize,
-            HgiBufferUsageVertex | HgiBufferUsageStorage);
+            layout.copyByteSize,
+            _ExtStreamName(mvb));
         if (!buffer) {
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-                .Msg("[%s] %s -> CPU: arena refused GL buffer %" PRIu64 "\n",
-                     GetID().GetText(), _ExtStreamName(mvb), rawHandle);
+                .Msg("[%s] %s -> CPU: %s bridge refused GL buffer %" PRIu64
+                     "\n",
+                     GetID().GetText(), _ExtStreamName(mvb),
+                     bridge.Describe(), rawHandle);
             return _ExtPublishResult::NoGpu;
         }
+    } else if (!bridge.IsZeroCopy()
+                   && !bridge.Refresh(buffer, static_cast<uint32_t>(rawHandle),
+                                      layout.copyByteSize)) {
+        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
+            .Msg("[%s] %s -> CPU: %s bridge could not refresh from buffer "
+                 "%" PRIu64 "\n",
+                 GetID().GetText(), _ExtStreamName(mvb), bridge.Describe(),
+                 rawHandle);
+        return _ExtPublishResult::NoGpu;
     }
 
     // What goes into the scene index is a WEAK reference; the strong one is
@@ -995,9 +999,10 @@ MayaHydraRenderItemAdapter::_PublishExtStream(
     // reported by Maya and getting it too small is the one failure that
     // silently disables sharing for an otherwise healthy stream.
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-        .Msg("[%s] %s SHARED: gl=%" PRIu64 " elements=%zu offset=%zu "
-             "stride=%zu byteSize=%zu allowDirectBind=%s\n",
-             GetID().GetText(), _ExtStreamName(mvb), rawHandle,
+        .Msg("[%s] %s SHARED via %s%s: gl=%" PRIu64 " elements=%zu "
+             "offset=%zu stride=%zu byteSize=%zu allowDirectBind=%s\n",
+             GetID().GetText(), _ExtStreamName(mvb), bridge.Describe(),
+             bridge.IsZeroCopy() ? "" : " (copied)", rawHandle,
              layout.numElements, layout.byteOffset, layout.byteStride,
              layout.byteSize, allowDirectBind ? "yes" : "no");
 
@@ -1158,27 +1163,27 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     const bool visibChanged     = data._flags & MVS::MVS_changedVisibility;
     const bool effectChanged    = data._flags & MVS::MVS_changedEffect;
 
-    // Dirty notification policy for this function — see
+    // Dirty notification policy for this function â€” see
     // doc/render_delegate_topology_vs_deformation.md for the full contract.
     //   Granularity: emit one locator per changed datum; never use the broad primvars locator
-    //     for geometry edits — that would re-pull unchanged data in the render delegate.
+    //     for geometry edits â€” that would re-pull unchanged data in the render delegate.
     //   Topology: on genuine connectivity change emit topology locators only
     //     (mesh/topology or basisCurves/topology via _EmitRenderItemTopologyDirtyLocators).
     //     When Maya also sets MVS_changedGeometry alongside MVS_changedTopo, the separate
     //     geomChanged path may dirty granular primvars (points/st/tangents and optionally normals).
-    //     The broad primvars locator is NOT emitted on the topology path — it would subsume
+    //     The broad primvars locator is NOT emitted on the topology path â€” it would subsume
     //     granular locators and defeat the useMayaNormals skip.
     //     Topology locators are suppressed when Maya sets MVS_changedTopo alongside
     //     MVS_changedGeometry but both vertex count and index connectivity are unchanged
     //     (deformation-only). When connectivity changes with the same vertex count, topology
-    //     locators are still emitted — but only when Maya set MVS_changedTopo, because the index
+    //     locators are still emitted â€” but only when Maya set MVS_changedTopo, because the index
     //     buffer is not read on the geometry-only path (see the Indices block below). Detecting
     //     connectivity edits therefore relies on that flag, which Maya sets for genuine ones.
     //   Extent: dirty only when the bounding box actually changes. Maya has no bbox-changed
     //     flag, so we diff the freshly-read bbox against the stored _bounds before overwriting.
     //     Checked in the geomChanged||topoChanged block (before the vertex-count workaround below),
-    //     separately from the per-primvar dirty block — this is intentional, not an oversight.
-    //   Normals: skip dirtyNormals() when useMayaNormals is false — Hydra generates
+    //     separately from the per-primvar dirty block â€” this is intentional, not an oversight.
+    //   Normals: skip dirtyNormals() when useMayaNormals is false â€” Hydra generates
     //     normals itself in that mode and a redundant notification would cause unnecessary work.
     //     The guard applies on the geomChanged path where granular primvar locators are emitted.
     //
@@ -1269,7 +1274,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 #endif
 
     // Extent is checked here, under geomChanged||topoChanged, so it is always evaluated when
-    // positions or topology change — including the geomChanged case. The old code always dirtied
+    // positions or topology change â€” including the geomChanged case. The old code always dirtied
     // extent on geomChanged; the new code diffs the actual bbox first and only emits dirtyExtent()
     // when the value changed. This is intentional: if vertices moved without changing the bbox
     // (e.g. internal vertices shuffled), there is nothing for the render delegate to re-read.
@@ -1342,7 +1347,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // update would be a false promise to the render delegate). A CPU stream
     // dirties whenever it is re-read; a GPU-shared stream dirties only when it
     // must (see the gating in the loop): identity/mode change (Republished),
-    // batch mode (re-blit every frame), or — for points — when Hydra generates
+    // batch mode (re-blit every frame), or â€” for points â€” when Hydra generates
     // normals (a moved points buffer must drive the smooth-normals recompute).
     // In steady-state direct binding with a stable handle every stream stays
     // clean and Storm reads the new bytes straight from the aliased buffer.
@@ -1740,7 +1745,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // (== emitTopologyLocators, which already ran the connectivity diff above) or when we have no
     // cached topology yet. Maya raises MVS_changedGeometry every frame during deformation with
     // unchanged connectivity; rebuilding on those frames would rescan the whole face-vertex index
-    // array (HdMeshTopology::ComputeNumPoints) and reallocate for nothing — no topology-dirty
+    // array (HdMeshTopology::ComputeNumPoints) and reallocate for nothing â€” no topology-dirty
     // locator is emitted on those frames, so Storm never re-pulls the rebuilt copy.
     const bool topologyNeedsRebuild = emitTopologyLocators || !_topology;
     if (indicesWereRead && !vertexCounts.empty() && topologyNeedsRebuild) {

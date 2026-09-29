@@ -21,6 +21,10 @@
 #include <pxr/imaging/garch/glApi.h>
 
 #include "renderOverride.h"
+
+#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
+#endif
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
 
@@ -2363,6 +2367,13 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
+
+#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+    // Before the renderer goes, because the bridge's GL objects alias memory
+    // the renderer owns and its imported semaphores need both a current
+    // context and a live diagnostic manager to be destroyed on.
+    MhExtGpuBufferBridge::Shutdown();
+#endif
 
     // Stop render delegates before tearing down scene indices or render indices.
     // Matches hvt::ViewportEngine::CreateRenderer(), which calls Stop() before
