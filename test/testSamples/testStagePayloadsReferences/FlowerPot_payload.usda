@@ -5,7 +5,7 @@
 )
 
 def "FlowerPot" (
-    add references = @./FlowerPot.geom.usd@</FlowerPot>
+    add references = @./FlowerPot.geom.usda@</FlowerPot>
 )
 {
 }
