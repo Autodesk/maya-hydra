@@ -37,7 +37,7 @@ typedef PXR_NS::TfRefPtr<const ReprSelectorSceneIndex> ReprSelectorSceneIndexCon
 /// A filtering scene index that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded).
 /// Meshes that do not get a wireframe RepSelector get refined, the repr of the render collection, so that
 /// passes using a non-forced collection of their own (such as the outline passes) draw the same surface.
-/// The prims under the excluded scene roots never get a wireframe RepSelector, but they do get refined.
+/// The prims under the excluded scene roots are left untouched.
 ///
 class ReprSelectorSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<ReprSelectorSceneIndex>

@@ -144,13 +144,13 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
 
-    if (!prim.dataSource || prim.primType != HdPrimTypeTokens->mesh) {
+    if (!prim.dataSource || prim.primType != HdPrimTypeTokens->mesh || _isExcluded(primPath)) {
         return prim;
     }
 
-    if (!_needsReprChanged || _isExcluded(primPath)) {
-        //Every mesh not getting a wireframe repr below gets refined, including the ones under the
-        //excluded scene roots: refined is what the render collection draws them with anyway.
+    if (!_needsReprChanged) {
+        //Meshes that do not get a wireframe repr below get refined: refined is what the render
+        //collection draws them with anyway.
         //The input comes first so that a reprSelector already authored upstream keeps winning.
         prim.dataSource = HdOverlayContainerDataSource::New(prim.dataSource, sRefinedDisplayStyleDataSource);
     } else {
