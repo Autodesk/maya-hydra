@@ -222,9 +222,22 @@ if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
     )
 endif()
 
+# Also runs with MAYA_HYDRA_USE_MESH_ADAPTER=1, an opt-in path (the viewport default is render items).
+# It is the only path where a Maya native mesh reaches Hydra with a refine level > 0 (Smooth Mesh
+# Preview), so the outline must follow the refined surface there too.
+if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
+    )
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
+        testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
+    )
+endif()
+
 # Outline-only scripts: no _legacy counterpart, as legacy mode has nothing to cover.
 set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineHover.py
+    testOutlineRefinement.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to

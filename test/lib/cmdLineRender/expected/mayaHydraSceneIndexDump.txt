@@ -188,7 +188,7 @@
                     |   |___SampledDataSource -> bool : pointsShadingEnabled
                     |   |___SampledDataSource -> bool : materialIsFinal
                     |   |___Blocked or absent data source : shadingStyle
-                    |   |___Blocked or absent data source : reprSelector
+                    |   |___SampledDataSource -> VtArray<TfToken> : reprSelector
                     |   |___SampledDataSource -> TfToken : cullStyle
                     |___# ContainerDataSource : visibility
                     |   |___SampledDataSource -> bool : visibility
