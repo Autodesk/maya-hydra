@@ -41,6 +41,8 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#else
+#include <unistd.h> // close(), for an export fd no import consumed
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -91,50 +93,54 @@ struct _GlAlias
 
 // One GL memory object per Vulkan memory BLOCK, not per buffer.
 //
-// VMA suballocates, and the export handle names the whole block: a dozen
+// VMA suballocates, and the export handle names the whole block: a few dozen
 // external buffers routinely live inside one 32 MiB block at different
 // offsets. Importing per buffer therefore imports the entire block once per
-// buffer -- 43 buffers holding 6 MB of data asked GL to hold 43 x 32 MiB, and
+// buffer -- 46 buffers holding 6 MB of data asked GL to hold 46 x 32 MiB, and
 // glNamedBufferStorageMemEXT began failing with GL_OUT_OF_MEMORY. The streams
 // that failed fell back to a CPU path that cannot read a VP2 buffer, which is
 // what took the geometry with it.
 //
-// The export info carries no block identity to key on, so the handles are
-// compared instead. GetWin32HandleForMemory caches one handle per
-// VkDeviceMemory and returns a fresh duplicate per call, so two buffers from
-// one block yield two handles naming the same kernel object -- precisely the
-// question CompareObjectHandles answers.
+// Blocks are matched on the arena's own identifier rather than on the handle,
+// which is minted per call and so says nothing about identity.
 struct _GlMemoryBlock
 {
-    void  *handle = nullptr; // retained duplicate naming the block, or null
-    GLuint memoryObject = 0;
-    int    refCount = 0;
+    uint64_t blockId = 0;
+    GLuint   memoryObject = 0;
+    int      refCount = 0;
+
+    // The handle the memory object was imported from, held until the object
+    // is destroyed.
+    //
+    // GL_EXT_memory_object_win32 asks the application to close an NT handle
+    // "when the handle is no longer needed" without saying that an imported
+    // memory object stops needing it, and closing it as soon as the import
+    // returned left every buffer bound over this object reading nothing.
+    // Since the object now outlives its import by every other buffer in the
+    // block, the conservative reading is the correct one. Null on POSIX,
+    // where the import consumes the fd outright.
+    void *handle = nullptr;
 };
 std::mutex                  _glBlocksMutex;
 std::vector<_GlMemoryBlock> _glBlocks;
 
-#if defined(ARCH_OS_WINDOWS)
-// Whether two handles name the same kernel object.
-//
-// CompareObjectHandles lives in kernelbase and is guarded by a newer
-// _WIN32_WINNT than this build targets, so it is resolved at runtime rather
-// than linked. Absent it, no two blocks ever match and every buffer imports
-// its own -- correct, but back to the duplication this exists to avoid.
-bool
-_HandlesNameSameObject(void *a, void *b)
+// Give back an export handle this import is not going to consume. A Win32
+// handle is a duplicate the recipient closes; a POSIX fd is a fresh
+// descriptor the recipient owns, and leaking one per buffer per frame would
+// run the process out of descriptors as surely as the memory it replaces.
+void
+_DiscardExportHandle(const HgiVulkanExternalBufferExportInfo &info)
 {
-    using CompareFn = BOOL(WINAPI *)(HANDLE, HANDLE);
-    static const CompareFn compare = []() -> CompareFn {
-        if (HMODULE kernelBase = GetModuleHandleW(L"kernelbase.dll")) {
-            return reinterpret_cast<CompareFn>(
-                GetProcAddress(kernelBase, "CompareObjectHandles"));
-        }
-        return nullptr;
-    }();
-    return compare
-        && compare(static_cast<HANDLE>(a), static_cast<HANDLE>(b)) != FALSE;
-}
+    if (!info.externalHandle) {
+        return;
+    }
+#if defined(ARCH_OS_WINDOWS)
+    CloseHandle(
+        reinterpret_cast<HANDLE>(static_cast<uintptr_t>(info.externalHandle)));
+#else
+    close(static_cast<int>(info.externalHandle));
 #endif
+}
 
 // Destroying GL objects needs a current context, and the last reference to an
 // external buffer is dropped by HgiExternalBufferArena::GarbageCollect() on
@@ -210,6 +216,7 @@ _ReleaseGlMemoryObject(GLuint memoryObject)
         glDeleteMemoryObjectsEXT(1, &memoryObject);
     }
 #if defined(ARCH_OS_WINDOWS)
+    // After the memory object, so the handle outlives every use of it.
     if (handleToClose) {
         CloseHandle(static_cast<HANDLE>(handleToClose));
     }
@@ -237,49 +244,51 @@ _DrainGlDeletes()
 // The GL memory object aliasing the block that \p info names, importing it on
 // first use and sharing it thereafter. Returns 0 on failure.
 //
-// Consumes \p info.externalHandle either way: the handle is our duplicate, so
-// it is closed once matched against an existing block, and retained by the
-// block it creates so later buffers can be recognised.
+// Takes over \p info.externalHandle on every path: the import consumes it
+// (POSIX) or the block retains it until the memory object is destroyed
+// (Windows), and it is discarded outright when this buffer turns out to be
+// one more allocation out of a block already imported.
 GLuint
-_AcquireGlMemoryObject(
-    const HgiVulkanExternalBufferExportInfo &info,
-    size_t                                   byteSize)
+_AcquireGlMemoryObject(const HgiVulkanExternalBufferExportInfo &info)
 {
 #if defined(ARCH_OS_WINDOWS)
-    HANDLE incoming =
-        reinterpret_cast<HANDLE>(static_cast<uintptr_t>(info.externalHandle));
     if (info.handleType != HgiExternalHandleTypeOpaqueWin32
             || !glImportMemoryWin32HandleEXT) {
+#else
+    if (info.handleType != HgiExternalHandleTypeOpaqueFd
+            || !glImportMemoryFdEXT) {
+#endif
+        _DiscardExportHandle(info);
         return 0;
     }
-    {
+
+    // 0 means the arena did not report a block identity, which for an
+    // allocated buffer means an Hgi predating memoryBlockId. Sharing is then
+    // unsafe to guess at -- two blocks would look alike -- so each buffer
+    // imports its own, which is what this exists to avoid.
+    if (info.memoryBlockId == 0) {
+        static std::once_flag warned;
+        std::call_once(warned, []() {
+            TF_WARN("[mayaHydra] The Vulkan external buffer arena reports no "
+                    "memory block identity, so each shared buffer imports its "
+                    "own copy of the block it lives in. Expect GL to run out "
+                    "of memory on a scene of any size.");
+        });
+    } else {
         std::lock_guard<std::mutex> lock(_glBlocksMutex);
         for (_GlMemoryBlock &block : _glBlocks) {
-            if (block.handle
-                    && _HandlesNameSameObject(block.handle, incoming)) {
+            if (block.blockId == info.memoryBlockId) {
                 ++block.refCount;
-                // Already have this block imported; our duplicate is surplus.
-                CloseHandle(incoming);
+                _DiscardExportHandle(info);
                 return block.memoryObject;
             }
         }
     }
-#else
-    // No portable way to tell whether two fds name the same allocation, so
-    // every buffer imports its own block here. Correct, but it pays the
-    // duplication this sharing exists to avoid.
-    if (info.handleType != HgiExternalHandleTypeOpaqueFd
-            || !glImportMemoryFdEXT) {
-        return 0;
-    }
-#endif
 
     GLuint memoryObject = 0;
     glCreateMemoryObjectsEXT(1, &memoryObject);
     if (!memoryObject) {
-#if defined(ARCH_OS_WINDOWS)
-        CloseHandle(incoming);
-#endif
+        _DiscardExportHandle(info);
         return 0;
     }
 
@@ -296,7 +305,7 @@ _AcquireGlMemoryObject(
 #if defined(ARCH_OS_WINDOWS)
     glImportMemoryWin32HandleEXT(
         memoryObject, info.memoryBlockSize, GL_HANDLE_TYPE_OPAQUE_WIN32_EXT,
-        incoming);
+        reinterpret_cast<void *>(static_cast<uintptr_t>(info.externalHandle)));
 #else
     // The import takes over the fd.
     glImportMemoryFdEXT(
@@ -304,11 +313,11 @@ _AcquireGlMemoryObject(
         static_cast<int>(info.externalHandle));
 #endif
 
-    const GLenum importErr = glGetError();
-    if (importErr != GL_NO_ERROR) {
+    if (glGetError() != GL_NO_ERROR) {
         glDeleteMemoryObjectsEXT(1, &memoryObject);
 #if defined(ARCH_OS_WINDOWS)
-        CloseHandle(incoming);
+        // Only on Windows: a failed fd import has still taken the fd.
+        _DiscardExportHandle(info);
 #endif
         return 0;
     }
@@ -316,14 +325,15 @@ _AcquireGlMemoryObject(
     {
         std::lock_guard<std::mutex> lock(_glBlocksMutex);
         _GlMemoryBlock block;
-        // Win32 import duplicates rather than consumes, so the handle stays
-        // ours -- and is kept, because it is the only thing that identifies
-        // this block when the next buffer out of it arrives.
-#if defined(ARCH_OS_WINDOWS)
-        block.handle = incoming;
-#endif
+        block.blockId = info.memoryBlockId;
         block.memoryObject = memoryObject;
         block.refCount = 1;
+#if defined(ARCH_OS_WINDOWS)
+        // Retained, not closed: see _GlMemoryBlock::handle.
+        block.handle =
+            reinterpret_cast<void *>(static_cast<uintptr_t>(
+                info.externalHandle));
+#endif
         _glBlocks.push_back(block);
     }
     return memoryObject;
@@ -343,12 +353,13 @@ _ImportIntoGl(
         return false;
     }
     if (!glCreateMemoryObjectsEXT || !glNamedBufferStorageMemEXT) {
+        _DiscardExportHandle(info);
         return false;
     }
 
     _DrainGlErrors();
 
-    const GLuint memoryObject = _AcquireGlMemoryObject(info, byteSize);
+    const GLuint memoryObject = _AcquireGlMemoryObject(info);
     if (!memoryObject) {
         return false;
     }
