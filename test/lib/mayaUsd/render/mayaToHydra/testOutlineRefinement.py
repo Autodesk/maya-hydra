@@ -96,9 +96,10 @@ class TestOutlineRefinement(mtohUtils.MayaHydraBaseTestCase):
             self.setRefinementLevel(0)
 
     def test_mayaMeshSmoothPreview(self):
-        # On the mesh adapter, Smooth Mesh Preview makes Storm refine the mesh (the case being
-        # tested). On the default render item path, VP2 hands over already smoothed geometry and
-        # Storm does not refine it (a control: the outline must match there too).
+        # On the mesh adapter (opt-in), Smooth Mesh Preview reaches Hydra as a refine level, and
+        # the renderer refines the mesh (the case being tested). On the default render item path,
+        # VP2 hands over already smoothed geometry at refine level 0 (a control: the outline must
+        # match there too).
         cubeTransform = cmds.polyCube()[0]
         cubeShape = cmds.listRelatives(cubeTransform, shapes=True)[0]
         # Same as pressing "3" in the viewport.
