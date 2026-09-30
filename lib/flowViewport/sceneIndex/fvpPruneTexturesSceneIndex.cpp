@@ -18,8 +18,10 @@
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/materialSchema.h>
+#if PXR_VERSION <= 2411
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#endif
 
 namespace FVP_NS_DEF {
 
@@ -84,15 +86,17 @@ PruneTexturesSceneIndex::MarkTexturesDirty(bool pruneTextures)
 {
     _pruneTextures = pruneTextures;
 
-    // A material dirty alone does not make Storm re-resolve a mesh's primvar requirements.
-    // The primvars locator is enough for UsdPreviewSurface, but a MaterialX shader only
-    // re-requests its UV primvar when the rprim re-initializes its repr, which the displayStyle
-    // locator triggers. Without it, MaterialX surfaces render black after the Textured toggle.
     const HdDataSourceLocatorSet locators {
-        HdMaterialSchema::GetDefaultLocator().Append(HdMaterialSchemaTokens->material),
+        HdMaterialSchema::GetDefaultLocator().Append(HdMaterialSchemaTokens->material)
+#if PXR_VERSION <= 2411
+        // A material dirty alone does not make Storm re-resolve a mesh's primvar requirements
+        // with USD 24.11 and older. The primvars locator is enough for UsdPreviewSurface, but a
+        // MaterialX shader only re-requests its UV primvar when the rprim re-initializes its repr,
+        // which the displayStyle locator triggers.
         // Workaround for HYDRA-1061, see https://forum.aousd.org/t/primvars-and-material-dirtying-issue-in-storm/1675
-        HdPrimvarsSchema::GetDefaultLocator(),
-        HdLegacyDisplayStyleSchema::GetDefaultLocator()
+        , HdPrimvarsSchema::GetDefaultLocator()
+        , HdLegacyDisplayStyleSchema::GetDefaultLocator()
+#endif
     };
 
     _DirtyAllPrims(locators);
