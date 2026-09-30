@@ -21,6 +21,7 @@
 
 #include "pxr/imaging/hd/legacyDisplayStyleSchema.h"
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/tokens.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -116,37 +117,18 @@ MayaHydraDisplayStyleDataSource::Get(const TfToken& name)
         return HdRetainedTypedSampledDataSource<TfToken>::New(shadingStyle);
     }
     else if (name == HdLegacyDisplayStyleSchemaTokens->reprSelector) {
-        HdReprSelector repr;
-        // TODO: Get the reprSelector
-        //HdSceneIndexPrim prim = _sceneIndex->GetPrim(_id);
-        //if (HdLegacyDisplayStyleSchema styleSchema =
-        //    HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource)) {
-
-        //    if (HdTokenArrayDataSourceHandle ds =
-        //        styleSchema.GetReprSelector()) {
-        //        VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
-        //        ar.resize(HdReprSelector::MAX_TOPOLOGY_REPRS);
-        //        repr = HdReprSelector(ar[0], ar[1], ar[2]);
-        //    }
-        //}
-        HdTokenArrayDataSourceHandle reprSelectorDs = nullptr;
-        bool empty = true;
-        for (size_t i = 0; i < HdReprSelector::MAX_TOPOLOGY_REPRS; ++i) {
-            if (!repr[i].IsEmpty()) {
-                empty = false;
-                break;
-            }
+        // Meshes get refined, the repr the render collection already draws them with. Authoring
+        // it on the prim makes the passes that use a non-forced collection of their own (where
+        // the prim's repr wins) draw the same surface. The outline primId passes are such passes:
+        // they use smoothHull, which never refines, and would otherwise outline the control cage
+        // of a mesh refined through refineLevel (Smooth Mesh Preview on the mesh adapter).
+        if (_type != HdPrimTypeTokens->mesh) {
+            return nullptr;
         }
-        if (!empty) {
-            VtArray<TfToken> array(HdReprSelector::MAX_TOPOLOGY_REPRS);
-            for (size_t i = 0; i < HdReprSelector::MAX_TOPOLOGY_REPRS; ++i) {
-                array[i] = repr[i];
-            }
-            reprSelectorDs =
-                HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                    array);
-        }
-        return reprSelectorDs;
+        static const HdDataSourceBaseHandle refinedReprSelectorDs
+            = HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
+                { HdReprTokens->refined, TfToken(), TfToken() });
+        return refinedReprSelectorDs;
     }
     else if (name == HdLegacyDisplayStyleSchemaTokens->cullStyle) {
         HdCullStyle cullStyle = _adapter->GetCullStyle();
