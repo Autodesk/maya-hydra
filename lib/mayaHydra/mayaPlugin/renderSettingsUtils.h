@@ -137,6 +137,10 @@ RenderTimes GetRenderTimes();
 // Single-line description of the render times, for debug output.
 std::string RenderTimesDescription(const RenderTimes& renderTimes);
 
+// Notify Maya that batch rendering has started.  On macOS and Linux this
+// registers the renderer process so that Maya can cancel it.
+void SendRenderStarted();
+
 // Report to Maya the progress of a batch render, as an integer percentage of
 // the frames in renderTimes, given the number of frames rendered so far.
 void SendRenderProgress(const RenderTimes& renderTimes, int framesDone);
