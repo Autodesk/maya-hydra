@@ -381,7 +381,7 @@ def RunCMake(context, extraArgs=None, stages=None):
                         codeCoverageCompilerC=("-DCMAKE_C_COMPILER=clang" if add_coverage_flags else ""),
                         generator=(generator or ""),
                         codeCoverageOption=("-DCODE_COVERAGE=ON" if add_coverage_flags else ""),
-                        extraArgs=(" ".join(extraArgs) if extraArgs else "")))
+                        extraArgs=(" ".join(shlex.quote(a) for a in extraArgs) if extraArgs else "")))
  
         installArg = ""
         if 'install' in stages:
@@ -549,31 +549,31 @@ def BuildAndInstall(context, buildArgs, stages):
         extraArgs = []
         stagesArgs = []
         if context.mayaLocation:
-            extraArgs.append('-DMAYA_LOCATION="{mayaLocation}"'
+            extraArgs.append('-DMAYA_LOCATION={mayaLocation}'
                              .format(mayaLocation=context.mayaLocation))
         
         if context.mayaUsdLocation:
-            extraArgs.append('-DMAYAUSD_LOCATION="{mayaUsdLocation}"'
+            extraArgs.append('-DMAYAUSD_LOCATION={mayaUsdLocation}'
                              .format(mayaUsdLocation=context.mayaUsdLocation))
         
         if context.mtoaLocation:
-            extraArgs.append('-DMTOA_LOCATION="{mtoaLocation}"' 
+            extraArgs.append('-DMTOA_LOCATION={mtoaLocation}' 
                              .format(mtoaLocation=context.mtoaLocation))
         
         if context.lookdevxLocation:
-            extraArgs.append('-DLOOKDEVX_LOCATION="{lookdevxLocation}"' 
+            extraArgs.append('-DLOOKDEVX_LOCATION={lookdevxLocation}' 
                              .format(lookdevxLocation=context.lookdevxLocation))
         
         if context.bifrostLocation:
-            extraArgs.append('-DBIFROST_LOCATION="{bifrostLocation}"' 
+            extraArgs.append('-DBIFROST_LOCATION={bifrostLocation}' 
                              .format(bifrostLocation=context.bifrostLocation))
 
         if context.pxrUsdLocation:
-            extraArgs.append('-DPXR_USD_LOCATION="{pxrUsdLocation}"'
+            extraArgs.append('-DPXR_USD_LOCATION={pxrUsdLocation}'
                              .format(pxrUsdLocation=context.pxrUsdLocation))
 
         if context.devkitLocation:
-            extraArgs.append('-DMAYA_DEVKIT_LOCATION="{devkitLocation}"'
+            extraArgs.append('-DMAYA_DEVKIT_LOCATION={devkitLocation}'
                              .format(devkitLocation=context.devkitLocation))
 
         extraArgs += buildArgs
