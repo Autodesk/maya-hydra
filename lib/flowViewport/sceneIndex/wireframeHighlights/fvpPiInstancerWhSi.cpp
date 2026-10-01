@@ -108,10 +108,28 @@ _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& ori
     return editedDataSource.Finish();
 }
 
-bool _IsPointInstancer(const HdSceneIndexPrim& prim) {
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+bool _IsPointInstancer(const HdSceneIndexPrim& prim)
+{
+    HdInstancerTopologySchema instancerTopology
+        = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined() && !instancerTopology.GetInstanceLocations() && !instancedBy.IsDefined();
+    return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined()
+        && !instancerTopology.GetInstanceLocations() && !instancedBy.IsDefined();
+}
+
+// A point instancer that is itself instanced by another point instancer, e.g. the propagated
+// copy of a point instancer nested under another point instancer. Such an instancer is only
+// drawn through the instancers that instance it. It only gets its own highlight when it is
+// directly selected : highlights caused by a selected ancestor are handled by the top-level
+// instancer drawing it, which is why these instancers are not added to _pointInstancerPaths.
+bool _IsSelectedPrototypedPointInstancer(const HdSceneIndexPrim& prim)
+{
+    HdInstancerTopologySchema instancerTopology
+        = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined()
+        && !instancerTopology.GetInstanceLocations() && instancedBy.IsDefined()
+        && HdSelectionsSchema::GetFromParent(prim.dataSource).IsDefined();
 }
 
 // Counts the total number of instances in a point instancer. O(n) where n is the number of instance indices.
@@ -236,7 +254,9 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
         }
         prim.dataSource = SetWireframeRepr(prim.dataSource, wireframeColor);
     }
-    else if (_IsPointInstancer(prim) && originalPath == selectionKey.first && selectionKey.second != kFullHighlight) {
+    else if ((_IsPointInstancer(prim) || _IsSelectedPrototypedPointInstancer(prim)) &&
+        originalPath == selectionKey.first && selectionKey.second != kFullHighlight) {
+
         // Adjust the instancer mask to only show selected instances
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         
@@ -311,6 +331,12 @@ void PiInstancerWhSi::ProcessAddedPrims(
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (_IsPointInstancer(prim)) {
             _pointInstancerPaths.emplace(entry.primPath);
+            if (_ConditionallyCreateSelectionHighlight(prim, entry.primPath)) {
+                // We just created the highlight, no need to add highlight prims
+                continue;
+            }
+        }
+        else if (_IsSelectedPrototypedPointInstancer(prim)) {
             if (_ConditionallyCreateSelectionHighlight(prim, entry.primPath)) {
                 // We just created the highlight, no need to add highlight prims
                 continue;
@@ -406,7 +432,12 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
     for (const auto& entry : entries) {
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-            if (_IsPointInstancer(prim)) {
+            const bool isPointInstancer = _IsPointInstancer(prim);
+            // A prototyped point instancer that was just deselected no longer passes
+            // _IsSelectedPrototypedPointInstancer, so also look up existing highlights
+            // keyed on this path to delete them.
+            const bool hasHighlights = _primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end();
+            if (isPointInstancer || hasHighlights || _IsSelectedPrototypedPointInstancer(prim)) {
                 // Selection changed on the instancer; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
@@ -416,7 +447,8 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
                     }
                 }
 
-                if (_ConditionallyCreateSelectionHighlight(prim, entry.primPath)) {
+                if ((isPointInstancer || _IsSelectedPrototypedPointInstancer(prim))
+                    && _ConditionallyCreateSelectionHighlight(prim, entry.primPath)) {
                     // We rebuilt the highlight, no need to do the rest
                     continue;
                 }
