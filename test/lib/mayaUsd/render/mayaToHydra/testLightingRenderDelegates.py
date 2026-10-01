@@ -148,6 +148,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         """Switch the viewport to the given Hydra renderer."""
         if delegate.get("plugin") == renderManUtils.HD_PRMAN:
             renderManUtils.logDiagnostics("before renderer switch")
+        self.setMayaUseHydra(True)
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
         cmds.refresh(force=True)

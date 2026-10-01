@@ -43,6 +43,13 @@ HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
+def setMayaUseHydra(enable=True):
+    if not cmds.optionVar(exists="mayaUseHydra"):
+        return
+    value = 1 if enable else 0
+    if cmds.optionVar(query="mayaUseHydra") != value:
+        cmds.optionVar(intValue=("mayaUseHydra", value))
+
 class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     '''Base class for mayaHydra unit tests.'''
 
@@ -363,6 +370,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                               file=sys.stderr)
 
     def setHdStormRenderer(self):
+        self.setMayaUseHydra(True)
         self.activeEditor = cmds.playblast(activeEditor=1)
         cmds.modelEditor(
             self.activeEditor, e=1,
@@ -376,11 +384,15 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                                     sceneDelegateId="MayaHydraSceneDelegate")
         
     def setViewport2Renderer(self):
+        self.setMayaUseHydra(False)
         self.activeEditor = cmds.playblast(activeEditor=1)
         # Empty string for rendererOverrideName unsets any currently active override, thus returning to VP2
         cmds.modelEditor(self.activeEditor, e=1, rendererOverrideName="")
         cmds.refresh(f=1)
         self.delegateId = ""
+
+    def setMayaUseHydra(self, enable=True):
+        setMayaUseHydra(enable)
 
     def setBasicCam(self, dist=DEFAULT_CAM_DIST):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
