@@ -120,8 +120,10 @@ bool _IsPointInstancer(const HdSceneIndexPrim& prim)
 // A point instancer that is itself instanced by another point instancer, e.g. the propagated
 // copy of a point instancer nested under another point instancer. Such an instancer is only
 // drawn through the instancers that instance it. It only gets its own highlight when it is
-// directly selected : highlights caused by a selected ancestor are handled by the top-level
-// instancer drawing it, which is why these instancers are not added to _pointInstancerPaths.
+// directly selected. Selecting an ancestor above the top-level instancer drawing it is covered
+// by that instancer's full highlight, which is why these instancers are not added to
+// _pointInstancerPaths. Selecting an ancestor between the two instancers (e.g. the nested
+// instancer's parent Xform) intentionally highlights nothing.
 bool _IsSelectedPrototypedPointInstancer(const HdSceneIndexPrim& prim)
 {
     HdInstancerTopologySchema instancerTopology
