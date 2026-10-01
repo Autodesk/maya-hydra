@@ -112,13 +112,16 @@ public:
 
     bool            outlineHoverHighlighting = false;
     // Draws a faint outline on every prim. Its whole-scene prim-id pass runs every frame, so the
-    // cost scales with the scene. Script-only.
+    // cost scales with the scene. Script-only and session-only: never saved to user preferences
+    // or scene files.
     bool            enableDefaultOutlines = false;
     // Profiling: runs the per-mouse-move hover pick even when hover is not drawn, to isolate the
-    // pick cost. Hover highlighting already implies the pick. Script-only.
+    // pick cost. Hover highlighting already implies the pick. Script-only and session-only: never
+    // saved to user preferences or scene files.
     bool            forceEnableInteractiveHitTest = false;
     // Profiling: disables selection highlighting while selection is still tracked, giving the
-    // no-highlight baseline. Script-only.
+    // no-highlight baseline. Script-only and session-only: never saved to user preferences or
+    // scene files.
     bool            forceDisableSelectionHighlight = false;
 };
 
