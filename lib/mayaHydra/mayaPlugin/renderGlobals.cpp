@@ -410,6 +410,39 @@ void _CreateBoolAttribute(
         MGlobal::optionVarIntValue);
 }
 
+// A bool that lasts only for the session: never restored from or saved to an optionVar, and not
+// storable, so its value reaches neither the user preferences nor a saved scene. Used for the
+// script-only profiling switches, which have no UI: a persisted value would come back on every
+// launch with nothing to show it is on.
+void _CreateSessionOnlyBoolAttribute(
+    MFnDependencyNode& node,
+    const MString&     attrName,
+    bool               defValue)
+{
+    // Discard a value saved by earlier builds, which persisted these settings.
+    if (MGlobal::optionVarExists(attrName)) {
+        MGlobal::removeOptionVar(attrName);
+    }
+
+    const auto attr = node.attribute(attrName);
+    if (!attr.isNull()) {
+        MStatus             status;
+        MFnNumericAttribute nAttr(attr, &status);
+        if (status && nAttr.unitType() == MFnNumericData::kBoolean && !nAttr.isStorable()) {
+            return;
+        }
+        // A storable attribute was created by an earlier build, or loaded from a scene saved by
+        // one. Recreate it so its value is dropped along with it.
+        node.removeAttribute(attr);
+    }
+
+    MFnNumericAttribute nAttr;
+    const auto          obj = nAttr.create(attrName, attrName, MFnNumericData::kBoolean);
+    nAttr.setDefault(defValue);
+    nAttr.setStorable(false);
+    node.addAttribute(obj);
+}
+
 void _CreateIntAttribute(
     MFnDependencyNode&                              node,
     const MString&                                  attrName,
@@ -1009,12 +1042,10 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
     }
     // Script-only profiling switch, deliberately absent from BuildOptionsMenu: runs the hover hit
     // test without drawing the hover, so pick cost can be measured apart from draw cost.
+    // Session-only: never restored from user defaults.
     if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
-        _CreateBoolAttribute(
-            node,
-            filter.mayaString(),
-            defGlobals.forceEnableInteractiveHitTest,
-            userDefaults);
+        _CreateSessionOnlyBoolAttribute(
+            node, filter.mayaString(), defGlobals.forceEnableInteractiveHitTest);
         if (filter.attributeFilter()) {
             return mayaObject;
         }
@@ -1029,24 +1060,20 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             return mayaObject;
         }
     }
-    // Script-only: deliberately absent from BuildOptionsMenu.
+    // Script-only: deliberately absent from BuildOptionsMenu. Session-only: never restored from
+    // user defaults.
     if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
-        _CreateBoolAttribute(
-            node,
-            filter.mayaString(),
-            defGlobals.forceDisableSelectionHighlight,
-            userDefaults);
+        _CreateSessionOnlyBoolAttribute(
+            node, filter.mayaString(), defGlobals.forceDisableSelectionHighlight);
         if (filter.attributeFilter()) {
             return mayaObject;
         }
     }
-    // Script-only: deliberately absent from BuildOptionsMenu.
+    // Script-only: deliberately absent from BuildOptionsMenu. Session-only: never restored from
+    // user defaults.
     if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
-        _CreateBoolAttribute(
-            node,
-            filter.mayaString(),
-            defGlobals.enableDefaultOutlines,
-            userDefaults);
+        _CreateSessionOnlyBoolAttribute(
+            node, filter.mayaString(), defGlobals.enableDefaultOutlines);
         if (filter.attributeFilter()) {
             return mayaObject;
         }
@@ -1280,32 +1307,35 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             return globals;
         }
     }
+    // Session-only (see _CreateSessionOnlyBoolAttribute): never stored as a user setting.
     if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
         _GetAttribute(
             node,
             filter.mayaString(),
             globals.enableDefaultOutlines,
-            storeUserSetting);
+            false);
         if (filter.attributeFilter()) {
             return globals;
         }
     }
+    // Session-only (see _CreateSessionOnlyBoolAttribute): never stored as a user setting.
     if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
         _GetAttribute(
             node,
             filter.mayaString(),
             globals.forceEnableInteractiveHitTest,
-            storeUserSetting);
+            false);
         if (filter.attributeFilter()) {
             return globals;
         }
     }
+    // Session-only (see _CreateSessionOnlyBoolAttribute): never stored as a user setting.
     if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
         _GetAttribute(
             node,
             filter.mayaString(),
             globals.forceDisableSelectionHighlight,
-            storeUserSetting);
+            false);
         if (filter.attributeFilter()) {
             return globals;
         }
