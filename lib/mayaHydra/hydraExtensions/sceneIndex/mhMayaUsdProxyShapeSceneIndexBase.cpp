@@ -437,6 +437,11 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
     Fvp::PrimSelections primSelections({ baseSelection });
 
     // Point instancing : propagate selection to propagated prototypes
+    // A point instancer rooted under another point instancer (a nested instancer) is made
+    // unrenderable at its original path by UsdImaging (its prim type is emptied), and is only
+    // drawn through its propagated copies.
+    const bool selectedPrimIsDrawnInstancer
+        = GetPrim(primPath).primType == HdPrimTypeTokens->instancer;
     auto ancestorsRange = primPath.GetAncestorsRange();
     for (const auto& ancestorPath : ancestorsRange) {
         HdSceneIndexPrim            currPrim = GetPrim(ancestorPath);
@@ -459,11 +464,15 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
                     = primPath.ReplacePrefix(ancestorPath, propagatedProtoPath);
                 HdSceneIndexPrim propagatedPrim = GetPrim(propagatedPrimPath);
                 // This check controls which types of prims have their selection data source
-                // propagated. Currently we skip instancers so that selecting an instancer A that is
-                // both drawing geometry but also prototyped and propagated for another instancer B
-                // will only mark the geometry-drawing instancer A as selected. This can be changed.
+                // propagated. We skip propagated instancers when the selected prim is itself a
+                // drawn instancer, so that selecting an instancer A that is both drawing geometry
+                // but also prototyped and propagated for another instancer B will only mark the
+                // geometry-drawing instancer A as selected. A nested instancer does not draw at
+                // its original path, so its propagated copies must be marked as selected,
+                // otherwise nothing gets highlighted (HYDRA-2588).
                 // For now, this only affects selection highlighting.
-                if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
+                if (propagatedPrim.primType != HdPrimTypeTokens->instancer
+                    || !selectedPrimIsDrawnInstancer) {
                     primSelections.push_back(
                         { propagatedPrimPath, primSelections.front().nestedInstanceIndices });
                 }

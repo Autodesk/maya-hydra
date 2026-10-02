@@ -135,6 +135,32 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.append(prototypeParentItem)
         self.assertSnapshotClose("prototype_parentSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
     
+    def test_NestedPointInstancerSelection(self):
+        # HYDRA-2588 : selecting a point instancer nested under another point instancer
+        # must highlight the instances drawn through the parent instancer.
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
+
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        nestedInstancerPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer"
+        nestedInstancerFirstInstancePath = nestedInstancerPath + "/0"
+
+        nestedInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(nestedInstancerPath))
+        nestedInstancerFirstInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(nestedInstancerFirstInstancePath))
+
+        sn.clear()
+        sn.append(nestedInstancerItem)
+        self.assertSnapshotClose("nestedInstancer_directSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
+
+        sn.clear()
+        sn.append(nestedInstancerFirstInstanceItem)
+        self.assertSnapshotClose("nestedInstancer_firstInstance.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
+
+        sn.clear()
+        self.assertSnapshotClose("nestedInstancer_deselected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
+
     def test_PointInstancerWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
