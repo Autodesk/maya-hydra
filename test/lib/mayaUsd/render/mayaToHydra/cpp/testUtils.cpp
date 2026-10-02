@@ -30,6 +30,7 @@
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/subdivisionTagsSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
@@ -412,6 +413,26 @@ std::filesystem::path getPathToSample(std::string filename)
     return getInputDir() / filename;
 }
 
+// The shared-GPU-buffer overlay depends on the sharing mode (direct/batch, live handle); the CPU
+// values, served through lazy readback when shared, are what the references pin.
+static HdDataSourceBaseHandle withoutExtGpuBuffer(const HdDataSourceBaseHandle& dataSource)
+{
+    const HdContainerDataSourceHandle container = HdContainerDataSource::Cast(dataSource);
+    if (!container) {
+        return dataSource;
+    }
+    static const TfToken kExtGpuBuffer("extGpuBuffer");
+    TfTokenVector                       names;
+    std::vector<HdDataSourceBaseHandle> values;
+    for (const TfToken& name : container->GetNames()) {
+        if (name != kExtGpuBuffer) {
+            names.push_back(name);
+            values.push_back(container->Get(name));
+        }
+    }
+    return HdRetainedContainerDataSource::New(names.size(), names.data(), values.data());
+}
+
 bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
     std::filesystem::path          referencePath)
@@ -420,7 +441,7 @@ bool dataSourceMatchesReference(
     // of what value was used for comparison, and can inspect it in case of failures.
     std::filesystem::path outputPath = getOutputDir() / referencePath.filename();
     std::fstream          outputFile(outputPath, std::ios::out);
-    HdDebugPrintDataSource(outputFile, dataSource);
+    HdDebugPrintDataSource(outputFile, withoutExtGpuBuffer(dataSource));
     outputFile.close();
 
     outputFile.open(outputPath, std::ios::in);

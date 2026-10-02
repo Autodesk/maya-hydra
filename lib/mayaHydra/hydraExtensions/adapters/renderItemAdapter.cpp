@@ -1306,7 +1306,15 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     VtIntArray vertexCounts;
         
     const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    // GPU meshes keep no CPU positions; the published external buffer is the baseline.
+    const bool hadPositionsBeforeUpdate = !_positions.empty() || _extPositions;
+    const size_t storedPositionCountBeforeUpdate
+        = _extPositions ? _extPositions.numElements : _positions.size();
+#else
+    const bool hadPositionsBeforeUpdate = !_positions.empty();
     const size_t storedPositionCountBeforeUpdate = _positions.size();
+#endif
 
     //Temp workaround for a bug in Maya MAYA-134200
     if ((!geomChanged && topoChanged) && vertexBuffercount) { 
@@ -1609,6 +1617,26 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 #endif
 
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    // Streams read in the loop above are already dirty. A stream VP2 did not supply has nothing
+    // to re-pull on a deformation-only frame (playback sets geomChanged without topoChanged); it
+    // can only have appeared or changed when Maya flags a topology change.
+    if (geomChanged && topoChanged) {
+        dirtyPositions = dirtyPositions || !_extPositions;
+        dirtyUvs = dirtyUvs || !_extUvs;
+        dirtyTangents = dirtyTangents || !_extTangents;
+        dirtyNormalsStream = dirtyNormalsStream || (useMayaNormals && !_extNormals);
+    }
+#else
+    // Any geometry change dirties every stream, whether or not VP2 supplied it on this update.
+    if (geomChanged) {
+        dirtyPositions = true;
+        dirtyUvs = true;
+        dirtyTangents = true;
+        dirtyNormalsStream = useMayaNormals;
+    }
+#endif
+
     // Emit the per-primvar dirty locators decided while reading the streams
     // above. GPU-shared streams were gated in the loop, so a stable direct-bound
     // buffer stays clean (Storm reads the deformed bytes through the alias with
@@ -1719,13 +1747,19 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    const bool hasPositionsAfterUpdate = !_positions.empty() || _extPositions;
+#else
+    const bool hasPositionsAfterUpdate = !_positions.empty();
+#endif
+
     // Topology dirty locators are decided after index buffers are read so we can diff connectivity,
     // not just vertex count, when Maya sets topoChanged alongside geomChanged (MAYA-134200).
     const bool emitTopologyLocators = RenderItemShouldEmitTopologyLocators(
         topoChanged,
         geomChanged,
         geom && vertexBuffercount > 0,
-        storedPositionCountBeforeUpdate == 0 && _positions.empty(),
+        !hadPositionsBeforeUpdate && !hasPositionsAfterUpdate,
         storedPositionCountBeforeUpdate,
         _GetPositionVertexCount(geom, vertexBuffercount),
         _topology.get(),
