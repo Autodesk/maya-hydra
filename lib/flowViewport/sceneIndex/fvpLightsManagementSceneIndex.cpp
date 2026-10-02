@@ -30,6 +30,8 @@
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/glf/simpleLight.h>
+#include <pxr/imaging/hdx/simpleLightTask.h>
+#include <pxr/usd/usdLux/tokens.h>
 
 //std
 #include <array>
@@ -84,6 +86,65 @@ void _DisableLight(HdSceneIndexPrim& prim)
     prim.dataSource = editor.Finish();
 }
 
+// Reads a light value through the HdSampledDataSource base rather than the typed
+// interface. Light data sources are free to serve their values untyped (the Maya
+// light data sources do so for 'params' and 'shadowParams'), in which case a
+// HdTypedSampledDataSource cast silently fails.
+template <typename T>
+bool _GetLightValue(const HdContainerDataSourceHandle& primDataSource, const TfToken& name, T& value)
+{
+    if (auto lightSchema = HdLightSchema::GetFromParent(primDataSource)) {
+        if (auto dataSource = HdSampledDataSource::Cast(lightSchema.GetContainer()->Get(name))) {
+            const VtValue v = dataSource->GetValue(0.0f);
+            if (v.IsHolding<T>()) {
+                value = v.UncheckedGet<T>();
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void _DisableShadows(HdSceneIndexPrim& prim)
+{
+    HdContainerDataSourceEditor editor(prim.dataSource);
+    const HdDataSourceLocator   lightLocator = HdLightSchema::GetDefaultLocator();
+
+    if (prim.primType == HdPrimTypeTokens->simpleLight) {
+        // Storm takes shadow casting from the GlfSimpleLight and the HdxShadowParams,
+        // not from the shadow enable tokens below.
+        GlfSimpleLight simpleLight;
+        if (_GetLightValue(prim.dataSource, HdTokens->params, simpleLight)) {
+            simpleLight.SetHasShadow(false);
+            editor.Set(
+                lightLocator.Append(HdTokens->params),
+                HdRetainedTypedSampledDataSource<GlfSimpleLight>::New(simpleLight));
+        }
+
+        HdxShadowParams shadowParams;
+        if (_GetLightValue(prim.dataSource, HdLightTokens->shadowParams, shadowParams)) {
+            shadowParams.enabled = false;
+            editor.Set(
+                lightLocator.Append(HdLightTokens->shadowParams),
+                HdRetainedTypedSampledDataSource<HdxShadowParams>::New(shadowParams));
+        }
+    }
+
+    // Typed lights are queried by name, and delegates disagree on the spelling, so
+    // override every variant the light adapters answer.
+    static const std::array<TfToken, 3> shadowEnableTokens
+        = { HdLightTokens->shadowEnable,
+            HdLightTokens->hasShadow,
+            UsdLuxTokens->inputsShadowEnable };
+    for (const auto& token : shadowEnableTokens) {
+        editor.Set(
+            lightLocator.Append(token), HdRetainedTypedSampledDataSource<bool>::New(false));
+    }
+
+    prim.dataSource = editor.Finish();
+}
+
 bool _IsPrimOrAncestorSelected(const SdfPath& primPath,  const HdSceneIndexPrim& prim, const HdSceneIndexBaseRefPtr& sceneIndex)
 {
     TF_AXIOM(sceneIndex);
@@ -130,6 +191,16 @@ void LightsManagementSceneIndex::SetLightingMode(LightingMode lightingMode)
     }
 
     _lightingMode = lightingMode;
+    _DirtyAllLightsPrims();
+}
+
+void LightsManagementSceneIndex::SetShadowsEnabled(bool shadowsEnabled)
+{
+    if (_shadowsEnabled == shadowsEnabled){
+        return;
+    }
+
+    _shadowsEnabled = shadowsEnabled;
     _DirtyAllLightsPrims();
 }
 
@@ -186,6 +257,11 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
             }
             break;
         }
+    }
+
+    // The global shadow toggle applies on top of the lighting mode.
+    if (!_shadowsEnabled) {
+        _DisableShadows(prim);
     }
 
     return prim;

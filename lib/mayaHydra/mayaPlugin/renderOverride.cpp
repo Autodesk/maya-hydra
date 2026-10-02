@@ -1652,18 +1652,26 @@ MStatus MtohRenderOverride::Render(
         entry.second->Update();
     }
 
-    if (_isUsingHdSt) {
-        auto  enableShadows = true;
-        auto* lightParam = drawContext.getLightParameterInformation(
-            0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
-        if (lightParam != nullptr) {
-            MIntArray intVals;
-            if (lightParam->getParameter(
-                    MHWRender::MLightParameterInformation::kGlobalShadowOn, intVals)
-                && intVals.length() > 0) {
-                enableShadows = intVals[0] != 0;
-            }
+    // The viewport shadow toggle is a global setting, so it is read for every render
+    // delegate. The Storm-specific task setup below only disables the shadow task;
+    // other delegates rely on the lights management scene index turning off shadow
+    // casting on the light prims themselves.
+    bool  enableShadows = true;
+    auto* lightParam = drawContext.getLightParameterInformation(
+        0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
+    if (lightParam != nullptr) {
+        MIntArray intVals;
+        if (lightParam->getParameter(
+                MHWRender::MLightParameterInformation::kGlobalShadowOn, intVals)
+            && intVals.length() > 0) {
+            enableShadows = intVals[0] != 0;
         }
+    }
+    if (_lightsManagementSceneIndex) {
+        _lightsManagementSceneIndex->SetShadowsEnabled(enableShadows);
+    }
+
+    if (_isUsingHdSt) {
         HdxShadowTaskParams shadowParams;
         shadowParams.cullStyle = HdCullStyleNothing;
 
