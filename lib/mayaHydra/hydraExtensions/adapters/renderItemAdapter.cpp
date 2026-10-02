@@ -1163,27 +1163,27 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     const bool visibChanged     = data._flags & MVS::MVS_changedVisibility;
     const bool effectChanged    = data._flags & MVS::MVS_changedEffect;
 
-    // Dirty notification policy for this function â€” see
+    // Dirty notification policy for this function - see
     // doc/render_delegate_topology_vs_deformation.md for the full contract.
     //   Granularity: emit one locator per changed datum; never use the broad primvars locator
-    //     for geometry edits â€” that would re-pull unchanged data in the render delegate.
+    //     for geometry edits - that would re-pull unchanged data in the render delegate.
     //   Topology: on genuine connectivity change emit topology locators only
     //     (mesh/topology or basisCurves/topology via _EmitRenderItemTopologyDirtyLocators).
     //     When Maya also sets MVS_changedGeometry alongside MVS_changedTopo, the separate
     //     geomChanged path may dirty granular primvars (points/st/tangents and optionally normals).
-    //     The broad primvars locator is NOT emitted on the topology path â€” it would subsume
+    //     The broad primvars locator is NOT emitted on the topology path - it would subsume
     //     granular locators and defeat the useMayaNormals skip.
     //     Topology locators are suppressed when Maya sets MVS_changedTopo alongside
     //     MVS_changedGeometry but both vertex count and index connectivity are unchanged
     //     (deformation-only). When connectivity changes with the same vertex count, topology
-    //     locators are still emitted â€” but only when Maya set MVS_changedTopo, because the index
+    //     locators are still emitted - but only when Maya set MVS_changedTopo, because the index
     //     buffer is not read on the geometry-only path (see the Indices block below). Detecting
     //     connectivity edits therefore relies on that flag, which Maya sets for genuine ones.
     //   Extent: dirty only when the bounding box actually changes. Maya has no bbox-changed
     //     flag, so we diff the freshly-read bbox against the stored _bounds before overwriting.
     //     Checked in the geomChanged||topoChanged block (before the vertex-count workaround below),
-    //     separately from the per-primvar dirty block â€” this is intentional, not an oversight.
-    //   Normals: skip dirtyNormals() when useMayaNormals is false â€” Hydra generates
+    //     separately from the per-primvar dirty block - this is intentional, not an oversight.
+    //   Normals: skip dirtyNormals() when useMayaNormals is false - Hydra generates
     //     normals itself in that mode and a redundant notification would cause unnecessary work.
     //     The guard applies on the geomChanged path where granular primvar locators are emitted.
     //
@@ -1274,7 +1274,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 #endif
 
     // Extent is checked here, under geomChanged||topoChanged, so it is always evaluated when
-    // positions or topology change â€” including the geomChanged case. The old code always dirtied
+    // positions or topology change - including the geomChanged case. The old code always dirtied
     // extent on geomChanged; the new code diffs the actual bbox first and only emits dirtyExtent()
     // when the value changed. This is intentional: if vertices moved without changing the bbox
     // (e.g. internal vertices shuffled), there is nothing for the render delegate to re-read.
@@ -1347,7 +1347,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // update would be a false promise to the render delegate). A CPU stream
     // dirties whenever it is re-read; a GPU-shared stream dirties only when it
     // must (see the gating in the loop): identity/mode change (Republished),
-    // batch mode (re-blit every frame), or â€” for points â€” when Hydra generates
+    // batch mode (re-blit every frame), or - for points - when Hydra generates
     // normals (a moved points buffer must drive the smooth-normals recompute).
     // In steady-state direct binding with a stable handle every stream stays
     // clean and Storm reads the new bytes straight from the aliased buffer.
@@ -1745,7 +1745,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // (== emitTopologyLocators, which already ran the connectivity diff above) or when we have no
     // cached topology yet. Maya raises MVS_changedGeometry every frame during deformation with
     // unchanged connectivity; rebuilding on those frames would rescan the whole face-vertex index
-    // array (HdMeshTopology::ComputeNumPoints) and reallocate for nothing â€” no topology-dirty
+    // array (HdMeshTopology::ComputeNumPoints) and reallocate for nothing - no topology-dirty
     // locator is emitted on those frames, so Storm never re-pulls the rebuilt copy.
     const bool topologyNeedsRebuild = emitTopologyLocators || !_topology;
     if (indicesWereRead && !vertexCounts.empty() && topologyNeedsRebuild) {
