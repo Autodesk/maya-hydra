@@ -107,6 +107,8 @@ target_link_libraries(${TARGET_NAME}
         gf
         hd
         hdGp
+        hgi
+        hgiGL
         $<$<BOOL:${CMAKE_WANT_MATERIALX_BUILD}>:hdMtlx>
         hdx
         js

@@ -52,6 +52,14 @@ TF_REGISTRY_FUNCTION(TfDebug)
         "calls to the light adapters.");
 
     TF_DEBUG_ENVIRONMENT_SYMBOL(
+        MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING,
+        "Print, per primvar stream, whether a VP2 GPU buffer was actually "
+        "shared with the renderer and why not when it was not. Worth having "
+        "because every failure in that path is a SILENT fallback to the CPU "
+        "primvar, which renders identical images -- so nothing else "
+        "distinguishes sharing from copying.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
         MAYAHYDRALIB_ADAPTER_IMAGEPLANES, "Print information about drawing image planes.");
 
     TF_DEBUG_ENVIRONMENT_SYMBOL(

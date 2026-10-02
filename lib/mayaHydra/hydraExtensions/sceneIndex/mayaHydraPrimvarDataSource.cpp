@@ -17,9 +17,12 @@
 #include "mayaHydraPrimvarDataSource.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
+#include <mayaHydraLib/adapters/renderItemAdapter.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <pxr/imaging/hd/extGpuBufferSchema.h>
+#include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
@@ -28,6 +31,51 @@
 #include <limits>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+namespace {
+
+/// CPU fallback paired with an extGpuBuffer primvar. Constructing the
+/// datasource does not touch the buffer; only GetValue() reads the shared GL
+/// buffer and materializes a VtArray.
+class _ExtGpuBufferLazyValueDataSource final
+    : public HdSampledDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_ExtGpuBufferLazyValueDataSource);
+
+    _ExtGpuBufferLazyValueDataSource(
+        const TfToken&                  primvarName,
+        MayaHydraRenderItemAdapter*     adapter)
+        : _primvarName(primvarName)
+        , _adapter(adapter)
+    {
+    }
+
+    VtValue GetValue(Time shutterOffset) override
+    {
+        TF_UNUSED(shutterOffset);
+        return _adapter
+            ? _adapter->GetExtGpuBufferLazyValue(_primvarName)
+            : VtValue();
+    }
+
+    bool GetContributingSampleTimesForInterval(
+        Time startTime,
+        Time endTime,
+        std::vector<Time>* outSampleTimes) override
+    {
+        TF_UNUSED(startTime);
+        TF_UNUSED(endTime);
+        TF_UNUSED(outSampleTimes);
+        return false;
+    }
+
+private:
+    TfToken                       _primvarName;
+    MayaHydraRenderItemAdapter*   _adapter;
+};
+
+} // namespace
 
 MayaHydraPrimvarsDataSource::MayaHydraPrimvarsDataSource(
     MayaHydraAdapter* adapter)
@@ -60,16 +108,38 @@ HdDataSourceBaseHandle MayaHydraPrimvarsDataSource::Get(const TfToken& name)
         return nullptr;
     }
 
+    HdContainerDataSourceHandle extGpuBuffer;
+    HdSampledDataSourceHandle value =
+        MayaHydraPrimvarValueDataSource::New(name, _adapter);
+    if (auto* ri = dynamic_cast<MayaHydraRenderItemAdapter*>(_adapter)) {
+        extGpuBuffer = ri->GetExtGpuBufferSchema(name);
+        if (extGpuBuffer) {
+            value = _ExtGpuBufferLazyValueDataSource::New(name, ri);
+        }
+    }
+
     // Need to handle indexed case?
     assert(!(*it).second.indexed);
-    return HdPrimvarSchema::Builder()
-        .SetPrimvarValue(MayaHydraPrimvarValueDataSource::New(
-            name, _adapter))
+    HdContainerDataSourceHandle primvar = HdPrimvarSchema::Builder()
+        .SetPrimvarValue(value)
         .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(
             (*it).second.interpolation))
         .SetRole(HdPrimvarSchema::BuildRoleDataSource(
             (*it).second.role))
         .Build();
+
+    // When the adapter provides an externally-owned GPU buffer for this
+    // primvar, overlay it as the `extGpuBuffer` child so a renderer can
+    // consume it directly (HdExtGpuBufferSchema::GetFromParent).
+    if (extGpuBuffer) {
+        const TfToken names[1] = {
+            HdExtGpuBufferSchemaTokens->extGpuBuffer };
+        const HdDataSourceBaseHandle values[1] = { extGpuBuffer };
+        primvar = HdOverlayContainerDataSource::New(
+            HdRetainedContainerDataSource::New(1, names, values),
+            primvar);
+    }
+    return primvar;
 }
 
 MayaHydraPrimvarValueDataSource::MayaHydraPrimvarValueDataSource(

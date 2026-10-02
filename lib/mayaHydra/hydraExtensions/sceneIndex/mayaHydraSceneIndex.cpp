@@ -462,6 +462,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool inter
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(&initData.renderIndex)
+    , _hgi(initData.hgi)
     , _isHdSt(initData.isHdSt)
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))

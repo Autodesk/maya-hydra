@@ -989,7 +989,17 @@ MStatus MtohRenderOverride::Render(
     //     }
     // }
     MH_PROFILE_FUNCTION();
-    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
+    // Name the destination, because Render() running more than once per
+    // refresh is ambiguous without it: two different destinations mean two
+    // panels each drawing their own frame, while the SAME destination twice
+    // means one panel is being rendered twice. Those call for different
+    // answers, and the bare message could not tell them apart.
+    MString destinationName;
+    const auto destination = drawContext.renderingDestination(destinationName);
+    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
+        .Msg("MtohRenderOverride::Render() destination=%s (type %d) scene.changed=%s\n",
+             destinationName.asChar(), int(destination),
+             scene.changed() ? "yes" : "no");
     // We can use the mayaHydraSetVisibleFramePasses command to set the visible passes
 
     // Filled in below once the display style is known; read by renderFrame, which runs later.
@@ -2195,7 +2205,8 @@ void MtohRenderOverride::_InitHydraResources(
         TfToken("MayaHydraSceneIndex"),
         *renderIndex(),
         MAYA_NATIVE_ROOT,
-        _isUsingHdSt
+        _isUsingHdSt,
+        _hgi.get()
     );
 
     // Data producer merging scene index sets up the Flow Viewport merging scene index, must
