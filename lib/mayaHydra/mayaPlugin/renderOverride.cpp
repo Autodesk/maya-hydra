@@ -262,6 +262,34 @@ bool isPathInSelection(const SdfPathVector& sortedSelectedPaths, const SdfPath& 
     return false;
 }
 
+//! \brief  The outline Base roots for the selection.
+//!
+//! The outline draws whole prims, so each instancer with an instance selection is replaced by the
+//! roots of its instance-masked copies (PiInstancerWhSi in OutlineInstances mode), which only draw
+//! the selected instances. Returned sorted, as isPathInSelection() requires.
+SdfPathVector outlineSelectedPaths(
+    const SdfPathVector&              sortedFullySelectedPaths,
+    const Fvp::PiInstancerWhSiRefPtr& piInstancerWhSi)
+{
+    const auto highlightRoots = piInstancerWhSi ? piInstancerWhSi->GetSelectionHighlightRoots()
+                                                : std::map<SdfPath, SdfPathVector>();
+    if (highlightRoots.empty()) {
+        return sortedFullySelectedPaths;
+    }
+    SdfPathVector paths;
+    paths.reserve(sortedFullySelectedPaths.size() + 2 * highlightRoots.size());
+    for (const auto& path : sortedFullySelectedPaths) {
+        if (highlightRoots.find(path) == highlightRoots.end()) {
+            paths.push_back(path);
+        }
+    }
+    for (const auto& [instancerPath, roots] : highlightRoots) {
+        paths.insert(paths.end(), roots.begin(), roots.end());
+    }
+    std::sort(paths.begin(), paths.end());
+    return paths;
+}
+
 //! \brief  Post-multiply onto a projection matrix so the pick region fills the whole viewport.
 MMatrix pickProjectionMatrix(
     const MMatrix& projMatrix,
@@ -1312,6 +1340,9 @@ MStatus MtohRenderOverride::Render(
     if (_needToReplaceSelection){
         _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
         _needToReplaceSelection = false;
+        // No selection notification comes with this replace, and the instance selection copies
+        // may have changed, so push the outline inputs again.
+        _outlineInputsDirty = true;
     }
 
     const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
@@ -1735,7 +1766,8 @@ MStatus MtohRenderOverride::Render(
             // Cached so that hover-only pushes don't re-walk the selection. selectionChanged is
             // always true on the first push after Install, so the cache is always seeded.
             if (selectionChanged) {
-                _pushedOutlineSelectedPaths = getFullySelectedPaths();
+                _pushedOutlineSelectedPaths
+                    = outlineSelectedPaths(getFullySelectedPaths(), _piInstancerWhSi);
             }
             inputs.selectedPaths = _pushedOutlineSelectedPaths;
 
@@ -1747,6 +1779,14 @@ MStatus MtohRenderOverride::Render(
                     // OutlineInputs::leadPath is a single path, so if the lead maps to several
                     // prims, only the first gets the lead color.
                     inputs.leadPath = leadSelections.front().primPath;
+                    // An instance selection is drawn through the copy of its lead instance.
+                    if (_piInstancerWhSi) {
+                        const SdfPath leadInstanceHighlightRoot
+                            = _piInstancerWhSi->GetLeadInstanceHighlightRoot(inputs.leadPath);
+                        if (!leadInstanceHighlightRoot.IsEmpty()) {
+                            inputs.leadPath = leadInstanceHighlightRoot;
+                        }
+                    }
                 }
             }
             // Exclude the selection-highlight prims from the default (whole-scene) outlines.
@@ -2079,6 +2119,13 @@ void MtohRenderOverride::_InitHydraResources(
                                                         HdRenderTagTokens->guide };
     // Secondary graphics pass index
     static const int           secondaryGraphicsPassIndex = 1;
+
+    // In outline mode, the only prims under _highlightHierarchyPrefix are the point instance
+    // selection copies, which only the outline draws: keep them out of the color passes. This
+    // runs on every (re)initialization, so a mode switch also restores the legacy collection.
+    _renderCollection.SetExcludePaths(_UseOutlineSelectionHighlighting()
+        ? SdfPathVector{ _highlightHierarchyPrefix }
+        : SdfPathVector{});
 
     // This is where the passes and their information is created
     _CreateFramePassesData();
@@ -2532,7 +2579,8 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
                                             /*needsReprChanged=*/false,
                                             _globals.delegateParams.refineLevel };
 
-    // Setup selection highlight scene indices, only in legacy mode (not outline, not force-disabled)
+    // Setup selection highlight scene indices: all of them in legacy mode, only the point instance
+    // one in outline mode, none when force-disabled
     if (!_SuppressLegacySelectionHighlight()) {
         //// At time of writing, wireframe selection highlighting of Maya native data
         //// is done by Maya at render item creation time, so avoid double wireframe
@@ -2557,6 +2605,17 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
         _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+    }
+    else if (_UseOutlineSelectionHighlighting()) {
+        // The outline draws whole prims, so it cannot isolate the selected instances of a point
+        // instancer. Instance selections get an instance-masked copy of the instancing graph
+        // instead, which Render() feeds to the outline in place of the instancer.
+        _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(
+            _lastFilteringSceneIndexBeforeCustomFiltering,
+            _highlightHierarchyPrefix,
+            _wireframeColorInterfaceImp,
+            Fvp::PiInstancerWhSi::Mode::OutlineInstances);
+        _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
     }
 
     TF_AXIOM(_mayaViewportSceneIndex);
@@ -3843,9 +3902,12 @@ void MtohRenderOverride::_CreateFramePassesData()
         auto filteringData = std::make_shared<Fvp::FramePassData>();
         filteringData->_rendererName = _rendererDesc.rendererName;//Render delegate chosen by the user
         filteringData->_includePaths = {};
-        filteringData->_excludePaths = (shouldUseSingleFramePass) 
+        // Ignore selection highlight prims if we have multiple passes, except in outline mode: the
+        // outline is installed on this pass and draws the point instance selection copies into its
+        // prim ID buffer. _renderCollection keeps them out of the color draw.
+        filteringData->_excludePaths = (shouldUseSingleFramePass || _UseOutlineSelectionHighlighting())
                                         ? SdfPathVector{}
-                                        : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
+                                        : SdfPathVector{_highlightHierarchyPrefix};
         filteringData->_removeLights = false; // Keep all lights in this pass
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag

@@ -61,22 +61,47 @@ class PiInstancerWhSi
     : public BaseWhSi
 {
 public:
+    /// Which selection highlights the scene index creates.
+    enum class Mode {
+        /// Legacy wireframe selection highlighting: whole instancer selections and instance
+        /// selections both get a wireframe highlight.
+        Wireframe,
+        /// Outline selection highlighting. The outline draws the selected prims themselves, which
+        /// covers whole instancer selections, but it cannot isolate some instances of an
+        /// instancer. So only instance selections get a highlight: an instance-masked copy of the
+        /// instancing graph, drawn with its regular repr, that the outline draws instead of the
+        /// instancer. The color passes never draw it.
+        OutlineInstances
+    };
+
     FVP_API
     static PiInstancerWhSiRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
-        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
+        Mode mode = Mode::Wireframe
     );
 
     FVP_API
     ~PiInstancerWhSi() override = default;
+
+    /// Returns the roots of the existing highlight sub-hierarchies, keyed by the selected
+    /// instancer path. In OutlineInstances mode, these are the instance selection highlights.
+    FVP_API
+    std::map<PXR_NS::SdfPath, PXR_NS::SdfPathVector> GetSelectionHighlightRoots() const;
+
+    /// Returns the root of the highlight sub-hierarchy drawing the lead (last selected) instance
+    /// of the given instancer, or an empty path if there is none.
+    FVP_API
+    PXR_NS::SdfPath GetLeadInstanceHighlightRoot(const PXR_NS::SdfPath& instancerPath) const;
 
 protected:
     FVP_API
     PiInstancerWhSi(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
-        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
+        Mode mode
     );
 
     FVP_API
@@ -117,6 +142,7 @@ private:
         size_t _selectedInstanceCount;
     };
 
+    const Mode _mode;
     std::set<PXR_NS::SdfPath> _pointInstancerPaths;
     std::map<SelectionKey, SelectionData> _selections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
