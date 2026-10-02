@@ -1,4 +1,4 @@
-﻿//
+//
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -1621,7 +1621,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // Streams read in the loop above are already dirty. A stream VP2 did not supply has nothing
     // to re-pull on a deformation-only frame (playback sets geomChanged without topoChanged); it
     // can only have appeared or changed when Maya flags a topology change.
-    if (geomChanged && topoChanged) {
+    if (_UseGpuBufferSharing() ? (geomChanged && topoChanged) : geomChanged) {
         dirtyPositions = dirtyPositions || !_extPositions;
         dirtyUvs = dirtyUvs || !_extUvs;
         dirtyTangents = dirtyTangents || !_extTangents;
@@ -1775,13 +1775,19 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // because connectivity is unchanged.
     const bool indicesWereRead = topoChanged && vertexBuffercount > 0
         && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip;
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
     // Only (re)build the cached topology when connectivity actually changed
     // (== emitTopologyLocators, which already ran the connectivity diff above) or when we have no
     // cached topology yet. Maya raises MVS_changedGeometry every frame during deformation with
     // unchanged connectivity; rebuilding on those frames would rescan the whole face-vertex index
     // array (HdMeshTopology::ComputeNumPoints) and reallocate for nothing - no topology-dirty
     // locator is emitted on those frames, so Storm never re-pulls the rebuilt copy.
-    const bool topologyNeedsRebuild = emitTopologyLocators || !_topology;
+    // The CPU path keeps rebuilding whenever indices were read.
+    const bool topologyNeedsRebuild
+        = !_UseGpuBufferSharing() || emitTopologyLocators || !_topology;
+#else
+    const bool topologyNeedsRebuild = true;
+#endif
     if (indicesWereRead && !vertexCounts.empty() && topologyNeedsRebuild) {
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangleStrip:
