@@ -52,6 +52,14 @@ set(HEADERS
     shadowMatrixComputation.h
 )
 
+if (USD_HAS_GPU_BUFFER_SHARING)
+    target_sources(${TARGET_NAME}
+        PRIVATE
+            mhExtGpuBufferBridge.cpp
+    )
+    list(APPEND HEADERS mhExtGpuBufferBridge.h)
+endif()
+
 if (MAYA_HAS_RENDER_ITEM_CULL_MODE_API)
     target_compile_definitions(${TARGET_NAME}
         PRIVATE
