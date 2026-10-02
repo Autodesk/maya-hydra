@@ -89,7 +89,13 @@ target_compile_definitions(${TARGET_NAME}
 # only against a USD package that exports it.
 if (USD_HAS_HGI_VULKAN)
     target_compile_definitions(${TARGET_NAME}
-        PRIVATE MAYAHYDRA_HAS_HGI_VULKAN=1)
+        PRIVATE USD_HAS_HGI_VULKAN=1)
+endif()
+
+# PUBLIC: the layout of MayaHydraRenderItemAdapter depends on it.
+if (USD_HAS_GPU_BUFFER_SHARING)
+    target_compile_definitions(${TARGET_NAME}
+        PUBLIC USD_HAS_GPU_BUFFER_SHARING=1)
 endif()
 
 if(DEFINED MAYAUSD_VERSION)

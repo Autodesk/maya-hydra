@@ -17,8 +17,6 @@
 #ifndef MAYAHYDRALIB_RENDER_ITEM_ADAPTER_H
 #define MAYAHYDRALIB_RENDER_ITEM_ADAPTER_H
 
-#define MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING
-
 #include <mayaHydraLib/adapters/adapter.h>
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
@@ -26,7 +24,7 @@
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/tf/token.h>
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <pxr/imaging/hd/extGpuBufferSchema.h>
 // MVertexBuffer and MVertexBufferDescriptor. Included explicitly rather than
 // relied on transitively: MHWGeometryUtilities.h below pulls in only
@@ -117,6 +115,7 @@ public:
     MAYAHYDRALIB_API
     VtValue Get(const TfToken& key) override;
 
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
     /// Returns the primvar's externally-owned GPU buffer as an
     /// HdExtGpuBufferSchema container, or a null handle when the primvar has
     /// no external buffer.  Consumed by MayaHydraPrimvarsDataSource, which
@@ -130,6 +129,7 @@ public:
     /// consumer actually pulls that value.
     MAYAHYDRALIB_API
     VtValue GetExtGpuBufferLazyValue(const TfToken& key) const;
+#endif
 
     MAYAHYDRALIB_API
     VtValue GetMaterialResource();
@@ -280,6 +280,7 @@ private:
     MRenderItem::CullMode       _cullMode = MRenderItem::CullNone;
 #endif
 
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
     // GPU buffer sharing state.
     bool _UseGpuBufferSharing() const;
 
@@ -351,6 +352,7 @@ private:
     // true, the mesh runs in direct mode (zero-copy). Only consulted when
     // MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
     bool _classifiedAsAnimating = false;
+#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

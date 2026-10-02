@@ -18,7 +18,6 @@
 #include "fvpFilteringSceneIndexExample.h"
 
 //USD/Hydra headers
-#include <pxr/imaging/hd/extGpuBufferSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -38,36 +37,18 @@ namespace
         if (sceneIndexPrim.dataSource){
         
             if ((sceneIndexPrim.primType == HdPrimTypeTokens->mesh) || (sceneIndexPrim.primType == HdPrimTypeTokens->basisCurves) ){
-                // Determine the source vertex count. Normally this comes from the
-                // CPU 'points' primvar value. With GPU buffer sharing the producer
-                // leaves that value empty and carries the data on an
-                // HdExtGpuBufferSchema overlaid as the 'extGpuBuffer' child of the
-                // primvar, so fall back to the schema's numElements -- that is
-                // metadata and needs no GPU readback (the count matches the CPU
-                // path, which is what a GPU-unaware consumer must reproduce).
-                const HdPrimvarSchema pointsPrimvar =
-                    HdPrimvarsSchema::GetFromParent(sceneIndexPrim.dataSource)
-                        .GetPrimvar(HdPrimvarsSchemaTokens->points);
-
-                size_t numPoints = 0;
-                if (HdSampledDataSourceHandle pointsDs = pointsPrimvar.GetPrimvarValue()) {
-                    const VtValue v = pointsDs->GetValue(0.0f);
+                // Retrieve points from source mesh
+                if (HdSampledDataSourceHandle pointsDs = HdPrimvarsSchema::GetFromParent(sceneIndexPrim.dataSource).GetPrimvar(HdPrimvarsSchemaTokens->points).GetPrimvarValue()) 
+                {
+                    VtValue v = pointsDs->GetValue(0.0f);
                     if (v.IsHolding<VtArray<GfVec3f>>()) {
-                        numPoints = v.Get<VtArray<GfVec3f>>().size();
-                    }
-                }
-                if (numPoints == 0) {
-                    if (const HdContainerDataSourceHandle primvarContainer = pointsPrimvar.GetContainer()) {
-                        const HdExtGpuBufferSchema extBuffer =
-                            HdExtGpuBufferSchema::GetFromParent(primvarContainer);
-                        if (const HdSizetDataSourceHandle numElementsDs = extBuffer.GetNumElements()) {
-                            numPoints = numElementsDs->GetTypedValue(0.0f);
+                        const VtArray<GfVec3f>& points = v.Get<VtArray<GfVec3f>>();
+                        const size_t numPoints = points.size();
+                        if (numPoints > 10000){
+                            //Hide the prims that have more than 10 000 vertices
+                            return true;
                         }
                     }
-                }
-                if (numPoints > 10000){
-                    //Hide the prims that have more than 10 000 vertices
-                    return true;
                 }
             }
         

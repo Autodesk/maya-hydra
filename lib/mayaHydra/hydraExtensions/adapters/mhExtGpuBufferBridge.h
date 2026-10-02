@@ -124,22 +124,26 @@ public:
         uint32_t mayaGlBuffer,
         size_t copyByteSize) const;
 
-    /// Open the producer's frame: wait until the consumer has finished
-    /// reading what was published last frame, so this frame's copies may
-    /// overwrite it. Call once before publishing anything, on the thread that
-    /// owns Maya's GL context.
+    /// \class ProducerFrame
     ///
-    /// A no-op for a zero-copy bridge, which overwrites nothing, and on the
-    /// first frame, when nothing has been published yet.
-    MAYAHYDRALIB_API
-    static void BeginProducerFrame();
+    /// Scopes the producer's frame: the window in which buffers handed to
+    /// the consumer may be written. Construct one around every publish, on
+    /// the thread that owns Maya's GL context, and let it go out of scope
+    /// before the consumer's frame begins -- the arena picks up a publish
+    /// only in a frame that starts after it.
+    ///
+    /// Open one every consumer frame, even when nothing will be published:
+    /// closing the frame is what hands the shared buffers back to the
+    /// consumer's queue, so a skipped frame leaves them unowned.
+    class ProducerFrame
+    {
+    public:
+        ProducerFrame() { BeginProducerFrame(); }
+        ~ProducerFrame() { EndProducerFrame(); }
 
-    /// Close the producer's frame: tell the consumer that everything published
-    /// this frame is written and may be read. Call once after publishing every
-    /// render item and, critically, before the consumer's frame begins -- the
-    /// arena picks up a publish only in a frame that starts after it.
-    MAYAHYDRALIB_API
-    static void EndProducerFrame();
+        ProducerFrame(const ProducerFrame&) = delete;
+        ProducerFrame& operator=(const ProducerFrame&) = delete;
+    };
 
     /// Release every GL object the bridge owns.
     ///
@@ -151,6 +155,20 @@ public:
     static void Shutdown();
 
 private:
+    /// Open the producer's frame: wait until the consumer has finished
+    /// reading what was published last frame, so this frame's copies may
+    /// overwrite it.
+    ///
+    /// A no-op for a zero-copy bridge, which overwrites nothing, and on the
+    /// first frame, when nothing has been published yet.
+    MAYAHYDRALIB_API
+    static void BeginProducerFrame();
+
+    /// Close the producer's frame: tell the consumer that everything published
+    /// this frame is written and may be read.
+    MAYAHYDRALIB_API
+    static void EndProducerFrame();
+
     enum class _Kind
     {
         None,

@@ -28,7 +28,7 @@
 #include <pxr/imaging/hgiGL/externalBufferArena.h>
 #include <pxr/imaging/hgiGL/semaphore.h>
 
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
 #include <pxr/imaging/hgiVulkan/externalBuffer.h>
 #include <pxr/imaging/hgiVulkan/externalBufferArena.h>
 #endif
@@ -68,7 +68,7 @@ _ProducerIsOpenGL()
     return api == MHWRender::kOpenGL || api == MHWRender::kOpenGLCoreProfile;
 }
 
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
 
 // Clear the GL error queue so that a later glGetError reports on our own call
 // and not on whatever Maya left behind. Without this a pending error from
@@ -514,7 +514,7 @@ _EnsureSync(HgiVulkanExternalBufferArena *arena)
     return true;
 }
 
-#endif // MAYAHYDRA_HAS_HGI_VULKAN
+#endif // USD_HAS_HGI_VULKAN
 
 } // namespace
 
@@ -536,7 +536,7 @@ MhExtGpuBufferBridge::ForHgi(Hgi *hgi)
         return bridge;
     }
 
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
     if (hgi->GetAPIName() == HgiTokens->Vulkan) {
         if (auto arena =
                 hgi->GetExternalBufferArena<HgiVulkanExternalBufferArena>()) {
@@ -583,7 +583,7 @@ MhExtGpuBufferBridge::Create(
             ->RegisterBuffer(mayaGlBuffer, byteSize, kExtBufferUsage);
     }
 
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
     if (_kind == _Kind::Vulkan) {
         _DrainGlDeletes();
 
@@ -671,7 +671,7 @@ MhExtGpuBufferBridge::Refresh(
         return true;
     }
 
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
     if (_kind == _Kind::Vulkan) {
         const _GlAlias *alias = _AliasOf(buffer);
         if (!alias) {
@@ -689,7 +689,7 @@ MhExtGpuBufferBridge::Refresh(
 void
 MhExtGpuBufferBridge::BeginProducerFrame()
 {
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
     // Nothing published is outstanding, so nothing has been handed to the
     // consumer that it could still be reading. This also covers the first
     // frame, when the semaphores do not exist yet.
@@ -712,7 +712,7 @@ MhExtGpuBufferBridge::BeginProducerFrame()
 void
 MhExtGpuBufferBridge::EndProducerFrame()
 {
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
     // The one point per frame that reliably holds Maya's context, which is
     // what destroying the GL objects the arena has released needs.
     _DrainGlDeletes();
@@ -748,7 +748,7 @@ MhExtGpuBufferBridge::EndProducerFrame()
 void
 MhExtGpuBufferBridge::Shutdown()
 {
-#if defined(MAYAHYDRA_HAS_HGI_VULKAN)
+#if defined(USD_HAS_HGI_VULKAN)
     // Everything GL-side has to go while a context is still current and Tf's
     // diagnostic delegates are still alive. Left to static destruction the
     // imported semaphores outlive both: HgiGLImportedSemaphore's destructor

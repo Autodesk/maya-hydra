@@ -22,7 +22,7 @@
 
 #include "renderOverride.h"
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
 #endif
 #include "renderRegionCommand.h"
@@ -1011,8 +1011,15 @@ MStatus MtohRenderOverride::Render(
 
     auto renderFrame = [&](bool markTime = false) {
         MH_PROFILE_SCOPE("MtohRenderOverride::Render renderFrame lambda");
-        if (scene.changed()) {
-            if (_mayaHydraSceneIndex) {
+        {
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+            // Render items are the only publishers of shared buffers, and the
+            // frame passes below are the consumer's frame, so the producer's
+            // frame has to close here. Opened even when the scene is
+            // unchanged: see MhExtGpuBufferBridge::ProducerFrame.
+            const MhExtGpuBufferBridge::ProducerFrame producerFrame;
+#endif
+            if (scene.changed() && _mayaHydraSceneIndex) {
                 _mayaHydraSceneIndex->UpdateRenderItems(scene, renderItemOptions);
             }
         }
@@ -2368,7 +2375,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
     // Before the renderer goes, because the bridge's GL objects alias memory
     // the renderer owns and its imported semaphores need both a current
     // context and a live diagnostic manager to be destroyed on.

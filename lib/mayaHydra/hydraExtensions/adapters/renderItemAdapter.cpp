@@ -33,7 +33,7 @@
 #include <pxr/usd/sdr/registry.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <pxr/base/tf/envSetting.h>
 #include <pxr/imaging/hd/extGpuBufferSchema.h>
 #include <pxr/imaging/hd/externalBuffer.h>
@@ -50,13 +50,13 @@
 #include <maya/MDGContextGuard.h>
 #include <maya/MFn.h>
 #include <maya/MNodeMessage.h>
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <maya/MFnDagNode.h>
 #include <maya/MViewport2Renderer.h>
 #endif
 
 #include <functional>
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <cinttypes>  // PRIu64, for the GPU buffer sharing debug output
 #include <cstring>
 #include <mutex>
@@ -81,7 +81,7 @@ using namespace MayaHydra;
 #define PLUG_THIS_PLUGIN \
     PlugRegistry::GetInstance().GetPluginWithName(TF_PP_STRINGIZE(MFB_PACKAGE_NAME))
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 TF_DEFINE_ENV_SETTING(MAYAHYDRA_GPU_BUFFER_SHARING, true,
     "Enable GPU buffer sharing between VP2 and Hydra Storm");
 
@@ -140,7 +140,7 @@ _EmitRenderItemTopologyDirtyLocators(
     }
 }
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 
 // Cached once at startup.
 bool _IsGpuBufferSharingEnabled()
@@ -761,11 +761,11 @@ _GetExtVertexBufferValue(
     }
     return VtValue(result);
 }
-#endif // MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING
+#endif // USD_HAS_GPU_BUFFER_SHARING
 
 } // namespace
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 bool
 MayaHydraRenderItemAdapter::_UseGpuBufferSharing() const
 {
@@ -1149,7 +1149,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     const bool positionsHaveBeenReset
         = (0 == _positions.size()
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
            && !_extPositions
 #endif
            ); // when positionsHaveBeenReset is true we need to recompute the
@@ -1229,7 +1229,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // geomChanged block below. The static ensures the env var is read only once.
     static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
     // GPU buffer sharing mode + hybrid sticky-promotion classifier.
     // In hybrid mode a mesh starts batched (allowDirectBind=false) so static
     // meshes aggregate from frame one; the first real deform (geom/topo change
@@ -1285,7 +1285,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         const MPoint& min = bbox.min();
         const MPoint& max = bbox.max();
         GfRange3d newRange({min.x, min.y, min.z}, {max.x, max.y, max.z});
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
         // GPU-buffer render items often have an empty MRenderItem bbox (vertex
         // data is GPU-only); fall back to the source shape's DAG-node bounds so
         // the prim isn't culled.
@@ -1326,7 +1326,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 MVertexBuffer*     verts = mvb;
                 const unsigned int originalVertexCount = verts->vertexCount();
                 size_t storedVertexCount = _positions.size();
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
                 // GPU meshes keep no CPU positions; take the stored count from
                 // the published external buffer instead.
                 if (_extPositions) {
@@ -1373,7 +1373,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 case MGeometry::Semantic::kPosition: {
                     //Vertices
                     MVertexBuffer*verts = mvb;
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
                     if (_UseGpuBufferSharing()) {
                         const _ExtPublishResult res = _PublishExtStream(
                             verts, _extPositions, useDirectBindOptimization);
@@ -1421,7 +1421,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                     //Normals
                     if (useMayaNormals){
                         MVertexBuffer* normals = mvb;
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
                         if (_UseGpuBufferSharing()) {
                             const _ExtPublishResult res = _PublishExtStream(
                                 normals, _extNormals, useDirectBindOptimization);
@@ -1465,7 +1465,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                     // Textures:
                     if (_primitive == MGeometry::Primitive::kTriangles
                         || _primitive == MGeometry::Primitive::kTriangleStrip) {
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
                         if (_UseGpuBufferSharing()) {
                             const _ExtPublishResult res = _PublishExtStream(
                                 mvb, _extUvs, useDirectBindOptimization);
@@ -1511,7 +1511,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                     // Tangents
                     if (_primitive == MGeometry::Primitive::kTriangles
                         || _primitive == MGeometry::Primitive::kTriangleStrip) {
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
                         if (_UseGpuBufferSharing()) {
                             const _ExtPublishResult res = _PublishExtStream(
                                 mvb, _extTangents, useDirectBindOptimization);
@@ -1565,7 +1565,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
     // A stream published earlier but absent from this geometry must be
     // withdrawn. VP2 can release a hidden item's buffers (a display-mode
     // switch does) and recycle the names, and the loop above only visits the
@@ -1799,7 +1799,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 // only need to specify the order of the vertices that you want connected. This is
                 // implicit in Hydra when specifying an empty index buffer.
                 curveTopoType = HdTokens->nonperiodic;
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
                 // In GPU buffer sharing mode _positions is cleared (the data
                 // lives only in the shared buffer), so take the vertex count
                 // from the published ext schema instead of the empty CPU array.
@@ -1837,7 +1837,7 @@ HdBasisCurvesTopology MayaHydraRenderItemAdapter::GetBasisCurvesTopology()
                      : HdBasisCurvesTopology();
 }
 
-#if defined(MAYAHYDRALIB_ENABLE_GPU_BUFFER_SHARING)
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 HdContainerDataSourceHandle
 MayaHydraRenderItemAdapter::GetExtGpuBufferSchema(const TfToken& key) const
 {

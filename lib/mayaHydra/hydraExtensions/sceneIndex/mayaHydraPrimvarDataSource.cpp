@@ -21,9 +21,11 @@
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <pxr/imaging/hd/extGpuBufferSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#endif
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 
@@ -32,6 +34,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
 namespace {
 
 /// CPU fallback paired with an extGpuBuffer primvar. Constructing the
@@ -76,6 +79,7 @@ private:
 };
 
 } // namespace
+#endif
 
 MayaHydraPrimvarsDataSource::MayaHydraPrimvarsDataSource(
     MayaHydraAdapter* adapter)
@@ -108,15 +112,17 @@ HdDataSourceBaseHandle MayaHydraPrimvarsDataSource::Get(const TfToken& name)
         return nullptr;
     }
 
-    HdContainerDataSourceHandle extGpuBuffer;
     HdSampledDataSourceHandle value =
         MayaHydraPrimvarValueDataSource::New(name, _adapter);
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    HdContainerDataSourceHandle extGpuBuffer;
     if (auto* ri = dynamic_cast<MayaHydraRenderItemAdapter*>(_adapter)) {
         extGpuBuffer = ri->GetExtGpuBufferSchema(name);
         if (extGpuBuffer) {
             value = _ExtGpuBufferLazyValueDataSource::New(name, ri);
         }
     }
+#endif
 
     // Need to handle indexed case?
     assert(!(*it).second.indexed);
@@ -128,6 +134,7 @@ HdDataSourceBaseHandle MayaHydraPrimvarsDataSource::Get(const TfToken& name)
             (*it).second.role))
         .Build();
 
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
     // When the adapter provides an externally-owned GPU buffer for this
     // primvar, overlay it as the `extGpuBuffer` child so a renderer can
     // consume it directly (HdExtGpuBufferSchema::GetFromParent).
@@ -139,6 +146,7 @@ HdDataSourceBaseHandle MayaHydraPrimvarsDataSource::Get(const TfToken& name)
             HdRetainedContainerDataSource::New(1, names, values),
             primvar);
     }
+#endif
     return primvar;
 }
 
