@@ -196,6 +196,10 @@ bool PiInstancerWhSi::_ConditionallyCreateSelectionHighlight(
     auto selectionsSchema = HdSelectionsSchema::GetFromParent(instancerPrim.dataSource);
 
     if (HasFullySelectedAncestorInclusive(instancerPath)) {
+        if (_mode == Mode::OutlineInstances) {
+            // The outline draws the instancer's own prims for a whole selection: no copy needed.
+            return false;
+        }
         _CreateSelectionHighlight(instancerPrim, instancerPath, selectionsSchema, kFullHighlight);
         return true;
     }
@@ -216,9 +220,25 @@ bool PiInstancerWhSi::_ConditionallyCreateSelectionHighlight(
 PiInstancerWhSiRefPtr PiInstancerWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
-    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface)
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
+    Mode mode)
 {
-    return TfCreateRefPtr(new PiInstancerWhSi(inputSceneIndex, highlightHierarchyPrefix, wireframeColorInterface));
+    return TfCreateRefPtr(new PiInstancerWhSi(inputSceneIndex, highlightHierarchyPrefix, wireframeColorInterface, mode));
+}
+
+std::map<SdfPath, SdfPathVector> PiInstancerWhSi::GetSelectionHighlightRoots() const
+{
+    std::map<SdfPath, SdfPathVector> highlightRoots;
+    for (const auto& selection : _selections) {
+        highlightRoots[selection.first.first].push_back(SelectionPathFromKey(selection.first));
+    }
+    return highlightRoots;
+}
+
+SdfPath PiInstancerWhSi::GetLeadInstanceHighlightRoot(const SdfPath& instancerPath) const
+{
+    const SelectionKey leadKey { instancerPath, kLeadHighlight };
+    return _selections.find(leadKey) == _selections.end() ? SdfPath() : SelectionPathFromKey(leadKey);
 }
 
 HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
@@ -239,7 +259,9 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
-    if (prim.primType == HdPrimTypeTokens->mesh) {
+    // In OutlineInstances mode, meshes keep their repr and purpose: the outline draws their prim
+    // IDs, and the color passes exclude the highlight hierarchy.
+    if (_mode == Mode::Wireframe && prim.primType == HdPrimTypeTokens->mesh) {
         GfVec4f wireframeColor;
         if (selectionKey.second == kLeadHighlight) {
             if (!Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelection, wireframeColor)) {
@@ -308,8 +330,10 @@ SdfPathVector PiInstancerWhSi::GetHighlightChildPrimPaths(const SdfPath &selecti
 PiInstancerWhSi::PiInstancerWhSi(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
-    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
+    Mode mode
 ) : BaseWhSi(inputSceneIndex, highlightHierarchyPrefix, wireframeColorInterface)
+  , _mode(mode)
 {
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         if (IsExcludedPath(primPath)) {
@@ -511,6 +535,24 @@ bool PiInstancerWhSi::NeedsDirtyProcessing(
 
 void PiInstancerWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
 {
+    if (_mode == Mode::OutlineInstances) {
+        // Instance highlights are only needed while the instancer has no fully selected ancestor:
+        // otherwise the outline already draws all of its instances.
+        for (auto itPointInstancer = FindSelfOrFirstChild(primPath, _pointInstancerPaths); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
+            auto existingSelectionKeys = _primPathsToSelections.find(*itPointInstancer);
+            if (existingSelectionKeys != _primPathsToSelections.end()) {
+                const auto selectionKeysToDelete = existingSelectionKeys->second;
+                for (const auto& selectionKey : selectionKeysToDelete) {
+                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+                }
+            }
+            if (!isFullySelected) {
+                _ConditionallyCreateSelectionHighlight(GetInputSceneIndex()->GetPrim(*itPointInstancer), *itPointInstancer);
+            }
+        }
+        return;
+    }
+
     if (isFullySelected) {
         for (auto itPointInstancer = FindSelfOrFirstChild(primPath, _pointInstancerPaths); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
             auto existingSelectionKeys = _primPathsToSelections.find(*itPointInstancer);
