@@ -3849,6 +3849,10 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_removeLights = false; // Keep all lights in this pass
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag
+
+        // Selection highlighting is maya-hydra's to draw, so hide the selection from delegates
+        // that would highlight from it on their own and double up. 
+        filteringData->_blockSelections = true;
         
         _framePassesData.emplace_back(filteringData);
         
