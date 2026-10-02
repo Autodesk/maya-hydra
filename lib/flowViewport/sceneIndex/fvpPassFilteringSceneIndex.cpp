@@ -17,11 +17,13 @@
 #include "flowViewport/fvpUtils.h"
 #include "flowViewport/tokens.h"
 
+#include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/repr.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
 #include <algorithm>
@@ -277,7 +279,16 @@ HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
     if (_IsFilteredOut(primPath)) {
         return {}; // Return empty prim
     }
-    return GetInputSceneIndex()->GetPrim(primPath);
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+
+    if (_framePassData && _framePassData->_blockSelections && prim.dataSource) {
+        prim.dataSource = HdContainerDataSourceEditor(prim.dataSource)
+                              .Set(HdSelectionsSchema::GetDefaultLocator(),
+                                   HdBlockDataSource::New())
+                              .Finish();
+    }
+
+    return prim;
 }
 
 SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const

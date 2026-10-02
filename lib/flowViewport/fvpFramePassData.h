@@ -67,6 +67,11 @@ struct FramePassData
     //! Determines if lights are filtered out from this pass or not.
     bool _removeLights = false;
 
+    //! Determines if the selections data source is hidden from this pass or not. Selection
+    //! highlighting is drawn by maya-hydra itself, so a render delegate that highlights from
+    //! the selections data source on its own would highlight a second time.
+    bool _blockSelections = false;
+
     //! this frame pass supports prims with no purpose render tags, set this to true if you want to
     //! render prims that do not have a purpose render tag
     bool _supportPrimsWithNoPurposeRenderTag = false;
