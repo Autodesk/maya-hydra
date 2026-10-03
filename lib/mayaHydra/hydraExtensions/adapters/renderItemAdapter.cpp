@@ -22,6 +22,7 @@
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/adapters/renderItemTopologyUtil.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/profilingUtils.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -222,6 +223,8 @@ void MayaHydraRenderItemAdapter::_RemoveRprim()
 // and the current frame
 void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data)
 {
+    MH_PROFILE_FUNCTION();
+
     if (_primitive != MHWRender::MGeometry::Primitive::kTriangles
         && _primitive != MHWRender::MGeometry::Primitive::kTriangleStrip
         && _primitive != MHWRender::MGeometry::Primitive::kLines
@@ -590,6 +593,8 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
     bool           useMayaNormals,
     _StreamDirty&  dirty)
 {
+    MH_PROFILE_FUNCTION();
+
     const MVertexBufferDescriptor& desc = mvb->descriptor();
     const auto semantic = desc.semantic();
     switch(semantic){

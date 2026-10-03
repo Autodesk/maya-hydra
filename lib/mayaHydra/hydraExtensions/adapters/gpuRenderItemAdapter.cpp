@@ -20,6 +20,7 @@
 #include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/profilingUtils.h>
 
 #include <pxr/base/tf/envSetting.h>
 #include <pxr/base/tf/registryManager.h>
@@ -77,6 +78,10 @@ constexpr uint8_t kLazyCpuPointsBit = 1u << 0;
 constexpr uint8_t kLazyCpuNormalsBit = 1u << 1;
 constexpr uint8_t kLazyCpuTangentsBit = 1u << 2;
 constexpr uint8_t kLazyCpuUvsBit = 1u << 3;
+
+#define TF_DEBUG_GPU_BUFFER_SHARING(fmt, ...)                      \
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)      \
+        .Msg("[GPU Buffer Sharing]: " fmt, ##__VA_ARGS__)
 
 namespace {
 
@@ -640,7 +645,8 @@ _GetExtVertexBufferValue(
     uint64_t rawHandle,
     size_t   numElements,
     size_t   byteOffset,
-    size_t   byteStride)
+    size_t   byteStride,
+    size_t   tupleSize = 0)
 {
     VtArray<T> result;
     if (rawHandle == 0 || numElements == 0) {
@@ -652,7 +658,23 @@ _GetExtVertexBufferValue(
         return VtValue(result);
     }
 
+    if (!glGetNamedBufferSubData) {
+        TF_WARN(
+            "Cannot read shared VP2 GL buffer %" PRIu64
+            ": glGetNamedBufferSubData is unavailable",
+            rawHandle);
+        return VtValue(result);
+    }
+
     const size_t elementSize = sizeof(T);
+    if (tupleSize > 0 && elementSize != tupleSize) {
+        TF_WARN(
+            "Cannot read shared VP2 GL buffer %" PRIu64
+            ": expected element size %zu does not match published layout tuple size %zu",
+            rawHandle, elementSize, tupleSize);
+        return VtValue(result);
+    }
+
     const size_t stride = byteStride > 0 ? byteStride : elementSize;
     if (stride < elementSize) {
         TF_WARN(
@@ -700,6 +722,52 @@ _GetExtVertexBufferValue(
     return VtValue(result);
 }
 
+template <typename T>
+static VtValue
+_GetExtVertexBufferValue(const MayaHydraGpuRenderItemAdapter::_ExtStream& stream)
+{
+    size_t tupleSize = stream.tupleType.type != HdTypeInvalid
+        ? HdDataSizeOfTupleType(stream.tupleType)
+        : 0;
+    if (tupleSize == 0 && stream.schema) {
+        HdExtGpuBufferSchema extSchema(stream.schema);
+        if (auto elemTypeDs = extSchema.GetElementType()) {
+            tupleSize = HdDataSizeOfTupleType(elemTypeDs->GetTypedValue(0.0f));
+        }
+    }
+    return _GetExtVertexBufferValue<T>(
+        stream.rawHandle,
+        stream.numElements,
+        stream.byteOffset,
+        stream.byteStride,
+        tupleSize);
+}
+
+// The VP2 semantic of a stream, for log lines that need to say WHICH
+// primvar was or was not shared.
+//
+// Mapped from the enum rather than taken from
+// MVertexBufferDescriptor::semanticName(), which returns MString BY VALUE:
+// asChar() on that temporary would dangle the moment this function
+// returned. String literals have static storage, so these do not.
+static const char* _ExtStreamName(MHWRender::MVertexBuffer* mvb)
+{
+    if (!mvb) {
+        return "<none>";
+    }
+    switch (mvb->descriptor().semantic()) {
+    case MGeometry::Semantic::kPosition: return "position";
+    case MGeometry::Semantic::kNormal: return "normal";
+    case MGeometry::Semantic::kTexture: return "texture";
+    case MGeometry::Semantic::kColor: return "color";
+    case MGeometry::Semantic::kTangent: return "tangent";
+    case MGeometry::Semantic::kBitangent: return "bitangent";
+    case MGeometry::Semantic::kTangentWithSign: return "tangentWithSign";
+    case MGeometry::Semantic::kInvalidSemantic: return "<invalid>";
+    }
+    return "<unknown>";
+}
+
 } // namespace
 
 MayaHydraGpuRenderItemAdapter::MayaHydraGpuRenderItemAdapter(
@@ -728,11 +796,23 @@ bool MayaHydraGpuRenderItemAdapter::IsEligible(const MRenderItem& ri, Hgi* hgi)
     case MGeometry::Primitive::kTriangleStrip:
     case MGeometry::Primitive::kLines:
     case MGeometry::Primitive::kLineStrip: break;
-    default: return false;
+    default:
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] Render item -> CPU: primitive type %d is not eligible for GPU buffer sharing\n",
+            ri.name().asChar(), int(ri.primitive()));
+        return false;
     }
     // A VP2 that is not on GL, or a renderer Hgi with no arena to share through (e.g. Metal),
     // can never share a stream, so such items stay on the CPU path entirely.
-    return static_cast<bool>(MhExtGpuBufferBridge::ForHgi(hgi));
+    const bool bridgeAvailable = static_cast<bool>(MhExtGpuBufferBridge::ForHgi(hgi));
+    if (!bridgeAvailable) {
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] Render item -> CPU: renderer Hgi (%s) has no GPU buffer sharing bridge\n",
+            ri.name().asChar(),
+            hgi ? hgi->GetAPIName().GetText() : "<null>");
+        return false;
+    }
+    return true;
 }
 
 bool MayaHydraGpuRenderItemAdapter::_HasStoredPositions() const
@@ -773,13 +853,13 @@ void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool 
     // about individual streams. Silence here therefore means UpdateFromDelta is
     // not running for this prim at all -- render items are not flowing --
     // rather than that sharing was declined.
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-        .Msg("[%s] update: mode=%d directBind=%s geomChanged=%s topoChanged=%s\n",
-             GetID().GetText(),
-             int(sharingMode),
-             _useDirectBind ? "yes" : "no",
-             geomChanged ? "yes" : "no",
-             topoChanged ? "yes" : "no");
+    TF_DEBUG_GPU_BUFFER_SHARING(
+        "[%s] update: mode=%d directBind=%s geomChanged=%s topoChanged=%s\n",
+        GetID().GetText(),
+        int(sharingMode),
+        _useDirectBind ? "yes" : "no",
+        geomChanged ? "yes" : "no",
+        topoChanged ? "yes" : "no");
 }
 
 GfRange3d MayaHydraGpuRenderItemAdapter::_ResolveBounds(const GfRange3d& renderItemBounds) const
@@ -798,6 +878,8 @@ bool MayaHydraGpuRenderItemAdapter::_ShareStream(
     bool           alwaysDirty,
     bool&          dirty)
 {
+    MH_PROFILE_FUNCTION();
+
     const _ExtPublishResult res = _PublishExtStream(mvb, stream, _useDirectBind);
     if (res == _ExtPublishResult::NoGpu) {
         stream = {};
@@ -820,6 +902,8 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
     bool           useMayaNormals,
     _StreamDirty&  dirty)
 {
+    MH_PROFILE_FUNCTION();
+
     const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
         || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
     switch (mvb->descriptor().semantic()) {
@@ -853,8 +937,22 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
             return;
         }
         break;
-    default: break;
+    case MGeometry::Semantic::kColor:
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: vertex colors not supported on GPU path yet\n",
+            GetID().GetText(), _ExtStreamName(mvb));
+        break;
+    default:
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: semantic %d not shared\n",
+            GetID().GetText(), _ExtStreamName(mvb), int(mvb->descriptor().semantic()));
+        break;
     }
+
+    TF_DEBUG_GPU_BUFFER_SHARING(
+        "[%s] %s falling back to CPU MVertexBuffer::map() read\n",
+        GetID().GetText(), _ExtStreamName(mvb));
+
     MayaHydraRenderItemAdapter::_ReadVertexStream(mvb, topoChanged, useMayaNormals, dirty);
 }
 
@@ -895,10 +993,10 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
             if (!stream || present) {
                 return;
             }
-            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-                .Msg("[%s] %s WITHDRAWN: gl=%" PRIu64 " is no longer in the "
-                     "render item's geometry\n",
-                     GetID().GetText(), name, stream.rawHandle);
+            TF_DEBUG_GPU_BUFFER_SHARING(
+                "[%s] %s WITHDRAWN: gl=%" PRIu64 " is no longer in the "
+                "render item's geometry\n",
+                GetID().GetText(), name, stream.rawHandle);
             stream = {};
             streamDirty = true;
         };
@@ -932,74 +1030,50 @@ bool MayaHydraGpuRenderItemAdapter::_TopologyNeedsRebuild(
     return emitTopologyLocators || !hasCachedTopology;
 }
 
-// The VP2 semantic of a stream, for log lines that need to say WHICH
-// primvar was or was not shared.
-//
-// Mapped from the enum rather than taken from
-// MVertexBufferDescriptor::semanticName(), which returns MString BY VALUE:
-// asChar() on that temporary would dangle the moment this function
-// returned. String literals have static storage, so these do not.
-static const char *
-_ExtStreamName(MHWRender::MVertexBuffer *mvb)
-{
-    if (!mvb) {
-        return "<none>";
-    }
-    switch (mvb->descriptor().semantic()) {
-    case MGeometry::Semantic::kPosition:        return "position";
-    case MGeometry::Semantic::kNormal:          return "normal";
-    case MGeometry::Semantic::kTexture:         return "texture";
-    case MGeometry::Semantic::kColor:           return "color";
-    case MGeometry::Semantic::kTangent:         return "tangent";
-    case MGeometry::Semantic::kBitangent:       return "bitangent";
-    case MGeometry::Semantic::kTangentWithSign: return "tangentWithSign";
-    case MGeometry::Semantic::kInvalidSemantic: return "<invalid>";
-    }
-    return "<unknown>";
-}
-
 MayaHydraGpuRenderItemAdapter::_ExtPublishResult
 MayaHydraGpuRenderItemAdapter::_PublishExtStream(
     MHWRender::MVertexBuffer *mvb,
     _ExtStream               &stream,
     bool                      allowDirectBind)
 {
+    MH_PROFILE_FUNCTION();
+
 #if defined(_WIN32)
     _CaptureMayaWglContext();
 #elif defined(__linux__)
     _CaptureMayaGlxContext();
 #endif
     if (!mvb || mvb->vertexCount() == 0) {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] no CPU fallback needed: empty vertex buffer\n",
-                 GetID().GetText());
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: VP2 gave empty vertex buffer\n",
+            GetID().GetText(), _ExtStreamName(mvb));
         return _ExtPublishResult::NoGpu;
     }
     void *resourceHandle = mvb->resourceHandle();
     if (!resourceHandle) {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s -> CPU: VP2 gave no resource handle\n",
-                 GetID().GetText(), _ExtStreamName(mvb));
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: VP2 gave no resource handle\n",
+            GetID().GetText(), _ExtStreamName(mvb));
         return _ExtPublishResult::NoGpu;
     }
     // resourceHandle() neither maps the buffer nor triggers a readback, so
     // identity can be checked every frame on every stream for almost nothing.
     const uint64_t rawHandle = _ExtractRawHandle(resourceHandle);
     if (rawHandle == 0) {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s -> CPU: resource handle is null\n",
-                 GetID().GetText(), _ExtStreamName(mvb));
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: resource handle is null\n",
+            GetID().GetText(), _ExtStreamName(mvb));
         return _ExtPublishResult::NoGpu;
     }
 
     const _ExtLayout layout = _GetExtLayout(mvb);
     if (!layout.IsValid()) {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s -> CPU: VP2 element type has no Hd equivalent "
-                 "(dataType=%d dimension=%d)\n",
-                 GetID().GetText(), _ExtStreamName(mvb),
-                 int(mvb->descriptor().dataType()),
-                 mvb->descriptor().dimension());
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: VP2 element type has no Hd equivalent "
+            "(dataType=%d dimension=%d)\n",
+            GetID().GetText(), _ExtStreamName(mvb),
+            int(mvb->descriptor().dataType()),
+            mvb->descriptor().dimension());
         return _ExtPublishResult::NoGpu;
     }
 
@@ -1010,12 +1084,12 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
     if (!bridge) {
         // The negotiation failing, not an error: a VP2 that is not on GL, or
         // an Hgi with no arena to share through.
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s -> CPU: no bridge (renderer Hgi: %s)\n",
-                 GetID().GetText(), _ExtStreamName(mvb),
-                 (sceneIndex && sceneIndex->GetHgi())
-                     ? sceneIndex->GetHgi()->GetAPIName().GetText()
-                     : "<none>");
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: no bridge (renderer Hgi: %s)\n",
+            GetID().GetText(), _ExtStreamName(mvb),
+            (sceneIndex && sceneIndex->GetHgi())
+                ? sceneIndex->GetHgi()->GetAPIName().GetText()
+                : "<none>");
         return _ExtPublishResult::NoGpu;
     }
 
@@ -1034,7 +1108,8 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
     const bool sourceIdentityMatters = bridge.IsZeroCopy();
     const bool layoutMatches = stream.numElements == layout.numElements
         && stream.byteOffset == layout.byteOffset
-        && stream.byteStride == layout.byteStride;
+        && stream.byteStride == layout.byteStride
+        && stream.tupleType == layout.elementType;
 
     // Same stream, same permission: the cached schema already describes it
     // exactly. A byte-only deform lands here -- VP2 rewrote the contents of a
@@ -1053,21 +1128,21 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
         if (!bridge.IsZeroCopy()) {
             if (!bridge.Refresh(stream.buffer, static_cast<uint32_t>(rawHandle),
                                 layout.copyByteSize)) {
-                TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-                    .Msg("[%s] %s -> CPU: %s bridge could not refresh from "
-                         "buffer %" PRIu64 "\n",
-                         GetID().GetText(), _ExtStreamName(mvb),
-                         bridge.Describe(), rawHandle);
+                TF_DEBUG_GPU_BUFFER_SHARING(
+                    "[%s] %s -> CPU: %s bridge could not refresh from "
+                    "buffer %" PRIu64 "\n",
+                    GetID().GetText(), _ExtStreamName(mvb),
+                    bridge.Describe(), rawHandle);
                 return _ExtPublishResult::NoGpu;
             }
             // Only bookkeeping: which buffer the next refresh reads from.
             stream.rawHandle = rawHandle;
         }
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s unchanged: source buffer %" PRIu64 ", %zu elements "
-                 "(nothing republished)\n",
-                 GetID().GetText(), _ExtStreamName(mvb),
-                 rawHandle, layout.numElements);
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s unchanged: source buffer %" PRIu64 ", %zu elements "
+            "(nothing republished)\n",
+            GetID().GetText(), _ExtStreamName(mvb),
+            rawHandle, layout.numElements);
         return _ExtPublishResult::Unchanged;
     }
 
@@ -1091,21 +1166,21 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
             layout.copyByteSize,
             _ExtStreamName(mvb));
         if (!buffer) {
-            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-                .Msg("[%s] %s -> CPU: %s bridge refused GL buffer %" PRIu64
-                     "\n",
-                     GetID().GetText(), _ExtStreamName(mvb),
-                     bridge.Describe(), rawHandle);
+            TF_DEBUG_GPU_BUFFER_SHARING(
+                "[%s] %s -> CPU: %s bridge refused GL buffer %" PRIu64
+                "\n",
+                GetID().GetText(), _ExtStreamName(mvb),
+                bridge.Describe(), rawHandle);
             return _ExtPublishResult::NoGpu;
         }
     } else if (!bridge.IsZeroCopy()
                    && !bridge.Refresh(buffer, static_cast<uint32_t>(rawHandle),
                                       layout.copyByteSize)) {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-            .Msg("[%s] %s -> CPU: %s bridge could not refresh from buffer "
-                 "%" PRIu64 "\n",
-                 GetID().GetText(), _ExtStreamName(mvb), bridge.Describe(),
-                 rawHandle);
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: %s bridge could not refresh from buffer "
+            "%" PRIu64 "\n",
+            GetID().GetText(), _ExtStreamName(mvb), bridge.Describe(),
+            rawHandle);
         return _ExtPublishResult::NoGpu;
     }
 
@@ -1144,19 +1219,20 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
     stream.numElements = layout.numElements;
     stream.byteOffset = layout.byteOffset;
     stream.byteStride = layout.byteStride;
+    stream.tupleType = layout.elementType;
     stream.allowDirectBind = allowDirectBind;
 
     // Logs the numbers the consumer bounds checks (byteOffset + numElements
     // * stride <= byteSize), because byteSize is derived here rather than
     // reported by Maya and getting it too small is the one failure that
     // silently disables sharing for an otherwise healthy stream.
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)
-        .Msg("[%s] %s SHARED via %s%s: gl=%" PRIu64 " elements=%zu "
-             "offset=%zu stride=%zu byteSize=%zu allowDirectBind=%s\n",
-             GetID().GetText(), _ExtStreamName(mvb), bridge.Describe(),
-             bridge.IsZeroCopy() ? "" : " (copied)", rawHandle,
-             layout.numElements, layout.byteOffset, layout.byteStride,
-             layout.byteSize, allowDirectBind ? "yes" : "no");
+    TF_DEBUG_GPU_BUFFER_SHARING(
+        "[%s] %s SHARED via %s%s: gl=%" PRIu64 " elements=%zu "
+        "offset=%zu stride=%zu byteSize=%zu allowDirectBind=%s\n",
+        GetID().GetText(), _ExtStreamName(mvb), bridge.Describe(),
+        bridge.IsZeroCopy() ? "" : " (copied)", rawHandle,
+        layout.numElements, layout.byteOffset, layout.byteStride,
+        layout.byteSize, allowDirectBind ? "yes" : "no");
 
     return _ExtPublishResult::Republished;
 }
@@ -1204,46 +1280,42 @@ MayaHydraGpuRenderItemAdapter::_SetLazyCpuBufferTriggered(
         bit = kLazyCpuUvsBit;
     }
     if (bit != 0) {
-        _lazyCpuBufferTriggeredMask.fetch_or(
+        const uint8_t prev = _lazyCpuBufferTriggeredMask.fetch_or(
             bit, std::memory_order_relaxed);
+        if ((prev & bit) == 0) {
+            TF_DEBUG_GPU_BUFFER_SHARING(
+                "[%s] %s: lazy CPU readback triggered for the FIRST time; "
+                "primvar will now be dirtied on future geometry changes\n",
+                GetID().GetText(), key.GetText());
+        }
     }
 }
 
 VtValue
 MayaHydraGpuRenderItemAdapter::GetExtGpuBufferLazyValue(const TfToken& key) const
 {
+    MH_PROFILE_FUNCTION();
+
+    TF_DEBUG_GPU_BUFFER_SHARING(
+        "[%s] %s: lazy CPU readback requested by consumer\n",
+        GetID().GetText(), key.GetText());
+
     // The adapter is shared by all viewports. Once any consumer pulls this
     // CPU fallback, future changes to that primvar must be dirtied globally;
     // GPU-capable renderers still take extGpuBuffer and avoid this map.
     _SetLazyCpuBufferTriggered(key);
 
     if (key == HdTokens->points) {
-        return _GetExtVertexBufferValue<GfVec3f>(
-            _extPositions.rawHandle,
-            _extPositions.numElements,
-            _extPositions.byteOffset,
-            _extPositions.byteStride);
+        return _GetExtVertexBufferValue<GfVec3f>(_extPositions);
     }
     if (key == HdTokens->normals) {
-        return _GetExtVertexBufferValue<GfVec3f>(
-            _extNormals.rawHandle,
-            _extNormals.numElements,
-            _extNormals.byteOffset,
-            _extNormals.byteStride);
+        return _GetExtVertexBufferValue<GfVec3f>(_extNormals);
     }
     if (key == MayaHydraAdapterTokens->tangents) {
-        return _GetExtVertexBufferValue<GfVec3f>(
-            _extTangents.rawHandle,
-            _extTangents.numElements,
-            _extTangents.byteOffset,
-            _extTangents.byteStride);
+        return _GetExtVertexBufferValue<GfVec3f>(_extTangents);
     }
     if (key == MayaHydraAdapterTokens->st) {
-        return _GetExtVertexBufferValue<GfVec2f>(
-            _extUvs.rawHandle,
-            _extUvs.numElements,
-            _extUvs.byteOffset,
-            _extUvs.byteStride);
+        return _GetExtVertexBufferValue<GfVec2f>(_extUvs);
     }
     return {};
 }
@@ -1256,5 +1328,7 @@ TF_REGISTRY_FUNCTION(TfType)
 {
     TfType::Define<MayaHydraGpuRenderItemAdapter, TfType::Bases<MayaHydraRenderItemAdapter>>();
 }
+
+#undef TF_DEBUG_GPU_BUFFER_SHARING
 
 PXR_NAMESPACE_CLOSE_SCOPE

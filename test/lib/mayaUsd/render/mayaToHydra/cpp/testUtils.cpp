@@ -59,6 +59,7 @@
 #include <exception>
 #include <iostream>
 #include <cstring>
+#include <set>
 
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
@@ -413,21 +414,23 @@ std::filesystem::path getPathToSample(std::string filename)
     return getInputDir() / filename;
 }
 
-// The shared-GPU-buffer overlay depends on the sharing mode (direct/batch, live handle); the CPU
-// values, served through lazy readback when shared, are what the references pin.
-static HdDataSourceBaseHandle withoutExtGpuBuffer(const HdDataSourceBaseHandle& dataSource)
+PXR_NS::HdDataSourceBaseHandle applyFiltering(const PXR_NS::HdDataSourceBaseHandle& dataSource)
 {
     const HdContainerDataSourceHandle container = HdContainerDataSource::Cast(dataSource);
     if (!container) {
         return dataSource;
     }
-    static const TfToken kExtGpuBuffer("extGpuBuffer");
+
+    // The shared-GPU-buffer overlay depends on the sharing mode (direct/batch, live handle); the
+    // CPU values, served through lazy readback when shared, are what the references pin.
+    static const std::set<TfToken> kFilterSet = { TfToken("extGpuBuffer") };
+
     TfTokenVector                       names;
     std::vector<HdDataSourceBaseHandle> values;
     for (const TfToken& name : container->GetNames()) {
-        if (name != kExtGpuBuffer) {
+        if (kFilterSet.find(name) == kFilterSet.end()) {
             names.push_back(name);
-            values.push_back(container->Get(name));
+            values.push_back(applyFiltering(container->Get(name)));
         }
     }
     return HdRetainedContainerDataSource::New(names.size(), names.data(), values.data());
@@ -435,13 +438,14 @@ static HdDataSourceBaseHandle withoutExtGpuBuffer(const HdDataSourceBaseHandle& 
 
 bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
-    std::filesystem::path          referencePath)
+    std::filesystem::path          referencePath,
+    bool                           applyFilter)
 {
     // We'll dump the data source to a file and then read from it. That way we have a trace
     // of what value was used for comparison, and can inspect it in case of failures.
     std::filesystem::path outputPath = getOutputDir() / referencePath.filename();
     std::fstream          outputFile(outputPath, std::ios::out);
-    HdDebugPrintDataSource(outputFile, withoutExtGpuBuffer(dataSource));
+    HdDebugPrintDataSource(outputFile, applyFilter ? applyFiltering(dataSource) : dataSource);
     outputFile.close();
 
     outputFile.open(outputPath, std::ios::in);

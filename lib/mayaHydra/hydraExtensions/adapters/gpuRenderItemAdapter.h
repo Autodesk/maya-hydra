@@ -20,6 +20,7 @@
 #include <mayaHydraLib/adapters/renderItemAdapter.h>
 
 #include <pxr/imaging/hd/extGpuBufferSchema.h>
+#include <pxr/imaging/hd/types.h>
 #include <pxr/pxr.h>
 
 #include <maya/MHWGeometry.h>
@@ -123,11 +124,12 @@ private:
         /// detection: which native buffer, how many elements, and whether we
         /// published permission to bind it directly. A byte-only deform leaves
         /// all three untouched, which is what makes it free.
-        uint64_t rawHandle = 0;
-        size_t   numElements = 0;
-        size_t   byteOffset = 0;
-        size_t   byteStride = 0;
-        bool     allowDirectBind = false;
+        uint64_t    rawHandle = 0;
+        size_t      numElements = 0;
+        size_t      byteOffset = 0;
+        size_t      byteStride = 0;
+        HdTupleType tupleType = { HdTypeInvalid, 1 };
+        bool        allowDirectBind = false;
 
         explicit operator bool() const { return static_cast<bool>(schema); }
     };

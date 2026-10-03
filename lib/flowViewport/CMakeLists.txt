@@ -53,11 +53,6 @@ target_compile_definitions(${TARGET_NAME}
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )
 
-if (USD_HAS_GPU_BUFFER_SHARING)
-    target_compile_definitions(${TARGET_NAME}
-        PRIVATE USD_HAS_GPU_BUFFER_SHARING=1)
-endif()
-
 mayaHydra_compile_config(${TARGET_NAME})
 
 # -----------------------------------------------------------------------------
