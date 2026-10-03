@@ -92,7 +92,7 @@ if (USD_HAS_HGI_VULKAN)
         PRIVATE USD_HAS_HGI_VULKAN=1)
 endif()
 
-# PUBLIC: the layout of MayaHydraRenderItemAdapter depends on it.
+# PUBLIC: consumers include gpuRenderItemAdapter.h and mhExtGpuBufferBridge.h under it.
 if (USD_HAS_GPU_BUFFER_SHARING)
     target_compile_definitions(${TARGET_NAME}
         PUBLIC USD_HAS_GPU_BUFFER_SHARING=1)

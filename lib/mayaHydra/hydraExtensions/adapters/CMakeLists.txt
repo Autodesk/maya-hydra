@@ -55,9 +55,13 @@ set(HEADERS
 if (USD_HAS_GPU_BUFFER_SHARING)
     target_sources(${TARGET_NAME}
         PRIVATE
+            gpuRenderItemAdapter.cpp
             mhExtGpuBufferBridge.cpp
     )
-    list(APPEND HEADERS mhExtGpuBufferBridge.h)
+    list(APPEND HEADERS
+        gpuRenderItemAdapter.h
+        mhExtGpuBufferBridge.h
+    )
 endif()
 
 if (MAYA_HAS_RENDER_ITEM_CULL_MODE_API)

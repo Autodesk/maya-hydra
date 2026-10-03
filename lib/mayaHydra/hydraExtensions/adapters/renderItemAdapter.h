@@ -24,23 +24,18 @@
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/tf/token.h>
-#if defined(USD_HAS_GPU_BUFFER_SHARING)
-#include <pxr/imaging/hd/extGpuBufferSchema.h>
-// MVertexBuffer and MVertexBufferDescriptor. Included explicitly rather than
-// relied on transitively: MHWGeometryUtilities.h below pulls in only
-// MTypes.h, so nothing else here declares them.
-#include <maya/MHWGeometry.h>
-#endif
 #include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/pxr.h>
 
 #include <maya/MDagPath.h>
+// MVertexBuffer and MGeometry, used by the protected stream hooks. MHWGeometryUtilities.h pulls
+// in only MTypes.h, so nothing else here declares them.
+#include <maya/MHWGeometry.h>
 #include <maya/MHWGeometryUtilities.h>
 #include <maya/MMatrix.h>
 
-#include <atomic>
 #include <functional>
 #include <memory>
 
@@ -114,22 +109,6 @@ public:
 
     MAYAHYDRALIB_API
     VtValue Get(const TfToken& key) override;
-
-#if defined(USD_HAS_GPU_BUFFER_SHARING)
-    /// Returns the primvar's externally-owned GPU buffer as an
-    /// HdExtGpuBufferSchema container, or a null handle when the primvar has
-    /// no external buffer.  Consumed by MayaHydraPrimvarsDataSource, which
-    /// overlays it as the primvar's `extGpuBuffer` child.
-    MAYAHYDRALIB_API
-    PXR_NS::HdContainerDataSourceHandle
-    GetExtGpuBufferSchema(const TfToken& key) const;
-
-    /// Materialize the CPU value corresponding to a published external GPU
-    /// buffer. Called only by the lazy primvar value data source when a Hydra
-    /// consumer actually pulls that value.
-    MAYAHYDRALIB_API
-    VtValue GetExtGpuBufferLazyValue(const TfToken& key) const;
-#endif
 
     MAYAHYDRALIB_API
     VtValue GetMaterialResource();
@@ -246,6 +225,59 @@ public:
     MAYAHYDRALIB_API
     bool GetIsReplaceableHighlightWire() const { return _isReplaceableHighlightWire; }
 
+protected:
+    /// Dirty state of each vertex stream, collected over one UpdateFromDelta call.
+    struct _StreamDirty
+    {
+        bool positions = false;
+        bool normals = false;
+        bool uvs = false;
+        bool tangents = false;
+    };
+
+    /// Whether positions from a previous update are held.
+    virtual bool _HasStoredPositions() const { return !_positions.empty(); }
+
+    /// Number of positions held from a previous update.
+    virtual size_t _StoredPositionCount() const { return _positions.size(); }
+
+    /// Called once per UpdateFromDelta, before any vertex stream is read.
+    virtual void _BeginGeometryUpdate(bool /*geomChanged*/, bool /*topoChanged*/) { }
+
+    /// Object-space bounds to publish, given the render item's own bounding box.
+    virtual GfRange3d _ResolveBounds(const GfRange3d& renderItemBounds) const
+    {
+        return renderItemBounds;
+    }
+
+    /// Read one vertex stream of a changed geometry and flag it in \p dirty.
+    virtual void _ReadVertexStream(
+        MVertexBuffer* mvb,
+        bool           topoChanged,
+        bool           useMayaNormals,
+        _StreamDirty&  dirty);
+
+    /// Called after every vertex stream has been read, to settle the final dirty state.
+    virtual void _EndGeometryUpdate(
+        MGeometry*    geom,
+        int           vertexBufferCount,
+        bool          geomChanged,
+        bool          topoChanged,
+        bool          useMayaNormals,
+        _StreamDirty& dirty);
+
+    /// Whether the cached topology is rebuilt from freshly-read indices.
+    virtual bool
+    _TopologyNeedsRebuild(bool /*emitTopologyLocators*/, bool /*hasCachedTopology*/) const
+    {
+        return true;
+    }
+
+    VtVec3fArray _positions = {};
+    VtVec3fArray _normals = {};  //Are per vertex
+    VtVec3fArray _tangents = {}; //Are face varying
+    VtVec2fArray _uvs = {};      //Are face varying
+
 private:
     MAYAHYDRALIB_API
     void _RemoveRprim();
@@ -256,10 +288,6 @@ private:
     SdfPath                     _material;
     MDagPath                    _dagPath;
     std::unique_ptr<HdTopology> _topology = nullptr;
-    VtVec3fArray                _positions = {};
-    VtVec3fArray                _normals = {};//Are per vertex
-    VtVec3fArray                _tangents = {}; //Are face varying
-    VtVec2fArray                _uvs = {}; //Are face varying
     MGeometry::Primitive        _primitive;
     MString                     _name;
     // [0] = shutter centre (current frame), [1] = shutter close, [2] = shutter open.
@@ -278,80 +306,6 @@ private:
     TfToken                     _purposeRenderTag;
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     MRenderItem::CullMode       _cullMode = MRenderItem::CullNone;
-#endif
-
-#if defined(USD_HAS_GPU_BUFFER_SHARING)
-    // GPU buffer sharing state.
-    bool _UseGpuBufferSharing() const;
-
-    enum class _ExtPublishResult
-    {
-        Republished, // schema (re)built: first publish, buffer change, or mode flip
-        Unchanged,   // same buffer, count and mode: cached schema kept as-is
-        NoGpu,       // not shareable with this renderer: caller uses the CPU path
-    };
-
-    /// One primvar stream shared out of a VP2 vertex buffer.
-    struct _ExtStream
-    {
-        /// The HdExtGpuBufferSchema container published to the scene index as
-        /// the primvar's `extGpuBuffer` child (see
-        /// MayaHydraPrimvarsDataSource). Null means this stream has no shared
-        /// buffer and the CPU value is authoritative.
-        PXR_NS::HdContainerDataSourceHandle schema;
-
-        /// The producer's STRONG reference to the shared buffer, and the only
-        /// thing keeping it alive on our side: what travels through the scene
-        /// index is weak, so that a scene-index cache outliving the geometry
-        /// cannot pin GPU memory. Dropping this is how the adapter withdraws a
-        /// buffer -- the arena then releases it once the GPU has retired the
-        /// work that named it, not before.
-        ///
-        /// Held through a forward-declared type on purpose: hd declares
-        /// HgiExternalBuffer without including hgi for the same reason, and
-        /// shared_ptr needs no more than that to be declared, copied and
-        /// destroyed.
-        std::shared_ptr<PXR_NS::HgiExternalBuffer> buffer;
-
-        /// Identity of the VP2 buffer `schema` describes, for change
-        /// detection: which native buffer, how many elements, and whether we
-        /// published permission to bind it directly. A byte-only deform leaves
-        /// all three untouched, which is what makes it free.
-        uint64_t rawHandle = 0;
-        size_t   numElements = 0;
-        size_t   byteOffset = 0;
-        size_t   byteStride = 0;
-        bool     allowDirectBind = false;
-
-        explicit operator bool() const { return static_cast<bool>(schema); }
-    };
-
-    _ExtStream _extPositions;
-    _ExtStream _extNormals;
-    _ExtStream _extUvs;
-    _ExtStream _extTangents;
-
-    /// Publish one primvar stream as a shared GPU buffer, registering it with
-    /// the renderer's arena and rebuilding the cached schema only when it must.
-    /// Returns NoGpu, leaving \p stream untouched, when the stream cannot be
-    /// shared -- no GPU handle, or a renderer that cannot consume VP2's buffers.
-    _ExtPublishResult _PublishExtStream(
-        MHWRender::MVertexBuffer *mvb,
-        _ExtStream               &stream,
-        bool                      allowDirectBind);
-
-    bool _LazyCpuBufferTriggered(const TfToken& key) const;
-    void _SetLazyCpuBufferTriggered(const TfToken& key) const;
-
-    mutable std::atomic<uint8_t> _lazyCpuBufferTriggeredMask { 0 };
-
-    // Hybrid-mode classifier. Starts false so the mesh runs in batch mode
-    // (allowDirectBind=false, GPU-to-GPU blit). Flips to true (sticky) the first
-    // time MVS_changedGeometry/MVS_changedTopo fires on a mesh that already has
-    // a published buffer (filtering out the initial population frame). Once
-    // true, the mesh runs in direct mode (zero-copy). Only consulted when
-    // MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
-    bool _classifiedAsAnimating = false;
 #endif
 };
 

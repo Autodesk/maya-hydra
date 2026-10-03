@@ -22,6 +22,8 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
+#include <mayaHydraLib/adapters/gpuRenderItemAdapter.h>
+
 #include <pxr/imaging/hd/extGpuBufferSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -48,7 +50,7 @@ public:
 
     _ExtGpuBufferLazyValueDataSource(
         const TfToken&                  primvarName,
-        MayaHydraRenderItemAdapter*     adapter)
+        MayaHydraGpuRenderItemAdapter*  adapter)
         : _primvarName(primvarName)
         , _adapter(adapter)
     {
@@ -74,8 +76,8 @@ public:
     }
 
 private:
-    TfToken                       _primvarName;
-    MayaHydraRenderItemAdapter*   _adapter;
+    TfToken                         _primvarName;
+    MayaHydraGpuRenderItemAdapter*  _adapter;
 };
 
 } // namespace
@@ -116,7 +118,7 @@ HdDataSourceBaseHandle MayaHydraPrimvarsDataSource::Get(const TfToken& name)
         MayaHydraPrimvarValueDataSource::New(name, _adapter);
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
     HdContainerDataSourceHandle extGpuBuffer;
-    if (auto* ri = dynamic_cast<MayaHydraRenderItemAdapter*>(_adapter)) {
+    if (auto* ri = dynamic_cast<MayaHydraGpuRenderItemAdapter*>(_adapter)) {
         extGpuBuffer = ri->GetExtGpuBufferSchema(name);
         if (extGpuBuffer) {
             value = _ExtGpuBufferLazyValueDataSource::New(name, ri);
