@@ -1312,6 +1312,8 @@ MStatus MtohRenderOverride::Render(
     if (_needToReplaceSelection){
         _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
         _needToReplaceSelection = false;
+        // No selection notification comes with this replace, so push the outline inputs again.
+        _outlineInputsDirty = true;
     }
 
     const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
