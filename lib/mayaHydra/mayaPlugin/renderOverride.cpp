@@ -262,6 +262,55 @@ bool isPathInSelection(const SdfPathVector& sortedSelectedPaths, const SdfPath& 
     return false;
 }
 
+//! \brief  Split the Fvp selection into the outline's whole-prim paths and instance targets.
+//!
+//! A prim with a PrimSelection that carries no instance indices is selected whole and goes to
+//! \p selectedPaths, sorted like Selection::GetFullySelectedPaths() (isPathInSelection() relies on
+//! it). Otherwise each of its PrimSelections becomes one target of \p selectedTargets, with one
+//! level per instancer of its nested instance indices. The indices are instancer-wide on both
+//! sides, so they pass through unchanged, and the prototype index is dropped: an instancer-wide
+//! index belongs to one prototype. Paths are in the render index namespace, as the selection is.
+void getOutlineSelection(
+    const Fvp::Selection&            selection,
+    SdfPathVector&                   selectedPaths,
+    HVT_NS::Outline::OutlineTargets& selectedTargets)
+{
+    selectedPaths.clear();
+    selectedTargets.clear();
+    for (const auto& [primPath, primSelections] : selection) {
+        const bool selectedWhole = std::any_of(
+            primSelections.begin(), primSelections.end(), [](const Fvp::PrimSelection& s) {
+                return s.nestedInstanceIndices.empty();
+            });
+        if (selectedWhole) {
+            selectedPaths.push_back(primPath);
+            continue;
+        }
+
+        for (const Fvp::PrimSelection& primSelection : primSelections) {
+            HVT_NS::Outline::OutlineTarget target { primPath, {} };
+            for (const Fvp::InstancesSelection& instances : primSelection.nestedInstanceIndices) {
+                // An OutlineTarget has one level per instancer: merge the entries of one
+                // instancer that differ only by prototype.
+                auto level = std::find_if(
+                    target.instanceLevels.begin(),
+                    target.instanceLevels.end(),
+                    [&](const HVT_NS::Outline::OutlineInstanceLevel& l) {
+                        return l.instancer == instances.instancerPath;
+                    });
+                if (level == target.instanceLevels.end()) {
+                    target.instanceLevels.push_back({ instances.instancerPath, {} });
+                    level = std::prev(target.instanceLevels.end());
+                }
+                for (int instanceIndex : instances.instanceIndices) {
+                    level->instanceIndices.push_back(instanceIndex);
+                }
+            }
+            selectedTargets.push_back(std::move(target));
+        }
+    }
+}
+
 //! \brief  Post-multiply onto a projection matrix so the pick region fills the whole viewport.
 MMatrix pickProjectionMatrix(
     const MMatrix& projMatrix,
@@ -1744,10 +1793,14 @@ MStatus MtohRenderOverride::Render(
 
             // Cached so that hover-only pushes don't re-walk the selection. selectionChanged is
             // always true on the first push after Install, so the cache is always seeded.
+            // Instance selections (the Instances pick mode) become targets, so that only the
+            // selected instances are outlined; the Base pass isolates them without copies.
             if (selectionChanged) {
-                _pushedOutlineSelectedPaths = getFullySelectedPaths();
+                getOutlineSelection(
+                    *_selection, _pushedOutlineSelectedPaths, _pushedOutlineSelectedTargets);
             }
             inputs.selectedPaths = _pushedOutlineSelectedPaths;
+            inputs.selectedTargets = _pushedOutlineSelectedTargets;
 
             // Set the lead (last-selected) object. Read on every push since it is cheap and can
             // resolve after the selection change.
@@ -1765,7 +1818,9 @@ MStatus MtohRenderOverride::Render(
             // The prim under the cursor, resolved above by _ResolveHoverPath().
             if (!wantedHoverPath.IsEmpty()) {
                 inputs.hoverPaths = { wantedHoverPath };
-                // A hovered prim already in the selection uses the selected-hover color.
+                // A hovered prim already in the selection uses the selected-hover color. Only
+                // whole selections count: the hover is a whole rprim, so an rprim with only some
+                // instances selected is not hovered as selected.
                 inputs.isHoverSelected = isPathInSelection(inputs.selectedPaths, wantedHoverPath);
             }
 
@@ -2412,6 +2467,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _pushedOutlineHoverPath = SdfPath();
     _pushedOutlineSelectedPaths.clear();
     _pushedOutlineSelectedPaths.shrink_to_fit();
+    _pushedOutlineSelectedTargets.clear();
+    _pushedOutlineSelectedTargets.shrink_to_fit();
     // Reset the legacy wireframe selection-highlight scene indices so they do not survive a
     // clear/reinit cycle (e.g. when toggling the selection-highlight mode).
     _geomSubsetWhSi.Reset();

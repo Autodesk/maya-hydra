@@ -429,10 +429,12 @@ private:
     /// comparing it avoids re-pushing inputs every frame. Render thread only.
     PXR_NS::SdfPath                       _pushedOutlineHoverPath;
 
-    /// Selection currently pushed into the OutlineManager, cached so a hover-only push does not pay
-    /// for Selection::GetFullySelectedPaths(), which walks the whole selection. Render thread only.
-    /// The lead path is deliberately not cached; see the push site.
+    /// Selection currently pushed into the OutlineManager, cached so a hover-only push does not
+    /// walk the whole selection again. Render thread only. Prims selected whole are in the paths,
+    /// instance selections in the targets. The lead path is deliberately not cached; see the push
+    /// site.
     PXR_NS::SdfPathVector                 _pushedOutlineSelectedPaths;
+    HVT_NS::Outline::OutlineTargets       _pushedOutlineSelectedTargets;
 
     /// Keyed by panel name. Entries are created and destroyed with the hover event filter, on the
     /// main thread. Fields are individually atomic, not snapshot-consistent; a torn x/y pair costs
