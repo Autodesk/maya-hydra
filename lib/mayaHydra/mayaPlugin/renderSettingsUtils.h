@@ -25,9 +25,9 @@
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
-#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdRender/settings.h>
 
+#include <string>
 #include <vector>
 
 namespace UFE_VERSIONED_NS {
@@ -72,6 +72,21 @@ enum class RenderSettingsType
 /// Determine the RenderSettingsType from the render delegate.
 RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const PXR_NS::TfToken& rendererName);
 
+/*! \brief Read the raw currentRenderer value from the UsdDefaultRenderDescription node.
+ *
+ *  This reads whatever string is currently stored in the currentRenderer
+ *  attribute of the UsdDefaultRenderDescription singleton node in the Maya
+ *  scene, and returns it as a TfToken. No validation is performed on the
+ *  returned value.
+ *
+ *  \return The raw currentRenderer value, or an empty TfToken if the
+ *  attribute has no value set. A missing UsdDefaultRenderDescription node,
+ *  or a missing currentRenderer attribute on it, also returns an empty
+ *  TfToken, but additionally triggers a TF_VERIFY, since both are expected
+ *  to always be present.
+ */
+PXR_NS::TfToken GetCurrentRenderer();
+
 // Extract the UsdRenderSettings named by the active render description path.
 // Returns the two-segment UFE path (proxy shape, then render settings prim) of
 // the active render settings prim, or an empty path when it does not resolve to
@@ -96,21 +111,39 @@ PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
 
 struct RenderTimes
 {
-    const bool  isAnimated;
-    const MTime startTime;
-    const MTime endTime;
+    /// Inclusive frame range, in Maya UI time units.
+    struct TimeRange
+    {
+        MTime startTime;
+        MTime endTime;
+    };
+
+    const std::vector<TimeRange> timeRanges;
     /// Frame increment, in frames.
     const float timeIncr;
 
-    RenderTimes(bool isAnimated, const MTime& startTime, const MTime& endTime, float timeIncr);
+    RenderTimes(std::vector<TimeRange> timeRanges, float timeIncr);
+
+    /// Total number of frames over all ranges, with the increment applied.
+    int FrameCount() const;
+
+    /// The frames to render, in range order, with the increment applied.
+    std::vector<MTime> FrameTimes() const;
 };
 
 // Get the render times from the Maya scene.
 RenderTimes GetRenderTimes();
 
+// Single-line description of the render times, for debug output.
+std::string RenderTimesDescription(const RenderTimes& renderTimes);
+
+// Notify Maya that batch rendering has started.  On macOS and Linux this
+// registers the renderer process so that Maya can cancel it.
+void SendRenderStarted();
+
 // Report to Maya the progress of a batch render, as an integer percentage of
-// the frames in renderTimes, given the frame that has just finished rendering.
-void SendRenderProgress(const RenderTimes& renderTimes, const MTime& renderedTime);
+// the frames in renderTimes, given the number of frames rendered so far.
+void SendRenderProgress(const RenderTimes& renderTimes, int framesDone);
 
 } // namespace MAYAHYDRA_NS_DEF
 

@@ -34,7 +34,7 @@ If you want to <B>be able to import usd data in maya through [MayaUSD](https://g
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
->NOTE: Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
+>NOTE: Make sure that you don't have any older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
 
 #### 3. Download and Build MayaUSD 
 
@@ -55,11 +55,11 @@ To build the project with UFE support, you will need to use the headers and libr
 https://www.autodesk.com/developer-network/platform-technologies/maya
 
 #### 5. Hydra Viewport Toolbox (HVT)
-[Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) is a set of utilities to help you build hydra-based viewport. HVT is included as a submodule of the maya-hydra repository, and is built automatically when you build maya-hydra.
+[Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) is a set of utilities to help you build a Hydra-based viewport. HVT is included as a submodule of the maya-hydra repository, and is built automatically when you build maya-hydra.
 
 #### 6. Download the source code
 
-Start by cloning the repository and udpate the sub-modules :
+Start by cloning the repository and updating the submodules:
 ```
 git clone https://github.com/Autodesk/maya-hydra 
 git submodule update --init --recursive
@@ -70,7 +70,7 @@ cd maya-hydra
 
 | Location      | Description                                                                                   |
 |-------------  |---------------------------------------------------------------------------------------------  |
-| [lib/adskHydraSceneBrowser](https://github.com/Autodesk/maya-hydra/tree/dev/lib/adskHydraSceneBrowser)| Contains the hydra scene browser to help you debugging the scene indices and usd data |
+| [lib/adskHydraSceneBrowser](https://github.com/Autodesk/maya-hydra/tree/dev/lib/adskHydraSceneBrowser)| Contains the Hydra scene browser to help you debug the scene indices and USD data |
 | [lib/flowViewport](https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport)| Contains the [Flow Viewport Toolkit](https://github.com/Autodesk/maya-hydra/blob/dev/doc/flowViewportToolkit.md) to add hydra primitives scene indices or add filtering scene indices to the viewport.<BR>What you retrieve in this folder is <B>the code that is not maya dependent and could be re-used by another hydra project</B>|
 | [lib/mayaHydra/](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra)| Contains code that is dependent from Maya |
 | [lib/mayaHydra/flowViewportAPIExamples](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples) | Contains samples on how to use the [Flow Viewport Toolkit](https://github.com/Autodesk/maya-hydra/blob/dev/doc/flowViewportToolkit.md) to add hydra primitives scene indices or add filtering scene indices to the viewport|
@@ -255,7 +255,11 @@ The same variable can be set in the environment before running CMake (e.g. from 
 
 **RenderMan (PRMan):** For HdPrman tests, provide the RenderMan locations via CMake cache variables (`-DRMANTREE=...`, `-DRENDERMAN_LOCATION=...` (optional), `-DPIXAR_LICENSE_FILE=...` (license server, format: `port@hostname`), `-DPRMAN_DELEGATE_PLUGIN_PATH=...` (path containing HdPrman `plugInfo.json`)) or via environment variables of the same names. CMake variables take precedence. On Windows, the test harness adds `${RMANTREE}/bin` and `${RMANTREE}/lib` to `PATH` when `RMANTREE` is set.
 
-**Local development:** If `PXR_PLUGINPATH_NAME` or `MAYA_PXR_PLUGINPATH_NAME` is set in your environment when you run CMake, those paths are automatically appended to the test environment. This allows locally-installed Hydra plugins (e.g. HdArnold, HdPrman) to be discovered when running tests. On Windows, use forward slashes or escaped backslashes in the path.
+**Local development:** To add a locally-installed, dependent Hydra render delegate plugin (e.g. HdArnold, HdPrman) to the test environment, set `ADDITIONAL_PXR_PLUGINPATH_NAME` before running CMake (or pass `-DADDITIONAL_PXR_PLUGINPATH_NAME=...`). The test harness propagates those paths to `MAYA_PXR_PLUGINPATH_NAME` so MayaUSD can perform its version check. On Windows, use forward slashes or escaped backslashes in the path.
+
+`MAYA_PXR_PLUGINPATH_NAME` is the correct variable for such dependent/third-party USD plugins: it points to a folder containing a `mayaUsdPlugInfo.json` file, which MayaUSD uses to run a `VersionCheck` (Python/USD/MayaUsd) before registering the plugin with `PlugRegistry`. This avoids loading a plugin that was built against a mismatched USD/MayaUsd/Python version. See maya-usd's [tutorials/import-export-plugin/README.md](https://github.com/Autodesk/maya-usd/blob/dev/tutorials/import-export-plugin/README.md) and [tutorials/import-export-plugin-c++/README.md](https://github.com/Autodesk/maya-usd/blob/dev/tutorials/import-export-plugin-c%2B%2B/README.md) for the full mechanism.
+
+The raw `PXR_PLUGINPATH_NAME` variable is still set internally by the test harness for paths that are compiled together with maya-hydra (no version-mismatch risk), but it should not be used to add dependent/third-party render delegates, since it skips MayaUSD's version check entirely.
 
 ### Using Visual Studio as the generator
 

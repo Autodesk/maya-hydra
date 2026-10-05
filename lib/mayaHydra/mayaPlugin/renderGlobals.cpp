@@ -40,6 +40,17 @@
 // This file is where we build the UI and expose to MEL the global parameters from this plug-in and
 // the parameters from the chosen render delegate.
 
+// Configurations where the Outline selection-highlight mode is not offered (the enum lists
+// "Legacy Selection" only):
+//  - USD <= 24.11: HgiGL corrupts the integer prim ids the outline compute shader samples.
+//  - macOS: not supported.
+// Keep in sync with outlineSelectionHighlight's default in renderGlobals.h,
+// MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in test/testUtils/mtohUtils.py and
+// MAYAHYDRA_OUTLINE_MODE_AVAILABLE in test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
+#if PXR_VERSION <= 2411 || defined(__APPLE__)
+#define MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
 // The following code currently lives inside the pxr namespace, but it would make more sense to 
@@ -399,6 +410,39 @@ void _CreateBoolAttribute(
         MGlobal::optionVarIntValue);
 }
 
+// A bool that lasts only for the session: never restored from or saved to an optionVar, and not
+// storable, so its value reaches neither the user preferences nor a saved scene. Used for the
+// script-only profiling switches, which have no UI: a persisted value would come back on every
+// launch with nothing to show it is on.
+void _CreateSessionOnlyBoolAttribute(
+    MFnDependencyNode& node,
+    const MString&     attrName,
+    bool               defValue)
+{
+    // Discard a value saved by earlier builds, which persisted these settings.
+    if (MGlobal::optionVarExists(attrName)) {
+        MGlobal::removeOptionVar(attrName);
+    }
+
+    const auto attr = node.attribute(attrName);
+    if (!attr.isNull()) {
+        MStatus             status;
+        MFnNumericAttribute nAttr(attr, &status);
+        if (status && nAttr.unitType() == MFnNumericData::kBoolean && !nAttr.isStorable()) {
+            return;
+        }
+        // A storable attribute was created by an earlier build, or loaded from a scene saved by
+        // one. Recreate it so its value is dropped along with it.
+        node.removeAttribute(attr);
+    }
+
+    MFnNumericAttribute nAttr;
+    const auto          obj = nAttr.create(attrName, attrName, MFnNumericData::kBoolean);
+    nAttr.setDefault(defValue);
+    nAttr.setStorable(false);
+    node.addAttribute(obj);
+}
+
 void _CreateIntAttribute(
     MFnDependencyNode&                              node,
     const MString&                                  attrName,
@@ -744,6 +788,30 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                         // Attribute name
            << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
            << ", $fromAE);\n";
+
+        // Dropdown: Outline Selection / Legacy Selection.
+        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
+           << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
+           << quote(_MangleName(MtohTokens->mayaHydraSelectionHighlightMode).GetString())
+           << ','                                                          // Attribute name
+           << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
+           << ", $fromAE);\n";
+
+        // Checkbox, shown only where hover can work: it needs Qt for the cursor position
+        // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
+        // everywhere, so scenes saved on a capable build load on any build.
+#if defined(MAYAHYDRA_HAS_QT) && !defined(MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT)
+        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
+           << ',' << quote("Outline the object under the cursor. Requires the Outline selection "
+                           "highlight mode.")
+           << ','                                                             // Description
+           << quote(_MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting).GetString())
+           << ','                                                             // Attribute name
+           << quote(
+                  MtohTokens->mayaHydraOutlineHoverHighlighting.GetString(),
+                  " (Experimental)") // Label
+           << ", $fromAE);\n";
+#endif
     }
 
     {
@@ -955,6 +1023,61 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             return mayaObject;
         }
     }
+    if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
+#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+        static const TfTokenVector kSelectionHighlightModes = { TfToken("Legacy Selection") };
+#else
+        static const TfTokenVector kSelectionHighlightModes
+            = { TfToken("Outline Selection"), TfToken("Legacy Selection") };
+#endif
+        _CreateEnumAttribute(
+            node,
+            filter.mayaString(),
+            kSelectionHighlightModes,
+            kSelectionHighlightModes[0], // Outline, or Legacy where Outline is unavailable
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only profiling switch, deliberately absent from BuildOptionsMenu: runs the hover hit
+    // test without drawing the hover, so pick cost can be measured apart from draw cost.
+    // Session-only: never restored from user defaults.
+    if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
+        _CreateSessionOnlyBoolAttribute(
+            node, filter.mayaString(), defGlobals.forceEnableInteractiveHitTest);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.outlineHoverHighlighting,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only: deliberately absent from BuildOptionsMenu. Session-only: never restored from
+    // user defaults.
+    if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
+        _CreateSessionOnlyBoolAttribute(
+            node, filter.mayaString(), defGlobals.forceDisableSelectionHighlight);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only: deliberately absent from BuildOptionsMenu. Session-only: never restored from
+    // user defaults.
+    if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
+        _CreateSessionOnlyBoolAttribute(
+            node, filter.mayaString(), defGlobals.enableDefaultOutlines);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
 
     for (const auto& rit : MtohGetRendererSettings()) {
         const auto rendererName = rit.first;
@@ -1154,6 +1277,65 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             filter.mayaString(),
             globals.delegateParams.refineLevel,
             storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
+#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+        TfToken mode("Legacy Selection");
+#else
+        TfToken mode("Outline Selection");
+#endif
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            mode,
+            storeUserSetting);
+        globals.outlineSelectionHighlight = (mode == TfToken("Outline Selection"));
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.outlineHoverHighlighting,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    // Session-only (see _CreateSessionOnlyBoolAttribute): never stored as a user setting.
+    if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.enableDefaultOutlines,
+            false);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    // Session-only (see _CreateSessionOnlyBoolAttribute): never stored as a user setting.
+    if (filter(MtohTokens->mayaHydraForceEnableInteractiveHitTest)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.forceEnableInteractiveHitTest,
+            false);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    // Session-only (see _CreateSessionOnlyBoolAttribute): never stored as a user setting.
+    if (filter(MtohTokens->mayaHydraForceDisableSelectionHighlight)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.forceDisableSelectionHighlight,
+            false);
         if (filter.attributeFilter()) {
             return globals;
         }

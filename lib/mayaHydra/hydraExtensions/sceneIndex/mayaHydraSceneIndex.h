@@ -99,10 +99,34 @@ public:
     // ------------------------------------------------------------------------
     // Maya Hydra scene producer implementations
 
+    /// How the caller wants VP2's legacy selection-highlight wireframes handled for this update.
+    struct RenderItemUpdateOptions
+    {
+        bool legacyMayaNativeHighlightEnabled = true;
+
+        /// Whether the panel being drawn draws wireframes. Decides whether a highlight wire is
+        /// visible.
+        bool viewportDrawsWireframes = false;
+
+        /// Whether any panel using this override draws wireframes. Decides whether a highlight
+        /// wire is translated at all. A union across panels because render item prims are shared
+        /// between panels, and Maya does not re-send a skipped wire.
+        bool anyViewportDrawsWireframes = false;
+
+        /// Reconsider, for this update only, the wires a previous update skipped.
+        bool reconsiderSkippedHighlightWires = false;
+    };
+
     // Method to update render item data translation. Code in this method should pertain
     // ONLY to render items, such that if there is no render item data to be translated,
     // this method should not need to be called.
-    void UpdateRenderItems(const MDataServerOperation::MViewportScene& scene);
+    void UpdateRenderItems(
+        const MDataServerOperation::MViewportScene& scene,
+        const RenderItemUpdateOptions&              options);
+
+    /// Re-evaluate the legacy selection-highlight treatment for every render item already translated.
+    /// Needed because Maya does not re-send unchanged render items when the display style changes.
+    void RefreshRenderItemLegacyHighlightTreatment(const RenderItemUpdateOptions& options);
 
     // Populate data from Maya
     void Populate();
@@ -177,8 +201,10 @@ public:
 
     GfInterval GetCurrentTimeSamplingInterval() const;
 
-    /// True while _Destroy() is in progress. Reentrant Maya callbacks during teardown must
-    /// no-op (see ShouldSkipHydraUpdates()); this is expected, not an error.
+    /// True once _Destroy() has started, and for the rest of this object's life: after an
+    /// explicit _Destroy() the object may outlive its render index as an inert shell.
+    /// Reentrant Maya callbacks during teardown must no-op (see ShouldSkipHydraUpdates());
+    /// this is expected, not an error.
     bool IsTearingDown() const { return _isTearingDown; }
 
     /// Returns the non-owning render index pointer. Must not be called while tearing down;
@@ -321,10 +347,8 @@ private:
     _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
     SdfPath _GetRenderItemPrimPath(const MRenderItem& ri);
     SdfPath GetMaterialPath(const MObject& obj);
-#ifdef CODE_COVERAGE_WORKAROUND
     friend class MtohRenderOverride;
     friend class MAYAHYDRA_NS_DEF::BatchRenderer;
-#endif
     void _Destroy();
 
 private:

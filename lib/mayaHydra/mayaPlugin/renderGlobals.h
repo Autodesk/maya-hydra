@@ -101,7 +101,28 @@ public:
     GfVec4f         colorSelectionHighlightColor = GfVec4f(1.0f, 1.0f, 0.0f, 0.5f);
     bool            colorSelectionHighlight = true;
     bool            wireframeSelectionHighlight = true;
-    float           outlineSelectionWidth = 4.f;
+
+    // The outline replaces the legacy wireframe highlighting rather than adding to it. Same gate as
+    // MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT in renderGlobals.cpp.
+#if PXR_VERSION <= 2411 || defined(__APPLE__)
+    bool            outlineSelectionHighlight = false;
+#else
+    bool            outlineSelectionHighlight = true;
+#endif
+
+    bool            outlineHoverHighlighting = false;
+    // Draws a faint outline on every prim. Its whole-scene prim-id pass runs every frame, so the
+    // cost scales with the scene. Script-only and session-only: never saved to user preferences
+    // or scene files.
+    bool            enableDefaultOutlines = false;
+    // Profiling: runs the per-mouse-move hover pick even when hover is not drawn, to isolate the
+    // pick cost. Hover highlighting already implies the pick. Script-only and session-only: never
+    // saved to user preferences or scene files.
+    bool            forceEnableInteractiveHitTest = false;
+    // Profiling: disables selection highlighting while selection is still tracked, giving the
+    // no-highlight baseline. Script-only and session-only: never saved to user preferences or
+    // scene files.
+    bool            forceDisableSelectionHighlight = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -169,11 +169,24 @@ is a part of.
 Of note are the following selection highlighting scenarios and their corresponding behaviors :
 - Selecting a point instancer in its entirety
   - If the instancer is a top-level instancer, all instances it draws WILL be highlighted.
-  - If the instancer is a prototype, instances of itself drawn by other instancers will NOT be highlighted. 
-    This is an intentional workflow decision from the Hydra for Maya team.
+  - If the instancer is a non-nested prototype (it is instanced by another instancer but is not rooted
+    under it, so it also draws by itself at its own path), instances of itself drawn by other instancers
+    will NOT be highlighted. This is an intentional workflow decision from the Hydra for Maya team.
+  - If the instancer is a nested prototype (rooted under the instancer that instances it), it does not
+    draw by itself, so all instances drawn through its parent instancer(s) WILL be highlighted
+    (HYDRA-2588). The selection is propagated to the instancer's propagated copies, and PiInstancerWhSi
+    highlights a directly selected prototyped instancer.
 - Selecting specific instances of point instancer
   - If the instancer is a top-level instancer, the selected instances it draws WILL be highlighted.
-  - If the instancer is a prototype, the instances it would indirectly draw through instances of itself drawn by other instancers will NOT be highlighted. 
+  - If the instancer is a non-nested prototype, the instances it would indirectly draw through instances
+    of itself drawn by other instancers will NOT be highlighted.
     This is an intentional workflow decision from the Hydra for Maya team.
+  - If the instancer is a nested prototype, the selected instances WILL be highlighted in every instance
+    of it drawn through its parent instancer(s).
 - Selecting a parent prim of a point instancer
-  - (same as selecting a point instancer in its entirety)
+  - If the parent prim is above the top-level instancer, this is the same as selecting the top-level
+    instancer in its entirety : all instances it draws, including those drawn through nested
+    instancers, WILL be highlighted.
+  - If the parent prim is between a nested instancer and the instancer that instances it (e.g. an
+    Xform under the prototypes scope), nothing will be highlighted. This is an intentional workflow
+    decision from the Hydra for Maya team.

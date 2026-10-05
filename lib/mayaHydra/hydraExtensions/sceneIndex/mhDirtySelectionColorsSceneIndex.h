@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef MAYA_HYDRA_SCENE_INDEX_DIRTY_PREVIOUS_LEAD_OBJECT_SCENE_INDEX_H
-#define MAYA_HYDRA_SCENE_INDEX_DIRTY_PREVIOUS_LEAD_OBJECT_SCENE_INDEX_H
+#ifndef MAYA_HYDRA_SCENE_INDEX_DIRTY_SELECTION_COLORS_SCENE_INDEX_H
+#define MAYA_HYDRA_SCENE_INDEX_DIRTY_SELECTION_COLORS_SCENE_INDEX_H
 
 //MayaHydra headers
 #include "mayaHydraLib/api.h"
@@ -26,26 +26,32 @@
 //Usd/Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
+//STL headers
+#include <unordered_set>
+
 
 namespace MAYAHYDRA_NS_DEF {
 
-class MhDirtyLeadObjectSceneIndex;
-typedef PXR_NS::TfRefPtr<MhDirtyLeadObjectSceneIndex> MhDirtyLeadObjectSceneIndexRefPtr;
-typedef PXR_NS::TfRefPtr<const MhDirtyLeadObjectSceneIndex> MhDirtyLeadObjectSceneIndexConstRefPtr;
+class MhDirtySelectionColorsSceneIndex;
+typedef PXR_NS::TfRefPtr<MhDirtySelectionColorsSceneIndex> MhDirtySelectionColorsSceneIndexRefPtr;
+typedef PXR_NS::TfRefPtr<const MhDirtySelectionColorsSceneIndex> MhDirtySelectionColorsSceneIndexConstRefPtr;
 
 
-/// \class MhDirtyLeadObjectSceneIndex
-/// This class is responsible for dirtying the current and previous maya selection lead objects prim
-/// path when a change in the lead object selection has happened.
-class MhDirtyLeadObjectSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
-    , public Fvp::InputSceneIndexUtils<MhDirtyLeadObjectSceneIndex>
+/// \class MhDirtySelectionColorsSceneIndex
+/// Dirties the wireframe and display colors of prims whose selection state changed, so they
+/// re-pull a color that reflects it.
+///
+/// dirtyLeadObjectRelatedSelections() handles a change of which object is the lead;
+/// dirtySelectionRelatedPrims() a change of what is selected.
+class MhDirtySelectionColorsSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<MhDirtySelectionColorsSceneIndex>
 {
 public:
     using ParentClass = PXR_NS::HdSingleInputFilteringSceneIndexBase;
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
-    static MhDirtyLeadObjectSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex){
-        return PXR_NS::TfCreateRefPtr(new MhDirtyLeadObjectSceneIndex(inputSceneIndex));
+    static MhDirtySelectionColorsSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex){
+        return PXR_NS::TfCreateRefPtr(new MhDirtySelectionColorsSceneIndex(inputSceneIndex));
     }
 
     // From HdSceneIndexBase
@@ -57,14 +63,18 @@ public:
         return GetInputSceneIndex()->GetChildPrimPaths(primPath);
     }
 
-    ~MhDirtyLeadObjectSceneIndex() override = default;
+    ~MhDirtySelectionColorsSceneIndex() override = default;
 
     MAYAHYDRALIB_API
     void dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections);
 
+    /// Call with the prims that were selected or deselected.
+    MAYAHYDRALIB_API
+    void dirtySelectionRelatedPrims(const PXR_NS::SdfPathVector& primPaths);
+
 protected:
     
-    MhDirtyLeadObjectSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) 
+    MhDirtySelectionColorsSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) 
     : ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex){}
 
     //From HdSingleInputFilteringSceneIndexBase
@@ -83,10 +93,16 @@ protected:
         _SendPrimsRemoved(entries);
     }
 
+    /// Appends a primvar-colors dirty entry for \p primPath and everything below it, including
+    /// instancer prototypes. \p inoutVisited is shared across all paths of one call to avoid
+    /// duplicate entries when paths overlap.
     MAYAHYDRALIB_API
-    void _DirtyPrimSelectionRecursively(const Fvp::PrimSelection& primSelection, PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const;
+    void _DirtyPrimPathRecursively(
+        const PXR_NS::SdfPath&                                      primPath,
+        PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries&           inoutDirtiedPrimEntries,
+        std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>& inoutVisited) const;
 };
 
 } // namespace MAYAHYDRA_NS_DEF
 
-#endif //MAYA_HYDRA_SCENE_INDEX_DIRTY_PREVIOUS_LEAD_OBJECT_SCENE_INDEX_H
+#endif //MAYA_HYDRA_SCENE_INDEX_DIRTY_SELECTION_COLORS_SCENE_INDEX_H

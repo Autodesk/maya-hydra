@@ -108,6 +108,7 @@ foreach(scene ${STORM_RENDER_SCENES})
     cmake_path(GET scene STEM sceneFileNameNoExt)
     mayaHydra_add_cmd_line_render_test(${scene}
         COPY_SCENE
+        RENDERER HdStormRendererPlugin
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
         RENDERER_ARGS "-x 960 -y 540 -im ${sceneFileNameNoExt}"
@@ -228,6 +229,50 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
         RENDERER_ARGS "-s 5 -e 9"
     )
 
+    # Frame set or frame range rendering is not renderer-specific, so can be
+    # tested with a single renderer.
+    if(folder STREQUAL "arnold")
+        # Test frames set (1, 3, 5-8, 9, 11-14).
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSet
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}FramesSet
+            RENDERER_ARGS "-frames \"1, 3, 5-8, 9, 11-14\""
+        )
+
+        # With step.  The step is applied at each range, so frames 1, 3, 5,
+        # 7, 9, 11 and 13 will be rendered.
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSetStep
+            IMAGE_EXTENSION png
+            TEST_NAME_SUFFIX ${suffix}FramesSetStep
+            RENDERER_ARGS "-frames \"1, 3, 5-8, 9, 11-14\" -b 2"
+        )
+
+        # Invalid frame set: the 8-5 range ends before it starts, which
+        # mayaHydra.renderSettings.frames._parseFrames() rejects, so Render
+        # exits non-zero and renderSettingsMultiImageTest.py returns 1.
+        # WILL_FAIL turns that non-zero exit into a pass.  The baseline
+        # directory is only supplied because the helper requires an existing
+        # one; image comparison is never reached.  Excluded on macOS, where
+        # bin/Render is a wrapper script that does not propagate the real
+        # exit code (see the registeredRenderRenderers comment below).
+        if(NOT IS_MACOSX)
+            cmake_path(GET animcube_scene STEM animcube_stem)
+            mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+                RENDERER ${renderer}
+                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/framesSet
+                IMAGE_EXTENSION png
+                TEST_NAME_SUFFIX ${suffix}FramesSetInvalid
+                RENDERER_ARGS "-frames \"1, 3, 8-5, 9, 11-14\""
+            )
+            set_tests_properties("${animcube_stem}_${suffix}FramesSetInvalid"
+                PROPERTIES WILL_FAIL TRUE)
+        endif()
+    endif()
+
     set(singlecam_fail_arg FAIL 0.05)
     if(folder STREQUAL "storm")
         set(singlecam_fail_arg "")
@@ -317,6 +362,46 @@ foreach(scene ${ARNOLD_MAYABATCH_RENDER_SCENES})
     )
 endforeach()
 
+# Render.exe/CTest coverage for renderer resolution precedence around the
+# USD currentRenderer attribute.  No-flag resolution (Render.exe without
+# -renderer) is covered by testCurrentRendererSelection.py instead: without an
+# explicit -renderer flag, no renderDesc/*.xml <melheader> runs, so plugin
+# loading for that path is a Maya product concern, not something we bootstrap
+# from defaultRenderGlobals in a scene file.
+#
+# renderCurrentFrame_UsdCurrentRendererStorm.ma bakes
+# UsdDefaultRenderDescription.currentRenderer to "HdStormRendererPlugin"
+# directly in the scene file (rather than setting it at runtime, as the
+# Python test does), so pure Render.exe/CTest invocations can exercise the
+# explicit-flag cases below.
+set(scene basic/renderCurrentFrame_UsdCurrentRendererStorm.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+
+# Sanity check: explicit -renderer matches the scene's baked-in
+# currentRenderer attribute (Storm, Hydra V1 render settings). Baseline is the
+# scene's own renderCurrentFrame_UsdCurrentRendererStorm.png (also used by
+# test_UsdCurrentRendererStormIsHonored).
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-rd ../images -im ${sceneFileNameNoExt}"
+)
+
+# Override check: explicit -renderer HdArnoldRendererPlugin must win over the
+# scene's baked-in currentRenderer=HdStormRendererPlugin attribute (HdArnold uses
+# Hydra V2 render settings by default; same as testCurrentRendererSelection.py).
+# Baseline is a copy of renderCurrentFrame_UsdCurrentRendererHonored.png: same
+# scene geometry/lighting, same renderer, so identical expected pixels.
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_ArnoldOverridesStorm
+    RENDERER_ARGS "-im ${sceneFileNameNoExt}_ArnoldOverridesStorm"
+    TEST_NAME_SUFFIX ArnoldOverridesStorm
+)
 
 # Test a render using the fallback USD resolution settings
 set(scene basic/sphereFallbackResolution.ma)
@@ -355,6 +440,21 @@ foreach(folder storm arnold)
         RENDERER ${renderer}
         TEST_NAME_SUFFIX ${suffix}
         RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
+    )
+endforeach()
+
+# Animated rig render.  As frame number resolution is only available for
+# Hydra v2 render settings renderers, HdStorm is excluded here.
+set(scene basic/basicAnimRig.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    mayaHydra_add_cmd_line_render_multi_image_test(${scene}
+        IMAGE_EXTENSION png
+        EXPECTED_IMAGES_DIR basic/${folder}/images/basicAnimRig
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        RENDERER_ARGS "-x 960 -y 540 -s 1 -e 10 -cam \"|camera1_group|camera1\""
     )
 endforeach()
 
@@ -538,6 +638,7 @@ set_tests_properties(
 set(MAYABATCH_TEST_SCRIPT_FILES
     testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
     testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
+    testCurrentRendererSelection.py|depOnPlugins:mtoa
 )
 
 
@@ -572,6 +673,26 @@ foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})
     # Add a ctest label to these tests for easy filtering.
     apply_labels_to_test("${all_labels}" ${target})
 
+endforeach()
+
+# Run as interactive test rather than under mayabatch. On Windows, commandPort is disabled
+# in batch mode, so batchRender (called by mayaBatchRender()) cannot receive progress from the
+# child render process and fails without starting it. Interactive mode behaves the same on
+# all platforms.
+set(INTERACTIVE_TEST_SCRIPT_FILES_RENDER_SETUP
+    testCancelBatchRender.py
+)
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_RENDER_SETUP})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYA_RENDER_DESC_PATH=${CMAKE_INSTALL_PREFIX}/renderDesc"
+    )
+    apply_labels_to_test("${all_labels}" ${target})
 endforeach()
 
 # Hydra scene index dump tests.  Render with the -hsd flag to produce a text

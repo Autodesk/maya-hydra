@@ -70,7 +70,16 @@ public:
 
     FVP_API
     LightingMode GetLightingMode()const {return _lightingMode;}
-    
+
+    /// Enables or disables shadow casting on every light, on top of the lighting mode.
+    /// This backs Maya's global viewport shadow toggle, which applies to all lights
+    /// regardless of their individual shadow attributes.
+    FVP_API
+    void SetShadowsEnabled(bool shadowsEnabled);
+
+    FVP_API
+    bool GetShadowsEnabled()const {return _shadowsEnabled;}
+
     FVP_API
     void SetDisabledLightsPrims(const std::set<PXR_NS::SdfPath>& disabledLightsPrims);
     
@@ -98,6 +107,7 @@ private:
     void _DirtyAllLightsPrims();
 
     LightingMode _lightingMode = LightingMode::kSceneLighting;
+    bool _shadowsEnabled = true;
     PXR_NS::SdfPath _defaultLightPath;
     std::set<PXR_NS::SdfPath> _disabledLightsPrims;
 };
