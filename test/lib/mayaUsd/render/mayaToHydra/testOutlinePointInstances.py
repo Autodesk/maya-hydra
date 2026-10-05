@@ -71,9 +71,8 @@ class TestOutlinePointInstances(mtohUtils.MayaHydraBaseTestCase):
         sn.append(cubesInstance0)
         self.verifySnapshot("instance0.png")
 
-        # Both rows of cubes. Instance 2 becomes the lead. Until the outline colors the lead per
-        # instance (HYDRA-2456 step 4.3), instance 0 also gets the lead color: both are instances
-        # of the same rprims.
+        # Both rows of cubes. Instance 2 becomes the lead; instance 0 switches to the selected color,
+        # although both are instances of the same rprims.
         sn.append(cubesInstance2)
         self.verifySnapshot("instances0and2.png")
 

@@ -262,14 +262,41 @@ bool isPathInSelection(const SdfPathVector& sortedSelectedPaths, const SdfPath& 
     return false;
 }
 
+//! \brief  The outline target of a prim selection.
+//!
+//! One level per instancer of its nested instance indices, none when it carries no instance
+//! indices (the whole prim). The indices are instancer-wide on both sides, so they pass through
+//! unchanged, and the prototype index is dropped: an instancer-wide index belongs to one prototype.
+//! Paths are in the render index namespace, as the selection is.
+HVT_NS::Outline::OutlineTarget toOutlineTarget(const Fvp::PrimSelection& primSelection)
+{
+    HVT_NS::Outline::OutlineTarget target { primSelection.primPath, {} };
+    for (const Fvp::InstancesSelection& instances : primSelection.nestedInstanceIndices) {
+        // An OutlineTarget has one level per instancer: merge the entries of one instancer that
+        // differ only by prototype.
+        auto level = std::find_if(
+            target.instanceLevels.begin(),
+            target.instanceLevels.end(),
+            [&](const HVT_NS::Outline::OutlineInstanceLevel& l) {
+                return l.instancer == instances.instancerPath;
+            });
+        if (level == target.instanceLevels.end()) {
+            target.instanceLevels.push_back({ instances.instancerPath, {} });
+            level = std::prev(target.instanceLevels.end());
+        }
+        for (int instanceIndex : instances.instanceIndices) {
+            level->instanceIndices.push_back(instanceIndex);
+        }
+    }
+    return target;
+}
+
 //! \brief  Split the Fvp selection into the outline's whole-prim paths and instance targets.
 //!
 //! A prim with a PrimSelection that carries no instance indices is selected whole and goes to
 //! \p selectedPaths, sorted like Selection::GetFullySelectedPaths() (isPathInSelection() relies on
-//! it). Otherwise each of its PrimSelections becomes one target of \p selectedTargets, with one
-//! level per instancer of its nested instance indices. The indices are instancer-wide on both
-//! sides, so they pass through unchanged, and the prototype index is dropped: an instancer-wide
-//! index belongs to one prototype. Paths are in the render index namespace, as the selection is.
+//! it). Otherwise each of its PrimSelections becomes one target of \p selectedTargets (see
+//! toOutlineTarget()).
 void getOutlineSelection(
     const Fvp::Selection&            selection,
     SdfPathVector&                   selectedPaths,
@@ -288,25 +315,28 @@ void getOutlineSelection(
         }
 
         for (const Fvp::PrimSelection& primSelection : primSelections) {
-            HVT_NS::Outline::OutlineTarget target { primPath, {} };
-            for (const Fvp::InstancesSelection& instances : primSelection.nestedInstanceIndices) {
-                // An OutlineTarget has one level per instancer: merge the entries of one
-                // instancer that differ only by prototype.
-                auto level = std::find_if(
-                    target.instanceLevels.begin(),
-                    target.instanceLevels.end(),
-                    [&](const HVT_NS::Outline::OutlineInstanceLevel& l) {
-                        return l.instancer == instances.instancerPath;
-                    });
-                if (level == target.instanceLevels.end()) {
-                    target.instanceLevels.push_back({ instances.instancerPath, {} });
-                    level = std::prev(target.instanceLevels.end());
-                }
-                for (int instanceIndex : instances.instanceIndices) {
-                    level->instanceIndices.push_back(instanceIndex);
-                }
-            }
-            selectedTargets.push_back(std::move(target));
+            selectedTargets.push_back(toOutlineTarget(primSelection));
+        }
+    }
+}
+
+//! \brief  Split the lead object's prim selections into the outline's lead path and lead targets.
+//!
+//! The first prim selection without instance indices goes to \p leadPath, the others to
+//! \p leadTargets: level-less for the other whole prims, so every prim of the lead gets the lead
+//! color, with instance levels for instance selections, so that only the lead instances do.
+void getOutlineLead(
+    const Fvp::PrimSelections&       leadSelections,
+    SdfPath&                         leadPath,
+    HVT_NS::Outline::OutlineTargets& leadTargets)
+{
+    leadPath = SdfPath();
+    leadTargets.clear();
+    for (const Fvp::PrimSelection& primSelection : leadSelections) {
+        if (primSelection.nestedInstanceIndices.empty() && leadPath.IsEmpty()) {
+            leadPath = primSelection.primPath;
+        } else {
+            leadTargets.push_back(toOutlineTarget(primSelection));
         }
     }
 }
@@ -1804,13 +1834,13 @@ MStatus MtohRenderOverride::Render(
 
             // Set the lead (last-selected) object. Read on every push since it is cheap and can
             // resolve after the selection change.
+            // An instance lead (the Instances pick mode) becomes a lead target, so that only the
+            // lead instances get the lead color, not every instance of the same prims.
             if (_leadObjectPathTracker) {
-                const auto& leadSelections = _leadObjectPathTracker->getLeadObjectPrimSelections();
-                if (!leadSelections.empty()) {
-                    // OutlineInputs::leadPath is a single path, so if the lead maps to several
-                    // prims, only the first gets the lead color.
-                    inputs.leadPath = leadSelections.front().primPath;
-                }
+                getOutlineLead(
+                    _leadObjectPathTracker->getLeadObjectPrimSelections(),
+                    inputs.leadPath,
+                    inputs.leadTargets);
             }
             // Exclude the selection-highlight prims from the default (whole-scene) outlines.
             inputs.excludePaths = { _highlightHierarchyPrefix };
