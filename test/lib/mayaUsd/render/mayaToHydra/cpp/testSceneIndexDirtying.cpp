@@ -22,6 +22,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 TEST(SceneIndexDirtying, testDirtyingNew)
@@ -40,7 +42,18 @@ TEST(SceneIndexDirtying, testDirtyingNew)
     const auto& addedPrimEntries = notifsAccumulator.GetAddedPrimEntries();
     const auto& removedPrimEntries = notifsAccumulator.GetRemovedPrimEntries();
 
+    // The refresh republishes the scene-wide lighting material, which Hydra Viewport Toolbox
+    // does by adding its glfGlobalMaterial prim again. That is not a repr change: skip it.
+    static const TfToken glfGlobalMaterialType("glfGlobalMaterial");
+    const auto reprAddedPrimCount = std::count_if(
+        addedPrimEntries.begin(), addedPrimEntries.end(),
+        [](const HdSceneIndexObserver::AddedPrimEntry& entry) {
+            return entry.primType != glfGlobalMaterialType;
+        });
+
+
+
     EXPECT_TRUE(dirtiedPrimEntries.size());  // Expect non-zero dirtied prims.
-    EXPECT_FALSE(addedPrimEntries.size());   // Changing Hydra reprs(via reprSelectorSceneIndex) 
+    EXPECT_EQ(reprAddedPrimCount, 0);        // Changing Hydra reprs(via reprSelectorSceneIndex) 
     EXPECT_FALSE(removedPrimEntries.size()); // should not cause prim Addition or removal.
 }
