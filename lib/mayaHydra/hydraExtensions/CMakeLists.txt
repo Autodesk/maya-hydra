@@ -120,9 +120,9 @@ target_link_libraries(${TARGET_NAME}
         gf
         hd
         hdGp
-        hgi
-        hgiGL
-        $<$<BOOL:${USD_HAS_HGI_VULKAN}>:hgiVulkan>
+        $<$<BOOL:${USD_HAS_GPU_BUFFER_SHARING}>:hgi>
+        $<$<BOOL:${USD_HAS_GPU_BUFFER_SHARING}>:hgiGL>
+        $<$<AND:$<BOOL:${USD_HAS_GPU_BUFFER_SHARING}>,$<BOOL:${USD_HAS_HGI_VULKAN}>>:hgiVulkan>
         $<$<BOOL:${CMAKE_WANT_MATERIALX_BUILD}>:hdMtlx>
         hdx
         js
