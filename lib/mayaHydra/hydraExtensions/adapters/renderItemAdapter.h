@@ -30,8 +30,6 @@
 #include <pxr/pxr.h>
 
 #include <maya/MDagPath.h>
-// MVertexBuffer and MGeometry, used by the protected stream hooks. MHWGeometryUtilities.h pulls
-// in only MTypes.h, so nothing else here declares them.
 #include <maya/MHWGeometry.h>
 #include <maya/MHWGeometryUtilities.h>
 #include <maya/MMatrix.h>

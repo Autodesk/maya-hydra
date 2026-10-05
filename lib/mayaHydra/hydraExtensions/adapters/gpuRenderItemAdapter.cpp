@@ -722,27 +722,6 @@ _GetExtVertexBufferValue(
     return VtValue(result);
 }
 
-template <typename T>
-static VtValue
-_GetExtVertexBufferValue(const MayaHydraGpuRenderItemAdapter::_ExtStream& stream)
-{
-    size_t tupleSize = stream.tupleType.type != HdTypeInvalid
-        ? HdDataSizeOfTupleType(stream.tupleType)
-        : 0;
-    if (tupleSize == 0 && stream.schema) {
-        HdExtGpuBufferSchema extSchema(stream.schema);
-        if (auto elemTypeDs = extSchema.GetElementType()) {
-            tupleSize = HdDataSizeOfTupleType(elemTypeDs->GetTypedValue(0.0f));
-        }
-    }
-    return _GetExtVertexBufferValue<T>(
-        stream.rawHandle,
-        stream.numElements,
-        stream.byteOffset,
-        stream.byteStride,
-        tupleSize);
-}
-
 // The VP2 semantic of a stream, for log lines that need to say WHICH
 // primvar was or was not shared.
 //
@@ -1305,17 +1284,31 @@ MayaHydraGpuRenderItemAdapter::GetExtGpuBufferLazyValue(const TfToken& key) cons
     // GPU-capable renderers still take extGpuBuffer and avoid this map.
     _SetLazyCpuBufferTriggered(key);
 
+    // The element type argument only selects T; its value is unused.
+    auto readStream = [](const _ExtStream& stream, auto elementType) {
+        using T = decltype(elementType);
+        const size_t tupleSize = stream.tupleType.type != HdTypeInvalid
+            ? HdDataSizeOfTupleType(stream.tupleType)
+            : 0;
+        return _GetExtVertexBufferValue<T>(
+            stream.rawHandle,
+            stream.numElements,
+            stream.byteOffset,
+            stream.byteStride,
+            tupleSize);
+    };
+
     if (key == HdTokens->points) {
-        return _GetExtVertexBufferValue<GfVec3f>(_extPositions);
+        return readStream(_extPositions, GfVec3f());
     }
     if (key == HdTokens->normals) {
-        return _GetExtVertexBufferValue<GfVec3f>(_extNormals);
+        return readStream(_extNormals, GfVec3f());
     }
     if (key == MayaHydraAdapterTokens->tangents) {
-        return _GetExtVertexBufferValue<GfVec3f>(_extTangents);
+        return readStream(_extTangents, GfVec3f());
     }
     if (key == MayaHydraAdapterTokens->st) {
-        return _GetExtVertexBufferValue<GfVec2f>(_extUvs);
+        return readStream(_extUvs, GfVec2f());
     }
     return {};
 }
