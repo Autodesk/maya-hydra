@@ -473,8 +473,25 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
                 // For now, this only affects selection highlighting.
                 if (propagatedPrim.primType != HdPrimTypeTokens->instancer
                     || !selectedPrimIsDrawnInstancer) {
-                    primSelections.push_back(
-                        { propagatedPrimPath, primSelections.front().nestedInstanceIndices });
+                    // The instance indices of an instancer under the propagated ancestor belong
+                    // to its propagated copy, which is the one drawing them: repath it like the
+                    // prim. Instancers above the ancestor are left unchanged by ReplacePrefix.
+                    auto propagatedInstanceIndices = primSelections.front().nestedInstanceIndices;
+                    for (auto& instancesSelection : propagatedInstanceIndices) {
+                        instancesSelection.instancerPath
+                            = instancesSelection.instancerPath.ReplacePrefix(
+                                ancestorPath, propagatedProtoPath);
+                    }
+                    primSelections.push_back({ propagatedPrimPath, propagatedInstanceIndices });
+                    // UsdImaging inserts the prototype copies drawn by a propagated instancer
+                    // under the original prototype paths, so the rprims it draws are under the
+                    // original selected path, not under the propagated one. Also select them
+                    // through the propagated instancer, which is in their instancer chain, so
+                    // that the outline keeps the selected instances.
+                    if (propagatedInstanceIndices
+                        != primSelections.front().nestedInstanceIndices) {
+                        primSelections.push_back({ primPath, propagatedInstanceIndices });
+                    }
                 }
             }
         }

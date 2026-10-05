@@ -94,5 +94,24 @@ class TestOutlinePointInstances(mtohUtils.MayaHydraBaseTestCase):
         sn.clear()
         self.verifySnapshot("noSelection.png")
 
+    def test_NestedInstanceSelection(self):
+        # CubePointInstancer is nested under ParentPointInstancer: UsdImaging only draws it through
+        # its propagated copy, while the cubes it draws stay under its original path. The outline
+        # must find the selected instances through the copy's instancer.
+        cubeInstancerPath = \
+            "/Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer"
+        # Instance 3 is the green cube at the origin of each row of cubes.
+        greenCubesInstance3 = self.createItem(cubeInstancerPath + "/3")
+
+        sn = ufe.GlobalSelection.get()
+
+        # Only the green cube of each row of cubes (parent instances 0 and 2).
+        sn.clear()
+        sn.append(greenCubesInstance3)
+        self.verifySnapshot("nestedInstance3.png")
+
+        sn.clear()
+        self.verifySnapshot("noSelection.png")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
