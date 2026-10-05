@@ -1,5 +1,89 @@
 # Changelog
 
+## [v0.8.3] - 2026-10-05
+
+**Features:**
+* External cameras Hydra v1 render settings support [#452](https://github.com/Autodesk/maya-hydra/pull/452)
+* Emit Hydra 2.0 data-source locators for Maya dirty updates [#465](https://github.com/Autodesk/maya-hydra/pull/465)
+* Render command line Hydra scene dump functionality [#466](https://github.com/Autodesk/maya-hydra/pull/466)
+* Add warning when marquee selecting with GeomSubset picking and no GeomSubsets are found [#475](https://github.com/Autodesk/maya-hydra/pull/475)
+* Pass OCIO configuration file path to Hydra render delegate [#485](https://github.com/Autodesk/maya-hydra/pull/485)
+* Register Hydra-based renderers with `-cap`/`-cpv` flags [#488](https://github.com/Autodesk/maya-hydra/pull/488)
+* Frame number resolving scene index [#491](https://github.com/Autodesk/maya-hydra/pull/491)
+* Implement `hydraRender` `-cf` and `-f` flags [#495](https://github.com/Autodesk/maya-hydra/pull/495)
+* Add rendering color space resolving scene index [#496](https://github.com/Autodesk/maya-hydra/pull/496)
+* Replace Maya `defaultRenderGlobals` start and end with `UsdRenderSetup` equivalents [#505](https://github.com/Autodesk/maya-hydra/pull/505)
+* Set the active render description prim on the scene globals scene index [#506](https://github.com/Autodesk/maya-hydra/pull/506)
+* Bind the viewport camera prim for non-Storm render delegates [#509](https://github.com/Autodesk/maya-hydra/pull/509)
+* Frame step support [#510](https://github.com/Autodesk/maya-hydra/pull/510)
+* Publish multi-sample transform and primvar data for motion blur [#511](https://github.com/Autodesk/maya-hydra/pull/511)
+* Support animated image names [#514](https://github.com/Autodesk/maya-hydra/pull/514)
+* Add support for depth of field [#516](https://github.com/Autodesk/maya-hydra/pull/516)
+* Simple percentage batch render progress message [#518](https://github.com/Autodesk/maya-hydra/pull/518)
+* Translate Maya depth map shadow settings to shadow light parameters [#522](https://github.com/Autodesk/maya-hydra/pull/522)
+* HdArnold now uses Hydra v2 render settings by default [#524](https://github.com/Autodesk/maya-hydra/pull/524)
+
+**Performance:**
+* Optimize `MarkPrimDirty` [#479](https://github.com/Autodesk/maya-hydra/pull/479)
+* Cache wireframe color in `UpdateRenderItems` [#487](https://github.com/Autodesk/maya-hydra/pull/487)
+* Move `dg_access_mutex` down to where it's actually needed [#489](https://github.com/Autodesk/maya-hydra/pull/489)
+* Fix playback performance regression [#499](https://github.com/Autodesk/maya-hydra/pull/499)
+* Replace multiple heavy static checks with a single boolean test in `UpdateRenderItems` [#504](https://github.com/Autodesk/maya-hydra/pull/504)
+
+**Bugfix:**
+* Fixed material and mesh issues in certain cases [#453](https://github.com/Autodesk/maya-hydra/pull/453)
+* Write rendered image in appropriate location [#454](https://github.com/Autodesk/maya-hydra/pull/454)
+* Fix `-rd` render command line option for animated render product names [#471](https://github.com/Autodesk/maya-hydra/pull/471)
+* Fix external camera resolution for two-segment UFE paths [#474](https://github.com/Autodesk/maya-hydra/pull/474)
+* Fix infinite loop [#481](https://github.com/Autodesk/maya-hydra/pull/481)
+* Fix selection highlight state for USD cameras only updating when changing viewport [#492](https://github.com/Autodesk/maya-hydra/pull/492)
+* Fix bounds checks [#494](https://github.com/Autodesk/maya-hydra/pull/494)
+* Force MayaUSD plugin to be loaded first so versioned plugins are registered before renderer descriptions are queried [#508](https://github.com/Autodesk/maya-hydra/pull/508)
+* Fix `listRenderers` exit code on macOS and Linux [#517](https://github.com/Autodesk/maya-hydra/pull/517)
+* Fix duplicate-USD load risk on macOS [#525](https://github.com/Autodesk/maya-hydra/pull/525)
+* Fix `mhFlowViewportAPILocator` UFE handler mishandling and warning on foreign paths, which slowed scene population [#532](https://github.com/Autodesk/maya-hydra/pull/532)
+
+**Build:**
+* Make MayaHydra compliant with USD 26.05 [#458](https://github.com/Autodesk/maya-hydra/pull/458)
+* Move path mapping support to `MayaUsdProxyShapeSceneIndexBase` [#459](https://github.com/Autodesk/maya-hydra/pull/459)
+* Remove or update outdated comments [#460](https://github.com/Autodesk/maya-hydra/pull/460)
+* Harden the download macro and report errors at configure stage [#467](https://github.com/Autodesk/maya-hydra/pull/467)
+* Update HVT to recent main [#476](https://github.com/Autodesk/maya-hydra/pull/476)
+* Remove `maya-hydra-new-issues.yml` due to security vulnerability [#502](https://github.com/Autodesk/maya-hydra/pull/502)
+* Update to latest MayaUsd naming [#503](https://github.com/Autodesk/maya-hydra/pull/503)
+* Stop stripping `usd_proc.dylib` on macOS since it's unnecessary [#515](https://github.com/Autodesk/maya-hydra/pull/515)
+* Command line render CMake cleanup [#527](https://github.com/Autodesk/maya-hydra/pull/527)
+
+**Documentation:**
+* Updated for new Maya release [#472](https://github.com/Autodesk/maya-hydra/pull/472)
+* Improve Footprint example about update notifications [#484](https://github.com/Autodesk/maya-hydra/pull/484)
+* Update documentation about `MAYA_PXR_PLUGINPATH_NAME` [#539](https://github.com/Autodesk/maya-hydra/pull/539)
+
+**Tests:**
+* Change `arnoldCropRegion` test from Maya to `UsdDefaultRenderSettings` [#455](https://github.com/Autodesk/maya-hydra/pull/455)
+* Re-enable test execution in coverage build and fix on-exit crash [#457](https://github.com/Autodesk/maya-hydra/pull/457)
+* More fixes for USD 26.05 unit tests [#461](https://github.com/Autodesk/maya-hydra/pull/461)
+* Add unit test for HdArnold custom nodes [#462](https://github.com/Autodesk/maya-hydra/pull/462)
+* Add HdArnold v2 render settings tests [#464](https://github.com/Autodesk/maya-hydra/pull/464)
+* Change LookdevX paths in tests [#468](https://github.com/Autodesk/maya-hydra/pull/468)
+* Re-enable `arnold_frames5to9` test and update baseline [#469](https://github.com/Autodesk/maya-hydra/pull/469)
+* Add Arnold custom attributes on Maya node unit test [#470](https://github.com/Autodesk/maya-hydra/pull/470)
+* Support Hydra PRMan in viewport unit tests [#388](https://github.com/Autodesk/maya-hydra/pull/388)
+* Remove workaround on exit in several unit tests [#477](https://github.com/Autodesk/maya-hydra/pull/477)
+* Fix random camera position in `testLightingRenderDelegates` [#478](https://github.com/Autodesk/maya-hydra/pull/478)
+* Retry scene browser file downloads [#480](https://github.com/Autodesk/maya-hydra/pull/480)
+* Fix path environment variables in tests to handle extra USD copy [#483](https://github.com/Autodesk/maya-hydra/pull/483)
+* Add PRMan production render test coverage [#486](https://github.com/Autodesk/maya-hydra/pull/486)
+* Re-enable `renderSettings/AnimCubeRenderSettings` on macOS [#507](https://github.com/Autodesk/maya-hydra/pull/507)
+* Fix `frameNbResolution_Arnold` on macOS [#512](https://github.com/Autodesk/maya-hydra/pull/512)
+* Re-enable HdArnold texturing tests on macOS [#519](https://github.com/Autodesk/maya-hydra/pull/519)
+* Re-enable multi-frame frame number resolution test [#521](https://github.com/Autodesk/maya-hydra/pull/521)
+* Add animated rig unit test [#529](https://github.com/Autodesk/maya-hydra/pull/529)
+* Avoid stdin-related hangs on subprocess and add retries on timeout [#531](https://github.com/Autodesk/maya-hydra/pull/531)
+
+**Miscellaneous:**
+* Remove legacy Maya render settings from Hydra batch rendering [#501](https://github.com/Autodesk/maya-hydra/pull/501)
+
 ## [v0.8.2] - 2026-06-04
 
 **Features:**
