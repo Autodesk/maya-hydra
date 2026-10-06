@@ -431,8 +431,8 @@ private:
 
     /// Selection currently pushed into the OutlineManager, cached so a hover-only push does not
     /// walk the whole selection again. Render thread only. Prims selected whole are in the paths,
-    /// instance selections in the targets. The lead path is deliberately not cached; see the push
-    /// site.
+    /// instance selections and the selected native instances in the targets. The lead path is
+    /// deliberately not cached; see the push site.
     PXR_NS::SdfPathVector                 _pushedOutlineSelectedPaths;
     HVT_NS::Outline::OutlineTargets       _pushedOutlineSelectedTargets;
 

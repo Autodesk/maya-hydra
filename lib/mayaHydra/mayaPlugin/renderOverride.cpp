@@ -115,7 +115,9 @@
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
+#include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/purposeSchema.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/usd/kind/registry.h>
@@ -155,6 +157,8 @@
 #include <exception>
 #include <iterator>
 #include <limits>
+#include <set>
+#include <unordered_map>
 #include <vector>
 
 #include <pxr/base/tf/getenv.h>
@@ -347,14 +351,161 @@ void appendMergedOutlineTargets(
     }
 }
 
+//! \brief  Finds the native instancers drawing the native instances under a prim, for the outline.
+//!
+//! UsdImaging draws the native instances found under a prim P through instancers that it adds at
+//! P/UsdNiPropagatedPrototypes/<binding>/<prototype>/UsdNiInstancer, each drawing one prototype.
+//! P is the stage root for the instances outside any prototype, and the prototype root for the
+//! instances nested in a prototype, so the instancers drawing the instances at or under a path are
+//! under the scope of one of its strict ancestors. Lookups are cached: one finder serves one
+//! outline push, so that a large selection reads each scope once.
+class NativeInstancerFinder
+{
+public:
+    struct Instancer
+    {
+        SdfPath          path;
+        SdfPath          prototype;
+        VtArray<SdfPath> instanceLocations; // By instance index.
+    };
+    using Instancers = std::vector<Instancer>;
+
+    explicit NativeInstancerFinder(HdSceneIndexBaseRefPtr sceneIndex)
+        : _sceneIndex(std::move(sceneIndex))
+    {
+    }
+
+    //! The native instancers that UsdImaging added for the native instances under \p root.
+    const Instancers& GetInstancersUnder(const SdfPath& root)
+    {
+        auto [it, inserted] = _instancersByRoot.try_emplace(root);
+        if (!inserted || !_sceneIndex) {
+            return it->second;
+        }
+        // A UsdImaging name (niInstanceAggregationSceneIndex.cpp), not exported.
+        static const TfToken propagatedPrototypesScope("UsdNiPropagatedPrototypes");
+        const SdfPath scope = root.AppendChild(propagatedPrototypesScope);
+        for (const SdfPath& binding : _sceneIndex->GetChildPrimPaths(scope)) {
+            for (const SdfPath& prototypeBase : _sceneIndex->GetChildPrimPaths(binding)) {
+                for (const SdfPath& instancerPath : _sceneIndex->GetChildPrimPaths(prototypeBase)) {
+                    const HdSceneIndexPrim prim = _sceneIndex->GetPrim(instancerPath);
+                    if (prim.primType != HdPrimTypeTokens->instancer) {
+                        continue;
+                    }
+                    const HdInstancerTopologySchema topology
+                        = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+                    const HdPathArrayDataSourceHandle prototypesDs = topology.GetPrototypes();
+                    const HdPathArrayDataSourceHandle locationsDs
+                        = topology.GetInstanceLocations();
+                    if (!prototypesDs || !locationsDs) {
+                        continue;
+                    }
+                    const VtArray<SdfPath> prototypes = prototypesDs->GetTypedValue(0.0f);
+                    if (prototypes.size() != 1) {
+                        continue;
+                    }
+                    it->second.push_back(
+                        { instancerPath, prototypes[0], locationsDs->GetTypedValue(0.0f) });
+                }
+            }
+        }
+        return it->second;
+    }
+
+private:
+    HdSceneIndexBaseRefPtr                                 _sceneIndex;
+    std::unordered_map<SdfPath, Instancers, SdfPath::Hash> _instancersByRoot;
+};
+
+//! \brief  Append the outline targets of the native instances that \p sortedWholePaths and
+//!         \p targets select.
+//!
+//! A native instance prim has no rprim under it: its instancer draws its prototype elsewhere in the
+//! namespace. So neither a path selected whole nor a target outlines the native instances at or
+//! under its path. For each native instancer drawing some of them, a target on its prototype keeps
+//! them: its levels are those of the selecting target (none for a whole path), plus one on the
+//! instancer.
+//! The instance index is the position in instanceLocations, as in HdInstanceSchema::instanceIndex.
+//! Instancers drawn under the selecting path are skipped: their rprims are already under it.
+//!
+//! \p sortedWholePaths must be sorted, as for isPathInSelection().
+void appendNativeInstanceTargets(
+    NativeInstancerFinder&           finder,
+    const SdfPathVector&             sortedWholePaths,
+    HVT_NS::Outline::OutlineTargets& targets)
+{
+    // The roots whose scope can hold the instancers of the instances at or under path.
+    const auto forEachRoot = [](const SdfPath& path, auto&& fn) {
+        for (SdfPath root = path.GetParentPath(); !root.IsEmpty();
+             root = root.IsAbsoluteRootPath() ? SdfPath() : root.GetParentPath()) {
+            fn(root);
+        }
+    };
+
+    // Targets with instance levels: the native instances under a point instance, or nested in the
+    // prototype of another native instance. Appended targets are not visited again.
+    const size_t targetCount = targets.size();
+    for (size_t iTarget = 0; iTarget < targetCount; ++iTarget) {
+        if (targets[iTarget].instanceLevels.empty()) {
+            continue;
+        }
+        // Copies: push_back() below can reallocate targets.
+        const SdfPath path = targets[iTarget].path;
+        const auto    levels = targets[iTarget].instanceLevels;
+        forEachRoot(path, [&](const SdfPath& root) {
+            for (const auto& instancer : finder.GetInstancersUnder(root)) {
+                if (instancer.path.HasPrefix(path)) {
+                    continue;
+                }
+                VtIntArray indices;
+                for (size_t i = 0; i < instancer.instanceLocations.size(); ++i) {
+                    if (instancer.instanceLocations[i].HasPrefix(path)) {
+                        indices.push_back(static_cast<int>(i));
+                    }
+                }
+                if (!indices.empty()) {
+                    HVT_NS::Outline::OutlineTarget target { instancer.prototype, levels };
+                    target.instanceLevels.push_back({ instancer.path, std::move(indices) });
+                    targets.push_back(std::move(target));
+                }
+            }
+        });
+    }
+
+    // Paths selected whole: one target per instancer, with the instances of all of them.
+    std::set<SdfPath> roots;
+    for (const SdfPath& path : sortedWholePaths) {
+        forEachRoot(path, [&](const SdfPath& root) { roots.insert(root); });
+    }
+    for (const SdfPath& root : roots) {
+        for (const auto& instancer : finder.GetInstancersUnder(root)) {
+            if (isPathInSelection(sortedWholePaths, instancer.path)) {
+                continue;
+            }
+            VtIntArray indices;
+            for (size_t i = 0; i < instancer.instanceLocations.size(); ++i) {
+                if (isPathInSelection(sortedWholePaths, instancer.instanceLocations[i])) {
+                    indices.push_back(static_cast<int>(i));
+                }
+            }
+            if (!indices.empty()) {
+                targets.push_back(
+                    { instancer.prototype, { { instancer.path, std::move(indices) } } });
+            }
+        }
+    }
+}
+
 //! \brief  Split the Fvp selection into the outline's whole-prim paths and instance targets.
 //!
 //! A prim with a PrimSelection that carries no instance indices is selected whole and goes to
 //! \p selectedPaths, sorted like Selection::GetFullySelectedPaths() (isPathInSelection() relies on
 //! it). Otherwise its PrimSelections become targets of \p selectedTargets, merged per instancer
-//! (see appendMergedOutlineTargets()).
+//! (see appendMergedOutlineTargets()). The selected native instances add targets on their
+//! prototypes (see appendNativeInstanceTargets()).
 void getOutlineSelection(
     const Fvp::Selection&            selection,
+    NativeInstancerFinder&           nativeInstancerFinder,
     SdfPathVector&                   selectedPaths,
     HVT_NS::Outline::OutlineTargets& selectedTargets)
 {
@@ -372,25 +523,45 @@ void getOutlineSelection(
 
         appendMergedOutlineTargets(primSelections, selectedTargets);
     }
+    appendNativeInstanceTargets(nativeInstancerFinder, selectedPaths, selectedTargets);
 }
 
 //! \brief  Split the lead object's prim selections into the outline's lead path and lead targets.
 //!
 //! The first prim selection without instance indices goes to \p leadPath, the others to
 //! \p leadTargets: level-less for the other whole prims, so every prim of the lead gets the lead
-//! color, with instance levels for instance selections, so that only the lead instances do.
+//! color, with instance levels for instance selections, so that only the lead instances do. The
+//! native instances of the lead add targets on their prototypes (see
+//! appendNativeInstanceTargets()); then all the whole prims are level-less targets, as a native
+//! instance prim resolves to no prim ID and would make \p leadPath warn.
 void getOutlineLead(
     const Fvp::PrimSelections&       leadSelections,
+    NativeInstancerFinder&           nativeInstancerFinder,
     SdfPath&                         leadPath,
     HVT_NS::Outline::OutlineTargets& leadTargets)
 {
     leadPath = SdfPath();
     leadTargets.clear();
+    SdfPathVector wholePaths;
     for (const Fvp::PrimSelection& primSelection : leadSelections) {
-        if (primSelection.nestedInstanceIndices.empty() && leadPath.IsEmpty()) {
-            leadPath = primSelection.primPath;
+        if (primSelection.nestedInstanceIndices.empty()) {
+            wholePaths.push_back(primSelection.primPath);
         } else {
             leadTargets.push_back(toOutlineTarget(primSelection));
+        }
+    }
+
+    SdfPathVector sortedWholePaths = wholePaths;
+    std::sort(sortedWholePaths.begin(), sortedWholePaths.end());
+    const size_t targetCount = leadTargets.size();
+    appendNativeInstanceTargets(nativeInstancerFinder, sortedWholePaths, leadTargets);
+    const bool hasNativeInstances = leadTargets.size() > targetCount;
+
+    for (const SdfPath& path : wholePaths) {
+        if (leadPath.IsEmpty() && !hasNativeInstances) {
+            leadPath = path;
+        } else {
+            leadTargets.push_back({ path, {} });
         }
     }
 }
@@ -1875,13 +2046,20 @@ MStatus MtohRenderOverride::Render(
         if (outlineLive && (selectionChanged || wantedHoverPath != _pushedOutlineHoverPath)) {
             HVT_NS::Outline::OutlineInputs inputs;
 
+            // Native instances are drawn under their instancers, not under their own paths: they
+            // also become targets, on the prototypes, read from the instancers of this scene index.
+            NativeInstancerFinder nativeInstancerFinder(_selectionSceneIndex);
+
             // Cached so that hover-only pushes don't re-walk the selection. selectionChanged is
             // always true on the first push after Install, so the cache is always seeded.
             // Instance selections (the Instances pick mode) become targets, so that only the
             // selected instances are outlined; the Base pass isolates them without copies.
             if (selectionChanged) {
                 getOutlineSelection(
-                    *_selection, _pushedOutlineSelectedPaths, _pushedOutlineSelectedTargets);
+                    *_selection,
+                    nativeInstancerFinder,
+                    _pushedOutlineSelectedPaths,
+                    _pushedOutlineSelectedTargets);
             }
             inputs.selectedPaths = _pushedOutlineSelectedPaths;
             inputs.selectedTargets = _pushedOutlineSelectedTargets;
@@ -1893,6 +2071,7 @@ MStatus MtohRenderOverride::Render(
             if (_leadObjectPathTracker) {
                 getOutlineLead(
                     _leadObjectPathTracker->getLeadObjectPrimSelections(),
+                    nativeInstancerFinder,
                     inputs.leadPath,
                     inputs.leadTargets);
             }

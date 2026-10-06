@@ -229,6 +229,7 @@ if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
         testOutlinePointInstances.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
+        testOutlineNativeInstances.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
     )
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
         testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
@@ -240,17 +241,19 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineHover.py
     testOutlineRefinement.py
     testOutlinePointInstances.py
+    testOutlineNativeInstances.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to
 # legacy and they get no _legacy counterpart.
 set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
     testGeomSubsetsWireframeHighlight.py # TODO: To support when implementing HYDRA-2458 (geometry subsets)
-    testNativeInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 for native instances
-    # Legacy-only by design: compares wireframe-highlight images. Point instances in outline mode
-    # are covered by testOutlinePointInstances.
+    # Legacy-only by design: these compare wireframe-highlight images. Point instances and native
+    # instances in outline mode are covered by testOutlinePointInstances and
+    # testOutlineNativeInstances.
+    testNativeInstancingWireframeHighlight.py
     testPointInstancingWireframeHighlight.py
-    testStageInstanceablePrimsSelHighlight.py # TODO: To support when implementing HYDRA-2456 for native instances
+    testStageInstanceablePrimsSelHighlight.py
     # TODO: revisit with HYDRA-2457 (wireframe-on-shaded). Outline defers translating a selected
     # object's wireframe render item, so toggling wireframeOnShaded adds a prim instead of dirtying one.
     cpp/testSceneIndexDirtying.py
