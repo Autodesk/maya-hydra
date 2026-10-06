@@ -150,10 +150,12 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <exception>
 #include <iterator>
 #include <limits>
+#include <vector>
 
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/envSetting.h>
@@ -291,12 +293,66 @@ HVT_NS::Outline::OutlineTarget toOutlineTarget(const Fvp::PrimSelection& primSel
     return target;
 }
 
+//! \brief  Append the outline targets of one prim's selections to \p targets, merged.
+//!
+//! The Instances pick mode adds one PrimSelection per selected instance, so a marquee of N
+//! instances would give N targets. Hydra Viewport Toolbox merges them as well, but the targets
+//! cached by the caller are copied and compared on every outline push, hover changes included, so
+//! they are merged once, on the selection change: the targets with one level on the same instancer
+//! become one target listing the sorted union of their indices. Targets with several levels are
+//! kept apart: a union of intersections is not the intersection of the unions.
+void appendMergedOutlineTargets(
+    const Fvp::PrimSelections&       primSelections,
+    HVT_NS::Outline::OutlineTargets& targets)
+{
+    const auto first = static_cast<std::ptrdiff_t>(targets.size());
+    bool       merged = false;
+    for (const Fvp::PrimSelection& primSelection : primSelections) {
+        HVT_NS::Outline::OutlineTarget target = toOutlineTarget(primSelection);
+        if (target.instanceLevels.size() == 1) {
+            // All the selections of one prim share its path: match on the instancer only.
+            const SdfPath& instancer = target.instanceLevels[0].instancer;
+            auto           found = std::find_if(
+                targets.begin() + first,
+                targets.end(),
+                [&](const HVT_NS::Outline::OutlineTarget& t) {
+                    return t.instanceLevels.size() == 1
+                        && t.instanceLevels[0].instancer == instancer;
+                });
+            if (found != targets.end()) {
+                VtIntArray& indices = found->instanceLevels[0].instanceIndices;
+                for (int instanceIndex : target.instanceLevels[0].instanceIndices) {
+                    indices.push_back(instanceIndex);
+                }
+                merged = true;
+                continue;
+            }
+        }
+        targets.push_back(std::move(target));
+    }
+
+    if (!merged) {
+        return;
+    }
+    // Sorted and deduplicated, so that the targets do not depend on the selection order.
+    for (auto it = targets.begin() + first; it != targets.end(); ++it) {
+        if (it->instanceLevels.size() != 1) {
+            continue;
+        }
+        VtIntArray&      indices = it->instanceLevels[0].instanceIndices;
+        std::vector<int> sorted(indices.cbegin(), indices.cend());
+        std::sort(sorted.begin(), sorted.end());
+        sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+        indices = VtIntArray(sorted.begin(), sorted.end());
+    }
+}
+
 //! \brief  Split the Fvp selection into the outline's whole-prim paths and instance targets.
 //!
 //! A prim with a PrimSelection that carries no instance indices is selected whole and goes to
 //! \p selectedPaths, sorted like Selection::GetFullySelectedPaths() (isPathInSelection() relies on
-//! it). Otherwise each of its PrimSelections becomes one target of \p selectedTargets (see
-//! toOutlineTarget()).
+//! it). Otherwise its PrimSelections become targets of \p selectedTargets, merged per instancer
+//! (see appendMergedOutlineTargets()).
 void getOutlineSelection(
     const Fvp::Selection&            selection,
     SdfPathVector&                   selectedPaths,
@@ -314,9 +370,7 @@ void getOutlineSelection(
             continue;
         }
 
-        for (const Fvp::PrimSelection& primSelection : primSelections) {
-            selectedTargets.push_back(toOutlineTarget(primSelection));
-        }
+        appendMergedOutlineTargets(primSelections, selectedTargets);
     }
 }
 
