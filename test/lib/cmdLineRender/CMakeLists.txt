@@ -714,7 +714,9 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
         set(CMD /bin/sh)
         set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer HdArnoldRendererPlugin ${renderer_args} \"${SCENE_PATH}\"")
         set(COMPARE_ARGS "\"${Python3_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${dump_file}\" \"${expected_file}\"")
-        set(CMD_ARGS -c "rm -f \"${dump_file}\"; ${RENDER_ARGS} && ${COMPARE_ARGS}")
+        # Escaped ';', as in mayaHydra_add_cmd_line_render_test(): an unescaped
+        # one splits CMD_ARGS, leaving 'sh -c' to run only the rm and exit 0.
+        set(CMD_ARGS -c "rm -f \"${dump_file}\" \; ${RENDER_ARGS} && ${COMPARE_ARGS}")
     endif()
 
     add_test(
