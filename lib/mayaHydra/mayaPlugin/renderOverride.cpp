@@ -21,6 +21,10 @@
 #include <pxr/imaging/garch/glApi.h>
 
 #include "renderOverride.h"
+
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+#include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
+#endif
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
 
@@ -1293,7 +1297,17 @@ MStatus MtohRenderOverride::Render(
     //     }
     // }
     MH_PROFILE_FUNCTION();
-    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
+    // Name the destination, because Render() running more than once per
+    // refresh is ambiguous without it: two different destinations mean two
+    // panels each drawing their own frame, while the SAME destination twice
+    // means one panel is being rendered twice. Those call for different
+    // answers, and the bare message could not tell them apart.
+    MString destinationName;
+    const auto destination = drawContext.renderingDestination(destinationName);
+    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
+        .Msg("MtohRenderOverride::Render() destination=%s (type %d) scene.changed=%s\n",
+             destinationName.asChar(), int(destination),
+             scene.changed() ? "yes" : "no");
     // We can use the mayaHydraSetVisibleFramePasses command to set the visible passes
 
     // Filled in below once the display style is known; read by renderFrame, which runs later.
@@ -1301,8 +1315,15 @@ MStatus MtohRenderOverride::Render(
 
     auto renderFrame = [&](bool markTime = false) {
         MH_PROFILE_SCOPE("MtohRenderOverride::Render renderFrame lambda");
-        if (scene.changed()) {
-            if (_mayaHydraSceneIndex) {
+        {
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+            // Render items are the only publishers of shared buffers, and the
+            // frame passes below are the consumer's frame, so the producer's
+            // frame has to close here. Opened even when the scene is
+            // unchanged: see MhExtGpuBufferBridge::ProducerFrame.
+            const MhExtGpuBufferBridge::ProducerFrame producerFrame;
+#endif
+            if (scene.changed() && _mayaHydraSceneIndex) {
                 _mayaHydraSceneIndex->UpdateRenderItems(scene, renderItemOptions);
             }
         }
@@ -2523,7 +2544,8 @@ void MtohRenderOverride::_InitHydraResources(
         TfToken("MayaHydraSceneIndex"),
         *renderIndex(),
         MAYA_NATIVE_ROOT,
-        _isUsingHdSt
+        _isUsingHdSt,
+        _hgi.get()
     );
 
     // Data producer merging scene index sets up the Flow Viewport merging scene index, must
@@ -2680,6 +2702,13 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
+
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    // Before the renderer goes, because the bridge's GL objects alias memory
+    // the renderer owns and its imported semaphores need both a current
+    // context and a live diagnostic manager to be destroyed on.
+    MhExtGpuBufferBridge::Shutdown();
+#endif
 
     // Stop render delegates before tearing down scene indices or render indices.
     // Matches hvt::ViewportEngine::CreateRenderer(), which calls Stop() before

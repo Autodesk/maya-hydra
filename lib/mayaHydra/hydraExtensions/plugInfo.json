@@ -13,6 +13,12 @@
                         ],
                         "displayName": "Render item in Hydra for Maya."
                     },
+                    "MayaHydraGpuRenderItemAdapter": {
+                        "bases": [
+                            "MayaHydraRenderItemAdapter"
+                        ],
+                        "displayName": "Render item sharing GPU buffers in Hydra for Maya."
+                    },
                     "MayaHydraDagAdapter": {
                         "bases": [
                             "MayaHydraAdapter"
