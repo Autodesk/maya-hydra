@@ -563,19 +563,25 @@ endif()
 # Example of an absolute path embedded in a .ma file:
 #   setAttr ".ftn" -type "string" "/nonExistentPath//UVChecker.png";
 # The test verifies that such paths can be resolved relative to the specified project.
-# The leading slash (rather than a Windows drive letter, which Maya only treats
-# as a root on Windows) is what makes the path absolute on all three platforms,
-# and therefore what makes Maya take the "absolute path that does not exist"
-# branch of its resolution that falls back to the project's sourceImages rule.
+# The prefix is a leading slash rather than a Windows drive letter so that the
+# path is absolute on all three platforms: MFileObject only treats "D:/..." as
+# rooted on Windows, and an unresolved *relative* path goes through a different
+# branch of Maya's resolution than the unresolved *absolute* path this test is
+# about.
 #
 # Scene and baseline image live under relativePathTest/<renderer>/.
-# Stage UVChecker.png within each test’s temporary Maya project so it can be
+# Stage UVChecker.png within each test's temporary Maya project so it can be
 # resolved via the workspace root when using `-proj`.
 #
+# The staging directory must be spelled "sourceimages", all lowercase: Maya's
+# file rule is named "sourceImages" but maps to a lowercase directory
+# (workspace -fr "sourceImages" "sourceimages"), so a camelCase directory
+# resolves only on case-insensitive filesystems and fails on Linux.
+#
 # Expected test directory layout:
-# .../test/Temporary/<sceneStem>/projects/default   ← what -proj points at
-# ├── images/<sceneStem>.png
-# └── sourceImages/UVChecker.png
+# .../test/Temporary/<sceneStem>/projects/default   <- what -proj points at
+# |__ images/<sceneStem>.png
+# |__ sourceimages/UVChecker.png
 function(_mayaHydra_add_relpath_variant folder)
     _mayaHydra_renderer_for_folder(${folder} renderer suffix)
     _mayaHydra_dep_label_for_folder(${folder} dep_label)
@@ -584,7 +590,7 @@ function(_mayaHydra_add_relpath_variant folder)
     set(proj_dir "${TEST_OUTPUT_ROOT}/${scene_stem}/projects/default")
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/scenes/texturing/storm/UVChecker.png"
-        "${proj_dir}/sourceImages/UVChecker.png"
+        "${proj_dir}/sourceimages/UVChecker.png"
         COPYONLY
     )
 
