@@ -561,8 +561,12 @@ endif()
 # This ensures that relative paths are correctly remapped at load time.
 #
 # Example of an absolute path embedded in a .ma file:
-#   setAttr ".ftn" -type "string" "D:/nonExistentPath//UVChecker.png";
+#   setAttr ".ftn" -type "string" "/nonExistentPath//UVChecker.png";
 # The test verifies that such paths can be resolved relative to the specified project.
+# The leading slash (rather than a Windows drive letter, which Maya only treats
+# as a root on Windows) is what makes the path absolute on all three platforms,
+# and therefore what makes Maya take the "absolute path that does not exist"
+# branch of its resolution that falls back to the project's sourceImages rule.
 #
 # Scene and baseline image live under relativePathTest/<renderer>/.
 # Stage UVChecker.png within each test’s temporary Maya project so it can be

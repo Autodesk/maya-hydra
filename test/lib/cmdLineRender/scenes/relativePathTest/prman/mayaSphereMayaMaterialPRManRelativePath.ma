@@ -172,7 +172,7 @@ createNode script -n "sceneConfigurationScriptNode";
 	setAttr ".st" 6;
 createNode file -n "file1";
 	rename -uid "0F5B9ACC-4403-93F7-29CF-00B4DFFC6996";
-	setAttr ".ftn" -type "string" "D:/nonExistentPath//UVChecker.png";
+	setAttr ".ftn" -type "string" "/nonExistentPath//UVChecker.png";
 	setAttr ".cs" -type "string" "sRGB Encoded Rec.709 (sRGB)";
 createNode place2dTexture -n "place2dTexture1";
 	rename -uid "59D781AA-4BC8-07E6-EAA4-B6BCA642FFE9";
