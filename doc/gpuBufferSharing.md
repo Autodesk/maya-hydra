@@ -392,13 +392,36 @@ The read happens on whatever Hydra worker thread pulls the value, so it cannot
 use `MVertexBuffer::map()`, which Maya restricts to the main thread for most
 buffers. Instead:
 
-- On the first publish, while Maya's context is current, the adapter creates a
-  private GL context in Maya's share group: a hidden window with WGL on
-  Windows, a 1x1 pbuffer with GLX on Linux. Lazy readback is not supported on
-  other platforms.
-- `GetValue()` makes that context current under a mutex and reads Maya's
+- `MhExtGpuBufferReadback` (`adapters/mhExtGpuBufferReadback.cpp`) holds one private GL
+  context in Maya's share group, with its own drawable: a hidden window with
+  WGL on Windows, a 1x1 pbuffer with GLX on Linux. Lazy readback is not
+  supported on other platforms. The context is created on the first publish
+  while Maya's context is current, and kept until the renderer shuts down:
+  Maya renders every VP2 panel with one GL context and never replaces it while
+  running. After the first publish the check is one atomic load.
+- A pull that the prefetch below did not cover takes a global lock -- one
+  thread reads back at a time -- makes that context current, and reads Maya's
   buffer with `glGetNamedBufferSubData`, de-interleaving when the stride is
-  larger than the element.
+  larger than the element. More contexts were measured to make no difference:
+  the driver serializes the round trips regardless.
+- Streams a CPU consumer has pulled before are prefetched. When such a
+  stream is published, the main thread queues a `glCopyNamedBufferSubData`
+  into persistently mapped staging (32 MB chunks, kept across frames). The
+  producer frame's fence covers every copy. The first pull in a frame waits
+  on that fence once; every pull then decodes from mapped memory with no GL
+  call. This replaces one synchronous GPU round trip per stream with one sync
+  per frame. A stream's first pull, and any pull the prefetch missed, reads
+  back on demand. `MAYAHYDRA_GPU_BUFFER_READBACK_PREFETCH=0` disables prefetch, for
+  A/B comparison. Copies are not error-checked in normal runs; with
+  `TF_DEBUG=MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING` each copy is checked with
+  `glGetError`, and a rejected copy falls back to reading back on demand.
+- Readbacks are deduplicated per frame, keyed on GL name, offset, stride,
+  count and element type: shaded and wireframe items on one shape read the
+  same VP2 buffer back once.
+- `MhExtGpuBufferBridge::ProducerFrame` brackets the readback frame. Opening it
+  clears the cache; closing it fences Maya's context, and every lease waits on
+  that fence, ordering the read after VP2's writes. A pull made before the
+  producer's frame closes has no fence to wait on.
 
 The first lazy read of a primvar sets a bit in
 `_lazyCpuBufferTriggeredMask`. From then on that primvar is dirtied on every

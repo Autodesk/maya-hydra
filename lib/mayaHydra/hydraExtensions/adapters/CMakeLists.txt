@@ -57,6 +57,7 @@ if (USD_HAS_GPU_BUFFER_SHARING)
         PRIVATE
             gpuRenderItemAdapter.cpp
             mhExtGpuBufferBridge.cpp
+            mhExtGpuBufferReadback.cpp
     )
     list(APPEND HEADERS
         gpuRenderItemAdapter.h

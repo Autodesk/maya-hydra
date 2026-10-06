@@ -15,6 +15,7 @@
 //
 
 #include "gpuRenderItemAdapter.h"
+#include "mhExtGpuBufferReadback.h"
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
@@ -40,18 +41,12 @@
 #include <maya/MViewport2Renderer.h>
 
 #include <cinttypes> // PRIu64, for the GPU buffer sharing debug output
-#include <cstring>
-#include <mutex>
+#include <cstring> // memcpy; memcpy_s on MSVC
+#include <limits>
 #include <string>
+#include <typeindex>
 #include <utility>
 #include <vector>
-
-#if defined(_WIN32)
-#include <windows.h>
-#elif defined(__linux__)
-#include <GL/glx.h>
-#include <GL/glxext.h>
-#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
@@ -254,391 +249,107 @@ _GetExtLayout(MHWRender::MVertexBuffer *mvb)
     return layout;
 }
 
-// A resource context can be current on only one pull thread at a time. Holding
-// this for the scope also protects one-time platform-context publication.
-std::mutex _mayaResourceContextMutex;
-
-#if defined(_WIN32)
-
-// wglGetProcAddress and creation of a context in Maya's share group are done
-// while Maya's render context is current. The context uses its own hidden
-// window/DC, so a pull worker never competes for Maya's active drawable.
-using _WglCreateContextAttribsArbProc =
-    HGLRC(WINAPI *)(HDC, HGLRC, const int *);
-
-struct _MayaWglContext
+// The stride to read a stream as T with, or 0 when its published layout
+// cannot be read as T.
+template <typename T>
+static size_t
+_ValidatedStride(uint64_t rawHandle, size_t byteStride, size_t tupleSize)
 {
-    HWND window = nullptr;
-    HDC dc = nullptr;
-    HGLRC context = nullptr;
-
-    ~_MayaWglContext()
-    {
-        if (context) {
-            wglDeleteContext(context);
-        }
-        if (dc && window) {
-            ReleaseDC(window, dc);
-        }
-        if (window) {
-            DestroyWindow(window);
-        }
+    const size_t elementSize = sizeof(T);
+    if (tupleSize > 0 && elementSize != tupleSize) {
+        TF_WARN(
+            "Cannot read shared VP2 GL buffer %" PRIu64
+            ": expected element size %zu does not match published layout tuple size %zu",
+            rawHandle, elementSize, tupleSize);
+        return 0;
     }
-};
-
-_MayaWglContext _mayaWglContext;
-
-void
-_CaptureMayaWglContext()
-{
-    const HGLRC mayaContext = wglGetCurrentContext();
-    const HDC mayaDc = wglGetCurrentDC();
-    if (!mayaContext || !mayaDc) {
-        return;
+    const size_t stride = byteStride > 0 ? byteStride : elementSize;
+    if (stride < elementSize) {
+        TF_WARN(
+            "Cannot read shared VP2 GL buffer %" PRIu64
+            ": stride %zu is smaller than element size %zu",
+            rawHandle, stride, elementSize);
+        return 0;
     }
-
-    const auto createContextAttribs =
-        reinterpret_cast<_WglCreateContextAttribsArbProc>(
-            wglGetProcAddress("wglCreateContextAttribsARB"));
-    if (!createContextAttribs) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(_mayaResourceContextMutex);
-    if (_mayaWglContext.context) {
-        return;
-    }
-
-    static constexpr wchar_t WindowClassName[] =
-        L"MayaHydraSharedWglContextWindow";
-    const HINSTANCE instance = GetModuleHandleW(nullptr);
-    WNDCLASSW windowClass {};
-    windowClass.style = CS_OWNDC;
-    windowClass.lpfnWndProc = DefWindowProcW;
-    windowClass.hInstance = instance;
-    windowClass.lpszClassName = WindowClassName;
-    if (!RegisterClassW(&windowClass)
-        && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-        TF_RUNTIME_ERROR(
-            "Could not register the MayaHydra WGL window class "
-            "(error %lu)",
-            static_cast<unsigned long>(GetLastError()));
-        return;
-    }
-
-    const HWND window = CreateWindowExW(
-        0,
-        WindowClassName,
-        L"",
-        WS_POPUP,
-        0,
-        0,
-        1,
-        1,
-        nullptr,
-        nullptr,
-        instance,
-        nullptr);
-    if (!window) {
-        TF_RUNTIME_ERROR(
-            "Could not create the MayaHydra WGL window (error %lu)",
-            static_cast<unsigned long>(GetLastError()));
-        return;
-    }
-
-    const HDC workerDc = GetDC(window);
-    const int pixelFormat = GetPixelFormat(mayaDc);
-    PIXELFORMATDESCRIPTOR pfd {};
-    if (!workerDc
-        || pixelFormat == 0
-        || !DescribePixelFormat(
-            mayaDc, pixelFormat, sizeof(pfd), &pfd)
-        || !SetPixelFormat(workerDc, pixelFormat, &pfd)) {
-        const DWORD error = GetLastError();
-        if (workerDc) {
-            ReleaseDC(window, workerDc);
-        }
-        DestroyWindow(window);
-        TF_RUNTIME_ERROR(
-            "Could not copy Maya's pixel format to the MayaHydra WGL "
-            "window (error %lu)",
-            static_cast<unsigned long>(error));
-        return;
-    }
-
-    constexpr int WglContextMajorVersionArb = 0x2091;
-    constexpr int WglContextMinorVersionArb = 0x2092;
-    constexpr int WglContextProfileMaskArb = 0x9126;
-    constexpr int WglContextCompatibilityProfileBitArb = 0x00000002;
-    const int attribs[] = {
-        WglContextMajorVersionArb, 4,
-        WglContextMinorVersionArb, 5,
-        WglContextProfileMaskArb,
-        WglContextCompatibilityProfileBitArb,
-        0
-    };
-
-    SetLastError(ERROR_SUCCESS);
-    const HGLRC workerContext =
-        createContextAttribs(workerDc, mayaContext, attribs);
-    if (!workerContext) {
-        const DWORD error = GetLastError();
-        ReleaseDC(window, workerDc);
-        DestroyWindow(window);
-        TF_RUNTIME_ERROR(
-            "Could not create a WGL context sharing Maya's resources "
-            "through a hidden window (error %lu)",
-            static_cast<unsigned long>(error));
-        return;
-    }
-
-    _mayaWglContext.window = window;
-    _mayaWglContext.dc = workerDc;
-    _mayaWglContext.context = workerContext;
+    return stride;
 }
 
-#elif defined(__linux__)
-
-using _GlxCreateContextAttribsArbProc =
-    GLXContext (*)(Display*, GLXFBConfig, GLXContext, Bool, const int*);
-
-struct _MayaGlxContext
+// Bytes a stream of \p numElements occupies from its first element: the
+// last element is counted at its own size, not a full stride. Saturates
+// instead of wrapping, so a bounds check against the result cannot be fooled
+// by an overflowing layout.
+template <typename T>
+static size_t
+_SpanBytes(size_t numElements, size_t stride)
 {
-    Display* display = nullptr;
-    GLXPbuffer pbuffer = 0;
-    GLXContext context = nullptr;
-
-    ~_MayaGlxContext()
-    {
-        if (context && display) {
-            glXDestroyContext(display, context);
-        }
-        if (pbuffer && display) {
-            glXDestroyPbuffer(display, pbuffer);
-        }
+    if (numElements == 0) {
+        return 0;
     }
-};
-
-_MayaGlxContext _mayaGlxContext;
-
-void
-_CaptureMayaGlxContext()
-{
-    Display* const display = glXGetCurrentDisplay();
-    const GLXContext mayaContext = glXGetCurrentContext();
-    if (!display || !mayaContext) {
-        return;
+    if (stride != 0
+        && numElements - 1 > (std::numeric_limits<size_t>::max() - sizeof(T)) / stride) {
+        return std::numeric_limits<size_t>::max();
     }
-
-    const auto createContextAttribs =
-        reinterpret_cast<_GlxCreateContextAttribsArbProc>(
-            glXGetProcAddressARB(
-                reinterpret_cast<const GLubyte*>(
-                    "glXCreateContextAttribsARB")));
-    if (!createContextAttribs) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(_mayaResourceContextMutex);
-    if (_mayaGlxContext.context) {
-        return;
-    }
-
-    int fbConfigId = 0;
-    int screen = 0;
-    if (glXQueryContext(
-            display, mayaContext, GLX_FBCONFIG_ID, &fbConfigId) != Success
-        || glXQueryContext(
-            display, mayaContext, GLX_SCREEN, &screen) != Success) {
-        TF_RUNTIME_ERROR(
-            "Could not query Maya's GLX context configuration");
-        return;
-    }
-
-    const int fbConfigAttribs[] = {
-        GLX_FBCONFIG_ID, fbConfigId,
-        None
-    };
-    int fbConfigCount = 0;
-    GLXFBConfig* const fbConfigs =
-        glXChooseFBConfig(
-            display, screen, fbConfigAttribs, &fbConfigCount);
-    if (!fbConfigs || fbConfigCount == 0) {
-        if (fbConfigs) {
-            XFree(fbConfigs);
-        }
-        TF_RUNTIME_ERROR(
-            "Could not find Maya's GLX framebuffer configuration");
-        return;
-    }
-    const GLXFBConfig fbConfig = fbConfigs[0];
-    XFree(fbConfigs);
-
-    const int pbufferAttribs[] = {
-        GLX_PBUFFER_WIDTH, 1,
-        GLX_PBUFFER_HEIGHT, 1,
-        None
-    };
-    const GLXPbuffer pbuffer =
-        glXCreatePbuffer(display, fbConfig, pbufferAttribs);
-    if (!pbuffer) {
-        TF_RUNTIME_ERROR(
-            "Could not create the MayaHydra GLX pbuffer");
-        return;
-    }
-
-    const int contextAttribs[] = {
-        GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
-        GLX_CONTEXT_MINOR_VERSION_ARB, 5,
-        GLX_CONTEXT_PROFILE_MASK_ARB,
-        GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-        None
-    };
-    const GLXContext workerContext = createContextAttribs(
-        display, fbConfig, mayaContext, True, contextAttribs);
-    if (!workerContext) {
-        glXDestroyPbuffer(display, pbuffer);
-        TF_RUNTIME_ERROR(
-            "Could not create a GLX context sharing Maya's resources");
-        return;
-    }
-
-    _mayaGlxContext.display = display;
-    _mayaGlxContext.pbuffer = pbuffer;
-    _mayaGlxContext.context = workerContext;
+    return (numElements - 1) * stride + sizeof(T);
 }
 
-#endif
-
-// Lease the private drawable/context created in Maya's share group.
-class MayaResourceContextScope
+// Copy \p count bytes into a destination of \p dstBytes, refusing to write
+// past it. memcpy_s where the C library provides it (MSVC; glibc and Apple's
+// libc do not), an explicit check otherwise.
+static bool
+_CopyBytes(void* dst, size_t dstBytes, const void* src, size_t count)
 {
-public:
 #if defined(_WIN32)
-    MayaResourceContextScope()
-        : _contextLock(_mayaResourceContextMutex)
-    {
-        _dc = _mayaWglContext.dc;
-        _context = _mayaWglContext.context;
-        if (!_context || !_dc) {
-            TF_CODING_ERROR(
-                "Cannot read a shared VP2 vertex buffer before the "
-                "MayaHydra shared WGL context has been created");
-            return;
-        }
-
-        _previousContext = wglGetCurrentContext();
-        _previousDc = wglGetCurrentDC();
-        if (!wglMakeCurrent(_dc, _context)) {
-            TF_RUNTIME_ERROR(
-                "Could not make the hidden-window WGL context current "
-                "(error %lu)",
-                static_cast<unsigned long>(GetLastError()));
-            return;
-        }
-        _isCurrent = true;
-    }
-
-    ~MayaResourceContextScope()
-    {
-        if (_isCurrent) {
-            if (_previousContext) {
-                TF_VERIFY(
-                    wglMakeCurrent(_previousDc, _previousContext),
-                    "Could not restore the worker's previous WGL context");
-            } else {
-                TF_VERIFY(
-                    wglMakeCurrent(nullptr, nullptr),
-                    "Could not release the shared WGL context");
-            }
-        }
-    }
-#elif defined(__linux__)
-    MayaResourceContextScope()
-        : _contextLock(_mayaResourceContextMutex)
-    {
-        _display = _mayaGlxContext.display;
-        _pbuffer = _mayaGlxContext.pbuffer;
-        _context = _mayaGlxContext.context;
-        if (!_display || !_pbuffer || !_context) {
-            TF_CODING_ERROR(
-                "Cannot read a shared VP2 vertex buffer before the "
-                "MayaHydra shared GLX context has been created");
-            return;
-        }
-
-        _previousDisplay = glXGetCurrentDisplay();
-        _previousDraw = glXGetCurrentDrawable();
-        _previousRead = glXGetCurrentReadDrawable();
-        _previousContext = glXGetCurrentContext();
-        if (!glXMakeContextCurrent(
-                _display, _pbuffer, _pbuffer, _context)) {
-            TF_RUNTIME_ERROR(
-                "Could not make the MayaHydra GLX pbuffer context current");
-            return;
-        }
-        _isCurrent = true;
-    }
-
-    ~MayaResourceContextScope()
-    {
-        if (_isCurrent) {
-            if (_previousContext && _previousDisplay) {
-                TF_VERIFY(
-                    glXMakeContextCurrent(
-                        _previousDisplay,
-                        _previousDraw,
-                        _previousRead,
-                        _previousContext),
-                    "Could not restore the worker's previous GLX context");
-            } else {
-                TF_VERIFY(
-                    glXMakeContextCurrent(
-                        _display, None, None, nullptr),
-                    "Could not release the MayaHydra GLX context");
-            }
-        }
-    }
+    return ::memcpy_s(dst, dstBytes, src, count) == 0;
 #else
-    MayaResourceContextScope()
-        : _contextLock(_mayaResourceContextMutex)
-    {
-        TF_CODING_ERROR(
-            "Lazy external GPU-buffer readback is unsupported on this "
-            "platform");
+    if (count > dstBytes) {
+        return false;
+    }
+    std::memcpy(dst, src, count);
+    return true;
+#endif
+}
+
+// De-interleave a stream's span -- its bytes from byteOffset on, in VP2's
+// layout, \p spanBytes long -- into a VtArray. Pure CPU, so it runs on any
+// thread. Returns an empty array when the layout would read past the span.
+template <typename T>
+static VtValue
+_DecodeStream(
+    const unsigned char* span,
+    size_t               spanBytes,
+    size_t               numElements,
+    size_t               stride)
+{
+    const size_t required = _SpanBytes<T>(numElements, stride);
+    if (required > spanBytes) {
+        TF_WARN(
+            "Cannot decode shared VP2 stream: %zu elements at stride %zu need "
+            "%zu bytes, but only %zu were read",
+            numElements, stride, required, spanBytes);
+        return VtValue(VtArray<T>());
     }
 
-    ~MayaResourceContextScope() = default;
-#endif
+    VtArray<T> result(numElements);
+    const size_t resultBytes = numElements * sizeof(T);
+    bool copied = true;
+    if (stride == sizeof(T)) {
+        copied = _CopyBytes(result.data(), resultBytes, span, resultBytes);
+    } else {
+        for (size_t i = 0; i < numElements && copied; ++i) {
+            copied = _CopyBytes(
+                &result[i], resultBytes - i * sizeof(T), span + i * stride, sizeof(T));
+        }
+    }
+    if (!copied) {
+        TF_WARN("Could not decode shared VP2 stream of %zu elements", numElements);
+        return VtValue(VtArray<T>());
+    }
+    return VtValue(result);
+}
 
-    MayaResourceContextScope(const MayaResourceContextScope&) = delete;
-    MayaResourceContextScope& operator=(
-        const MayaResourceContextScope&) = delete;
-
-    explicit operator bool() const { return _isCurrent; }
-
-private:
-    std::unique_lock<std::mutex> _contextLock;
-#if defined(_WIN32)
-    HDC                          _dc = nullptr;
-    HGLRC                        _context = nullptr;
-    HDC                          _previousDc = nullptr;
-    HGLRC                        _previousContext = nullptr;
-    bool                         _isCurrent = false;
-#elif defined(__linux__)
-    Display*                       _display = nullptr;
-    GLXPbuffer                     _pbuffer = 0;
-    GLXContext                     _context = nullptr;
-    Display*                       _previousDisplay = nullptr;
-    GLXDrawable                    _previousDraw = None;
-    GLXDrawable                    _previousRead = None;
-    GLXContext                     _previousContext = nullptr;
-    bool                           _isCurrent = false;
-#else
-    bool _isCurrent = false;
-#endif
-};
-
+// Synchronous readback of one stream through the shared readback context,
+// under its global lock: one GPU round trip. Used for a stream's first pull,
+// and for any pull the prefetch missed.
 template <typename T>
 static VtValue
 _GetExtVertexBufferValue(
@@ -653,7 +364,12 @@ _GetExtVertexBufferValue(
         return VtValue(result);
     }
 
-    MayaResourceContextScope resourceContext;
+    const size_t stride = _ValidatedStride<T>(rawHandle, byteStride, tupleSize);
+    if (stride == 0) {
+        return VtValue(result);
+    }
+
+    MhExtGpuBufferReadback::Lease resourceContext;
     if (!resourceContext) {
         return VtValue(result);
     }
@@ -666,49 +382,28 @@ _GetExtVertexBufferValue(
         return VtValue(result);
     }
 
-    const size_t elementSize = sizeof(T);
-    if (tupleSize > 0 && elementSize != tupleSize) {
-        TF_WARN(
-            "Cannot read shared VP2 GL buffer %" PRIu64
-            ": expected element size %zu does not match published layout tuple size %zu",
-            rawHandle, elementSize, tupleSize);
-        return VtValue(result);
-    }
-
-    const size_t stride = byteStride > 0 ? byteStride : elementSize;
-    if (stride < elementSize) {
-        TF_WARN(
-            "Cannot read shared VP2 GL buffer %" PRIu64
-            ": stride %zu is smaller than element size %zu",
-            rawHandle, stride, elementSize);
-        return VtValue(result);
-    }
-
-    result.resize(numElements);
     // Do not use MVertexBuffer::map() here. Although it can happen to work
     // with some VP2 buffers, Maya limits direct OGSMayaVertexBuffer access to
     // the main thread unless the buffer is software-staged or dual-memory.
     // This lazy value is pulled on Hydra workers, so read through the shared
     // GL context without entering Maya's main-thread-only buffer bookkeeping.
-    if (stride == elementSize) {
+    VtValue value;
+    if (stride == sizeof(T)) {
+        result.resize(numElements);
         glGetNamedBufferSubData(
             static_cast<GLuint>(rawHandle),
             static_cast<GLintptr>(byteOffset),
-            static_cast<GLsizeiptr>(numElements * elementSize),
+            static_cast<GLsizeiptr>(numElements * sizeof(T)),
             result.data());
+        value = VtValue(result);
     } else {
-        const size_t spanSize =
-            (numElements - 1) * stride + elementSize;
-        std::vector<unsigned char> bytes(spanSize);
+        std::vector<unsigned char> bytes(_SpanBytes<T>(numElements, stride));
         glGetNamedBufferSubData(
             static_cast<GLuint>(rawHandle),
             static_cast<GLintptr>(byteOffset),
-            static_cast<GLsizeiptr>(spanSize),
+            static_cast<GLsizeiptr>(bytes.size()),
             bytes.data());
-        for (size_t i = 0; i < numElements; ++i) {
-            std::memcpy(
-                &result[i], bytes.data() + i * stride, elementSize);
-        }
+        value = _DecodeStream<T>(bytes.data(), bytes.size(), numElements, stride);
     }
 
     const GLenum error = glGetError();
@@ -717,9 +412,39 @@ _GetExtVertexBufferValue(
             "Could not read shared VP2 GL buffer %" PRIu64
             " (OpenGL error 0x%x)",
             rawHandle, static_cast<unsigned int>(error));
-        result.clear();
+        return VtValue(VtArray<T>());
     }
-    return VtValue(result);
+    return value;
+}
+
+// The readback key of a stream materialized as T. Prefetch and pull must
+// build it identically, or every prefetched stream is read back twice.
+// Templated on the stream so it can take the adapter's private stream type.
+template <typename T, typename Stream>
+static MhExtGpuBufferReadback::ReadKey
+_ReadKeyFor(const Stream& stream)
+{
+    return { stream.rawHandle,
+             stream.byteOffset,
+             stream.byteStride,
+             stream.numElements,
+             std::type_index(typeid(T)) };
+}
+
+// Queue a stream's span for this frame's batched readback.
+template <typename T, typename Stream>
+static void
+_PrefetchStream(const Stream& stream)
+{
+    if (stream.rawHandle == 0 || stream.numElements == 0) {
+        return;
+    }
+    const size_t stride = stream.byteStride > 0 ? stream.byteStride : sizeof(T);
+    if (stride < sizeof(T)) {
+        return;
+    }
+    MhExtGpuBufferReadback::Prefetch(
+        _ReadKeyFor<T>(stream), _SpanBytes<T>(stream.numElements, stride));
 }
 
 // The VP2 semantic of a stream, for log lines that need to say WHICH
@@ -868,9 +593,21 @@ bool MayaHydraGpuRenderItemAdapter::_ShareStream(
     // and Storm reads the new bytes straight from the aliased buffer. It dirties
     // on an identity/mode change (Republished), in batch mode (re-blit every
     // update), or once a consumer has pulled the lazy CPU fallback.
+    const bool lazyCpuConsumer = _LazyCpuBufferTriggered(key);
     if (res == _ExtPublishResult::Republished || !_useDirectBind || alwaysDirty
-        || _LazyCpuBufferTriggered(key)) {
+        || lazyCpuConsumer) {
         dirty = true;
+    }
+    // A CPU consumer has pulled this stream before and, being dirtied above,
+    // will pull it again this frame: queue its readback now, batched under
+    // the producer frame's fence, instead of paying a GPU round trip per
+    // stream at pull time. The element types match GetExtGpuBufferLazyValue.
+    if (lazyCpuConsumer) {
+        if (key == MayaHydraAdapterTokens->st) {
+            _PrefetchStream<GfVec2f>(stream);
+        } else {
+            _PrefetchStream<GfVec3f>(stream);
+        }
     }
     return true;
 }
@@ -1017,11 +754,7 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
 {
     MH_PROFILE_FUNCTION();
 
-#if defined(_WIN32)
-    _CaptureMayaWglContext();
-#elif defined(__linux__)
-    _CaptureMayaGlxContext();
-#endif
+    MhExtGpuBufferReadback::Capture();
     if (!mvb || mvb->vertexCount() == 0) {
         TF_DEBUG_GPU_BUFFER_SHARING(
             "[%s] %s -> CPU: VP2 gave empty vertex buffer\n",
@@ -1290,12 +1023,26 @@ MayaHydraGpuRenderItemAdapter::GetExtGpuBufferLazyValue(const TfToken& key) cons
         const size_t tupleSize = stream.tupleType.type != HdTypeInvalid
             ? HdDataSizeOfTupleType(stream.tupleType)
             : 0;
-        return _GetExtVertexBufferValue<T>(
-            stream.rawHandle,
-            stream.numElements,
-            stream.byteOffset,
-            stream.byteStride,
-            tupleSize);
+        // Served from this frame's prefetch when _ShareStream queued one,
+        // otherwise read back on demand. Either way, items drawing from the
+        // same VP2 buffer read it once per frame.
+        return MhExtGpuBufferReadback::GetOrRead(
+            _ReadKeyFor<T>(stream),
+            [&stream, tupleSize](const unsigned char* span, size_t spanBytes) {
+                const size_t stride = _ValidatedStride<T>(
+                    stream.rawHandle, stream.byteStride, tupleSize);
+                return stride > 0
+                    ? _DecodeStream<T>(span, spanBytes, stream.numElements, stride)
+                    : VtValue(VtArray<T>());
+            },
+            [&stream, tupleSize]() {
+                return _GetExtVertexBufferValue<T>(
+                    stream.rawHandle,
+                    stream.numElements,
+                    stream.byteOffset,
+                    stream.byteStride,
+                    tupleSize);
+            });
     };
 
     if (key == HdTokens->points) {

@@ -15,6 +15,7 @@
 //
 
 #include "mhExtGpuBufferBridge.h"
+#include "mhExtGpuBufferReadback.h"
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 
@@ -689,6 +690,9 @@ MhExtGpuBufferBridge::Refresh(
 void
 MhExtGpuBufferBridge::BeginProducerFrame()
 {
+    // Every backend: lazy readbacks run whether or not anything is copied.
+    MhExtGpuBufferReadback::BeginFrame();
+
 #if defined(USD_HAS_HGI_VULKAN)
     // Nothing published is outstanding, so nothing has been handed to the
     // consumer that it could still be reading. This also covers the first
@@ -712,6 +716,10 @@ MhExtGpuBufferBridge::BeginProducerFrame()
 void
 MhExtGpuBufferBridge::EndProducerFrame()
 {
+    // After this frame's publishes, before the consumer's frame: the fence
+    // that orders lazy readbacks after VP2's writes.
+    MhExtGpuBufferReadback::EndFrame();
+
 #if defined(USD_HAS_HGI_VULKAN)
     // The one point per frame that reliably holds Maya's context, which is
     // what destroying the GL objects the arena has released needs.
@@ -748,6 +756,9 @@ MhExtGpuBufferBridge::EndProducerFrame()
 void
 MhExtGpuBufferBridge::Shutdown()
 {
+    // The readback contexts share Maya's; release them while it is current.
+    MhExtGpuBufferReadback::Shutdown();
+
 #if defined(USD_HAS_HGI_VULKAN)
     // Everything GL-side has to go while a context is still current and Tf's
     // diagnostic delegates are still alive. Left to static destruction the
