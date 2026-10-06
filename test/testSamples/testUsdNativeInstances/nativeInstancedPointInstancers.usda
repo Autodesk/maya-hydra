@@ -1,0 +1,56 @@
+#usda 1.0
+(
+    upAxis = "Y"
+)
+
+# Point instances under native instances (HYDRA-2592): three native instances of a point instancer
+# drawing three cubes. Rows of cubes at z = 0, 4, 8 (NI_0, NI_1, NI_2), cubes at x = 0, 3, 6
+# (point instances 0, 1, 2).
+
+class Xform "ProtoSrc"
+{
+    def PointInstancer "PI"
+    {
+        rel prototypes = </ProtoSrc/PI/Protos/Cube>
+        point3f[] positions = [(0, 0, 0), (3, 0, 0), (6, 0, 0)]
+        int[] protoIndices = [0, 0, 0]
+
+        def Xform "Protos"
+        {
+            def Cube "Cube"
+            {
+                double size = 1
+            }
+        }
+    }
+}
+
+def Xform "Root"
+{
+    def Xform "NI_0" (
+        instanceable = true
+        references = </ProtoSrc>
+    )
+    {
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "NI_1" (
+        instanceable = true
+        references = </ProtoSrc>
+    )
+    {
+        double3 xformOp:translate = (0, 0, 4)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "NI_2" (
+        instanceable = true
+        references = </ProtoSrc>
+    )
+    {
+        double3 xformOp:translate = (0, 0, 8)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
