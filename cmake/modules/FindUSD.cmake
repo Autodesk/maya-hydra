@@ -118,6 +118,13 @@ if (USD_INCLUDE_DIR AND EXISTS "${USD_INCLUDE_DIR}/pxr/usd/sdr/shaderProperty.h"
     endif()
 endif()
 
+# See if Hydra can consume externally-owned GPU buffers (HdExtGpuBufferSchema):
+set(USD_HAS_GPU_BUFFER_SHARING FALSE CACHE INTERNAL "USD.Hd.ExtGpuBufferSchema")
+if (USD_INCLUDE_DIR AND EXISTS "${USD_INCLUDE_DIR}/pxr/imaging/hd/extGpuBufferSchema.h")
+    set(USD_HAS_GPU_BUFFER_SHARING TRUE CACHE INTERNAL "USD.Hd.ExtGpuBufferSchema")
+    message(STATUS "USD has GPU buffer sharing support (HdExtGpuBufferSchema)")
+endif()
+
 # See if MaterialX shaders have full Metadata imported:
 # Not yet in a tagged USD version: https://github.com/PixarAnimationStudios/USD/pull/1895
 set(USD_HAS_MX_METADATA_SUPPORT FALSE CACHE INTERNAL "USD.MaterialX.Metadata")
@@ -127,6 +134,16 @@ if (USD_LIBRARY_DIR AND EXISTS "${USD_LIBRARY_DIR}/${USD_LIB_PREFIX}usdMtlx${CMA
         set(USD_HAS_MX_METADATA_SUPPORT TRUE CACHE INTERNAL "USD.MaterialX.Metadata")
         message(STATUS "USD has MaterialX metadata support")
     endif()
+endif()
+
+# See if this USD package was built with the Vulkan backend. Code reaching
+# hgiVulkan directly is compiled out when it is absent.
+set(USD_HAS_HGI_VULKAN FALSE CACHE INTERNAL "USD.Hgi.Vulkan")
+if (TARGET hgiVulkan)
+    set(USD_HAS_HGI_VULKAN TRUE CACHE INTERNAL "USD.Hgi.Vulkan")
+    message(STATUS "USD has the Vulkan Hgi backend")
+else()
+    message(STATUS "USD has no Vulkan Hgi backend: external GPU buffers won't be shared with a Vulkan consumer")
 endif()
 
 message(STATUS "USD include dir: ${USD_INCLUDE_DIR}")

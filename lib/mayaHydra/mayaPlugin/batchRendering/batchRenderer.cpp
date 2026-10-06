@@ -468,7 +468,8 @@ void BatchRenderer::_InitHydraResources()
         TfToken("MayaHydraSceneIndex"),
         *renderIndex(),
         MAYA_NATIVE_ROOT,
-        _isUsingHdSt
+        _isUsingHdSt,
+        _hgi.get()
     );
 
     // Data producer merging scene index sets up the Flow Viewport merging scene index, must

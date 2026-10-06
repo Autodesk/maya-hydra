@@ -426,12 +426,15 @@ std::filesystem::path getPathToSample(std::string filename);
  *
  * @param[in] dataSource The data source to dump and compare to a reference.
  * @param[in] referencePath The path to the reference dump file.
+ * @param[in] applyFilter Whether to filter out dynamic/volatile data sources (such as extGpuBuffer)
+ *                        before comparison. Defaults to true.
  *
  * @return Whether the data source dump matches the reference dump.
  */
 bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
-    std::filesystem::path          referencePath);
+    std::filesystem::path          referencePath,
+    bool                           applyFilter = true);
 
 /**
  * @brief Returns the path where dataSourceMatchesReference writes the actual output.

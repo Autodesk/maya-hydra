@@ -53,17 +53,21 @@ namespace MAYAHYDRA_NS_DEF { class BatchRenderer; }
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class Hgi;
+
 struct MayaHydraInitData
 {
     MayaHydraInitData(
         TfToken        nameIn,
         HdRenderIndex& renderIndexIn,
         const SdfPath& delegateIDIn,
-        bool           isHdStIn)
+        bool           isHdStIn,
+        Hgi*           hgiIn = nullptr)
         : name(nameIn)
         , renderIndex(renderIndexIn)
         , delegateID(delegateIDIn)
         , isHdSt(isHdStIn)
+        , hgi(hgiIn)
     {
     }
 
@@ -71,6 +75,12 @@ struct MayaHydraInitData
     HdRenderIndex& renderIndex;
     SdfPath        delegateID;
     bool           isHdSt;
+    /// The Hgi behind the render index's render delegate, owned by the render
+    /// override. Required to share a GPU buffer with the renderer: the arena
+    /// that wraps the buffer comes from this Hgi, and a consumer rejects a
+    /// buffer minted by a different one, since its handle names an object on
+    /// another device. Null means no sharing -- the CPU primvar path is used.
+    Hgi*           hgi = nullptr;
 };
 
 class MayaHydraSceneIndex;
@@ -211,6 +221,10 @@ public:
     /// TF_VERIFY on violation. Callers that may run from Maya callbacks should guard with
     /// ShouldSkipHydraUpdates() first.
     HdRenderIndex* GetRenderIndexPtr();
+
+    /// The Hgi behind the render delegate, or null when none was supplied.
+    /// Non-owning; see MayaHydraInitData::hgi.
+    Hgi* GetHgi() const { return _hgi; }
 
     /// True when the render index exists and has an attached render delegate. Returns false
     /// during teardown (expected). Several HdRenderIndex queries dereference _renderDelegate
@@ -356,6 +370,7 @@ private:
     MayaHydraParams _params;
 
     HdRenderIndex* _renderIndex = nullptr;
+    Hgi*           _hgi = nullptr;
     bool           _isTearingDown = false;
 
     // Adapters
