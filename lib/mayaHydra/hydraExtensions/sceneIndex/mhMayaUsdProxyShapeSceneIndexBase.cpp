@@ -31,7 +31,7 @@
 #include <ufe/scene.h>
 #include <ufe/sceneNotification.h>
 
-#include <optional>
+#include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -358,8 +358,11 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
     //    becoming an SdfPath component. If the last component is a number,
     //    then we are dealing with an instance selection.
     TF_AXIOM(appPath.nbSegments() == 2);
-    SdfPath                                primPath = SdfPath::AbsoluteRootPath();
-    std::optional<Fvp::InstancesSelection> instanceSelection;
+    SdfPath primPath = SdfPath::AbsoluteRootPath();
+    // One entry per instancing level crossed by the path, outermost first, as in
+    // HdSelectionSchema::nestedInstanceIndices. A point instance under a native instance, or a
+    // native instance inside the prototype of another, crosses two levels.
+    std::vector<Fvp::InstancesSelection> instanceSelections;
 
     auto       secondSegment = appPath.getSegments()[1];
     const auto lastComponentString = secondSegment.components().back().string();
@@ -380,9 +383,10 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
             auto prototypes = instancerTopologySchema.GetPrototypes()->GetTypedValue(0);
             auto prototypeIndex = instanceSchema.GetPrototypeIndex()->GetTypedValue(0);
             primPath = prototypes[prototypeIndex];
-            instanceSelection = { instancerPath,
-                                  prototypeIndex,
-                                  { instanceSchema.GetInstanceIndex()->GetTypedValue(0) } };
+            instanceSelections.push_back(
+                { instancerPath,
+                  prototypeIndex,
+                  { instanceSchema.GetInstanceIndex()->GetTypedValue(0) } });
         }
 
         // SdfPath components cannot be numeric.  This happens with point instance selections.
@@ -418,8 +422,8 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
                             instanceIndices.end(),
                             std::stoi(lastComponentString))
                         != instanceIndices.end()) {
-                        instanceSelection
-                            = { primPath, iInstanceIndices, { std::stoi(lastComponentString) } };
+                        instanceSelections.push_back(
+                            { primPath, iInstanceIndices, { std::stoi(lastComponentString) } });
                         break;
                     }
                 }
@@ -431,10 +435,7 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
         }
     }
 
-    Fvp::PrimSelection  baseSelection = instanceSelection.has_value()
-         ? Fvp::PrimSelection { primPath, { instanceSelection.value() } }
-         : Fvp::PrimSelection { primPath };
-    Fvp::PrimSelections primSelections({ baseSelection });
+    Fvp::PrimSelections primSelections({ Fvp::PrimSelection { primPath, instanceSelections } });
 
     // Point instancing : propagate selection to propagated prototypes
     // A point instancer rooted under another point instancer (a nested instancer) is made
