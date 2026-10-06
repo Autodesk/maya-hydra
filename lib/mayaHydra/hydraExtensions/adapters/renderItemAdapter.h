@@ -30,6 +30,7 @@
 #include <pxr/pxr.h>
 
 #include <maya/MDagPath.h>
+#include <maya/MHWGeometry.h>
 #include <maya/MHWGeometryUtilities.h>
 #include <maya/MMatrix.h>
 
@@ -222,6 +223,59 @@ public:
     MAYAHYDRALIB_API
     bool GetIsReplaceableHighlightWire() const { return _isReplaceableHighlightWire; }
 
+protected:
+    /// Dirty state of each vertex stream, collected over one UpdateFromDelta call.
+    struct _StreamDirty
+    {
+        bool positions = false;
+        bool normals = false;
+        bool uvs = false;
+        bool tangents = false;
+    };
+
+    /// Whether positions from a previous update are held.
+    virtual bool _HasStoredPositions() const { return !_positions.empty(); }
+
+    /// Number of positions held from a previous update.
+    virtual size_t _StoredPositionCount() const { return _positions.size(); }
+
+    /// Called once per UpdateFromDelta, before any vertex stream is read.
+    virtual void _BeginGeometryUpdate(bool /*geomChanged*/, bool /*topoChanged*/) { }
+
+    /// Object-space bounds to publish, given the render item's own bounding box.
+    virtual GfRange3d _ResolveBounds(const GfRange3d& renderItemBounds) const
+    {
+        return renderItemBounds;
+    }
+
+    /// Read one vertex stream of a changed geometry and flag it in \p dirty.
+    virtual void _ReadVertexStream(
+        MVertexBuffer* mvb,
+        bool           topoChanged,
+        bool           useMayaNormals,
+        _StreamDirty&  dirty);
+
+    /// Called after every vertex stream has been read, to settle the final dirty state.
+    virtual void _EndGeometryUpdate(
+        MGeometry*    geom,
+        int           vertexBufferCount,
+        bool          geomChanged,
+        bool          topoChanged,
+        bool          useMayaNormals,
+        _StreamDirty& dirty);
+
+    /// Whether the cached topology is rebuilt from freshly-read indices.
+    virtual bool
+    _TopologyNeedsRebuild(bool /*emitTopologyLocators*/, bool /*hasCachedTopology*/) const
+    {
+        return true;
+    }
+
+    VtVec3fArray _positions = {};
+    VtVec3fArray _normals = {};  //Are per vertex
+    VtVec3fArray _tangents = {}; //Are face varying
+    VtVec2fArray _uvs = {};      //Are face varying
+
 private:
     MAYAHYDRALIB_API
     void _RemoveRprim();
@@ -232,10 +286,6 @@ private:
     SdfPath                     _material;
     MDagPath                    _dagPath;
     std::unique_ptr<HdTopology> _topology = nullptr;
-    VtVec3fArray                _positions = {};
-    VtVec3fArray                _normals = {};//Are per vertex
-    VtVec3fArray                _tangents = {}; //Are face varying
-    VtVec2fArray                _uvs = {}; //Are face varying
     MGeometry::Primitive        _primitive;
     MString                     _name;
     // [0] = shutter centre (current frame), [1] = shutter close, [2] = shutter open.

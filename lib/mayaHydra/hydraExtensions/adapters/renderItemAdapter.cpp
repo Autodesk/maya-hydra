@@ -22,6 +22,7 @@
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/adapters/renderItemTopologyUtil.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/profilingUtils.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -222,6 +223,8 @@ void MayaHydraRenderItemAdapter::_RemoveRprim()
 // and the current frame
 void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data)
 {
+    MH_PROFILE_FUNCTION();
+
     if (_primitive != MHWRender::MGeometry::Primitive::kTriangles
         && _primitive != MHWRender::MGeometry::Primitive::kTriangleStrip
         && _primitive != MHWRender::MGeometry::Primitive::kLines
@@ -230,8 +233,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 
     const bool positionsHaveBeenReset
-        = (0 == _positions.size()); // when positionsHaveBeenReset is true we need to recompute the
-                                    // geometry and topology as our data has been cleared
+        = !_HasStoredPositions(); // when positionsHaveBeenReset is true we need to recompute the
+                                  // geometry and topology as our data has been cleared
     using MVS = MDataServerOperation::MViewportScene;
     // const bool isNew = flags & MViewportScene::MVS_new;  //not used yet
     const bool visible          = data._flags & MVS::MVS_visible;
@@ -307,6 +310,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // geomChanged block below. The static ensures the env var is read only once.
     static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
 
+    _BeginGeometryUpdate(geomChanged, topoChanged);
+
     // Extent is checked here, under geomChanged||topoChanged, so it is always evaluated when
     // positions or topology change — including the geomChanged case. The old code always dirtied
     // extent on geomChanged; the new code diffs the actual bbox first and only emits dirtyExtent()
@@ -318,7 +323,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         auto bbox = data._ri.boundingBox();
         const MPoint& min = bbox.min();
         const MPoint& max = bbox.max();
-        const GfRange3d newRange({min.x, min.y, min.z}, {max.x, max.y, max.z});
+        const GfRange3d newRange
+            = _ResolveBounds(GfRange3d({ min.x, min.y, min.z }, { max.x, max.y, max.z }));
         if (newRange != _bounds.GetRange()) {
             notifier.dirtyExtent();
             _bounds.SetRange(newRange);
@@ -332,7 +338,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     VtIntArray vertexCounts;
         
     const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
-    const size_t storedPositionCountBeforeUpdate = _positions.size();
+    const bool hadPositionsBeforeUpdate = _HasStoredPositions();
+    const size_t storedPositionCountBeforeUpdate = _StoredPositionCount();
 
     //Temp workaround for a bug in Maya MAYA-134200
     if ((!geomChanged && topoChanged) && vertexBuffercount) { 
@@ -351,7 +358,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 // Vertices
                 MVertexBuffer*     verts = mvb;
                 const unsigned int originalVertexCount = verts->vertexCount();
-                if (_positions.size() != originalVertexCount) {//Is it different ?
+                const size_t storedVertexCount = _StoredPositionCount();
+                if (storedVertexCount != originalVertexCount) {//Is it different ?
                     geomChanged = true;//this will stop the loop
                 }
             } break;
@@ -360,20 +368,11 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
-    // geomChanged means vertex buffers are re-read. Dirty one locator per primvar so the render
-    // delegate only re-pulls what actually changed. Normals are skipped when Hydra generates them.
-    // Emitted after the vertex-count workaround above, which may have turned a topo-only update into also setting geomChanged.
-    if (geomChanged) {
-        notifier.dirtyPoints();
-        notifier.dirtyUVs();
-        notifier.dirtyTangents();
-            // .dirtyVertexColors() — uncomment once the kColor buffer read is wired in (see kColor case below).
-            // Do not emit the locator before the data is actually read: a dirty signal without a
-            // corresponding data update is a false promise to the render delegate.
-        if (useMayaNormals) {
-            notifier.dirtyNormals(); // skipped when Hydra generates normals
-        }
-    }
+    // Per-stream dirty decisions, emitted after the geometry loop once the data
+    // has actually been read (a dirty without a corresponding data update would
+    // be a false promise to the render delegate).
+    // (Vertex colors: add a flag here once the kColor read in _ReadVertexStream is wired in.)
+    _StreamDirty dirty;
 
     // Vertices
     if (geomChanged && vertexBuffercount) {
@@ -383,129 +382,23 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             if ( ! mvb) {
                 continue;
             }
-
-            const MVertexBufferDescriptor& desc = mvb->descriptor();
-            const auto semantic = desc.semantic();
-            switch(semantic){
-
-                case MGeometry::Semantic::kPosition: {
-                    //Vertices
-                    MVertexBuffer*verts = mvb;
-                    int                vertCount = 0;
-                    const unsigned int originalVertexCount = verts->vertexCount();
-                    if (topoChanged) {
-                        vertCount = originalVertexCount;
-                    } else {
-                        // Keep the previously-determined vertex count in case it was truncated.
-                        const size_t positionSize = _positions.size();
-                        if (positionSize > 0 && positionSize <= originalVertexCount) {
-                            vertCount = positionSize;
-                        } else {
-                            vertCount = originalVertexCount;
-                        }
-                    }
-
-                    _positions.clear();
-                    const auto* vertexPositions = reinterpret_cast<const GfVec3f*>(verts->map());
-                    if (TF_VERIFY(vertexPositions)) {
-                        _positions.assign(vertexPositions, vertexPositions + vertCount);
-                    }
-                    verts->unmap();
-                }
-                break;
-                case MGeometry::Semantic::kNormal: {
-                    //Normals
-                    if (useMayaNormals){
-                        MVertexBuffer* normals = mvb;
-                        int normalsCount = 0;
-                        const unsigned int originalNormalsCount = normals->vertexCount();
-                        if (topoChanged) {
-                            normalsCount = originalNormalsCount;
-                        } else {
-                            // Keep the previously-determined normals count in case it was truncated.
-                            const size_t normalSize = _normals.size();
-                            if (normalSize > 0 && normalSize <= originalNormalsCount) {
-                                normalsCount = normalSize;
-                            } else {
-                                normalsCount = originalNormalsCount;
-                            }
-                        }
-
-                        _normals.clear();
-                        const auto* vertexNormals = reinterpret_cast<const GfVec3f*>(normals->map());
-                        if (TF_VERIFY(vertexNormals)) {
-                            _normals.assign(vertexNormals, vertexNormals + normalsCount);
-                        }
-                        normals->unmap();
-                    }
-                }
-                break;
-                case MGeometry::Semantic::kTexture: {
-                    // Textures:
-                    if (_primitive == MGeometry::Primitive::kTriangles
-                        || _primitive == MGeometry::Primitive::kTriangleStrip) {
-                        int uvsCount = 0;
-                        const unsigned int originalUvsCount = mvb->vertexCount();
-                        if (topoChanged) {
-                            uvsCount = originalUvsCount;
-                        } else {
-                            // Keep the previously-determined uvs count in case it was truncated.
-                            const size_t uvSize = _uvs.size();
-                            if (uvSize > 0 && uvSize <= originalUvsCount) {
-                                uvsCount = uvSize;
-                            } else {
-                                uvsCount = originalUvsCount;
-                            }
-                        }
-
-                        _uvs.clear();
-                        const auto* uvData =
-                            reinterpret_cast<const GfVec2f*>(mvb->map());
-                        if (TF_VERIFY(uvData)) {
-                            _uvs.assign(uvData, uvData + uvsCount);
-                        }
-                        mvb->unmap();
-                    }
-                }
-                break;
-                case MHWRender::MGeometry::kTangent: {
-                    // Tangents
-                    if (_primitive == MGeometry::Primitive::kTriangles
-                        || _primitive == MGeometry::Primitive::kTriangleStrip) {
-                        int tangentsCount = 0;
-                        const unsigned int originalTangentsCount = mvb->vertexCount();
-                        if (topoChanged) {
-                            tangentsCount = originalTangentsCount;
-                        } else {
-                            // Keep the previously-determined tangents count in case it was truncated.
-                            const size_t tangentSize = _tangents.size();
-                            if (tangentSize > 0 && tangentSize <= originalTangentsCount) {
-                                tangentsCount = tangentSize;
-                            } else {
-                                tangentsCount = originalTangentsCount;
-                            }
-                        }
-
-                        _tangents.clear();
-                        const auto* tangentData =
-                            reinterpret_cast<const GfVec3f*>(mvb->map());
-                        if (TF_VERIFY(tangentData)) {
-                            _tangents.assign(tangentData, tangentData + tangentsCount);
-                        }
-                        mvb->unmap();
-                    }
-                }
-                break;
-                case MGeometry::Semantic::kColor:
-                    // Vertex color sets (per-vertex displayColor) are not yet read from the
-                    // vertex buffer. When adding support: read the buffer here and store the
-                    // result, then uncomment notifier.dirtyVertexColors() in the geomChanged
-                    // block above so the render delegate is notified only once data is live.
-                break;
-                default:
-                break;
-            }
+            _ReadVertexStream(mvb, topoChanged, useMayaNormals, dirty);
         }
+    }
+
+    _EndGeometryUpdate(geom, vertexBuffercount, geomChanged, topoChanged, useMayaNormals, dirty);
+
+    if (dirty.positions) {
+        notifier.dirtyPoints();
+    }
+    if (dirty.uvs) {
+        notifier.dirtyUVs();
+    }
+    if (dirty.tangents) {
+        notifier.dirtyTangents();
+    }
+    if (dirty.normals) {
+        notifier.dirtyNormals();
     }
 
     // Indices
@@ -601,13 +494,15 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
+    const bool hasPositionsAfterUpdate = _HasStoredPositions();
+
     // Topology dirty locators are decided after index buffers are read so we can diff connectivity,
     // not just vertex count, when Maya sets topoChanged alongside geomChanged (MAYA-134200).
     const bool emitTopologyLocators = RenderItemShouldEmitTopologyLocators(
         topoChanged,
         geomChanged,
         geom && vertexBuffercount > 0,
-        storedPositionCountBeforeUpdate == 0 && _positions.empty(),
+        !hadPositionsBeforeUpdate && !hasPositionsAfterUpdate,
         storedPositionCountBeforeUpdate,
         _GetPositionVertexCount(geom, vertexBuffercount),
         _topology.get(),
@@ -623,7 +518,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // because connectivity is unchanged.
     const bool indicesWereRead = topoChanged && vertexBuffercount > 0
         && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip;
-    if (indicesWereRead && !vertexCounts.empty()) {
+    if (indicesWereRead && !vertexCounts.empty()
+        && _TopologyNeedsRebuild(emitTopologyLocators, _topology != nullptr)) {
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangleStrip:
         case MGeometry::Primitive::kTriangles: {
@@ -674,7 +570,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 // only need to specify the order of the vertices that you want connected. This is
                 // implicit in Hydra when specifying an empty index buffer.
                 curveTopoType = HdTokens->nonperiodic;
-                vertexCounts.assign(1, _positions.size());
+                vertexCounts.assign(1, _StoredPositionCount());
                 vertexIndices = VtIntArray();
             }
             _topology.reset(new HdBasisCurvesTopology(
@@ -691,6 +587,158 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 }
 
+void MayaHydraRenderItemAdapter::_ReadVertexStream(
+    MVertexBuffer* mvb,
+    bool           topoChanged,
+    bool           useMayaNormals,
+    _StreamDirty&  dirty)
+{
+    MH_PROFILE_FUNCTION();
+
+    const MVertexBufferDescriptor& desc = mvb->descriptor();
+    const auto semantic = desc.semantic();
+    switch(semantic){
+
+        case MGeometry::Semantic::kPosition: {
+            //Vertices
+            MVertexBuffer*verts = mvb;
+            int                vertCount = 0;
+            const unsigned int originalVertexCount = verts->vertexCount();
+            if (topoChanged) {
+                vertCount = originalVertexCount;
+            } else {
+                // Keep the previously-determined vertex count in case it was truncated.
+                const size_t positionSize = _positions.size();
+                if (positionSize > 0 && positionSize <= originalVertexCount) {
+                    vertCount = positionSize;
+                } else {
+                    vertCount = originalVertexCount;
+                }
+            }
+
+            _positions.clear();
+            const auto* vertexPositions = reinterpret_cast<const GfVec3f*>(verts->map());
+            if (TF_VERIFY(vertexPositions)) {
+                _positions.assign(vertexPositions, vertexPositions + vertCount);
+            }
+            verts->unmap();
+            dirty.positions = true;
+        }
+        break;
+        case MGeometry::Semantic::kNormal: {
+            //Normals
+            if (useMayaNormals){
+                MVertexBuffer* normals = mvb;
+                int normalsCount = 0;
+                const unsigned int originalNormalsCount = normals->vertexCount();
+                if (topoChanged) {
+                    normalsCount = originalNormalsCount;
+                } else {
+                    // Keep the previously-determined normals count in case it was truncated.
+                    const size_t normalSize = _normals.size();
+                    if (normalSize > 0 && normalSize <= originalNormalsCount) {
+                        normalsCount = normalSize;
+                    } else {
+                        normalsCount = originalNormalsCount;
+                    }
+                }
+
+                _normals.clear();
+                const auto* vertexNormals = reinterpret_cast<const GfVec3f*>(normals->map());
+                if (TF_VERIFY(vertexNormals)) {
+                    _normals.assign(vertexNormals, vertexNormals + normalsCount);
+                }
+                normals->unmap();
+                dirty.normals = true;
+            }
+        }
+        break;
+        case MGeometry::Semantic::kTexture: {
+            // Textures:
+            if (_primitive == MGeometry::Primitive::kTriangles
+                || _primitive == MGeometry::Primitive::kTriangleStrip) {
+                int uvsCount = 0;
+                const unsigned int originalUvsCount = mvb->vertexCount();
+                if (topoChanged) {
+                    uvsCount = originalUvsCount;
+                } else {
+                    // Keep the previously-determined uvs count in case it was truncated.
+                    const size_t uvSize = _uvs.size();
+                    if (uvSize > 0 && uvSize <= originalUvsCount) {
+                        uvsCount = uvSize;
+                    } else {
+                        uvsCount = originalUvsCount;
+                    }
+                }
+
+                _uvs.clear();
+                const auto* uvData =
+                    reinterpret_cast<const GfVec2f*>(mvb->map());
+                if (TF_VERIFY(uvData)) {
+                    _uvs.assign(uvData, uvData + uvsCount);
+                }
+                mvb->unmap();
+                dirty.uvs = true;
+            }
+        }
+        break;
+        case MHWRender::MGeometry::kTangent: {
+            // Tangents
+            if (_primitive == MGeometry::Primitive::kTriangles
+                || _primitive == MGeometry::Primitive::kTriangleStrip) {
+                int tangentsCount = 0;
+                const unsigned int originalTangentsCount = mvb->vertexCount();
+                if (topoChanged) {
+                    tangentsCount = originalTangentsCount;
+                } else {
+                    // Keep the previously-determined tangents count in case it was truncated.
+                    const size_t tangentSize = _tangents.size();
+                    if (tangentSize > 0 && tangentSize <= originalTangentsCount) {
+                        tangentsCount = tangentSize;
+                    } else {
+                        tangentsCount = originalTangentsCount;
+                    }
+                }
+
+                _tangents.clear();
+                const auto* tangentData =
+                    reinterpret_cast<const GfVec3f*>(mvb->map());
+                if (TF_VERIFY(tangentData)) {
+                    _tangents.assign(tangentData, tangentData + tangentsCount);
+                }
+                mvb->unmap();
+                dirty.tangents = true;
+            }
+        }
+        break;
+        case MGeometry::Semantic::kColor:
+            // Vertex color sets (per-vertex displayColor) are not yet read from the
+            // vertex buffer. When adding support: read the buffer here and store the
+            // result, then uncomment notifier.dirtyVertexColors() in the geomChanged
+            // block above so the render delegate is notified only once data is live.
+        break;
+        default:
+        break;
+    }
+}
+
+void MayaHydraRenderItemAdapter::_EndGeometryUpdate(
+    MGeometry*    /*geom*/,
+    int           /*vertexBufferCount*/,
+    bool          geomChanged,
+    bool          /*topoChanged*/,
+    bool          useMayaNormals,
+    _StreamDirty& dirty)
+{
+    // Any geometry change dirties every stream, whether or not VP2 supplied it on this update.
+    if (geomChanged) {
+        dirty.positions = true;
+        dirty.uvs = true;
+        dirty.tangents = true;
+        dirty.normals = useMayaNormals;
+    }
+}
+
 HdMeshTopology MayaHydraRenderItemAdapter::GetMeshTopology()
 {
     return _topology ? *static_cast<HdMeshTopology*>(_topology.get()) : HdMeshTopology();
@@ -701,6 +749,7 @@ HdBasisCurvesTopology MayaHydraRenderItemAdapter::GetBasisCurvesTopology()
     return _topology ? *static_cast<HdBasisCurvesTopology*>(_topology.get())
                      : HdBasisCurvesTopology();
 }
+
 
 VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
 {

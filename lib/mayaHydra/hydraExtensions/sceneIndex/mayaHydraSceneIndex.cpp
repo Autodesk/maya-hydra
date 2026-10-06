@@ -17,6 +17,9 @@
 #include "mayaHydraSceneIndex.h"
 
 #include <mayaHydraLib/adapters/adapterRegistry.h>
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+#include <mayaHydraLib/adapters/gpuRenderItemAdapter.h>
+#endif
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/debugCodes.h>
 #include <mayaHydraLib/hydraUtils.h>
@@ -462,6 +465,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool inter
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(&initData.renderIndex)
+    , _hgi(initData.hgi)
     , _isHdSt(initData.isHdSt)
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
@@ -660,8 +664,16 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             // Otherwise create a valid adapter
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
-            ria = std::make_shared<MayaHydraRenderItemAdapter>(
-                dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+            if (MayaHydraGpuRenderItemAdapter::IsEligible(ri, GetHgi())) {
+                ria = std::make_shared<MayaHydraGpuRenderItemAdapter>(
+                    dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
+            } else
+#endif
+            {
+                ria = std::make_shared<MayaHydraRenderItemAdapter>(
+                    dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
+            }
 
             // HYDRA-1992 : Order is important here. Downstream scene indices
             // might do some operations based on PrimsAdded notifications, which
@@ -742,6 +754,8 @@ void MayaHydraSceneIndex::RefreshRenderItemLegacyHighlightTreatment(
             !replaceable || options.viewportDrawsWireframes);
     }
 }
+
+
 
 void MayaHydraSceneIndex::Populate()
 {
