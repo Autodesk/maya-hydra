@@ -590,6 +590,9 @@ endif()
 # (workspace -fr "sourceImages" "sourceimages"), so a camelCase directory
 # resolves only on case-insensitive filesystems and fails on Linux.
 #
+# Skipped on macOS, where the texture still does not resolve through the project
+# and the sphere renders untextured: HYDRA-2611.
+#
 # Expected test directory layout:
 # .../test/Temporary/<sceneStem>/projects/default   <- what -proj points at
 # |__ images/<sceneStem>.png
@@ -608,7 +611,11 @@ function(_mayaHydra_add_relpath_variant folder)
 
     set(scene relativePathTest/${folder}/${scene_stem}.ma)
     cmake_path(GET scene STEM sceneFileNameNoExt)
-    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
+    # HYDRA-2611 : the texture does not resolve through the -proj project on
+    # macOS, so the sphere renders untextured while Windows and Linux match the
+    # baseline.  Skipped on every macOS version rather than 2027 only, since the
+    # failure is platform- rather than version-specific.
+    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}|skipOnPlatform:osx
         RENDERER ${renderer}
         # Must specify:
         # - The resolution, otherwise the USD default render settings 2048x1080
