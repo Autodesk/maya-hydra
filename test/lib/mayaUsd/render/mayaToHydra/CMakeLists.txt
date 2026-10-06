@@ -246,9 +246,11 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
 # legacy and they get no _legacy counterpart.
 set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
     testGeomSubsetsWireframeHighlight.py # TODO: To support when implementing HYDRA-2458 (geometry subsets)
-    testNativeInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
-    testPointInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
-    testStageInstanceablePrimsSelHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
+    testNativeInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 for native instances
+    # Legacy-only by design: compares wireframe-highlight images. Point instances in outline mode
+    # are covered by testOutlinePointInstances.
+    testPointInstancingWireframeHighlight.py
+    testStageInstanceablePrimsSelHighlight.py # TODO: To support when implementing HYDRA-2456 for native instances
     # TODO: revisit with HYDRA-2457 (wireframe-on-shaded). Outline defers translating a selected
     # object's wireframe render item, so toggling wireframeOnShaded adds a prim instead of dirtying one.
     cpp/testSceneIndexDirtying.py
