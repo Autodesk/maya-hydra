@@ -32,6 +32,7 @@ class TestArnoldCustomAttributesMayaNodes(mtohUtils.MayaHydraBaseTestCase):
 
     def _setArnoldRenderer(self):
         """Activate the Arnold Hydra renderer so mtoaSIP is in the scene index chain."""
+        self.setMayaUseHydra(True)
         self.activeEditor = cmds.playblast(activeEditor=1)
         cmds.modelEditor(
             self.activeEditor, e=1,
