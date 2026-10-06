@@ -51,8 +51,6 @@ TEST(SceneIndexDirtying, testDirtyingNew)
             return entry.primType != glfGlobalMaterialType;
         });
 
-
-
     EXPECT_TRUE(dirtiedPrimEntries.size());  // Expect non-zero dirtied prims.
     EXPECT_EQ(reprAddedPrimCount, 0);        // Changing Hydra reprs(via reprSelectorSceneIndex) 
     EXPECT_FALSE(removedPrimEntries.size()); // should not cause prim Addition or removal.
