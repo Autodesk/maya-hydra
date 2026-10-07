@@ -60,9 +60,13 @@ public:
 
     /// The scene items that a click on \p pickHit would select, resolved as handlePickHit()
     /// resolves them, without changing the selection. Hover highlighting uses it to show exactly
-    /// what a click would select. Returns false when the handler does not support it: the caller
-    /// then falls back to the picked prim. A handler that supports it may still resolve the hit to
-    /// no item, as a click would select nothing.
+    /// what a click would select. \p isSolePickHit is true when \p pickHit is the only hit of the
+    /// pick: a click, or a marquee over a single prim. Hover passes true. It matters only for the
+    /// Faces GeomSubsets pick mode: a sole hit that hits no GeomSubset falls back to the prim or
+    /// instance, while one hit among several then resolves to nothing, so that a marquee selects
+    /// GeomSubsets only. Returns false when the handler does not support it: the caller then falls
+    /// back to the picked prim. A handler that supports it may still resolve the hit to no item,
+    /// as a click would select nothing.
     MAYAHYDRALIB_API
     virtual bool resolvePickHit(
         const PickHit& /* pickHit */,
