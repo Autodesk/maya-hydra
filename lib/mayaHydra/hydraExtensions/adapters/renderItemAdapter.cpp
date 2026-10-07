@@ -72,6 +72,35 @@ _GetPositionVertexCount(MGeometry* geom, int vertexBufferCount)
     return 0;
 }
 
+// Copies the first `count` elements of a float vertex stream into `out`, keeping only the
+// first VecT::dimension components of each element. The stream layout is dictated by the
+// shader's geometry requirements, so it may carry more components than Hydra expects
+// (e.g. 4-component tangents with the bitangent sign in w).
+template <typename VecT>
+void
+_CopyFloatStream(MVertexBuffer* mvb, size_t count, VtArray<VecT>& out)
+{
+    out.clear();
+    const MVertexBufferDescriptor& desc = mvb->descriptor();
+    const int stride = desc.dimension();
+    if (desc.dataType() != MGeometry::kFloat || stride < static_cast<int>(VecT::dimension)) {
+        return;
+    }
+    const auto* data = static_cast<const float*>(mvb->map());
+    if (TF_VERIFY(data)) {
+        if (stride == static_cast<int>(VecT::dimension)) {
+            const auto* elements = reinterpret_cast<const VecT*>(data);
+            out.assign(elements, elements + count);
+        } else {
+            out.resize(count);
+            for (size_t i = 0; i < count; ++i) {
+                out[i] = VecT(data + i * stride);
+            }
+        }
+    }
+    mvb->unmap();
+}
+
 void
 _EmitRenderItemTopologyDirtyLocators(
     Fvp::DirtyNotifier& notifier,
@@ -643,12 +672,7 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
                     }
                 }
 
-                _normals.clear();
-                const auto* vertexNormals = reinterpret_cast<const GfVec3f*>(normals->map());
-                if (TF_VERIFY(vertexNormals)) {
-                    _normals.assign(vertexNormals, vertexNormals + normalsCount);
-                }
-                normals->unmap();
+                _CopyFloatStream(normals, normalsCount, _normals);
                 dirty.normals = true;
             }
         }
@@ -671,13 +695,7 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
                     }
                 }
 
-                _uvs.clear();
-                const auto* uvData =
-                    reinterpret_cast<const GfVec2f*>(mvb->map());
-                if (TF_VERIFY(uvData)) {
-                    _uvs.assign(uvData, uvData + uvsCount);
-                }
-                mvb->unmap();
+                _CopyFloatStream(mvb, uvsCount, _uvs);
                 dirty.uvs = true;
             }
         }
@@ -700,13 +718,7 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
                     }
                 }
 
-                _tangents.clear();
-                const auto* tangentData =
-                    reinterpret_cast<const GfVec3f*>(mvb->map());
-                if (TF_VERIFY(tangentData)) {
-                    _tangents.assign(tangentData, tangentData + tangentsCount);
-                }
-                mvb->unmap();
+                _CopyFloatStream(mvb, tangentsCount, _tangents);
                 dirty.tangents = true;
             }
         }
@@ -783,17 +795,22 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
     // Local descriptors
     HdPrimvarDescriptorVector localDescs;
     if (interpolation == HdInterpolationVertex) {// Vertices
+        // VP2 only fills the streams requested by the render item's shader (e.g. a MaterialX
+        // standard_surface without textures requests no UVs). Only advertise optional streams
+        // holding one value per point: an empty st is read as a degenerate texture coordinate
+        // instead of being treated as missing.
+        const size_t numPoints = _positions.size();
+        const auto hasPerPointData = [numPoints](const auto& values) {
+            return numPoints > 0 && values.size() == numPoints;
+        };
+
+        localDescs = {
+            { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point }//Vertices
+        };
         static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
-        if(useMayaNormals) {
-            localDescs = {
-                { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point },//Vertices
-                { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal }//Normals
-            };
-        }
-        else {
-            localDescs = {
-                { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point }//Vertices only
-            };
+        if (useMayaNormals && hasPerPointData(_normals)) {
+            localDescs.push_back(
+                { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal }); //Normals
         }
         // Also use HdInterpolationVertex for UV/Tangent, same as Normal
         // The vertex buffers in MRenderItem was already expanded as per-face-vertex
@@ -801,10 +818,14 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
         // Note: the default cube doesn't give 36 face vertices as VP2 deduplicated them.
         if (_primitive == MGeometry::Primitive::kTriangles
             || _primitive == MGeometry::Primitive::kTriangleStrip) {
-            localDescs.push_back(
-                {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //uvs
-            localDescs.push_back(
-                {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //tangents
+            if (hasPerPointData(_uvs)) {
+                localDescs.push_back(
+                    {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //uvs
+            }
+            if (hasPerPointData(_tangents)) {
+                localDescs.push_back(
+                    {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //tangents
+            }
         }
     } else if (interpolation == HdInterpolationConstant) {
         switch(_primitive){

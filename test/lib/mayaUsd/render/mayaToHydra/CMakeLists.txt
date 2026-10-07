@@ -110,6 +110,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testDataSourceNames.py
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
+    cpp/testRenderItemPrimvars.py|depOnPlugins:lookdevx
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
     cpp/testMayaNodesAttributes.py|depOnPlugins:mtoa

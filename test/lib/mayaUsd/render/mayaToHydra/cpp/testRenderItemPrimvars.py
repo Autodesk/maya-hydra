@@ -1,0 +1,53 @@
+# Copyright 2026 Autodesk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Python wrapper for testRenderItemPrimvars.cpp in render-items mode (no mesh adapter env var).
+#
+import maya.cmds as cmds
+import fixturesUtils
+import mayaUtils
+import mtohUtils
+from testUtils import PluginLoaded
+
+
+class TestRenderItemPrimvars(mtohUtils.MayaHydraBaseTestCase):
+    _file = __file__
+    _requiredPlugins = ['LookdevXMaya']
+
+    def setupScene(self, sceneFolder, sceneFile, meshShape):
+        mayaUtils.openTestScene(sceneFolder, sceneFile)
+        self.setHdStormRenderer()
+        cmds.optionVar(stringValue=("mhMeshShape", cmds.ls(meshShape, long=True)[0]))
+        cmds.refresh()
+
+    # What: untextured MaterialX shader must not advertise unpopulated primvars (st, tangents).
+    # How: open RedMtlxSphere.ma, then run the C++ test on the sphere render items.
+    # Expect: declared normals/st/tangents hold one value per point.
+    def test_untexturedMaterialXDeclaresOnlyPopulatedPrimvars(self):
+        self.setupScene("testMaterialX", "RedMtlxSphere.ma", "pSphereShape1")
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                f="RenderItemPrimvars.UntexturedMaterialXDeclaresOnlyPopulatedPrimvars")
+
+    # What: a file-textured shader must keep its UVs.
+    # How: open testUVs.ma, then run the C++ test on a textured plane's render items.
+    # Expect: st is declared and every declared primvar is populated.
+    def test_texturedMeshDeclaresPopulatedUVs(self):
+        self.setupScene("testUVandUDIM", "testUVs.ma", "pPlaneShape1")
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="RenderItemPrimvars.TexturedMeshDeclaresPopulatedUVs")
+
+
+if __name__ == '__main__':
+    fixturesUtils.runTests(globals())
