@@ -145,6 +145,14 @@ mayaHydra_resolve_usd_location(
     "${MAYAUSD_LOCATION}"
 )
 
+# Not REQUIRED: a USD package built without Vulkan exports no hgiVulkan.
+find_package(Vulkan QUIET COMPONENTS shaderc_combined)
+if (Vulkan_FOUND)
+    message(STATUS "Found Vulkan from USD's hgiVulkan link interface")
+else()
+    message(STATUS "Vulkan not found. Build USD with Vulkan to enable Vulkan support.")
+endif()
+
 # Load CMake targets from the developer OpenUSD package. MayaUSD's runtime
 # bundle intentionally omits pxrTargets.cmake and cannot configure consumers.
 find_package(USD 0.22.11 REQUIRED)
