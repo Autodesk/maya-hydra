@@ -255,14 +255,29 @@ private:
     /// mayaHydraForceEnableInteractiveHitTest forces it for profiling.
     bool _HitTestEnabled() const;
 
-    /// Whether the resolved hover path is drawn using outlines.
+    /// Whether the resolved hover is drawn using outlines.
     bool _OutlineHoverHighlightingEnabled() const;
+
+    /// What the hover highlights: the items a click at the cursor would select, in the render
+    /// index namespace, split as the outline splits the selection. Prims selected whole are in
+    /// the sorted paths, instance selections and native instances in the targets.
+    struct HoverHighlight
+    {
+        PXR_NS::SdfPathVector           paths;
+        HVT_NS::Outline::OutlineTargets targets;
+
+        bool operator==(const HoverHighlight& other) const
+        {
+            return paths == other.paths && targets == other.targets;
+        }
+        bool operator!=(const HoverHighlight& other) const { return !(*this == other); }
+    };
 
     /// Hover state, per panel: one MtohRenderOverride serves every panel using the renderer, so a
     /// shared state would highlight every viewport at once.
     struct HoverState
     {
-        // Device pixels, Qt top-left origin; -1 means no hover. _ResolveHoverPath() flips the y.
+        // Device pixels, Qt top-left origin; -1 means no hover. _PickHoverHit() flips the y.
         std::atomic<int>  deviceX { -1 };
         std::atomic<int>  deviceY { -1 };
         std::atomic<bool> active { false }; // cursor inside viewport, no button held
@@ -273,9 +288,9 @@ private:
         /// this to re-resolve. Render thread only.
         MMatrix lastViewProjMatrix;
 
-        /// Last resolved hover path, reused until the hover is dirtied so the pick does not rerun.
+        /// Last resolved hover, reused until the hover is dirtied so the pick does not rerun.
         /// Render thread only.
-        PXR_NS::SdfPath resolvedPath;
+        HoverHighlight resolved;
     };
 
     /// The hover state for \p panelName, or nullptr when that panel has none.
@@ -287,9 +302,16 @@ private:
     // Called by the hover event filter (UI thread). Records the cursor position and schedules a
     // viewport refresh.
     void _SetHoverPosition(const std::string& panelName, int deviceX, int deviceY, bool active);
-    // Picks the prim under the cursor pixel (HdxPickTask via the outline frame pass). Returns an
-    // empty path when not hovering or over background.
-    PXR_NS::SdfPath _ResolveHoverPath(const MHWRender::MDrawContext& drawContext);
+    // Hover resolution, in two steps, so that the way the prim under the cursor is found can
+    // change without changing what the hover highlights:
+    // - _PickHoverHit() finds the prim under the cursor pixel (HdxPickTask via the outline frame
+    //   pass). It appends at most one hit to outHits: none when not hovering or over background.
+    // - _ResolveHoverHighlight() turns a hit into what a click on it would select, through the
+    //   pick handler of the hit (pick modes, selection kind), then into outline paths and targets.
+    void _PickHoverHit(
+        const MHWRender::MDrawContext& drawContext,
+        MayaHydra::PickHitVector&      outHits);
+    HoverHighlight _ResolveHoverHighlight(const MayaHydra::PickHit& hit) const;
 
     void _PickByRegion(
         MayaHydra::PickHitVector& outHits,
@@ -425,9 +447,9 @@ private:
     // one of those styles dirties every prim anyway (SetReprType(), BboxSceneIndex::Enable()).
     std::atomic<bool>                     _dormantWireframeColorDirty = { false };
 
-    /// Hover path currently pushed into the shared OutlineManager. It is the only per-panel input;
+    /// Hover currently pushed into the shared OutlineManager. It is the only per-panel input;
     /// comparing it avoids re-pushing inputs every frame. Render thread only.
-    PXR_NS::SdfPath                       _pushedOutlineHoverPath;
+    HoverHighlight                        _pushedOutlineHover;
 
     /// Selection currently pushed into the OutlineManager, cached so a hover-only push does not
     /// walk the whole selection again. Render thread only. Prims selected whole are in the paths,

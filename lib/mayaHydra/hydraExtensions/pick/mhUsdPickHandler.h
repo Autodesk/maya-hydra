@@ -51,6 +51,12 @@ public:
         const Input& pickInput, Output& pickOutput
     ) const override;
 
+    // Applies the point instances pick mode, the selection kind and the geometry subsets pick
+    // mode, as for a click.
+    bool resolvePickHit(
+        const PickHit& pickHit, bool isSolePickHit, Ufe::SceneItemList& sceneItems
+    ) const override;
+
 private:
 
     PXR_NS::HdRenderIndex* renderIndex(int passIndex = 0) const;

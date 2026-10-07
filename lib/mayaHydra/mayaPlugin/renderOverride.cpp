@@ -2051,20 +2051,24 @@ MStatus MtohRenderOverride::Render(
         const bool hovering = hover && hover->active.load() && hitTestEnabled;
         if (outlineLive && hovering
             && (hoverChanged || _globals.forceEnableInteractiveHitTest)) {
-            hover->resolvedPath = _ResolveHoverPath(drawContext);
+            PickHitVector hoverHits;
+            _PickHoverHit(drawContext, hoverHits);
+            hover->resolved
+                = hoverHits.empty() ? HoverHighlight() : _ResolveHoverHighlight(hoverHits.front());
         }
         else if (hover && !hovering) {
-            // Cursor left, or the hit test was turned off: drop the stale path.
-            hover->resolvedPath = SdfPath();
+            // Cursor left, or the hit test was turned off: drop the stale hover.
+            hover->resolved = HoverHighlight();
         }
 
         // Empty unless this panel is hovered and hover highlighting is enabled.
-        const SdfPath wantedHoverPath
-            = (hovering && _OutlineHoverHighlightingEnabled()) ? hover->resolvedPath : SdfPath();
+        static const HoverHighlight noHover;
+        const HoverHighlight&       wantedHover
+            = (hovering && _OutlineHoverHighlightingEnabled()) ? hover->resolved : noHover;
 
         // The OutlineManager is shared by all panels. Push only when the selection changed or this
         // panel's hover differs from the one last pushed.
-        if (outlineLive && (selectionChanged || wantedHoverPath != _pushedOutlineHoverPath)) {
+        if (outlineLive && (selectionChanged || wantedHover != _pushedOutlineHover)) {
             HVT_NS::Outline::OutlineInputs inputs;
 
             // Native instances are drawn under their instancers, not under their own paths: they
@@ -2099,17 +2103,20 @@ MStatus MtohRenderOverride::Render(
             // Exclude the selection-highlight prims from the default (whole-scene) outlines.
             inputs.excludePaths = { _highlightHierarchyPrefix };
 
-            // The prim under the cursor, resolved above by _ResolveHoverPath().
-            if (!wantedHoverPath.IsEmpty()) {
-                inputs.hoverPaths = { wantedHoverPath };
-                // A hovered prim already in the selection uses the selected-hover color. Only
-                // whole selections count: the hover is a whole rprim, so an rprim with only some
-                // instances selected is not hovered as selected.
-                inputs.isHoverSelected = isPathInSelection(inputs.selectedPaths, wantedHoverPath);
-            }
+            // What a click at the cursor would select, resolved above by _ResolveHoverHighlight().
+            inputs.hoverPaths = wantedHover.paths;
+            inputs.hoverTargets = wantedHover.targets;
+            // Prims hovered whole and all in the selection use the selected-hover color. Only
+            // whole selections count here: the rprims that an instance target restricts are
+            // colored per instance by the outline, whatever this flag says.
+            inputs.isHoverSelected = !wantedHover.paths.empty()
+                && std::all_of(
+                    wantedHover.paths.begin(), wantedHover.paths.end(), [&](const SdfPath& path) {
+                        return isPathInSelection(inputs.selectedPaths, path);
+                    });
 
             _outlineManager->SetInputs(std::move(inputs));
-            _pushedOutlineHoverPath = wantedHoverPath;
+            _pushedOutlineHover = wantedHover;
         }
 
 #ifndef MAYAHYDRALIB_OIT_ENABLED
@@ -2277,47 +2284,49 @@ void MtohRenderOverride::_SetHoverPosition(
     }
 }
 
-SdfPath MtohRenderOverride::_ResolveHoverPath(const MHWRender::MDrawContext& drawContext)
+void MtohRenderOverride::_PickHoverHit(
+    const MHWRender::MDrawContext& drawContext,
+    PickHitVector&                 outHits)
 {
     // Only the panel under the cursor has an active hover state.
     const HoverState* hover = _GetHoverState(_currentPanelName.asChar());
     if (!hover || !hover->active.load()) {
-        return SdfPath();
+        return;
     }
     const int deviceX = hover->deviceX.load();
     const int deviceY = hover->deviceY.load();
     if (deviceX < 0 || deviceY < 0) {
-        return SdfPath();
+        return;
     }
 
     // Pick against the pass the outline is installed on (see _InitHydraResources()).
     constexpr int outlinePassIndex = 0;
     const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
     if (!outlinePass) {
-        return SdfPath();
+        return;
     }
 
     MStatus status;
     const MMatrix viewMatrix = drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx, &status);
     if (status != MStatus::kSuccess) {
-        return SdfPath();
+        return;
     }
     const MMatrix projMatrix =
         drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx, &status);
     if (status != MStatus::kSuccess) {
-        return SdfPath();
+        return;
     }
     int view_x = 0, view_y = 0, view_w = 0, view_h = 0;
     if (drawContext.getViewportDimensions(view_x, view_y, view_w, view_h) != MStatus::kSuccess
         || view_w <= 0 || view_h <= 0) {
-        return SdfPath();
+        return;
     }
 
     // Qt device pixels are top-left origin; the pick region is bottom-left origin. Both are
     // relative to the viewport origin, which is (0,0) for a model panel.
     const int flippedY = view_h - 1 - deviceY;
     if (deviceX < 0 || deviceX >= view_w || flippedY < 0 || flippedY >= view_h) {
-        return SdfPath();
+        return;
     }
     const unsigned int sel_x = static_cast<unsigned int>(deviceX);
     const unsigned int sel_y = static_cast<unsigned int>(flippedY);
@@ -2342,11 +2351,39 @@ SdfPath MtohRenderOverride::_ResolveHoverPath(const MHWRender::MDrawContext& dra
     outlinePass->Pick(pickParams);
 
     if (hits.empty()) {
-        return SdfPath(); // background / no prim under the cursor
+        return; // background / no prim under the cursor
     }
 
     // resolveNearestToCenter resolves to a single hit, the one closest to the cursor.
-    return hits.front().objectId;
+    outHits.emplace_back(outlinePassIndex, hits.front());
+}
+
+MtohRenderOverride::HoverHighlight
+MtohRenderOverride::_ResolveHoverHighlight(const PickHit& hit) const
+{
+    HoverHighlight highlight;
+
+    // What a click on the hit would select, resolved by the same pick handler, so that the hover
+    // follows the pick modes and the selection kind. A Maya pick handler does not support it:
+    // Maya prims are not instanced, so the picked prim itself is hovered, as before.
+    Ufe::SceneItemList  sceneItems;
+    PickHandlerConstPtr pickHandler = _PickHandler(hit);
+    if (!pickHandler || !pickHandler->resolvePickHit(hit, true, sceneItems)) {
+        highlight.paths = { hit.hdxPickHit.objectId };
+        return highlight;
+    }
+
+    // Into the render index namespace through the path mappers, as a click selection, then split
+    // as the selection is, native instances included.
+    Fvp::Selection hoverSelection;
+    for (const auto& sceneItem : sceneItems) {
+        for (const auto& primSelection : Fvp::ufePathToPrimSelections(sceneItem->path())) {
+            hoverSelection.Add(primSelection);
+        }
+    }
+    NativeInstancerFinder nativeInstancerFinder(_selectionSceneIndex);
+    getOutlineSelection(hoverSelection, nativeInstancerFinder, highlight.paths, highlight.targets);
+    return highlight;
 }
 
 HVT_NS::Outline::OutlineStyle MtohRenderOverride::_BuildOutlineStyle() const
@@ -2756,7 +2793,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // caches a pointer to it.
     _outlineManager.reset();
     // A stale value would suppress the first hover push after reinstall.
-    _pushedOutlineHoverPath = SdfPath();
+    _pushedOutlineHover = HoverHighlight();
     _pushedOutlineSelectedPaths.clear();
     _pushedOutlineSelectedPaths.shrink_to_fit();
     _pushedOutlineSelectedTargets.clear();

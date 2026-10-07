@@ -195,6 +195,44 @@ SdfPath instancerPrimOrigin(const HdxInstancerContext& instancerContext)
     return schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
 }
 
+//! \brief  The prim origin path of a pick hit, as HdxPrimOriginInfo::GetFullPath() composes it:
+//!         the origins of every native instancing level, outermost first, then the prim's own.
+//!
+//! An empty path when the composition starts with a relative origin, which has nothing to be
+//! relative to: GetFullPath() posts a coding error for it ("Cannot append to invalid path"). This
+//! happens for a prim inside a USD prototype that is drawn directly instead of through its
+//! instancer, so a pick on it resolves to nothing, as other unresolvable hits do.
+SdfPath fullPrimOriginPath(const HdxPrimOriginInfo& primOrigin)
+{
+    SdfPath    path;
+    const auto append = [&path](const HdContainerDataSourceHandle& primOriginDs) {
+        const HdPrimOriginSchema schema(primOriginDs);
+        if (!schema) {
+            return true;
+        }
+        const SdfPath scenePath = schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+        if (scenePath.IsEmpty()) {
+            return true;
+        }
+        if (scenePath.IsAbsolutePath()) {
+            path = scenePath;
+            return true;
+        }
+        if (path.IsEmpty()) {
+            return false;
+        }
+        path = path.AppendPath(scenePath);
+        return true;
+    };
+
+    for (const HdxInstancerContext& instancerContext : primOrigin.instancerContexts) {
+        if (!append(instancerContext.instancePrimOrigin)) {
+            return SdfPath();
+        }
+    }
+    return append(primOrigin.primOrigin) ? path : SdfPath();
+}
+
 UsdPickHandler::HitPath pickInstance(
     const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit
 )
@@ -210,7 +248,7 @@ UsdPickHandler::HitPath pickPrototype(
 )
 {
     // The prototype path is the prim origin path in the USD data model.
-    return {primOrigin.GetFullPath(), -1};
+    return {fullPrimOriginPath(primOrigin), -1};
 }
 
 UsdPickHandler::HitPath pickInstancer(
@@ -284,7 +322,7 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
     auto primOrigin = HdxPrimOriginInfo::FromPickHit(&renderIndex, pickHit);
 
     if (pickHit.instancerId.IsEmpty() || primOrigin.instancerContexts.empty()) {
-        return {primOrigin.GetFullPath(), -1};
+        return {fullPrimOriginPath(primOrigin), -1};
     }
 
     // If there is a Hydra instancer, distinguish between native instancing
@@ -304,6 +342,11 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
             return {SdfPath(), -1};
         }
         auto instanceOriginPath = instanceOriginSchema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+        // The outermost instance is outside any prototype, so its origin is absolute, unless the
+        // instancer is itself inside a USD prototype drawn directly: nothing to select then.
+        if (!instanceOriginPath.IsAbsolutePath()) {
+            return {SdfPath(), -1};
+        }
 
         // EMSUSD-1220 : Native instances picking depends on the Point Instances pick mode.
         if (GetPointInstancesPickMode() != UsdPointInstancesPickMode::Prototypes) {
@@ -320,7 +363,7 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
         // Compose the origins of every native instancing level, outermost first, then the
         // prototype prim's. A native instance nested in a prototype has an origin relative to that
         // prototype.
-        return {primOrigin.GetFullPath(), -1};
+        return {fullPrimOriginPath(primOrigin), -1};
     }
 
     // Explicit prototype instancing (i.e. USD point instancing).
@@ -360,6 +403,21 @@ bool UsdPickHandler::handlePickHit(
     const Input& pickInput, Output& pickOutput
 ) const
 {
+    Ufe::SceneItemList sceneItems;
+    if (!resolvePickHit(pickInput.pickHit, pickInput.isSolePickHit, sceneItems)) {
+        return false;
+    }
+
+    for (const auto& sceneItem : sceneItems) {
+        pickOutput.ufeSelection->append(sceneItem);
+    }
+    return !sceneItems.empty();
+}
+
+bool UsdPickHandler::resolvePickHit(
+    const PickHit& pickHit, bool isSolePickHit, Ufe::SceneItemList& sceneItems
+) const
+{
     if (!sceneIndexRegistry()) {
         TF_FATAL_ERROR("Picking called while no scene index registry exists");
         return false;
@@ -370,7 +428,7 @@ bool UsdPickHandler::handlePickHit(
         return false;
     }
 
-    auto registration = sceneIndexRegistry()->GetSceneIndexRegistrationForRprim(pickInput.pickHit.hdxPickHit.objectId);
+    auto registration = sceneIndexRegistry()->GetSceneIndexRegistrationForRprim(pickHit.hdxPickHit.objectId);
 
     if (!registration) {
         return false;
@@ -381,26 +439,25 @@ bool UsdPickHandler::handlePickHit(
 #if PXR_VERSION >= 2405
     if (GetGeomSubsetsPickMode() == GeomSubsetsPickModeTokens->Faces) {
         auto geomSubsetsHitPaths = resolveGeomSubsetsPicking(
-            renderIndex(pickInput.pickHit.passIndex)->GetTerminalSceneIndex(),
-            pickInput.pickHit.hdxPickHit.objectId,
+            renderIndex(pickHit.passIndex)->GetTerminalSceneIndex(),
+            pickHit.hdxPickHit.objectId,
             HdGeomSubsetSchemaTokens->typeFaceSet,
-            pickInput.pickHit.hdxPickHit.elementIndex);
+            pickHit.hdxPickHit.elementIndex);
         if (!geomSubsetsHitPaths.empty()) {
             hitPaths.insert(hitPaths.end(), geomSubsetsHitPaths.begin(), geomSubsetsHitPaths.end());
         }
 
         // If we did not find any geomSubset and this is the only pick hit, then fallback to selecting the base prim/instance.
-        if (hitPaths.empty() && pickInput.isSolePickHit) {
-            hitPaths.push_back(resolveInstancePicking(*renderIndex(pickInput.pickHit.passIndex), pickInput.pickHit.hdxPickHit));
+        if (hitPaths.empty() && isSolePickHit) {
+            hitPaths.push_back(resolveInstancePicking(*renderIndex(pickHit.passIndex), pickHit.hdxPickHit));
         }
     } else {
-        hitPaths.push_back(resolveInstancePicking(*renderIndex(pickInput.pickHit.passIndex), pickInput.pickHit.hdxPickHit));
+        hitPaths.push_back(resolveInstancePicking(*renderIndex(pickHit.passIndex), pickHit.hdxPickHit));
     }
 #else
-    hitPaths.push_back(resolveInstancePicking(*renderIndex(pickInput.pickHit.passIndex), pickInput.pickHit.hdxPickHit));
+    hitPaths.push_back(resolveInstancePicking(*renderIndex(pickHit.passIndex), pickHit.hdxPickHit));
 #endif
 
-    size_t nbSelectedUfeItems = 0;
     for (const auto& [pickedUsdPath, instanceNdx] : hitPaths) {
         SdfPath effectiveUsdPath = pickedUsdPath;
 
@@ -408,8 +465,8 @@ bool UsdPickHandler::handlePickHit(
         // resolve to the GP procedural parent instead.
         if (effectiveUsdPath.IsEmpty()) {
             effectiveUsdPath = resolveGenerativeProceduralAncestorPath(
-                renderIndex(pickInput.pickHit.passIndex)->GetTerminalSceneIndex(),
-                pickInput.pickHit.hdxPickHit.objectId);
+                renderIndex(pickHit.passIndex)->GetTerminalSceneIndex(),
+                pickHit.hdxPickHit.objectId);
             if (effectiveUsdPath.IsEmpty()) {
                 continue;
             }
@@ -461,10 +518,9 @@ bool UsdPickHandler::handlePickHit(
             continue;
         }
 
-        pickOutput.ufeSelection->append(si);
-        nbSelectedUfeItems++;
+        sceneItems.push_back(si);
     }
-    return nbSelectedUfeItems > 0;
+    return true;
 }
 
 HdRenderIndex* UsdPickHandler::renderIndex(int passIndex) const

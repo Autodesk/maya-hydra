@@ -25,6 +25,7 @@
 #include <maya/MApiNamespace.h>
 
 #include <ufe/namedSelection.h>
+#include <ufe/sceneItemList.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -54,6 +55,20 @@ public:
 
     MAYAHYDRALIB_API
     virtual bool inSingleNodeComponentsPick(const PickHit&) const {
+        return false;
+    }
+
+    /// The scene items that a click on \p pickHit would select, resolved as handlePickHit()
+    /// resolves them, without changing the selection. Hover highlighting uses it to show exactly
+    /// what a click would select. Returns false when the handler does not support it: the caller
+    /// then falls back to the picked prim. A handler that supports it may still resolve the hit to
+    /// no item, as a click would select nothing.
+    MAYAHYDRALIB_API
+    virtual bool resolvePickHit(
+        const PickHit& /* pickHit */,
+        bool           /* isSolePickHit */,
+        Ufe::SceneItemList& /* sceneItems */
+    ) const {
         return false;
     }
 };

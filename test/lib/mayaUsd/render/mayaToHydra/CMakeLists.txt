@@ -220,6 +220,7 @@ endif()
 if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
+        testOutlineHoverPickModes.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
     )
 endif()
 
@@ -240,6 +241,7 @@ endif()
 # Outline-only scripts: no _legacy counterpart, as legacy mode has nothing to cover.
 set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineHover.py
+    testOutlineHoverPickModes.py
     testOutlineRefinement.py
     testOutlinePointInstances.py
     testOutlineNativeInstances.py
