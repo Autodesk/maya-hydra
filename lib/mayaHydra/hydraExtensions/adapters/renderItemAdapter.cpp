@@ -75,20 +75,26 @@ _GetPositionVertexCount(MGeometry* geom, int vertexBufferCount)
 // Copies the first `count` elements of a float vertex stream into `out`, keeping only the
 // first VecT::dimension components of each element. The stream layout is dictated by the
 // shader's geometry requirements, so it may carry more components than Hydra expects
-// (e.g. 4-component tangents with the bitangent sign in w).
+// (e.g. 4-component tangents with the bitangent sign in w), and may be interleaved or padded.
 template <typename VecT>
 void
 _CopyFloatStream(MVertexBuffer* mvb, size_t count, VtArray<VecT>& out)
 {
     out.clear();
     const MVertexBufferDescriptor& desc = mvb->descriptor();
-    const int stride = desc.dimension();
-    if (desc.dataType() != MGeometry::kFloat || stride < static_cast<int>(VecT::dimension)) {
+    constexpr int numComponents = static_cast<int>(VecT::dimension);
+    if (desc.dataType() != MGeometry::kFloat || desc.dimension() < numComponents
+        || desc.offset() < 0 || desc.stride() < 0) {
         return;
     }
+    // offset() and stride() are counted in dataType units, not bytes. A zero stride means
+    // tightly packed.
+    const size_t offset = static_cast<size_t>(desc.offset());
+    const size_t stride = static_cast<size_t>(desc.stride() > 0 ? desc.stride() : desc.dimension());
     const auto* data = static_cast<const float*>(mvb->map());
     if (TF_VERIFY(data)) {
-        if (stride == static_cast<int>(VecT::dimension)) {
+        data += offset;
+        if (stride == static_cast<size_t>(numComponents)) {
             const auto* elements = reinterpret_cast<const VecT*>(data);
             out.assign(elements, elements + count);
         } else {
@@ -786,6 +792,20 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
     return MayaHydraAdapter::Get(key);
 }
 
+size_t MayaHydraRenderItemAdapter::_StoredStreamCount(const TfToken& primvar) const
+{
+    if (primvar == UsdGeomTokens->normals) {
+        return _normals.size();
+    }
+    if (primvar == MayaHydraAdapterTokens->st) {
+        return _uvs.size();
+    }
+    if (primvar == MayaHydraAdapterTokens->tangents) {
+        return _tangents.size();
+    }
+    return 0;
+}
+
 HdPrimvarDescriptorVector
 MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
 {
@@ -799,16 +819,16 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
         // standard_surface without textures requests no UVs). Only advertise optional streams
         // holding one value per point: an empty st is read as a degenerate texture coordinate
         // instead of being treated as missing.
-        const size_t numPoints = _positions.size();
-        const auto hasPerPointData = [numPoints](const auto& values) {
-            return numPoints > 0 && values.size() == numPoints;
+        const size_t numPoints = _StoredPositionCount();
+        const auto hasPerPointData = [this, numPoints](const TfToken& primvar) {
+            return numPoints > 0 && _StoredStreamCount(primvar) == numPoints;
         };
 
         localDescs = {
             { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point }//Vertices
         };
         static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
-        if (useMayaNormals && hasPerPointData(_normals)) {
+        if (useMayaNormals && hasPerPointData(UsdGeomTokens->normals)) {
             localDescs.push_back(
                 { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal }); //Normals
         }
@@ -818,11 +838,11 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
         // Note: the default cube doesn't give 36 face vertices as VP2 deduplicated them.
         if (_primitive == MGeometry::Primitive::kTriangles
             || _primitive == MGeometry::Primitive::kTriangleStrip) {
-            if (hasPerPointData(_uvs)) {
+            if (hasPerPointData(MayaHydraAdapterTokens->st)) {
                 localDescs.push_back(
                     {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //uvs
             }
-            if (hasPerPointData(_tangents)) {
+            if (hasPerPointData(MayaHydraAdapterTokens->tangents)) {
                 localDescs.push_back(
                     {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //tangents
             }

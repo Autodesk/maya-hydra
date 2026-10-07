@@ -74,6 +74,7 @@ public:
 protected:
     bool      _HasStoredPositions() const override;
     size_t    _StoredPositionCount() const override;
+    size_t    _StoredStreamCount(const TfToken& primvar) const override;
     void      _BeginGeometryUpdate(bool geomChanged, bool topoChanged) override;
     GfRange3d _ResolveBounds(const GfRange3d& renderItemBounds) const override;
     void      _ReadVertexStream(

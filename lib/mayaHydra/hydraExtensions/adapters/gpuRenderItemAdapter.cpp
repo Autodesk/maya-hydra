@@ -531,6 +531,21 @@ size_t MayaHydraGpuRenderItemAdapter::_StoredPositionCount() const
                          : MayaHydraRenderItemAdapter::_StoredPositionCount();
 }
 
+size_t MayaHydraGpuRenderItemAdapter::_StoredStreamCount(const TfToken& primvar) const
+{
+    // A shared stream's CPU array is cleared once it is published.
+    const _ExtStream* stream = nullptr;
+    if (primvar == HdTokens->normals) {
+        stream = &_extNormals;
+    } else if (primvar == MayaHydraAdapterTokens->st) {
+        stream = &_extUvs;
+    } else if (primvar == MayaHydraAdapterTokens->tangents) {
+        stream = &_extTangents;
+    }
+    return (stream && *stream) ? stream->numElements
+                               : MayaHydraRenderItemAdapter::_StoredStreamCount(primvar);
+}
+
 void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool topoChanged)
 {
     // In hybrid mode a mesh starts batched (allowDirectBind=false) so static

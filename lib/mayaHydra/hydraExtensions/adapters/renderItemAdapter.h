@@ -239,6 +239,9 @@ protected:
     /// Number of positions held from a previous update.
     virtual size_t _StoredPositionCount() const { return _positions.size(); }
 
+    /// Number of values held for the normals, st or tangents vertex stream.
+    virtual size_t _StoredStreamCount(const TfToken& primvar) const;
+
     /// Called once per UpdateFromDelta, before any vertex stream is read.
     virtual void _BeginGeometryUpdate(bool /*geomChanged*/, bool /*topoChanged*/) { }
 
