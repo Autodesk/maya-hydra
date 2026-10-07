@@ -1199,7 +1199,13 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
         # Use POSIX shell; '&&' ensures the compare step runs only on successful render
         set(CMD /bin/sh)
         set(COMPARE_ARGS "\"${Python_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${IDIFF_CMD}\" \"${EXPECTED_IMAGE_PATH}\" \"${RENDERED_IMAGE_PATH}\" ${FAIL} ${FAILPERCENT}")
-        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${COMPARE_ARGS}")
+        # The command separator must be written '\;'.  An unescaped ';' is a
+        # CMake list separator, so the unquoted ${CMD_ARGS} expansion in
+        # add_test() below would split the script into separate arguments, and
+        # 'sh -c' runs only its first operand (the rest become $0, $1, ...):
+        # the render and compare legs would never run and the test would
+        # silently exit 0 with the status of the rm.
+        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/* \; ${RENDER_ARGS} && ${COMPARE_ARGS}")
     endif()
 
     add_test(
@@ -1397,7 +1403,9 @@ function(mayaHydra_add_mayabatch_render_test SCENE_FILE_LABELED)
         set(CMD /bin/sh)
         set(RENDER_ARGS "\"${MAYA_EXECUTABLE}\" -batch -script \"${MEL_SCRIPT_PATH}\"")
         set(COMPARE_ARGS "\"${Python_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${IDIFF_CMD}\" \"${EXPECTED_IMAGE_PATH}\" \"${RENDERED_IMAGE_PATH}\" ${FAIL} ${FAILPERCENT}")
-        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${COMPARE_ARGS}")
+        # Escaped ';', as in mayaHydra_add_cmd_line_render_test(): an unescaped
+        # one splits CMD_ARGS, leaving 'sh -c' to run only the rm and exit 0.
+        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/* \; ${RENDER_ARGS} && ${COMPARE_ARGS}")
     endif()
 
     add_test(
