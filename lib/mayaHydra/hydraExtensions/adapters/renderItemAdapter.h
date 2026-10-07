@@ -233,6 +233,18 @@ protected:
         bool tangents = false;
     };
 
+    /// Vertex stream semantics supplied by a render item's geometry.
+    struct _StreamPresence
+    {
+        bool positions = false;
+        bool normals = false;
+        bool uvs = false;
+        bool tangents = false;
+    };
+
+    /// Scan the vertex buffers of \p geom for the semantics they supply.
+    static _StreamPresence _GetStreamPresence(MGeometry* geom, int vertexBufferCount);
+
     /// Whether positions from a previous update are held.
     virtual bool _HasStoredPositions() const { return !_positions.empty(); }
 

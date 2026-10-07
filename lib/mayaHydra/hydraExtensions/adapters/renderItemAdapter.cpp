@@ -419,6 +419,20 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             }
             _ReadVertexStream(mvb, topoChanged, useMayaNormals, dirty);
         }
+
+        // VP2 only supplies the streams the current shader requests, and the adapter outlives
+        // shader reassignments: drop the CPU copy of a stream the geometry no longer supplies,
+        // otherwise it stays advertised with stale values.
+        const _StreamPresence present = _GetStreamPresence(geom, vertexBuffercount);
+        const auto clearAbsent = [](bool isPresent, auto& values, bool& streamDirty) {
+            if (!isPresent && !values.empty()) {
+                values.clear();
+                streamDirty = true;
+            }
+        };
+        clearAbsent(present.normals, _normals, dirty.normals);
+        clearAbsent(present.uvs, _uvs, dirty.uvs);
+        clearAbsent(present.tangents, _tangents, dirty.tangents);
     }
 
     _EndGeometryUpdate(geom, vertexBuffercount, geomChanged, topoChanged, useMayaNormals, dirty);
@@ -738,6 +752,26 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
         default:
         break;
     }
+}
+
+MayaHydraRenderItemAdapter::_StreamPresence
+MayaHydraRenderItemAdapter::_GetStreamPresence(MGeometry* geom, int vertexBufferCount)
+{
+    _StreamPresence present;
+    for (int vbIdx = 0; geom && vbIdx < vertexBufferCount; vbIdx++) {
+        const MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
+        if (!mvb) {
+            continue;
+        }
+        switch (mvb->descriptor().semantic()) {
+        case MGeometry::Semantic::kPosition: present.positions = true; break;
+        case MGeometry::Semantic::kNormal: present.normals = true; break;
+        case MGeometry::Semantic::kTexture: present.uvs = true; break;
+        case MGeometry::Semantic::kTangent: present.tangents = true; break;
+        default: break;
+        }
+    }
+    return present;
 }
 
 void MayaHydraRenderItemAdapter::_EndGeometryUpdate(

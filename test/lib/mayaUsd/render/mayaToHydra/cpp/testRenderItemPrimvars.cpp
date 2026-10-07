@@ -101,3 +101,24 @@ TEST(RenderItemPrimvars, TexturedMeshDeclaresPopulatedUVs)
     }
     EXPECT_TRUE(hasUVs) << "A textured mesh render item should declare the st primvar";
 }
+
+// What: a shader losing its textures must withdraw the UVs of the mesh render item.
+// How: open testUVs.ma and disconnect the file textures of blinn1, so VP2 stops supplying the
+//      UV stream to the plane's existing render item.
+// Expect: st is no longer declared, and declared primvars are fully populated.
+// Regression: the CPU UV array read while the shader was textured was kept, so st stayed
+//      declared with stale values.
+TEST(RenderItemPrimvars, TexturedToUntexturedWithdrawsUVs)
+{
+    const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, "pPlaneShape1");
+    const PrimEntriesVector prims = FindMeshRenderItemPrims(meshShapeFull);
+    ASSERT_FALSE(prims.empty()) << meshShapeFull << " render item not found";
+
+    for (const PrimEntry& primEntry : prims) {
+        ExpectDeclaredPrimvarsArePopulated(primEntry);
+        HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(primEntry.prim.dataSource);
+        EXPECT_FALSE(primvars.GetPrimvar(TfToken("st")).IsDefined())
+            << primEntry.primPath.GetText() << " still declares st after its shader lost its "
+            << "textures";
+    }
+}

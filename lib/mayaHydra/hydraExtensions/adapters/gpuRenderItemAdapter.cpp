@@ -702,23 +702,7 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
     // naming a GL buffer VP2 no longer guarantees, and Storm copies from or
     // draws through whatever that name now is.
     if (geomChanged || topoChanged) {
-        bool hasPositions = false;
-        bool hasNormals = false;
-        bool hasUvs = false;
-        bool hasTangents = false;
-        for (int vbIdx = 0; vbIdx < vertexBufferCount; vbIdx++) {
-            MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
-            if (!mvb) {
-                continue;
-            }
-            switch (mvb->descriptor().semantic()) {
-            case MGeometry::Semantic::kPosition: hasPositions = true; break;
-            case MGeometry::Semantic::kNormal: hasNormals = true; break;
-            case MGeometry::Semantic::kTexture: hasUvs = true; break;
-            case MGeometry::Semantic::kTangent: hasTangents = true; break;
-            default: break;
-            }
-        }
+        const _StreamPresence present = _GetStreamPresence(geom, vertexBufferCount);
         auto withdraw = [this](_ExtStream& stream, bool present, bool& streamDirty,
                                const char* name) {
             if (!stream || present) {
@@ -731,10 +715,10 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
             stream = {};
             streamDirty = true;
         };
-        withdraw(_extPositions, hasPositions, dirty.positions, "position");
-        withdraw(_extNormals, hasNormals, dirty.normals, "normal");
-        withdraw(_extUvs, hasUvs, dirty.uvs, "texture");
-        withdraw(_extTangents, hasTangents, dirty.tangents, "tangent");
+        withdraw(_extPositions, present.positions, dirty.positions, "position");
+        withdraw(_extNormals, present.normals, dirty.normals, "normal");
+        withdraw(_extUvs, present.uvs, dirty.uvs, "texture");
+        withdraw(_extTangents, present.tangents, dirty.tangents, "tangent");
     }
 
     // Streams read on this update are already dirty. A stream VP2 did not supply has nothing

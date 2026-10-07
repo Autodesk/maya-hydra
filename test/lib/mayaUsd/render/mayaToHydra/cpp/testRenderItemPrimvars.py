@@ -48,6 +48,19 @@ class TestRenderItemPrimvars(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="RenderItemPrimvars.TexturedMeshDeclaresPopulatedUVs")
 
+    # What: a shader losing its textures must withdraw the UVs of the mesh render item.
+    # How: open testUVs.ma, disconnect the file textures of blinn1 (the render item is kept),
+    #      then run the C++ test on the plane.
+    # Expect: st is no longer declared on the plane render items.
+    def test_texturedToUntexturedWithdrawsUVs(self):
+        self.setupScene("testUVandUDIM", "testUVs.ma", "pPlaneShape1")
+        for src, dst in (("file1.oc", "blinn1.c"), ("file2.oc", "blinn1.ic"),
+                         ("file3.oc", "blinn1.sc")):
+            cmds.disconnectAttr(src, dst)
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="RenderItemPrimvars.TexturedToUntexturedWithdrawsUVs")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
