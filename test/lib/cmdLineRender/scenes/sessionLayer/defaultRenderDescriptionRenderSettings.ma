@@ -1,6 +1,6 @@
 //Maya ASCII 2027 scene
 //Name: defaultRenderDescriptionRenderSettings.ma
-//Last modified: Fri, Oct 02, 2026 02:36:40 PM
+//Last modified: Wed, Oct 07, 2026 03:21:11 PM
 //Codeset: 1252
 requires maya "2027";
 requires "stereoCamera" "10.0";
@@ -14,17 +14,17 @@ fileInfo "product" "Maya 2027";
 fileInfo "version" "2027";
 fileInfo "cutIdentifier" "202608142319-696fc47a96";
 fileInfo "osv" "Windows 11 Enterprise v2009 (Build: 26200)";
-fileInfo "UUID" "71B17202-4A1A-1F94-7DF7-AD94E1AAD88A";
+fileInfo "UUID" "C7A89FAC-4A32-C54C-A137-B8B332FDAD0C";
 createNode transform -s -n "persp";
 	rename -uid "491D1E9C-4433-94BD-CB6B-B9B9EA5120EC";
 	setAttr ".v" no;
-	setAttr ".t" -type "double3" 28 21 28 ;
+	setAttr ".t" -type "double3" 2.4344067617844867 3.5981814372189218 4.8705739375811365 ;
 	setAttr ".r" -type "double3" -27.938352729602379 44.999999999999972 -5.172681101354183e-14 ;
 createNode camera -s -n "perspShape" -p "persp";
 	rename -uid "74F86C81-465F-8C0B-2F58-29820AE3BED4";
 	setAttr -k off ".v" no;
 	setAttr ".fl" 34.999999999999993;
-	setAttr ".coi" 44.82186966202994;
+	setAttr ".coi" 6.2492098583990439;
 	setAttr ".imn" -type "string" "persp";
 	setAttr ".den" -type "string" "persp_depth";
 	setAttr ".man" -type "string" "persp_mask";
@@ -97,20 +97,20 @@ createNode mesh -n "pSphereShape1" -p "pSphere1";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
 createNode lightLinker -s -n "lightLinker1";
-	rename -uid "8CA5AB66-4AE2-6C3F-1555-BDB590E0BA4A";
+	rename -uid "DF6DDAB4-41CD-F6AC-6312-59AB4DDC0B1C";
 	setAttr -s 2 ".lnk";
 	setAttr -s 2 ".slnk";
 createNode shapeEditorManager -n "shapeEditorManager";
-	rename -uid "B621E4B6-414D-606D-2F27-C1841AD08944";
+	rename -uid "BD8B9E67-4BA6-8D0B-49C5-7C854C400701";
 createNode poseInterpolatorManager -n "poseInterpolatorManager";
-	rename -uid "8612FBE9-46F5-2D00-DD17-B1AE3371BF54";
+	rename -uid "63E217FF-4021-5FDF-14A1-20811A92851A";
 createNode displayLayerManager -n "layerManager";
-	rename -uid "29E51DE4-4614-F73A-CC9B-5A8820B2A112";
+	rename -uid "A27505F7-4EC4-2894-F419-FDBE67391A94";
 createNode displayLayer -n "defaultLayer";
 	rename -uid "322F7671-4765-3D16-32C6-0A8D20D9A02C";
 	setAttr ".ufem" -type "stringArray" 0  ;
 createNode renderLayerManager -n "renderLayerManager";
-	rename -uid "E61ED2AF-4E1D-A7C0-E8BB-91AB4EB3F11C";
+	rename -uid "D6E73C32-4330-06C4-C4AF-BA88A91AE841";
 createNode renderLayer -n "defaultRenderLayer";
 	rename -uid "B8588992-41F8-0B98-B84E-A9A9252A8ED0";
 	setAttr ".g" yes;
@@ -183,7 +183,7 @@ createNode aiImagerDenoiserOidn -s -n "defaultArnoldDenoiser";
 	rename -uid "92173420-44D3-A0C4-FE91-B8BB6737C035";
 createNode UsdDefaultSettings -n "UsdDefaultRenderDescription";
 	rename -uid "94A4FC98-40B8-2C6E-144B-ED84FAAE9277";
-	setAttr ".srl" -type "string" "#usda 1.0\n(\n    renderSettingsPrimPath = \"/Render/SceneRenderSettings\"\n)\n\ndef Scope \"Render\"\n{\n    def RenderSettings \"SceneRenderSettings\"\n    {\n        rel products = </Render/Products/BeautyProduct>\n        custom string adskUsd:externalCamera = \"|persp\" (\n            displayName = \"External Camera\"\n        )\n    }\n\n    def Scope \"Products\"\n    {\n        def RenderProduct \"BeautyProduct\"\n        {\n            prepend rel orderedVars = </Render/Vars/color>\n            token productName = \"defaultRenderDescriptionRenderSettings.png\"\n            token productType = \"raster\"\n            token fileFormat = \"png\"\n        }\n    }\n\n    def Scope \"Vars\"\n    {\n        def RenderVar \"color\"\n        {\n            uniform string sourceName = \"color\"\n        }\n    }\n}\n\n";
+	setAttr ".srl" -type "string" "#usda 1.0\n(\n    renderSettingsPrimPath = \"/Render/SceneRenderSettings\"\n)\n\ndef Scope \"Render\"\n{\n    def RenderSettings \"SceneRenderSettings\"\n    {\n        custom string adskUsd:externalCamera = \"|persp\" (\n            displayName = \"External Camera\"\n        )\n        rel products = </Render/Products/BeautyProduct>\n    }\n\n    def Scope \"Products\"\n    {\n        def RenderProduct \"BeautyProduct\"\n        {\n            token fileFormat = \"png\"\n            prepend rel orderedVars = </Render/Vars/color>\n            token productName = \"defaultRenderDescriptionRenderSettings.png\"\n            token productType = \"raster\"\n        }\n    }\n\n    def Scope \"Vars\"\n    {\n        def RenderVar \"color\"\n        {\n            uniform string sourceName = \"color\"\n        }\n    }\n}\n\n";
 	setAttr ".ssl" -type "string" "#usda 1.0\n\n";
 	setAttr ".ard" -type "string" "UsdDefaultRenderDescription,/Render/SceneRenderSettings";
 lockNode -l 1 ;
@@ -377,13 +377,13 @@ select -ne :defaultRenderGlobals;
 		-dv 1 -min 0 -max 1 -at "bool";
 	addAttr -ci true -sn "mayaHydraSelectionHighlightMode" -ln "mayaHydraSelectionHighlightMode" 
 		-min 0 -max 1 -en "Outline Selection:Legacy Selection" -at "enum";
-	addAttr -ci true -sn "mayaHydraForceEnableInteractiveHitTest" -ln "mayaHydraForceEnableInteractiveHitTest" 
-		-min 0 -max 1 -at "bool";
 	addAttr -ci true -sn "mayaHydraOutlineHoverHighlighting" -ln "mayaHydraOutlineHoverHighlighting" 
 		-min 0 -max 1 -at "bool";
-	addAttr -ci true -sn "mayaHydraForceDisableSelectionHighlight" -ln "mayaHydraForceDisableSelectionHighlight" 
+	addAttr -s false -ci true -sn "mayaHydraForceEnableInteractiveHitTest" -ln "mayaHydraForceEnableInteractiveHitTest" 
 		-min 0 -max 1 -at "bool";
-	addAttr -ci true -sn "mayaHydraEnableDefaultOutlines" -ln "mayaHydraEnableDefaultOutlines" 
+	addAttr -s false -ci true -sn "mayaHydraForceDisableSelectionHighlight" -ln "mayaHydraForceDisableSelectionHighlight" 
+		-min 0 -max 1 -at "bool";
+	addAttr -s false -ci true -sn "mayaHydraEnableDefaultOutlines" -ln "mayaHydraEnableDefaultOutlines" 
 		-min 0 -max 1 -at "bool";
 	setAttr ".ren" -type "string" "arnold";
 	setAttr ".imfkey" -type "string" "exr";
