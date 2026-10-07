@@ -42,12 +42,8 @@ namespace MAYAHYDRA_NS_DEF {
 inline constexpr std::string_view kUsdDefaultRenderDescriptionNodeName = "UsdDefaultRenderDescription";
 
 //! Short-hand for kUsdDefaultRenderDescriptionNodeName as an MString.
-inline MString rdNodeName()
-{
-    return MString(
-        kUsdDefaultRenderDescriptionNodeName.data(),
-        static_cast<int>(kUsdDefaultRenderDescriptionNodeName.length()));
-}
+MAYAHYDRALIB_API
+const MString& rdNodeName();
 
 //! Maya type id of the mayaUsd proxy shape node, hardcoded to match
 //! MayaUsd::MAYAUSD_PROXYSHAPE_ID, which maya-usd does not export.

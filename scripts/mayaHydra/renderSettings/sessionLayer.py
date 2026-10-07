@@ -13,6 +13,20 @@
 # limitations under the License.
 #
 
+# This module implements an important design choice: there is logic behind the
+# choice of the session layer stage. If absent, it will be the
+# UsdDefaultRenderDescription stage, and if present, it can be a
+# MayaUsdProxyShape stage, which is represented by a Dag path. This cannot be
+# handled at the Render argument parsing level in Python, where each argument
+# is handled separately, so during Render argument parsing we simply copy the
+# session layer and session layer stage arguments into dynamic attributes on
+# the UsdDefaultRenderDescription node.
+#
+# These values can then later be retrieved by the hydraRender command, which
+# then has the whole picture and both arguments. The dynamic attributes are
+# never persisted, and serve only as a communication channel to get values from
+# the Render command line into the hydraRender command.
+
 from contextlib import contextmanager
 
 import maya.cmds as cmds

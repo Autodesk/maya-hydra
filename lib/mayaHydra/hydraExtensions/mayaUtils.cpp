@@ -41,6 +41,15 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
+const MString& rdNodeName()
+{
+    static const MString name(
+        kUsdDefaultRenderDescriptionNodeName.data(),
+        static_cast<int>(kUsdDefaultRenderDescriptionNodeName.length()));
+
+    return name;
+}
+
 const Ufe::Path& UsdDefaultRenderDescriptionNodePath()
 {
     static const Ufe::Path path(Ufe::PathSegment(
