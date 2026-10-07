@@ -73,4 +73,11 @@ def Xform "Root"
         double3 xformOp:translate = (0, 0, 8)
         uniform token[] xformOpOrder = ["xformOp:translate"]
     }
+
+    # Picking marker (draws nothing): the center of Inner_1 in Outer_2.
+    def Xform "marker_Outer_2_Inner_1"
+    {
+        double3 xformOp:translate = (3, 0, 8)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
 }

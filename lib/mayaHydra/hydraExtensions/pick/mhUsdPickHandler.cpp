@@ -317,8 +317,10 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
         if (!TF_VERIFY(prototypeOriginSchema, "Cannot build prototype prim origin schema for USD native instance, falling back to selecting instance.")) {
             return {instanceOriginPath, -1};
         }
-        auto prototypeOriginPath = prototypeOriginSchema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
-        return {instanceOriginPath.AppendPath(prototypeOriginPath), -1};
+        // Compose the origins of every native instancing level, outermost first, then the
+        // prototype prim's. A native instance nested in a prototype has an origin relative to that
+        // prototype.
+        return {primOrigin.GetFullPath(), -1};
     }
 
     // Explicit prototype instancing (i.e. USD point instancing).

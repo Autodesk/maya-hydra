@@ -99,6 +99,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPicking.py
     cpp/testUsdPointInstancePicking.py
     cpp/testUsdNativeInstancePicking.py
+    cpp/testUsdNestedNativeInstancePicking.py
     cpp/testUsdPickKind.py
     cpp/testNurbsSurfaces.py
     cpp/testGeomSubsetsPicking.py
