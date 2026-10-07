@@ -13,11 +13,4 @@ set(ENABLE_TESTS OFF)
 set(HVT_BUILD_TEST_FRAMEWORK OFF)
 # Disable HVT codesign, we have our own.
 set(HVT_CODESIGN OFF)
-# Trim windows.h for HVT with every Windows compiler: HVT defines these for MSVC only. With clang++
-# (the Coverage variant), the full windows.h defines interface as struct through combaseapi.h,
-# which breaks USD's HdMaterialNetworkSchemaTokens once HVT's precompiled header pulls windows.h
-# in through oneTBB. Set here, just before add_subdirectory, so it applies to HVT only.
-if (WIN32)
-    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
-endif()
 add_subdirectory(hydra-viewport-toolbox)
