@@ -250,6 +250,28 @@ _GetExtLayout(MHWRender::MVertexBuffer *mvb)
     return layout;
 }
 
+// Byte width Hydra expects for the CPU fallback / lazy readback of a primvar.
+static size_t
+_HydraCpuElementSize(const TfToken& primvar)
+{
+    if (primvar == MayaHydraAdapterTokens->st) {
+        return sizeof(GfVec2f);
+    }
+    if (primvar == UsdGeomTokens->points || primvar == UsdGeomTokens->normals
+        || primvar == MayaHydraAdapterTokens->tangents) {
+        return sizeof(GfVec3f);
+    }
+    return 0;
+}
+
+static bool
+_ExtLayoutMatchesHydraCpu(const _ExtLayout& layout, const TfToken& primvar)
+{
+    const size_t expected = _HydraCpuElementSize(primvar);
+    return layout.IsValid() && expected != 0
+        && HdDataSizeOfTupleType(layout.elementType) == expected;
+}
+
 // The stride to read a stream as T with, or 0 when its published layout
 // cannot be read as T.
 template <typename T>
@@ -534,8 +556,16 @@ size_t MayaHydraGpuRenderItemAdapter::_StoredStreamCount(const TfToken& primvar)
     } else if (primvar == MayaHydraAdapterTokens->tangents) {
         stream = &_extTangents;
     }
-    return (stream && *stream) ? stream->numElements
-                               : MayaHydraRenderItemAdapter::_StoredStreamCount(primvar);
+    if (stream && *stream) {
+        const size_t expected = _HydraCpuElementSize(primvar);
+        const size_t tupleSize = stream->tupleType.type != HdTypeInvalid
+            ? HdDataSizeOfTupleType(stream->tupleType)
+            : 0;
+        if (expected != 0 && tupleSize == expected) {
+            return stream->numElements;
+        }
+    }
+    return MayaHydraRenderItemAdapter::_StoredStreamCount(primvar);
 }
 
 void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool topoChanged)
@@ -629,35 +659,50 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
 
     const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
         || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
+    const _ExtLayout extLayout = _GetExtLayout(mvb);
+    const auto       canShare = [&extLayout](const TfToken& primvar) {
+        return _ExtLayoutMatchesHydraCpu(extLayout, primvar);
+    };
     switch (mvb->descriptor().semantic()) {
     case MGeometry::Semantic::kPosition:
         // Points also drive Hydra's smooth-normals recompute when Maya does not
         // supply normals, so they dirty whenever Hydra owns normals -- even under
         // stable direct binding.
-        if (_ShareStream(mvb, _extPositions, HdTokens->points, !useMayaNormals, dirty.positions)) {
+        if (canShare(HdTokens->points)
+            && _ShareStream(mvb, _extPositions, HdTokens->points, !useMayaNormals, dirty.positions)) {
             _positions.clear();
             return;
         }
         break;
     case MGeometry::Semantic::kNormal:
-        if (useMayaNormals
+        if (useMayaNormals && canShare(HdTokens->normals)
             && _ShareStream(mvb, _extNormals, HdTokens->normals, false, dirty.normals)) {
             _normals.clear();
             return;
         }
         break;
     case MGeometry::Semantic::kTexture:
-        if (isMesh && _ShareStream(mvb, _extUvs, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
+        if (isMesh && canShare(MayaHydraAdapterTokens->st)
+            && _ShareStream(mvb, _extUvs, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
             _uvs.clear();
             return;
         }
         break;
     case MGeometry::Semantic::kTangent:
-        if (isMesh
+        if (isMesh && canShare(MayaHydraAdapterTokens->tangents)
             && _ShareStream(
                 mvb, _extTangents, MayaHydraAdapterTokens->tangents, false, dirty.tangents)) {
             _tangents.clear();
             return;
+        }
+        if (isMesh && extLayout.IsValid() && !canShare(MayaHydraAdapterTokens->tangents)) {
+            TF_DEBUG_GPU_BUFFER_SHARING(
+                "[%s] %s -> CPU: VP2 tuple size %zu does not match Hydra %zu-byte "
+                "tangents; using map() projection\n",
+                GetID().GetText(),
+                _ExtStreamName(mvb),
+                HdDataSizeOfTupleType(extLayout.elementType),
+                _HydraCpuElementSize(MayaHydraAdapterTokens->tangents));
         }
         break;
     case MGeometry::Semantic::kColor:
