@@ -22,9 +22,11 @@
 
 namespace MAYAHYDRA_NS_DEF {
 
-class PickHit;
+// struct, as defined in mhPickHit.h: MSVC mangles class and struct differently, so a mismatch
+// breaks the link of functions taking a PickHit across translation units.
+struct PickHit;
 
-using PickHitVector = std::vector<struct PickHit>;
+using PickHitVector = std::vector<PickHit>;
 
 } // namespace MAYAHYDRA_NS_DEF
 

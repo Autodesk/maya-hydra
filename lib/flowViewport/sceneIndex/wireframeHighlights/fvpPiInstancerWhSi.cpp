@@ -74,8 +74,11 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
             return originalMask;
         }
 
-        for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
-            auto instanceIndices = nestedInstanceIndices.GetElement(0);
+        // The innermost level indexes this instancer. The outer levels, if any, index the
+        // instancers that draw it (for example a native instance enclosing the point instancer).
+        {
+            const size_t innermost = nestedInstanceIndices.GetNumElements() - 1;
+            auto instanceIndices = nestedInstanceIndices.GetElement(innermost);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
                 if (instanceIndex < 0 || static_cast<size_t>(instanceIndex) >= nbInstances) {
                     continue;
@@ -166,8 +169,11 @@ void _SeparateLeadAndActiveInstances(
         const auto nestedInstanceIndices = sn.GetNestedInstanceIndices();
         if (!nestedInstanceIndices) continue;
         
-        for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
-            auto instanceIndices = nestedInstanceIndices.GetElement(0);
+        // The innermost level indexes this instancer. The outer levels, if any, index the
+        // instancers that draw it (for example a native instance enclosing the point instancer).
+        {
+            const size_t innermost = nestedInstanceIndices.GetNumElements() - 1;
+            auto instanceIndices = nestedInstanceIndices.GetElement(innermost);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
                 if (instanceIndex < 0 || static_cast<size_t>(instanceIndex) >= nbInstances) {
                     continue;

@@ -1,0 +1,36 @@
+#usda 1.0
+(
+    upAxis = "Y"
+)
+
+# Hover follows the selection kind: a component model made of two cubes (CubeA at x = -1.5, CubeB
+# at x = 0), and a cube outside any model (Other, at x = 1.5).
+
+def Xform "Root"
+{
+    def Xform "Model" (
+        kind = "component"
+    )
+    {
+        def Cube "CubeA"
+        {
+            double size = 1
+            double3 xformOp:translate = (-1.5, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Cube "CubeB"
+        {
+            double size = 1
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+
+    def Cube "Other"
+    {
+        double size = 1
+        double3 xformOp:translate = (1.5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
