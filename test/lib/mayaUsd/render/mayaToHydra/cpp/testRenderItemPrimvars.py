@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Python wrapper for testRenderItemPrimvars.cpp in render-items mode (no mesh adapter env var).
+# The MaterialX case, which needs LookdevX, is in testRenderItemPrimvarsMaterialX.py.
 #
 import maya.cmds as cmds
 import fixturesUtils
@@ -23,22 +24,12 @@ from testUtils import PluginLoaded
 
 class TestRenderItemPrimvars(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
-    _requiredPlugins = ['LookdevXMaya']
 
     def setupScene(self, sceneFolder, sceneFile, meshShape):
         mayaUtils.openTestScene(sceneFolder, sceneFile)
         self.setHdStormRenderer()
         cmds.optionVar(stringValue=("mhMeshShape", cmds.ls(meshShape, long=True)[0]))
         cmds.refresh()
-
-    # What: untextured MaterialX shader must not advertise unpopulated primvars (st, tangents).
-    # How: open RedMtlxSphere.ma, then run the C++ test on the sphere render items.
-    # Expect: declared normals/st/tangents hold one value per point.
-    def test_untexturedMaterialXDeclaresOnlyPopulatedPrimvars(self):
-        self.setupScene("testMaterialX", "RedMtlxSphere.ma", "pSphereShape1")
-        with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(
-                f="RenderItemPrimvars.UntexturedMaterialXDeclaresOnlyPopulatedPrimvars")
 
     # What: a file-textured shader must keep its UVs.
     # How: open testUVs.ma, then run the C++ test on a textured plane's render items.

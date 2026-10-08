@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Primvar declarations of the MRenderItem adapter path. Python wrapper
-// testRenderItemPrimvars.py runs these suites in render items mode (no mesh adapter env var).
+// Primvar declarations of the MRenderItem adapter path. Python wrappers
+// testRenderItemPrimvars.py and testRenderItemPrimvarsMaterialX.py run these suites in
+// render items mode (no mesh adapter env var).
 
 #include "testUtils.h"
 
