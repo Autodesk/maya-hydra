@@ -120,6 +120,7 @@
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/meshSchema.h>
@@ -355,22 +356,62 @@ void appendMergedOutlineTargets(
     }
 }
 
+//! The scope under which UsdImaging adds the native instancers. A UsdImaging name
+//! (niInstanceAggregationSceneIndex.cpp), not exported.
+const TfToken& propagatedPrototypesScope()
+{
+    static const TfToken scope("UsdNiPropagatedPrototypes");
+    return scope;
+}
+
+//! Whether \p path is at or under a UsdNiPropagatedPrototypes scope, where UsdImaging keeps its
+//! native instancers.
+bool isUnderPropagatedPrototypes(const SdfPath& path)
+{
+    for (SdfPath p = path; !p.IsEmpty() && !p.IsAbsoluteRootPath(); p = p.GetParentPath()) {
+        if (p.GetNameToken() == propagatedPrototypesScope()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 //! \brief  Finds the native instancers drawing the native instances under a prim, for the outline.
 //!
 //! UsdImaging draws the native instances found under a prim P through instancers that it adds at
 //! P/UsdNiPropagatedPrototypes/<binding>/<prototype>/UsdNiInstancer, each drawing one prototype.
 //! P is the stage root for the instances outside any prototype, and the prototype root for the
 //! instances nested in a prototype, so the instancers drawing the instances at or under a path are
-//! under the scope of one of its strict ancestors. Lookups are cached: one finder serves one
-//! outline push, so that a large selection reads each scope once.
+//! under the scope of one of its strict ancestors. Lookups are cached until Clear(): the render
+//! override keeps one finder across outline pushes and clears it when the instancers change (see
+//! MtohRenderOverride::NativeInstancerCache), so that a selection change reads no scope again.
 class NativeInstancerFinder
 {
 public:
     struct Instancer
     {
-        SdfPath          path;
-        SdfPath          prototype;
-        VtArray<SdfPath> instanceLocations; // By instance index.
+        SdfPath path;
+        SdfPath prototype;
+        //! (instance location, instance index) pairs, sorted by location. SdfPath sorts
+        //! dictionary-style, so the instances at or under a path are the range that starts at the
+        //! path: a lookup costs O(log n + matches), not a scan of every instance.
+        std::vector<std::pair<SdfPath, int>> sortedLocations;
+
+        //! Append to \p indices the indices of the instances at or under \p path, in location
+        //! order.
+        void AppendInstancesUnder(const SdfPath& path, std::vector<int>& indices) const
+        {
+            auto it = std::lower_bound(
+                sortedLocations.begin(),
+                sortedLocations.end(),
+                path,
+                [](const std::pair<SdfPath, int>& location, const SdfPath& p) {
+                    return location.first < p;
+                });
+            for (; it != sortedLocations.end() && it->first.HasPrefix(path); ++it) {
+                indices.push_back(it->second);
+            }
+        }
     };
     using Instancers = std::vector<Instancer>;
 
@@ -386,9 +427,7 @@ public:
         if (!inserted || !_sceneIndex) {
             return it->second;
         }
-        // A UsdImaging name (niInstanceAggregationSceneIndex.cpp), not exported.
-        static const TfToken propagatedPrototypesScope("UsdNiPropagatedPrototypes");
-        const SdfPath scope = root.AppendChild(propagatedPrototypesScope);
+        const SdfPath scope = root.AppendChild(propagatedPrototypesScope());
         for (const SdfPath& binding : _sceneIndex->GetChildPrimPaths(scope)) {
             for (const SdfPath& prototypeBase : _sceneIndex->GetChildPrimPaths(binding)) {
                 for (const SdfPath& instancerPath : _sceneIndex->GetChildPrimPaths(prototypeBase)) {
@@ -408,13 +447,30 @@ public:
                     if (prototypes.size() != 1) {
                         continue;
                     }
-                    it->second.push_back(
-                        { instancerPath, prototypes[0], locationsDs->GetTypedValue(0.0f) });
+                    // The instance index is the position in instanceLocations, as in
+                    // HdInstanceSchema::instanceIndex.
+                    const VtArray<SdfPath> locations = locationsDs->GetTypedValue(0.0f);
+                    Instancer instancer { instancerPath, prototypes[0], {} };
+                    instancer.sortedLocations.reserve(locations.size());
+                    for (size_t i = 0; i < locations.size(); ++i) {
+                        instancer.sortedLocations.emplace_back(locations[i], static_cast<int>(i));
+                    }
+                    // UsdImaging lists the locations sorted in practice: check before sorting,
+                    // which is the costly part for many instances.
+                    if (!std::is_sorted(
+                            instancer.sortedLocations.begin(), instancer.sortedLocations.end())) {
+                        std::sort(
+                            instancer.sortedLocations.begin(), instancer.sortedLocations.end());
+                    }
+                    it->second.push_back(std::move(instancer));
                 }
             }
         }
         return it->second;
     }
+
+    //! Forget every lookup, for when the instancers may have changed.
+    void Clear() { _instancersByRoot.clear(); }
 
 private:
     HdSceneIndexBaseRefPtr                                 _sceneIndex;
@@ -446,6 +502,13 @@ void appendNativeInstanceTargets(
         }
     };
 
+    // Ascending and unique, as the instance indices of a target are expected to be.
+    const auto toTargetIndices = [](std::vector<int>& indices) {
+        std::sort(indices.begin(), indices.end());
+        indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+        return VtIntArray(indices.begin(), indices.end());
+    };
+
     // Targets with instance levels: the native instances under a point instance, or nested in the
     // prototype of another native instance. Appended targets are not visited again.
     const size_t targetCount = targets.size();
@@ -461,22 +524,20 @@ void appendNativeInstanceTargets(
                 if (instancer.path.HasPrefix(path)) {
                     continue;
                 }
-                VtIntArray indices;
-                for (size_t i = 0; i < instancer.instanceLocations.size(); ++i) {
-                    if (instancer.instanceLocations[i].HasPrefix(path)) {
-                        indices.push_back(static_cast<int>(i));
-                    }
-                }
+                std::vector<int> indices;
+                instancer.AppendInstancesUnder(path, indices);
                 if (!indices.empty()) {
                     HVT_NS::Outline::OutlineTarget target { instancer.prototype, levels };
-                    target.instanceLevels.push_back({ instancer.path, std::move(indices) });
+                    target.instanceLevels.push_back({ instancer.path, toTargetIndices(indices) });
                     targets.push_back(std::move(target));
                 }
             }
         });
     }
 
-    // Paths selected whole: one target per instancer, with the instances of all of them.
+    // Paths selected whole: one target per instancer, with the instances of all of them. An
+    // instance is in the selection when one of the paths is a prefix of its location, so each path
+    // looks up its own range, instead of testing every instance against the selection.
     std::set<SdfPath> roots;
     for (const SdfPath& path : sortedWholePaths) {
         forEachRoot(path, [&](const SdfPath& root) { roots.insert(root); });
@@ -486,15 +547,13 @@ void appendNativeInstanceTargets(
             if (isPathInSelection(sortedWholePaths, instancer.path)) {
                 continue;
             }
-            VtIntArray indices;
-            for (size_t i = 0; i < instancer.instanceLocations.size(); ++i) {
-                if (isPathInSelection(sortedWholePaths, instancer.instanceLocations[i])) {
-                    indices.push_back(static_cast<int>(i));
-                }
+            std::vector<int> indices;
+            for (const SdfPath& path : sortedWholePaths) {
+                instancer.AppendInstancesUnder(path, indices);
             }
             if (!indices.empty()) {
                 targets.push_back(
-                    { instancer.prototype, { { instancer.path, std::move(indices) } } });
+                    { instancer.prototype, { { instancer.path, toTargetIndices(indices) } } });
             }
         }
     }
@@ -684,6 +743,77 @@ public:
 
 private:
     MtohRenderOverride& _renderOverride;
+};
+
+// Keeps the native instancer lookups of the outline across selection changes: reading and sorting
+// the instance locations of many native instances costs more than the rest of a selection change.
+// They are cleared when UsdImaging may have changed its native instancers: a prim added, or dirtied
+// in its instancer topology, under a UsdNiPropagatedPrototypes scope, or any prim removed or
+// renamed (such a subtree can hold a scope without naming it). The notices only set a flag: the
+// lookups belong to Render().
+class MtohRenderOverride::NativeInstancerCache : public HdSceneIndexObserver
+{
+public:
+    explicit NativeInstancerCache(HdSceneIndexBaseRefPtr sceneIndex)
+        : _sceneIndex(std::move(sceneIndex))
+        , _finder(_sceneIndex)
+    {
+        _sceneIndex->AddObserver(HdSceneIndexObserverPtr(this));
+    }
+
+    ~NativeInstancerCache() override { _sceneIndex->RemoveObserver(HdSceneIndexObserverPtr(this)); }
+
+    //! The cached lookups, cleared first if the native instancers changed since the last call.
+    NativeInstancerFinder& GetFinder()
+    {
+        if (_instancersChanged.exchange(false)) {
+            _finder.Clear();
+        }
+        return _finder;
+    }
+
+    void PrimsAdded(const HdSceneIndexBase&, const AddedPrimEntries& entries) override
+    {
+        for (const AddedPrimEntry& entry : entries) {
+            if (isUnderPropagatedPrototypes(entry.primPath)) {
+                _InstancersChanged();
+                return;
+            }
+        }
+    }
+
+    void PrimsRemoved(const HdSceneIndexBase&, const RemovedPrimEntries& entries) override
+    {
+        if (!entries.empty()) {
+            _InstancersChanged();
+        }
+    }
+
+    void PrimsDirtied(const HdSceneIndexBase&, const DirtiedPrimEntries& entries) override
+    {
+        for (const DirtiedPrimEntry& entry : entries) {
+            // The locator test first: it is the cheaper one, and rarely passes.
+            if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())
+                && isUnderPropagatedPrototypes(entry.primPath)) {
+                _InstancersChanged();
+                return;
+            }
+        }
+    }
+
+    void PrimsRenamed(const HdSceneIndexBase&, const RenamedPrimEntries& entries) override
+    {
+        if (!entries.empty()) {
+            _InstancersChanged();
+        }
+    }
+
+private:
+    void _InstancersChanged() { _instancersChanged = true; }
+
+    HdSceneIndexBaseRefPtr _sceneIndex;
+    NativeInstancerFinder  _finder;
+    std::atomic<bool>      _instancersChanged = { false };
 };
 
 // MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of VP2.0.
@@ -2073,7 +2203,11 @@ MStatus MtohRenderOverride::Render(
 
             // Native instances are drawn under their instancers, not under their own paths: they
             // also become targets, on the prototypes, read from the instancers of this scene index.
-            NativeInstancerFinder nativeInstancerFinder(_selectionSceneIndex);
+            // The lookups are kept across pushes (see NativeInstancerCache).
+            if (!_nativeInstancerCache) {
+                _nativeInstancerCache = std::make_unique<NativeInstancerCache>(_selectionSceneIndex);
+            }
+            NativeInstancerFinder& nativeInstancerFinder = _nativeInstancerCache->GetFinder();
 
             // Cached so that hover-only pushes don't re-walk the selection. selectionChanged is
             // always true on the first push after Install, so the cache is always seeded.
@@ -2785,6 +2919,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _pruneTexturesSceneIndex = nullptr;
     _defaultMaterialSceneIndex = nullptr;
     _currentlyTextured = false;
+    // Before the scene index it observes, which it otherwise keeps alive.
+    _nativeInstancerCache.reset();
     _selectionSceneIndex.Reset();
     _selection.reset();
     _wireframeColorInterfaceImp.reset();

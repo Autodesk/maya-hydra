@@ -552,6 +552,11 @@ private:
 
     std::unique_ptr<HVT_NS::Outline::OutlineManager> _outlineManager;
 
+    /// Native instancer lookups of the outline, kept across selection changes and cleared when the
+    /// native instancers change. Created on the first outline push. Render thread only.
+    class NativeInstancerCache;
+    std::unique_ptr<NativeInstancerCache> _nativeInstancerCache;
+
 #ifdef MAYAHYDRA_HAS_QT
     // One hover event filter per model panel, keyed by panel name.
     std::map<std::string, std::unique_ptr<MAYAHYDRA_NS_DEF::HoverEventFilter>>
