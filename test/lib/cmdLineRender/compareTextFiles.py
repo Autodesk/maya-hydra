@@ -18,10 +18,13 @@
 Exit 0 if the files match, 1 if they differ.  On mismatch a unified diff
 is printed to stdout so the CTest log contains actionable diagnostics.
 
+With --lines, only that many leading lines of each file are compared.
+
 Usage:
-    python compareTextFiles.py <actual_file> <expected_file>
+    python compareTextFiles.py <actual_file> <expected_file> [--lines N]
 """
 
+import argparse
 import difflib
 import re
 import sys
@@ -35,13 +38,18 @@ def _mask_addresses(line):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: compareTextFiles.py <actual_file> <expected_file>",
-              file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(
+        description="Compare two text files, normalizing line endings.")
+    parser.add_argument("actual_file")
+    parser.add_argument("expected_file")
+    parser.add_argument("--lines", type=int, default=0, metavar="N",
+                        help="Compare only the first N lines of each file.  "
+                             "The default, 0, compares the whole file.")
+    args = parser.parse_args()
 
-    actual_path = sys.argv[1]
-    expected_path = sys.argv[2]
+    actual_path = args.actual_file
+    expected_path = args.expected_file
+    num_lines = args.lines
 
     try:
         with open(actual_path, "r", newline="") as f:
@@ -64,6 +72,22 @@ def main():
     expected_normalized = [_mask_addresses(line.rstrip("\r\n") + "\n")
                            for line in expected_lines]
 
+    # Comparing a file shorter than the requested number of lines would
+    # silently compare fewer lines than asked for, making the test vacuous.
+    scope = ""
+    if num_lines > 0:
+        if len(expected_normalized) < num_lines:
+            print(f"ERROR: expected file has fewer than {num_lines} lines: "
+                  f"{expected_path}", file=sys.stderr)
+            return 2
+        if len(actual_normalized) < num_lines:
+            print(f"ERROR: actual file has fewer than {num_lines} lines: "
+                  f"{actual_path}", file=sys.stderr)
+            return 1
+        actual_normalized = actual_normalized[:num_lines]
+        expected_normalized = expected_normalized[:num_lines]
+        scope = f" (first {num_lines} lines)"
+
     if actual_normalized == expected_normalized:
         print("Files match.")
         return 0
@@ -71,11 +95,11 @@ def main():
     diff = difflib.unified_diff(
         expected_normalized,
         actual_normalized,
-        fromfile=expected_path,
-        tofile=actual_path,
+        fromfile=expected_path + scope,
+        tofile=actual_path + scope,
     )
     sys.stdout.writelines(diff)
-    print(f"\nERROR: files differ: {actual_path} vs {expected_path}",
+    print(f"\nERROR: files differ{scope}: {actual_path} vs {expected_path}",
           file=sys.stderr)
     return 1
 
