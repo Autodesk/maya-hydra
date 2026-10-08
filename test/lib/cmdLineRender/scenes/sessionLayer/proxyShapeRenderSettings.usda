@@ -41,12 +41,6 @@ def Scope "World"
     }
 }
 
-def DistantLight "DistantLight1"
-{
-    double3 xformOp:translate = (0, 0, 9.816884029117492)
-    uniform token[] xformOpOrder = ["xformOp:translate"]
-}
-
 def Scope "mtl"
 {
     def Material "open_pbr_surface1" (
