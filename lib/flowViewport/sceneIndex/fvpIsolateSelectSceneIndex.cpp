@@ -698,6 +698,12 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
             std::set<int> visibleIndices;
             for (const auto& primSelection : primSelections) {
                 for (const auto& instancesSelection : primSelection.nestedInstanceIndices) {
+                    // Only the level of this instancer: the outer levels of a nested selection
+                    // (for example the native instance enclosing a point instancer) index the
+                    // instancers that draw it.
+                    if (instancesSelection.instancerPath != instancerPath) {
+                        continue;
+                    }
                     for (auto instanceIndex : instancesSelection.instanceIndices) {
                         visibleIndices.insert(instanceIndex);
                     }

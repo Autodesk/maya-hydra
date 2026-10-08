@@ -1,0 +1,74 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    upAxis = "Y"
+)
+
+# Hover follows the point instances pick mode: one point instancer, two rows of 7 cubes of size 1
+# (z = 0 and z = -1.5, x = -4.5 to 4.5 every 1.5), each row using the 7 prototypes once. Instance 3
+# is at the origin, instance 10 behind it, both of prototype 3. The cubes are grey so that the
+# outline colors stand out in the reference images.
+
+def Xform "Root"
+{
+    def PointInstancer "CubePointInstancer"
+    {
+        float3[] extent = [(-5, -0.5, -2), (5, 0.5, 0.5)]
+        point3f[] positions = [(-4.5, 0, 0), (-3, 0, 0), (-1.5, 0, 0), (0, 0, 0), (1.5, 0, 0), (3, 0, 0), (4.5, 0, 0), (-4.5, 0, -1.5), (-3, 0, -1.5), (-1.5, 0, -1.5), (0, 0, -1.5), (1.5, 0, -1.5), (3, 0, -1.5), (4.5, 0, -1.5)]
+        int[] protoIndices = [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6]
+        rel prototypes = [
+            </Root/CubePointInstancer/prototypes/Cube0>,
+            </Root/CubePointInstancer/prototypes/Cube1>,
+            </Root/CubePointInstancer/prototypes/Cube2>,
+            </Root/CubePointInstancer/prototypes/Cube3>,
+            </Root/CubePointInstancer/prototypes/Cube4>,
+            </Root/CubePointInstancer/prototypes/Cube5>,
+            </Root/CubePointInstancer/prototypes/Cube6>,
+        ]
+
+        def Scope "prototypes"
+        {
+            def Cube "Cube0"
+            {
+                double size = 1
+                color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+            }
+
+            def Cube "Cube1"
+            {
+                double size = 1
+                color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+            }
+
+            def Cube "Cube2"
+            {
+                double size = 1
+                color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+            }
+
+            def Cube "Cube3"
+            {
+                double size = 1
+                color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+            }
+
+            def Cube "Cube4"
+            {
+                double size = 1
+                color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+            }
+
+            def Cube "Cube5"
+            {
+                double size = 1
+                color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+            }
+
+            def Cube "Cube6"
+            {
+                double size = 1
+                color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+            }
+        }
+    }
+}

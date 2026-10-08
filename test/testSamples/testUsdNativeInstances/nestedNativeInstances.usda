@@ -1,0 +1,83 @@
+#usda 1.0
+(
+    upAxis = "Y"
+)
+
+# Native instances nested in the prototype of other native instances: three rows (Outer_0, Outer_1,
+# Outer_2 at z = 0, 4, 8), each made of three instances of a cube (Inner_0, Inner_1, Inner_2 at
+# x = 0, 3, 6). Same layout as nativeInstancedPointInstancers.usda.
+
+class Xform "CubeSrc"
+{
+    def Cube "Cube"
+    {
+        double size = 1
+    }
+}
+
+class Xform "RowSrc"
+{
+    def Xform "Inner_0" (
+        instanceable = true
+        references = </CubeSrc>
+    )
+    {
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "Inner_1" (
+        instanceable = true
+        references = </CubeSrc>
+    )
+    {
+        double3 xformOp:translate = (3, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "Inner_2" (
+        instanceable = true
+        references = </CubeSrc>
+    )
+    {
+        double3 xformOp:translate = (6, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+def Xform "Root"
+{
+    def Xform "Outer_0" (
+        instanceable = true
+        references = </RowSrc>
+    )
+    {
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "Outer_1" (
+        instanceable = true
+        references = </RowSrc>
+    )
+    {
+        double3 xformOp:translate = (0, 0, 4)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "Outer_2" (
+        instanceable = true
+        references = </RowSrc>
+    )
+    {
+        double3 xformOp:translate = (0, 0, 8)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    # Picking marker (draws nothing): the center of Inner_1 in Outer_2.
+    def Xform "marker_Outer_2_Inner_1"
+    {
+        double3 xformOp:translate = (3, 0, 8)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
