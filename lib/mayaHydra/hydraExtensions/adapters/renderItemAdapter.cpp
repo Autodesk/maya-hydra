@@ -267,9 +267,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         return;
     }
 
-    const bool positionsHaveBeenReset
-        = !_HasStoredPositions(); // when positionsHaveBeenReset is true we need to recompute the
-                                  // geometry and topology as our data has been cleared
+    // when positionsHaveBeenReset is true we need to recompute the geometry and topology as our
+    // data has been cleared
+    const bool positionsHaveBeenReset = _StoredStreamCount(UsdGeomTokens->points) == 0;
     using MVS = MDataServerOperation::MViewportScene;
     // const bool isNew = flags & MViewportScene::MVS_new;  //not used yet
     const bool visible          = data._flags & MVS::MVS_visible;
@@ -373,8 +373,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     VtIntArray vertexCounts;
         
     const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
-    const bool hadPositionsBeforeUpdate = _HasStoredPositions();
-    const size_t storedPositionCountBeforeUpdate = _StoredPositionCount();
+    const size_t storedPositionCountBeforeUpdate = _StoredStreamCount(UsdGeomTokens->points);
+    const bool hadPositionsBeforeUpdate = storedPositionCountBeforeUpdate > 0;
 
     //Temp workaround for a bug in Maya MAYA-134200
     if ((!geomChanged && topoChanged) && vertexBuffercount) { 
@@ -393,7 +393,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 // Vertices
                 MVertexBuffer*     verts = mvb;
                 const unsigned int originalVertexCount = verts->vertexCount();
-                const size_t storedVertexCount = _StoredPositionCount();
+                const size_t storedVertexCount = _StoredStreamCount(UsdGeomTokens->points);
                 if (storedVertexCount != originalVertexCount) {//Is it different ?
                     geomChanged = true;//this will stop the loop
                 }
@@ -543,7 +543,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
-    const bool hasPositionsAfterUpdate = _HasStoredPositions();
+    const bool hasPositionsAfterUpdate = _StoredStreamCount(UsdGeomTokens->points) > 0;
 
     // Topology dirty locators are decided after index buffers are read so we can diff connectivity,
     // not just vertex count, when Maya sets topoChanged alongside geomChanged (MAYA-134200).
@@ -619,7 +619,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 // only need to specify the order of the vertices that you want connected. This is
                 // implicit in Hydra when specifying an empty index buffer.
                 curveTopoType = HdTokens->nonperiodic;
-                vertexCounts.assign(1, _StoredPositionCount());
+                vertexCounts.assign(1, _StoredStreamCount(UsdGeomTokens->points));
                 vertexIndices = VtIntArray();
             }
             _topology.reset(new HdBasisCurvesTopology(
@@ -828,6 +828,9 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
 
 size_t MayaHydraRenderItemAdapter::_StoredStreamCount(const TfToken& primvar) const
 {
+    if (primvar == UsdGeomTokens->points) {
+        return _positions.size();
+    }
     if (primvar == UsdGeomTokens->normals) {
         return _normals.size();
     }
@@ -853,7 +856,7 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
         // standard_surface without textures requests no UVs). Only advertise optional streams
         // holding one value per point: an empty st is read as a degenerate texture coordinate
         // instead of being treated as missing.
-        const size_t numPoints = _StoredPositionCount();
+        const size_t numPoints = _StoredStreamCount(UsdGeomTokens->points);
         const auto hasPerPointData = [this, numPoints](const TfToken& primvar) {
             return numPoints > 0 && _StoredStreamCount(primvar) == numPoints;
         };

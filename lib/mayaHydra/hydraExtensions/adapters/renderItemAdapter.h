@@ -245,13 +245,8 @@ protected:
     /// Scan the vertex buffers of \p geom for the semantics they supply.
     static _StreamPresence _GetStreamPresence(MGeometry* geom, int vertexBufferCount);
 
-    /// Whether positions from a previous update are held.
-    virtual bool _HasStoredPositions() const { return !_positions.empty(); }
-
-    /// Number of positions held from a previous update.
-    virtual size_t _StoredPositionCount() const { return _positions.size(); }
-
-    /// Number of values held for the normals, st or tangents vertex stream.
+    /// Number of values held from a previous update for the points, normals, st or
+    /// tangents vertex stream.
     virtual size_t _StoredStreamCount(const TfToken& primvar) const;
 
     /// Called once per UpdateFromDelta, before any vertex stream is read.

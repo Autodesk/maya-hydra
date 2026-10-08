@@ -36,6 +36,7 @@
 #include <pxr/imaging/hgi/externalBuffer.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
+#include <pxr/usd/usdGeom/tokens.h>
 
 #include <maya/MFnDagNode.h>
 #include <maya/MViewport2Renderer.h>
@@ -519,23 +520,14 @@ bool MayaHydraGpuRenderItemAdapter::IsEligible(const MRenderItem& ri, Hgi* hgi)
     return true;
 }
 
-bool MayaHydraGpuRenderItemAdapter::_HasStoredPositions() const
-{
-    // GPU meshes keep no CPU positions; the published external buffer is the baseline.
-    return MayaHydraRenderItemAdapter::_HasStoredPositions() || _extPositions;
-}
-
-size_t MayaHydraGpuRenderItemAdapter::_StoredPositionCount() const
-{
-    return _extPositions ? _extPositions.numElements
-                         : MayaHydraRenderItemAdapter::_StoredPositionCount();
-}
-
 size_t MayaHydraGpuRenderItemAdapter::_StoredStreamCount(const TfToken& primvar) const
 {
-    // A shared stream's CPU array is cleared once it is published.
+    // A shared stream's CPU array is cleared once it is published, so the published
+    // external buffer is the baseline.
     const _ExtStream* stream = nullptr;
-    if (primvar == HdTokens->normals) {
+    if (primvar == UsdGeomTokens->points) {
+        stream = &_extPositions;
+    } else if (primvar == UsdGeomTokens->normals) {
         stream = &_extNormals;
     } else if (primvar == MayaHydraAdapterTokens->st) {
         stream = &_extUvs;
