@@ -689,11 +689,14 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
         }
         break;
     case MGeometry::Semantic::kTangent:
-        if (isMesh && canShare(MayaHydraAdapterTokens->tangents)
-            && _ShareStream(
-                mvb, _extTangents, MayaHydraAdapterTokens->tangents, false, dirty.tangents)) {
-            _tangents.clear();
-            return;
+        if (isMesh && canShare(MayaHydraAdapterTokens->tangents)) {
+            if (_ShareStream(
+                    mvb, _extTangents, MayaHydraAdapterTokens->tangents, false, dirty.tangents)) {
+                _tangents.clear();
+                return;
+            }
+        } else {
+            _extTangents = {};
         }
         if (isMesh && extLayout.IsValid() && !canShare(MayaHydraAdapterTokens->tangents)) {
             TF_DEBUG_GPU_BUFFER_SHARING(
