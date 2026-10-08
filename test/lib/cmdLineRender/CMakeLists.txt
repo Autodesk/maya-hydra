@@ -189,12 +189,6 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name ou
             RENDERER ${renderer}
             RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89 -im ${sceneFileNameNoExt}"
             FAIL 0.5
-            # Crop region does not work in HdArnold in Hydra v2 render settings
-            # mode, entered as HYDRA-2545.  We still have successful Hydra v2
-            # render settings crop region test coverage, as the following
-            # environment variable is not used by HdPrman.
-            ENV
-                "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=0"
         )
     endif()
 
