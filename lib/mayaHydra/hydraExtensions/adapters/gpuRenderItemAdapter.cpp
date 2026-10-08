@@ -267,9 +267,14 @@ _HydraCpuElementSize(const TfToken& primvar)
 static bool
 _ExtLayoutMatchesHydraCpu(const _ExtLayout& layout, const TfToken& primvar)
 {
-    const size_t expected = _HydraCpuElementSize(primvar);
-    return layout.IsValid() && expected != 0
-        && HdDataSizeOfTupleType(layout.elementType) == expected;
+    HdType expected = HdTypeInvalid;
+    if (primvar == MayaHydraAdapterTokens->st) {
+        expected = HdTypeFloatVec2;
+    } else if (primvar == UsdGeomTokens->points || primvar == UsdGeomTokens->normals
+               || primvar == MayaHydraAdapterTokens->tangents) {
+        expected = HdTypeFloatVec3;
+    }
+    return layout.IsValid() && layout.elementType.type == expected;
 }
 
 // The stride to read a stream as T with, or 0 when its published layout
