@@ -723,7 +723,10 @@ endforeach()
 # baseline using compareTextFiles.py.  Using a Python script rather than fc (or
 # fc /W) on Windows / diff on UNIX to normalize line ending differences, for
 # robustness.
-function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file expected_file)
+#
+# compare_lines is the number of leading lines of the dump to compare; see the
+# call sites below for why only the head of the dump is compared.
+function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file expected_file compare_lines)
     set(SCENE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/scenes/${scene_file}")
     set(COMPARE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/compareTextFiles.py")
 
@@ -731,12 +734,12 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
         set(CMD PowerShell)
         set(RM_ARGS "Remove-Item \"${dump_file}\" -Force -ErrorAction SilentlyContinue")
         set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"HdArnoldRendererPlugin\" ${renderer_args} \"${SCENE_PATH}\"")
-        set(COMPARE_ARGS "& \"${Python3_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${dump_file}\" \"${expected_file}\"")
+        set(COMPARE_ARGS "& \"${Python3_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${dump_file}\" \"${expected_file}\" --lines ${compare_lines}")
         set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${COMPARE_ARGS} } \; exit \$LASTEXITCODE")
     else()
         set(CMD /bin/sh)
         set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer HdArnoldRendererPlugin ${renderer_args} \"${SCENE_PATH}\"")
-        set(COMPARE_ARGS "\"${Python3_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${dump_file}\" \"${expected_file}\"")
+        set(COMPARE_ARGS "\"${Python3_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${dump_file}\" \"${expected_file}\" --lines ${compare_lines}")
         # Escaped ';', as in mayaHydra_add_cmd_line_render_test(): an unescaped
         # one splits CMD_ARGS, leaving 'sh -c' to run only the rm and exit 0.
         set(CMD_ARGS -c "rm -f \"${dump_file}\" \; ${RENDER_ARGS} && ${COMPARE_ARGS}")
@@ -762,39 +765,35 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
 endfunction()
 
-# Two following tests are overly sensitive to text file dump differences.
-# An alternate strategy to perhaps check for the presence of certain prims
-# would be more robust.  Entered as HYDRA-2408.
-if(FALSE)
-    set(_terminal_dump_file
-        "${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/sceneIndexDump.txt")
-    set(render_dir ${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/projects/default/images)
-    if(MAYA_APP_VERSION VERSION_GREATER 2027)
-        set(_terminal_expected
-            "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump_next.txt")
-    else()
-        set(_terminal_expected
-            "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump_2027.txt")
-    endif()
-    _add_scene_index_dump_test(
-        terminalSceneIndexDump
-        texturing/arnold/mayaSphereMayaMaterialArnold.ma
-        "-x 160 -y 120 -hsd \"${_terminal_dump_file}\" -rd \"${render_dir}\""
-        "${_terminal_dump_file}"
-        "${_terminal_expected}"
-    )
+# Smoke tests for the -hsd / -hsi flags: check that a scene index dump was
+# produced and that its top-level hierarchy is as expected.  They are
+# deliberately NOT detailed scene tests.  Whole dump comparison is too fragile
+# across different machines and architectures (additional elements, difference
+# in printed format, order differences), so each test compares only the leading
+# lines passed as the last argument below.  Full dump is kept as reference.
+set(_terminal_dump_file
+    "${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/sceneIndexDump.txt")
+set(render_dir ${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/projects/default/images)
+_add_scene_index_dump_test(
+    terminalSceneIndexDump
+    texturing/arnold/mayaSphereMayaMaterialArnold.ma
+    "-x 160 -y 120 -hsd \"${_terminal_dump_file}\" -rd \"${render_dir}\""
+    "${_terminal_dump_file}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump.txt"
+    11 # Compare first 11 lines
+)
 
-    set(_mayaHydra_dump_file
-        "${TEST_OUTPUT_ROOT}/mayaHydraSceneIndexDump/sceneIndexDump.txt")
-    set(render_dir ${TEST_OUTPUT_ROOT}/mayaHydraSceneIndexDump/projects/default/images)
-    _add_scene_index_dump_test(
-        mayaHydraSceneIndexDump
-        texturing/arnold/mayaSphereMayaMaterialArnold.ma
-        "-x 160 -y 120 -hsd \"${_mayaHydra_dump_file}\" -hsi MayaHydraSceneIndex -rd \"${render_dir}\""
-        "${_mayaHydra_dump_file}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/expected/mayaHydraSceneIndexDump.txt"
-    )
-endif()
+set(_mayaHydra_dump_file
+    "${TEST_OUTPUT_ROOT}/mayaHydraSceneIndexDump/sceneIndexDump.txt")
+set(render_dir ${TEST_OUTPUT_ROOT}/mayaHydraSceneIndexDump/projects/default/images)
+_add_scene_index_dump_test(
+    mayaHydraSceneIndexDump
+    texturing/arnold/mayaSphereMayaMaterialArnold.ma
+    "-x 160 -y 120 -hsd \"${_mayaHydra_dump_file}\" -hsi MayaHydraSceneIndex -rd \"${render_dir}\""
+    "${_mayaHydra_dump_file}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/expected/mayaHydraSceneIndexDump.txt"
+    4 # Compare first 4 lines
+)
 
 # C++ unit tests
 add_subdirectory(cpp)
