@@ -233,11 +233,21 @@ protected:
         bool tangents = false;
     };
 
-    /// Whether positions from a previous update are held.
-    virtual bool _HasStoredPositions() const { return !_positions.empty(); }
+    /// Vertex stream semantics supplied by a render item's geometry.
+    struct StreamPresence
+    {
+        bool positions = false;
+        bool normals = false;
+        bool uvs = false;
+        bool tangents = false;
+    };
 
-    /// Number of positions held from a previous update.
-    virtual size_t _StoredPositionCount() const { return _positions.size(); }
+    /// Scan the vertex buffers of \p geom for the semantics they supply.
+    static StreamPresence _GetStreamPresence(MGeometry* geom, int vertexBufferCount);
+
+    /// Number of values held from a previous update for the points, normals, st or
+    /// tangents vertex stream.
+    virtual size_t _StoredStreamCount(const TfToken& primvar) const;
 
     /// Called once per UpdateFromDelta, before any vertex stream is read.
     virtual void _BeginGeometryUpdate(bool /*geomChanged*/, bool /*topoChanged*/) { }
@@ -248,21 +258,23 @@ protected:
         return renderItemBounds;
     }
 
-    /// Read one vertex stream of a changed geometry and flag it in \p dirty.
+    /// Read one vertex stream of a changed geometry and flag it in \p dirty. \p present lists
+    /// every stream the geometry supplies, including those not read yet.
     virtual void _ReadVertexStream(
-        MVertexBuffer* mvb,
-        bool           topoChanged,
-        bool           useMayaNormals,
-        _StreamDirty&  dirty);
+        MVertexBuffer*         mvb,
+        bool                   topoChanged,
+        bool                   useMayaNormals,
+        const StreamPresence& present,
+        _StreamDirty&          dirty);
 
     /// Called after every vertex stream has been read, to settle the final dirty state.
+    /// \p present is only meaningful when \p geomChanged or \p topoChanged is set.
     virtual void _EndGeometryUpdate(
-        MGeometry*    geom,
-        int           vertexBufferCount,
-        bool          geomChanged,
-        bool          topoChanged,
-        bool          useMayaNormals,
-        _StreamDirty& dirty);
+        const StreamPresence& present,
+        bool                   geomChanged,
+        bool                   topoChanged,
+        bool                   useMayaNormals,
+        _StreamDirty&          dirty);
 
     /// Whether the cached topology is rebuilt from freshly-read indices.
     virtual bool
