@@ -31,9 +31,33 @@
 #include <maya/MSelectionList.h>
 #include <maya/MStringArray.h>
 
+#include <ufeExtensions/Global.h>
+
+#include <ufe/path.h>
+#include <ufe/pathComponent.h>
+#include <ufe/pathSegment.h>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
+
+const MString& rdNodeName()
+{
+    static const MString name(
+        kUsdDefaultRenderDescriptionNodeName.data(),
+        static_cast<int>(kUsdDefaultRenderDescriptionNodeName.length()));
+
+    return name;
+}
+
+const Ufe::Path& UsdDefaultRenderDescriptionNodePath()
+{
+    static const Ufe::Path path(Ufe::PathSegment(
+        Ufe::PathComponent(std::string(kUsdDefaultRenderDescriptionNodeName)),
+        UfeExtensions::getMayaRunTimeId(),
+        '\0'));
+    return path;
+}
 
 MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath)
 {
@@ -53,6 +77,12 @@ MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNod
         status = selectionList.getDependNode(0, outDependNode);
     }
     return status;
+}
+
+MObject GetDependNodeFromNodeName(const MString& nodeName)
+{
+    MObject dependNode;
+    return GetDependNodeFromNodeName(nodeName, dependNode) ? dependNode : MObject();
 }
 
 MStatus GetPlug(const MString& nodeName, const MString& attrName, MPlug& outPlug)

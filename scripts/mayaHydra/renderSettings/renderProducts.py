@@ -32,21 +32,21 @@ def getRenderProductsToApplySettings():
     AOV, user choice, ...) belongs here so that every override goes through
     the same rule.
 
-    Only direct children of /Render are scanned.  This matches the Maya Hydra
-    convention of placing render products at /Render/<Name>; products nested
-    deeper would be silently skipped."""
+    The settings prim's products relationship is the authoritative list of
+    outputs."""
 
     rsPrim = getRenderSettingsPrim()
 
     if not rsPrim:
         raise RuntimeError("Render settings prim %s not found." % str(rsPrim.GetPath()))
 
-    rsParentPrim = rsPrim.GetParent()
-
+    stage = rsPrim.GetStage()
     products = []
-    for child in rsParentPrim.GetChildren():
-        if child.IsA(UsdRender.Product):
-            products.append(UsdRender.Product(child))
+    for target in UsdRender.Settings(rsPrim).GetProductsRel().GetTargets():
+        productPrim = stage.GetPrimAtPath(target)
+        if productPrim.IsValid() and productPrim.IsA(UsdRender.Product):
+            products.append(UsdRender.Product(productPrim))
+
     return products
 
 
