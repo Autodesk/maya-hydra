@@ -687,10 +687,13 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
         }
         break;
     case MGeometry::Semantic::kTexture:
-        if (isMesh && canShare(MayaHydraAdapterTokens->st)
-            && _ShareStream(mvb, _extUvs, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
-            _uvs.clear();
-            return;
+        if (isMesh && canShare(MayaHydraAdapterTokens->st)) {
+            if (_ShareStream(mvb, _extUvs, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
+                _uvs.clear();
+                return;
+            }
+        } else {
+            _extUvs = {};
         }
         break;
     case MGeometry::Semantic::kTangent:
