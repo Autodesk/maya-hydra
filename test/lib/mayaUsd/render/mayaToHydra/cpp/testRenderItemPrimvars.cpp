@@ -281,3 +281,73 @@ TEST(RenderItemPrimvars, TexturedToUntexturedWithdrawsUVs)
         << "No render item that declared st survived the shader change, so the UV withdrawal "
         << "was not exercised";
 }
+
+// What: a shader gaining textures must give the UVs to the existing mesh render item.
+// How: open testUVs.ma, disconnect the file textures of blinn1 so the plane's render item loses
+//      its UV stream, then reconnect them so VP2 supplies the UV stream again.
+// Expect: a render item that existed while untextured declares st again, with st dirtied, and
+//      declared primvars are fully populated with the decoded Maya values.
+// Regression: a shader change can arrive as a topology-only update, on which the vertex streams
+//      were not read, so the new UV stream was never stored and st stayed undeclared until the
+//      next geometry change.
+TEST(RenderItemPrimvars, UntexturedToTexturedAcquiresUVs)
+{
+    const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, "pPlaneShape1");
+    const char* const connections[]
+        = { "file1.oc blinn1.c", "file2.oc blinn1.ic", "file3.oc blinn1.sc" };
+    for (const char* connection : connections) {
+        ASSERT_EQ(MGlobal::executeCommand(MString("disconnectAttr ") + connection), MS::kSuccess)
+            << "Failed to disconnect " << connection;
+    }
+    MGlobal::executeCommand("refresh");
+
+    HdSceneIndexBaseRefPtr  mayaSceneIndex;
+    const PrimEntriesVector untexturedPrims
+        = FindMeshRenderItemPrims(meshShapeFull, &mayaSceneIndex);
+    ASSERT_FALSE(untexturedPrims.empty()) << meshShapeFull << " render item not found";
+    std::vector<SdfPath> untexturedPrimPaths;
+    for (const PrimEntry& primEntry : untexturedPrims) {
+        HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(primEntry.prim.dataSource);
+        ASSERT_FALSE(primvars.GetPrimvar(TfToken("st")).IsDefined())
+            << primEntry.primPath.GetText() << " declares st while untextured";
+        untexturedPrimPaths.push_back(primEntry.primPath);
+    }
+
+    SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
+    const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
+
+    for (const char* connection : connections) {
+        ASSERT_EQ(MGlobal::executeCommand(MString("connectAttr ") + connection), MS::kSuccess)
+            << "Failed to connect " << connection;
+    }
+    MGlobal::executeCommand("refresh");
+
+    const PrimEntriesVector prims = FindMeshRenderItemPrims(meshShapeFull);
+    ASSERT_FALSE(prims.empty()) << meshShapeFull << " render item not found";
+    const std::vector<GfVec2f> mayaUVs = GetMayaMeshUVs(meshShapeFull);
+    ASSERT_FALSE(mayaUVs.empty()) << meshShapeFull << " has no UVs";
+    // Only a render item that existed while untextured exercises acquiring a stream: a render
+    // item VP2 rebuilt for the new shader is populated from scratch.
+    size_t survivingPrimsWithUVs = 0;
+    for (const PrimEntry& primEntry : prims) {
+        ExpectDeclaredPrimvarsArePopulated(primEntry);
+        ExpectDecodedPrimvarValues(primEntry, mayaUVs);
+        if (std::find(untexturedPrimPaths.begin(), untexturedPrimPaths.end(), primEntry.primPath)
+            == untexturedPrimPaths.end()) {
+            continue;
+        }
+        HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(primEntry.prim.dataSource);
+        if (!primvars.GetPrimvar(TfToken("st")).IsDefined()) {
+            continue;
+        }
+        ++survivingPrimsWithUVs;
+        const MeshDirtySignals signals
+            = ClassifyMeshDirtySince(notifsAccumulator, startIndex, primEntry.primPath);
+        EXPECT_TRUE(signals.uvs || signals.broadPrimvars)
+            << primEntry.primPath.GetText() << " st was not dirtied when acquired. Dirtied: "
+            << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, primEntry.primPath);
+    }
+    EXPECT_GT(survivingPrimsWithUVs, 0u)
+        << "No render item that existed while untextured declares st after its shader gained "
+        << "textures";
+}

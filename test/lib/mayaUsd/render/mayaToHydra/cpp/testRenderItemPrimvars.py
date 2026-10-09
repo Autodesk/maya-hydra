@@ -49,6 +49,15 @@ class TestRenderItemPrimvars(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="RenderItemPrimvars.TexturedToUntexturedWithdrawsUVs")
 
+    # What: a shader gaining textures must give the UVs to the existing mesh render item.
+    # How: open testUVs.ma, then run the C++ test, which disconnects and reconnects the file
+    #      textures of blinn1 while observing the scene index notifications.
+    # Expect: st is dirtied and declared again on a plane render item that was kept.
+    def test_untexturedToTexturedAcquiresUVs(self):
+        self.setupScene("testUVandUDIM", "testUVs.ma", "pPlaneShape1")
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="RenderItemPrimvars.UntexturedToTexturedAcquiresUVs")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

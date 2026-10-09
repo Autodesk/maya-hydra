@@ -422,8 +422,20 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // the update. Only meaningful when the geometry was fetched (geomChanged || topoChanged).
     const StreamPresence present = _GetStreamPresence(geom, vertexBuffercount);
 
+    // VP2 only supplies the streams the current shader requests, and a shader change can arrive
+    // as a topology-only update: read the streams then too when one appeared, otherwise it stays
+    // unadvertised until the next geometry change. Not on every topology-only update, which face
+    // component selection also raises, as nothing else needs re-reading there.
+    const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
+        || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
+    const bool streamAppeared
+        = (isMesh && present.uvs && _StoredStreamCount(MayaHydraAdapterTokens->st) == 0)
+        || (isMesh && present.tangents
+            && _StoredStreamCount(MayaHydraAdapterTokens->tangents) == 0)
+        || (useMayaNormals && present.normals && _StoredStreamCount(UsdGeomTokens->normals) == 0);
+
     // Vertices
-    if (geomChanged && vertexBuffercount) {
+    if ((geomChanged || (topoChanged && streamAppeared)) && vertexBuffercount) {
         //vertexBuffercount > 0 means geom is non null
         for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
             MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
@@ -434,10 +446,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
-    // VP2 only supplies the streams the current shader requests, and the adapter outlives
-    // shader reassignments: drop the CPU copy of a stream the geometry no longer supplies,
-    // otherwise it stays advertised with stale values. Same condition as the GPU withdraw in
-    // _EndGeometryUpdate: a shader change can arrive as a topology-only update.
+    // The reverse of streamAppeared above, as the adapter outlives shader reassignments: drop
+    // the CPU copy of a stream the geometry no longer supplies, otherwise it stays advertised
+    // with stale values. Same condition as the GPU withdraw in _EndGeometryUpdate.
     if (geom) {
         const auto clearAbsent = [](bool isPresent, auto& values, bool& streamDirty) {
             if (!isPresent && !values.empty()) {
