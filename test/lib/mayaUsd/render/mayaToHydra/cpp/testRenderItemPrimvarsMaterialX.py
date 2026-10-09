@@ -28,7 +28,7 @@ class TestRenderItemPrimvarsMaterialX(mtohUtils.MayaHydraBaseTestCase):
 
     # What: untextured MaterialX shader must not advertise unpopulated primvars (st, tangents).
     # How: open RedMtlxSphere.ma, then run the C++ test on the sphere render items.
-    # Expect: declared normals/st/tangents hold one value per point.
+    # Expect: declared normals/st/tangents cover every point the topology references.
     def test_untexturedMaterialXDeclaresOnlyPopulatedPrimvars(self):
         mayaUtils.openTestScene("testMaterialX", "RedMtlxSphere.ma")
         self.setHdStormRenderer()

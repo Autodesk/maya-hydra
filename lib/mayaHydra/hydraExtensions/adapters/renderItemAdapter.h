@@ -234,7 +234,7 @@ protected:
     };
 
     /// Vertex stream semantics supplied by a render item's geometry.
-    struct _StreamPresence
+    struct StreamPresence
     {
         bool positions = false;
         bool normals = false;
@@ -243,7 +243,7 @@ protected:
     };
 
     /// Scan the vertex buffers of \p geom for the semantics they supply.
-    static _StreamPresence _GetStreamPresence(MGeometry* geom, int vertexBufferCount);
+    static StreamPresence _GetStreamPresence(MGeometry* geom, int vertexBufferCount);
 
     /// Number of values held from a previous update for the points, normals, st or
     /// tangents vertex stream.
@@ -258,21 +258,23 @@ protected:
         return renderItemBounds;
     }
 
-    /// Read one vertex stream of a changed geometry and flag it in \p dirty.
+    /// Read one vertex stream of a changed geometry and flag it in \p dirty. \p present lists
+    /// every stream the geometry supplies, including those not read yet.
     virtual void _ReadVertexStream(
-        MVertexBuffer* mvb,
-        bool           topoChanged,
-        bool           useMayaNormals,
-        _StreamDirty&  dirty);
+        MVertexBuffer*         mvb,
+        bool                   topoChanged,
+        bool                   useMayaNormals,
+        const StreamPresence& present,
+        _StreamDirty&          dirty);
 
     /// Called after every vertex stream has been read, to settle the final dirty state.
+    /// \p present is only meaningful when \p geomChanged or \p topoChanged is set.
     virtual void _EndGeometryUpdate(
-        MGeometry*    geom,
-        int           vertexBufferCount,
-        bool          geomChanged,
-        bool          topoChanged,
-        bool          useMayaNormals,
-        _StreamDirty& dirty);
+        const StreamPresence& present,
+        bool                   geomChanged,
+        bool                   topoChanged,
+        bool                   useMayaNormals,
+        _StreamDirty&          dirty);
 
     /// Whether the cached topology is rebuilt from freshly-read indices.
     virtual bool

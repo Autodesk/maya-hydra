@@ -81,14 +81,23 @@ void
 _CopyFloatStream(MVertexBuffer* mvb, size_t count, VtArray<VecT>& out)
 {
     out.clear();
+    if (count == 0) {
+        return;
+    }
     const MVertexBufferDescriptor& desc = mvb->descriptor();
     constexpr int numComponents = static_cast<int>(VecT::dimension);
     if (desc.dataType() != MGeometry::kFloat || desc.dimension() < numComponents
-        || desc.offset() < 0 || desc.stride() < 0) {
+        || desc.offset() < 0 || desc.stride() < 0
+        || (desc.stride() > 0 && desc.stride() < numComponents)) {
         return;
     }
     // offset() and stride() are counted in dataType units, not bytes. A zero stride means
-    // tightly packed.
+    // tightly packed. The MVertexBufferDescriptor docs only guarantee them inside
+    // MPxShaderOverride::draw(), but VP2 fills them for the render item geometry handed to us,
+    // and the GPU sharing path publishes the same values as the layout consumers bind with
+    // (_GetExtLayout in gpuRenderItemAdapter.cpp). map() is taken to return the start of the
+    // buffer, as the GPU path's byteOffset assumes, so the offset is applied here. A negative
+    // value is rejected above.
     const size_t offset = static_cast<size_t>(desc.offset());
     const size_t stride = static_cast<size_t>(desc.stride() > 0 ? desc.stride() : desc.dimension());
     const auto* data = static_cast<const float*>(mvb->map());
@@ -409,6 +418,10 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // (Vertex colors: add a flag here once the kColor read in _ReadVertexStream is wired in.)
     _StreamDirty dirty;
 
+    // The semantics this geometry supplies, scanned once for the stream reads and for the end of
+    // the update. Only meaningful when the geometry was fetched (geomChanged || topoChanged).
+    const StreamPresence present = _GetStreamPresence(geom, vertexBuffercount);
+
     // Vertices
     if (geomChanged && vertexBuffercount) {
         //vertexBuffercount > 0 means geom is non null
@@ -417,13 +430,15 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             if ( ! mvb) {
                 continue;
             }
-            _ReadVertexStream(mvb, topoChanged, useMayaNormals, dirty);
+            _ReadVertexStream(mvb, topoChanged, useMayaNormals, present, dirty);
         }
+    }
 
-        // VP2 only supplies the streams the current shader requests, and the adapter outlives
-        // shader reassignments: drop the CPU copy of a stream the geometry no longer supplies,
-        // otherwise it stays advertised with stale values.
-        const _StreamPresence present = _GetStreamPresence(geom, vertexBuffercount);
+    // VP2 only supplies the streams the current shader requests, and the adapter outlives
+    // shader reassignments: drop the CPU copy of a stream the geometry no longer supplies,
+    // otherwise it stays advertised with stale values. Same condition as the GPU withdraw in
+    // _EndGeometryUpdate: a shader change can arrive as a topology-only update.
+    if (geom) {
         const auto clearAbsent = [](bool isPresent, auto& values, bool& streamDirty) {
             if (!isPresent && !values.empty()) {
                 values.clear();
@@ -435,7 +450,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         clearAbsent(present.tangents, _tangents, dirty.tangents);
     }
 
-    _EndGeometryUpdate(geom, vertexBuffercount, geomChanged, topoChanged, useMayaNormals, dirty);
+    _EndGeometryUpdate(present, geomChanged, topoChanged, useMayaNormals, dirty);
 
     if (dirty.positions) {
         notifier.dirtyPoints();
@@ -637,10 +652,11 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 }
 
 void MayaHydraRenderItemAdapter::_ReadVertexStream(
-    MVertexBuffer* mvb,
-    bool           topoChanged,
-    bool           useMayaNormals,
-    _StreamDirty&  dirty)
+    MVertexBuffer*         mvb,
+    bool                   topoChanged,
+    bool                   useMayaNormals,
+    const StreamPresence& /*present*/,
+    _StreamDirty&          dirty)
 {
     MH_PROFILE_FUNCTION();
 
@@ -665,12 +681,9 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
                 }
             }
 
-            _positions.clear();
-            const auto* vertexPositions = reinterpret_cast<const GfVec3f*>(verts->map());
-            if (TF_VERIFY(vertexPositions)) {
-                _positions.assign(vertexPositions, vertexPositions + vertCount);
-            }
-            verts->unmap();
+            // Not necessarily packed float3: a GPU item sends exactly the streams it cannot share
+            // here, e.g. float4 or interleaved positions.
+            _CopyFloatStream(verts, vertCount, _positions);
             dirty.positions = true;
         }
         break;
@@ -754,10 +767,10 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
     }
 }
 
-MayaHydraRenderItemAdapter::_StreamPresence
+MayaHydraRenderItemAdapter::StreamPresence
 MayaHydraRenderItemAdapter::_GetStreamPresence(MGeometry* geom, int vertexBufferCount)
 {
-    _StreamPresence present;
+    StreamPresence present;
     for (int vbIdx = 0; geom && vbIdx < vertexBufferCount; vbIdx++) {
         const MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
         if (!mvb) {
@@ -775,12 +788,11 @@ MayaHydraRenderItemAdapter::_GetStreamPresence(MGeometry* geom, int vertexBuffer
 }
 
 void MayaHydraRenderItemAdapter::_EndGeometryUpdate(
-    MGeometry*    /*geom*/,
-    int           /*vertexBufferCount*/,
-    bool          geomChanged,
-    bool          /*topoChanged*/,
-    bool          useMayaNormals,
-    _StreamDirty& dirty)
+    const StreamPresence& /*present*/,
+    bool                   geomChanged,
+    bool                   /*topoChanged*/,
+    bool                   useMayaNormals,
+    _StreamDirty&          dirty)
 {
     // Any geometry change dirties every stream, whether or not VP2 supplied it on this update.
     if (geomChanged) {
@@ -854,18 +866,20 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
     if (interpolation == HdInterpolationVertex) {// Vertices
         // VP2 only fills the streams requested by the render item's shader (e.g. a MaterialX
         // standard_surface without textures requests no UVs). Only advertise optional streams
-        // holding one value per point: an empty st is read as a degenerate texture coordinate
-        // instead of being treated as missing.
-        const size_t numPoints = _StoredStreamCount(UsdGeomTokens->points);
-        const auto hasPerPointData = [this, numPoints](const TfToken& primvar) {
-            return numPoints > 0 && _StoredStreamCount(primvar) == numPoints;
+        // that hold data: an empty st is read as a degenerate texture coordinate instead of
+        // being treated as missing. Do not require the count to match points: a stream shared
+        // as a GPU buffer keeps VP2's full vertex count while a CPU fallback stream is truncated
+        // to the highest index used, so the two can legitimately differ on one render item.
+        const bool hasPoints = _StoredStreamCount(UsdGeomTokens->points) > 0;
+        const auto hasStreamData = [this, hasPoints](const TfToken& primvar) {
+            return hasPoints && _StoredStreamCount(primvar) > 0;
         };
 
         localDescs = {
             { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point }//Vertices
         };
         static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
-        if (useMayaNormals && hasPerPointData(UsdGeomTokens->normals)) {
+        if (useMayaNormals && hasStreamData(UsdGeomTokens->normals)) {
             localDescs.push_back(
                 { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal }); //Normals
         }
@@ -875,11 +889,11 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
         // Note: the default cube doesn't give 36 face vertices as VP2 deduplicated them.
         if (_primitive == MGeometry::Primitive::kTriangles
             || _primitive == MGeometry::Primitive::kTriangleStrip) {
-            if (hasPerPointData(MayaHydraAdapterTokens->st)) {
+            if (hasStreamData(MayaHydraAdapterTokens->st)) {
                 localDescs.push_back(
                     {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //uvs
             }
-            if (hasPerPointData(MayaHydraAdapterTokens->tangents)) {
+            if (hasStreamData(MayaHydraAdapterTokens->tangents)) {
                 localDescs.push_back(
                     {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //tangents
             }

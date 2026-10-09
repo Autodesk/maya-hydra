@@ -21,9 +21,12 @@
 #include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/types.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
+#include <maya/MDagPath.h>
 #include <maya/MFloatArray.h>
 #include <maya/MFnMesh.h>
 #include <maya/MGlobal.h>
@@ -129,19 +132,35 @@ void ExpectDecodedPrimvarValues(const PrimEntry& primEntry, const std::vector<Gf
     }
 }
 
-// Every optional vertex primvar that is declared must hold one value per point: a declared
-// but empty st makes render delegates build a degenerate tangent frame (black shading).
+// Number of points the mesh topology references (highest face-vertex index + 1).
+size_t GetReferencedPointCount(const PrimEntry& primEntry)
+{
+    const HdMeshSchema mesh = HdMeshSchema::GetFromParent(primEntry.prim.dataSource);
+    HdIntArrayDataSourceHandle indicesDs = mesh.GetTopology().GetFaceVertexIndices();
+    const VtIntArray indices = indicesDs ? indicesDs->GetTypedValue(0.0f) : VtIntArray();
+    if (indices.empty()) {
+        return 0;
+    }
+    return static_cast<size_t>(*std::max_element(indices.begin(), indices.end())) + 1;
+}
+
+// Every optional vertex primvar that is declared must cover every point the topology
+// references: a declared but empty st makes render delegates build a degenerate tangent frame
+// (black shading). The count need not equal the points count -- a stream shared as a GPU buffer
+// keeps VP2's full vertex count while a CPU fallback stream is truncated to the highest index
+// used -- and render delegates validate vertex primvars against the topology, as here.
 void ExpectDeclaredPrimvarsArePopulated(const PrimEntry& primEntry)
 {
     HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(primEntry.prim.dataSource);
-    const size_t     numPoints = GetPrimvarArraySize(primvars, HdTokens->points);
-    ASSERT_GT(numPoints, 0u) << primEntry.primPath.GetText() << " has no points";
+    const size_t     numReferenced = GetReferencedPointCount(primEntry);
+    ASSERT_GT(numReferenced, 0u) << primEntry.primPath.GetText() << " has no topology";
 
-    for (const TfToken& name : { HdTokens->normals, TfToken("st"), TfToken("tangents") }) {
+    for (const TfToken& name : { HdTokens->points, HdTokens->normals, TfToken("st"),
+                                 TfToken("tangents") }) {
         if (primvars.GetPrimvar(name).IsDefined()) {
-            EXPECT_EQ(GetPrimvarArraySize(primvars, name), numPoints)
+            EXPECT_GE(GetPrimvarArraySize(primvars, name), numReferenced)
                 << primEntry.primPath.GetText() << " declares primvar '" << name.GetString()
-                << "' without one value per point";
+                << "' without a value for every point its topology references";
         }
     }
 }
@@ -151,7 +170,7 @@ void ExpectDeclaredPrimvarsArePopulated(const PrimEntry& primEntry)
 // What: a mesh with an untextured MaterialX shader must not advertise unpopulated primvars.
 // How: open RedMtlxSphere.ma (standard_surface, no textures: VP2 supplies no UV stream) and
 //      inspect the primvars of every mesh render item of the sphere.
-// Expect: normals/st/tangents, when declared, hold one value per point.
+// Expect: normals/st/tangents, when declared, cover every point the topology references.
 // Regression: the adapter declared st/tangents unconditionally, so Flash shaded the sphere black.
 TEST(RenderItemPrimvars, UntexturedMaterialXDeclaresOnlyPopulatedPrimvars)
 {
@@ -224,6 +243,10 @@ TEST(RenderItemPrimvars, TexturedToUntexturedWithdrawsUVs)
 
     const PrimEntriesVector prims = FindMeshRenderItemPrims(meshShapeFull);
     ASSERT_FALSE(prims.empty()) << meshShapeFull << " render item not found";
+    // The withdrawal is only exercised on a render item that was textured before and still
+    // exists: a render item VP2 rebuilt for the new shader starts without UVs, and would pass
+    // without the adapter ever dropping a stream.
+    size_t survivingTexturedPrims = 0;
     for (const PrimEntry& primEntry : prims) {
         ExpectDeclaredPrimvarsArePopulated(primEntry);
         HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(primEntry.prim.dataSource);
@@ -238,6 +261,7 @@ TEST(RenderItemPrimvars, TexturedToUntexturedWithdrawsUVs)
         if (texturedPrim == primsWithUVs.end()) {
             continue;
         }
+        ++survivingTexturedPrims;
         const MeshDirtySignals signals
             = ClassifyMeshDirtySince(notifsAccumulator, startIndex, primEntry.primPath);
         EXPECT_TRUE(signals.uvs || signals.broadPrimvars)
@@ -253,4 +277,7 @@ TEST(RenderItemPrimvars, TexturedToUntexturedWithdrawsUVs)
                 << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, primEntry.primPath);
         }
     }
+    EXPECT_GT(survivingTexturedPrims, 0u)
+        << "No render item that declared st survived the shader change, so the UV withdrawal "
+        << "was not exercised";
 }

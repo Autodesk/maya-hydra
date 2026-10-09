@@ -76,17 +76,17 @@ protected:
     void      _BeginGeometryUpdate(bool geomChanged, bool topoChanged) override;
     GfRange3d _ResolveBounds(const GfRange3d& renderItemBounds) const override;
     void      _ReadVertexStream(
-        MVertexBuffer* mvb,
-        bool           topoChanged,
-        bool           useMayaNormals,
-        _StreamDirty&  dirty) override;
+        MVertexBuffer*         mvb,
+        bool                   topoChanged,
+        bool                   useMayaNormals,
+        const StreamPresence& present,
+        _StreamDirty&          dirty) override;
     void _EndGeometryUpdate(
-        MGeometry*    geom,
-        int           vertexBufferCount,
-        bool          geomChanged,
-        bool          topoChanged,
-        bool          useMayaNormals,
-        _StreamDirty& dirty) override;
+        const StreamPresence& present,
+        bool                   geomChanged,
+        bool                   topoChanged,
+        bool                   useMayaNormals,
+        _StreamDirty&          dirty) override;
     bool _TopologyNeedsRebuild(bool emitTopologyLocators, bool hasCachedTopology) const override;
 
 private:
@@ -136,10 +136,12 @@ private:
     /// Publish one primvar stream as a shared GPU buffer, registering it with
     /// the renderer's arena and rebuilding the cached schema only when it must.
     /// Returns NoGpu, leaving \p stream untouched, when the stream cannot be
-    /// shared -- no GPU handle, or a renderer that cannot consume VP2's buffers.
+    /// shared -- no GPU handle, an element type other than Hydra's for \p key, or a renderer
+    /// that cannot consume VP2's buffers.
     _ExtPublishResult _PublishExtStream(
         MVertexBuffer* mvb,
         _ExtStream&    stream,
+        const TfToken& key,
         bool           allowDirectBind);
 
     /// Publish \p mvb into \p stream and set \p dirty when the renderer has to re-pull it.
@@ -150,6 +152,9 @@ private:
         const TfToken& key,
         bool           alwaysDirty,
         bool&          dirty);
+
+    /// The published stream for the points, normals, st or tangents primvar, or null.
+    const _ExtStream* _ExtStreamFor(const TfToken& key) const;
 
     bool _LazyCpuBufferTriggered(const TfToken& key) const;
     void _SetLazyCpuBufferTriggered(const TfToken& key) const;

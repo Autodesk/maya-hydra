@@ -41,7 +41,8 @@ class TestRenderItemPrimvars(mtohUtils.MayaHydraBaseTestCase):
 
     # What: a shader losing its textures must withdraw the UVs of the mesh render item.
     # How: open testUVs.ma, then run the C++ test, which disconnects the file textures of blinn1
-    #      (the render item is kept) while observing the scene index notifications.
+    #      (the render item is kept, which the test checks) while observing the scene index
+    #      notifications.
     # Expect: st is dirtied and no longer declared on the plane render items.
     def test_texturedToUntexturedWithdrawsUVs(self):
         self.setupScene("testUVandUDIM", "testUVs.ma", "pPlaneShape1")
