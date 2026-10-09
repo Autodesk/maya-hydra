@@ -114,11 +114,18 @@ TEST(MayaHydraSceneIndex, ReleasedOnHydraRebuild)
     // the old scene index's adapter callbacks were still registered and fired against the
     // freed render index. The release is checked after coming back to Hydra, the latest point
     // by which the old generation must be gone.
+    //
+    // Clearing rendererOverrideName is not enough to reach VP2 while Global Hydra is on: Maya
+    // reapplies the override from the mayaUseHydra optionVar (HYDRA-2575). The optionVar does
+    // not exist on older Maya versions, hence the guard.
     ASSERT_EQ(
         MGlobal::executeCommand("{ string $ed = `playblast -activeEditor`;"
                                 " string $ovr = `modelEditor -q -rendererOverrideName $ed`;"
+                                " int $globalHydra = `optionVar -exists mayaUseHydra`;"
+                                " if ($globalHydra) { optionVar -iv mayaUseHydra 0; }"
                                 " modelEditor -e -rendererOverrideName \"\" $ed; refresh -f;"
                                 " setAttr sphere1.translateX 2; delete sphere1; refresh -f;"
+                                " if ($globalHydra) { optionVar -iv mayaUseHydra 1; }"
                                 " modelEditor -e -rendererOverrideName $ovr $ed; refresh -f; }"),
         MS::kSuccess);
 
