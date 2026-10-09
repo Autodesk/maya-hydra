@@ -4321,9 +4321,15 @@ void MtohRenderOverride::_CreateFramePass(
     framePassDescriptor.uid         = passId;
     auto framePass                  = hvt::ViewportEngine::CreateFramePass(framePassDescriptor);
 
+    // MayaHydra draws its own selection highlighting.
     // Remove the default selection tasks as we do not use them.
     framePass->GetTaskManager()->RemoveTask(HdxPrimitiveTokens->colorizeSelectionTask);
     framePass->GetTaskManager()->RemoveTask(TfToken("selectionTask"));
+
+    // Also tell the render delegate not to draw one too. 
+    // Only meaningful for delegates that implement the setting, others ignore it.
+    renderer->RenderIndex()->GetRenderDelegate()->SetRenderSetting(
+        TfToken("selectionHighlightEnabled"), VtValue(false));
 
     // Update the consolidated frame pass data
     _framePassesData[passIndex]->_renderIndexProxy = renderer;
