@@ -666,28 +666,6 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
 
     const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
         || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
-    const _ExtLayout extLayout = _GetExtLayout(mvb);
-    // A stream whose element width is not what Hydra reads (e.g. VP2's 4-component tangents)
-    // takes the CPU path, which projects it. A buffer shared before the layout changed must be
-    // withdrawn, or its schema keeps being published.
-    const auto canShare = [this, mvb, &extLayout](
-                              const TfToken& primvar, _ExtStream& stream, bool& streamDirty) {
-        const HdType hydraType = _HydraCpuType(primvar);
-        if (extLayout.IsValid() && extLayout.elementType.type == hydraType) {
-            return true;
-        }
-        TF_DEBUG_GPU_BUFFER_SHARING(
-            "[%s] %s -> CPU: VP2 element size %zu does not match Hydra's %zu for %s\n",
-            GetID().GetText(), _ExtStreamName(mvb),
-            extLayout.IsValid() ? HdDataSizeOfTupleType(extLayout.elementType) : size_t(0),
-            hydraType != HdTypeInvalid ? HdDataSizeOfType(hydraType) : size_t(0),
-            primvar.GetText());
-        if (stream) {
-            stream = {};
-            streamDirty = true;
-        }
-        return false;
-    };
     switch (mvb->descriptor().semantic()) {
     case MGeometry::Semantic::kPosition: {
         // Points also drive Hydra's normals recompute whenever Hydra owns this item's normals --
@@ -695,30 +673,28 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
         // dirty then even under stable direct binding. Lines and curves never carry a normal
         // stream and Hydra computes none for them, so a missing stream does not count there.
         const bool hydraOwnsNormals = !useMayaNormals || (isMesh && !present.normals);
-        if (canShare(HdTokens->points, _extPositions, dirty.positions)
-            && _ShareStream(mvb, _extPositions, HdTokens->points, hydraOwnsNormals,
-                            dirty.positions)) {
+        if (_ShareStream(mvb, _extPositions, HdTokens->points, hydraOwnsNormals,
+                         dirty.positions)) {
             _positions.clear();
             return;
         }
         break;
     }
     case MGeometry::Semantic::kNormal:
-        if (useMayaNormals && canShare(HdTokens->normals, _extNormals, dirty.normals)
+        if (useMayaNormals
             && _ShareStream(mvb, _extNormals, HdTokens->normals, false, dirty.normals)) {
             _normals.clear();
             return;
         }
         break;
     case MGeometry::Semantic::kTexture:
-        if (isMesh && canShare(MayaHydraAdapterTokens->st, _extUvs, dirty.uvs)
-            && _ShareStream(mvb, _extUvs, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
+        if (isMesh && _ShareStream(mvb, _extUvs, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
             _uvs.clear();
             return;
         }
         break;
     case MGeometry::Semantic::kTangent:
-        if (isMesh && canShare(MayaHydraAdapterTokens->tangents, _extTangents, dirty.tangents)
+        if (isMesh
             && _ShareStream(
                 mvb, _extTangents, MayaHydraAdapterTokens->tangents, false, dirty.tangents)) {
             _tangents.clear();
