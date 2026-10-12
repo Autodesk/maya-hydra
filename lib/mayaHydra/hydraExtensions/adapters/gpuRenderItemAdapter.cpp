@@ -36,6 +36,7 @@
 #include <pxr/imaging/hgi/externalBuffer.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
+#include <pxr/usd/usdGeom/tokens.h>
 
 #include <maya/MFnDagNode.h>
 #include <maya/MViewport2Renderer.h>
@@ -215,7 +216,13 @@ _GetExtLayout(MHWRender::MVertexBuffer *mvb)
     if (layout.elementType.type == HdTypeInvalid) {
         return layout;
     }
+    if (desc.offset() < 0 || desc.stride() < 0) {
+        return {};
+    }
     layout.numElements = mvb->vertexCount();
+    if (layout.numElements == 0) {
+        return {};
+    }
 
     // offset() and stride() are both counted in dataType units, not bytes.
     layout.byteOffset =
@@ -231,6 +238,9 @@ _GetExtLayout(MHWRender::MVertexBuffer *mvb)
     // stream, applying the same stride rule the consumer does: a zero stride
     // means tightly packed.
     const size_t elemSize = HdDataSizeOfTupleType(layout.elementType);
+    if (layout.byteStride > 0 && layout.byteStride < elemSize) {
+        return {};
+    }
     const size_t stride = layout.byteStride > 0 ? layout.byteStride : elemSize;
     layout.byteSize = layout.byteOffset + layout.numElements * stride;
 
@@ -244,9 +254,39 @@ _GetExtLayout(MHWRender::MVertexBuffer *mvb)
     // it only ever compares. A copy out of Maya's buffer is not so forgiving:
     // reading past the end is an out-of-range GL copy that fails the whole
     // stream rather than clamping.
-    layout.copyByteSize =
-        layout.byteOffset + (layout.numElements - 1) * stride + elemSize;
+    layout.copyByteSize = layout.numElements > 0
+        ? layout.byteOffset + (layout.numElements - 1) * stride + elemSize
+        : 0;
     return layout;
+}
+
+// The element type Hydra reads a shareable primvar as -- on the GPU, and as the CPU fallback /
+// lazy readback -- or HdTypeInvalid for a primvar that is never shared. A VP2 stream is shared
+// only when its element type is exactly this. The one place this mapping lives.
+static HdType
+_HydraCpuType(const TfToken& primvar)
+{
+    if (primvar == MayaHydraAdapterTokens->st) {
+        return HdTypeFloatVec2;
+    }
+    if (primvar == UsdGeomTokens->points || primvar == UsdGeomTokens->normals
+        || primvar == MayaHydraAdapterTokens->tangents) {
+        return HdTypeFloatVec3;
+    }
+    return HdTypeInvalid;
+}
+
+// Call \p fn with a value of the C++ element type matching _HydraCpuType(primvar); the value
+// only selects the type. Returns R() for a primvar that is never shared.
+template <typename R, typename Fn>
+static R
+_WithHydraCpuElement(const TfToken& primvar, Fn&& fn)
+{
+    switch (_HydraCpuType(primvar)) {
+    case HdTypeFloatVec2: return fn(GfVec2f());
+    case HdTypeFloatVec3: return fn(GfVec3f());
+    default: return R();
+    }
 }
 
 // The stride to read a stream as T with, or 0 when its published layout
@@ -519,16 +559,16 @@ bool MayaHydraGpuRenderItemAdapter::IsEligible(const MRenderItem& ri, Hgi* hgi)
     return true;
 }
 
-bool MayaHydraGpuRenderItemAdapter::_HasStoredPositions() const
+size_t MayaHydraGpuRenderItemAdapter::_StoredStreamCount(const TfToken& primvar) const
 {
-    // GPU meshes keep no CPU positions; the published external buffer is the baseline.
-    return MayaHydraRenderItemAdapter::_HasStoredPositions() || _extPositions;
-}
-
-size_t MayaHydraGpuRenderItemAdapter::_StoredPositionCount() const
-{
-    return _extPositions ? _extPositions.numElements
-                         : MayaHydraRenderItemAdapter::_StoredPositionCount();
+    // A shared stream's CPU array is cleared once it is published, so the published
+    // external buffer is the baseline. A stream is only published with Hydra's element type, so
+    // its element count is the value count Hydra reads.
+    const _ExtStream* stream = _ExtStreamFor(primvar);
+    if (stream && *stream) {
+        return stream->numElements;
+    }
+    return MayaHydraRenderItemAdapter::_StoredStreamCount(primvar);
 }
 
 void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool topoChanged)
@@ -584,9 +624,14 @@ bool MayaHydraGpuRenderItemAdapter::_ShareStream(
 {
     MH_PROFILE_FUNCTION();
 
-    const _ExtPublishResult res = _PublishExtStream(mvb, stream, _useDirectBind);
+    const _ExtPublishResult res = _PublishExtStream(mvb, stream, key, _useDirectBind);
     if (res == _ExtPublishResult::NoGpu) {
-        stream = {};
+        // Withdraw a stream published earlier, so its schema does not keep naming a buffer VP2
+        // may recycle. The caller reads the stream on the CPU instead.
+        if (stream) {
+            stream = {};
+            dirty = true;
+        }
         return false;
     }
     // In steady-state direct binding with a stable handle the stream stays clean
@@ -603,35 +648,38 @@ bool MayaHydraGpuRenderItemAdapter::_ShareStream(
     // the producer frame's fence, instead of paying a GPU round trip per
     // stream at pull time. The element types match GetExtGpuBufferLazyValue.
     if (lazyCpuConsumer) {
-        if (key == MayaHydraAdapterTokens->st) {
-            _PrefetchStream<GfVec2f>(stream);
-        } else {
-            _PrefetchStream<GfVec3f>(stream);
-        }
+        _WithHydraCpuElement<void>(key, [&stream](auto elementType) {
+            _PrefetchStream<decltype(elementType)>(stream);
+        });
     }
     return true;
 }
 
 void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
-    MVertexBuffer* mvb,
-    bool           topoChanged,
-    bool           useMayaNormals,
-    _StreamDirty&  dirty)
+    MVertexBuffer*         mvb,
+    bool                   topoChanged,
+    bool                   useMayaNormals,
+    const StreamPresence& present,
+    _StreamDirty&          dirty)
 {
     MH_PROFILE_FUNCTION();
 
     const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
         || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
     switch (mvb->descriptor().semantic()) {
-    case MGeometry::Semantic::kPosition:
-        // Points also drive Hydra's smooth-normals recompute when Maya does not
-        // supply normals, so they dirty whenever Hydra owns normals -- even under
-        // stable direct binding.
-        if (_ShareStream(mvb, _extPositions, HdTokens->points, !useMayaNormals, dirty.positions)) {
+    case MGeometry::Semantic::kPosition: {
+        // Points also drive Hydra's normals recompute whenever Hydra owns this item's normals --
+        // Maya normals disabled, or a mesh whose shader requested no normal stream -- so they
+        // dirty then even under stable direct binding. Lines and curves never carry a normal
+        // stream and Hydra computes none for them, so a missing stream does not count there.
+        const bool hydraOwnsNormals = !useMayaNormals || (isMesh && !present.normals);
+        if (_ShareStream(mvb, _extPositions, HdTokens->points, hydraOwnsNormals,
+                         dirty.positions)) {
             _positions.clear();
             return;
         }
         break;
+    }
     case MGeometry::Semantic::kNormal:
         if (useMayaNormals
             && _ShareStream(mvb, _extNormals, HdTokens->normals, false, dirty.normals)) {
@@ -669,16 +717,15 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
         "[%s] %s falling back to CPU MVertexBuffer::map() read\n",
         GetID().GetText(), _ExtStreamName(mvb));
 
-    MayaHydraRenderItemAdapter::_ReadVertexStream(mvb, topoChanged, useMayaNormals, dirty);
+    MayaHydraRenderItemAdapter::_ReadVertexStream(mvb, topoChanged, useMayaNormals, present, dirty);
 }
 
 void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
-    MGeometry*    geom,
-    int           vertexBufferCount,
-    bool          geomChanged,
-    bool          topoChanged,
-    bool          useMayaNormals,
-    _StreamDirty& dirty)
+    const StreamPresence& present,
+    bool                   geomChanged,
+    bool                   topoChanged,
+    bool                   useMayaNormals,
+    _StreamDirty&          dirty)
 {
     // A stream published earlier but absent from this geometry must be
     // withdrawn. VP2 can release a hidden item's buffers (a display-mode
@@ -687,26 +734,9 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
     // naming a GL buffer VP2 no longer guarantees, and Storm copies from or
     // draws through whatever that name now is.
     if (geomChanged || topoChanged) {
-        bool hasPositions = false;
-        bool hasNormals = false;
-        bool hasUvs = false;
-        bool hasTangents = false;
-        for (int vbIdx = 0; vbIdx < vertexBufferCount; vbIdx++) {
-            MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
-            if (!mvb) {
-                continue;
-            }
-            switch (mvb->descriptor().semantic()) {
-            case MGeometry::Semantic::kPosition: hasPositions = true; break;
-            case MGeometry::Semantic::kNormal: hasNormals = true; break;
-            case MGeometry::Semantic::kTexture: hasUvs = true; break;
-            case MGeometry::Semantic::kTangent: hasTangents = true; break;
-            default: break;
-            }
-        }
-        auto withdraw = [this](_ExtStream& stream, bool present, bool& streamDirty,
+        auto withdraw = [this](_ExtStream& stream, bool isPresent, bool& streamDirty,
                                const char* name) {
-            if (!stream || present) {
+            if (!stream || isPresent) {
                 return;
             }
             TF_DEBUG_GPU_BUFFER_SHARING(
@@ -716,10 +746,10 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
             stream = {};
             streamDirty = true;
         };
-        withdraw(_extPositions, hasPositions, dirty.positions, "position");
-        withdraw(_extNormals, hasNormals, dirty.normals, "normal");
-        withdraw(_extUvs, hasUvs, dirty.uvs, "texture");
-        withdraw(_extTangents, hasTangents, dirty.tangents, "tangent");
+        withdraw(_extPositions, present.positions, dirty.positions, "position");
+        withdraw(_extNormals, present.normals, dirty.normals, "normal");
+        withdraw(_extUvs, present.uvs, dirty.uvs, "texture");
+        withdraw(_extTangents, present.tangents, dirty.tangents, "tangent");
     }
 
     // Streams read on this update are already dirty. A stream VP2 did not supply has nothing
@@ -750,6 +780,7 @@ MayaHydraGpuRenderItemAdapter::_ExtPublishResult
 MayaHydraGpuRenderItemAdapter::_PublishExtStream(
     MHWRender::MVertexBuffer *mvb,
     _ExtStream               &stream,
+    const TfToken            &key,
     bool                      allowDirectBind)
 {
     MH_PROFILE_FUNCTION();
@@ -786,6 +817,17 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
             GetID().GetText(), _ExtStreamName(mvb),
             int(mvb->descriptor().dataType()),
             mvb->descriptor().dimension());
+        return _ExtPublishResult::NoGpu;
+    }
+    // Shared only when Hydra can read the stream as-is: a consumer binds it with Hydra's
+    // element type, and the lazy CPU readback decodes it as that type. Anything else (e.g.
+    // 4-component tangents) is read on the CPU, which keeps only the components Hydra expects.
+    const HdType hydraType = _HydraCpuType(key);
+    if (layout.elementType.type != hydraType) {
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] %s -> CPU: VP2 element type %d does not match Hydra's %d for %s\n",
+            GetID().GetText(), _ExtStreamName(mvb), int(layout.elementType.type),
+            int(hydraType), key.GetText());
         return _ExtPublishResult::NoGpu;
     }
 
@@ -952,10 +994,17 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
 HdContainerDataSourceHandle
 MayaHydraGpuRenderItemAdapter::GetExtGpuBufferSchema(const TfToken& key) const
 {
-    if (key == HdTokens->points)                 { return _extPositions.schema; }
-    if (key == HdTokens->normals)                { return _extNormals.schema; }
-    if (key == MayaHydraAdapterTokens->tangents) { return _extTangents.schema; }
-    if (key == MayaHydraAdapterTokens->st)       { return _extUvs.schema; }
+    const _ExtStream* stream = _ExtStreamFor(key);
+    return stream ? stream->schema : nullptr;
+}
+
+const MayaHydraGpuRenderItemAdapter::_ExtStream*
+MayaHydraGpuRenderItemAdapter::_ExtStreamFor(const TfToken& key) const
+{
+    if (key == HdTokens->points)                 { return &_extPositions; }
+    if (key == HdTokens->normals)                { return &_extNormals; }
+    if (key == MayaHydraAdapterTokens->tangents) { return &_extTangents; }
+    if (key == MayaHydraAdapterTokens->st)       { return &_extUvs; }
     return nullptr;
 }
 
@@ -1045,19 +1094,13 @@ MayaHydraGpuRenderItemAdapter::GetExtGpuBufferLazyValue(const TfToken& key) cons
             });
     };
 
-    if (key == HdTokens->points) {
-        return readStream(_extPositions, GfVec3f());
+    const _ExtStream* stream = _ExtStreamFor(key);
+    if (!stream) {
+        return {};
     }
-    if (key == HdTokens->normals) {
-        return readStream(_extNormals, GfVec3f());
-    }
-    if (key == MayaHydraAdapterTokens->tangents) {
-        return readStream(_extTangents, GfVec3f());
-    }
-    if (key == MayaHydraAdapterTokens->st) {
-        return readStream(_extUvs, GfVec2f());
-    }
-    return {};
+    return _WithHydraCpuElement<VtValue>(key, [&readStream, stream](auto elementType) {
+        return readStream(*stream, elementType);
+    });
 }
 
 ///////////////////////////////////////////////////////////////////////
