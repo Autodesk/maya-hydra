@@ -43,6 +43,7 @@ target_sources(${TARGET_NAME}
         testCameraPrimvars.cpp
         testMeshPrimvars.cpp
         testDirtyLocators.cpp
+        testRenderItemPrimvars.cpp
         testRenderItemTopologyUtil.cpp
         testMeshGeomSubsets.cpp
         testFlowViewportAPIFilterPrims.cpp
