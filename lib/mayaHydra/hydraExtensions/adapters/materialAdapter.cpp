@@ -23,6 +23,7 @@
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/stl.h>
@@ -42,6 +43,7 @@
 #include <pxr/usdImaging/usdImaging/materialParamUtils.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
+#include <maya/MFnAttribute.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
@@ -188,12 +190,7 @@ public:
         _CacheNodeAndTypes();
     }
 
-    ~MayaHydraShadingEngineAdapter() override
-    {
-        if (_surfaceShaderCallback != 0) {
-            MNodeMessage::removeCallback(_surfaceShaderCallback);
-        }
-    }
+    ~MayaHydraShadingEngineAdapter() override { _RemoveSurfaceShaderCallbacks(); }
 
     void CreateCallbacks() override
     {
@@ -256,11 +253,37 @@ private:
             adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
             return;
         }
-        {
-            MayaHydra::DirtyNotifier(adapter).dirtyMaterial();
+        adapter->_DirtySurfaceShaderMaterial();
+    }
+    // Interactive edits (e.g. dragging an Attribute Editor slider) only send node-dirty until the
+    // drag ends, so value changes must be picked up here to reach the frames Maya draws during
+    // the drag. Upstream changes (e.g. a texture node feeding baseColor) also land here.
+    static void _ShaderPlugDirtyCallback(MObject& node, MPlug& plug, void* clientData)
+    {
+        TF_UNUSED(node);
+        auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
+        if (MayaHydraAdapter::ShouldSkipHydraUpdates(adapter->GetMayaHydraSceneIndex())) {
+            return;
         }
-        if (adapter->GetMayaHydraSceneIndex()->IsHdSt()) {
-            adapter->GetMayaHydraSceneIndex()->MaterialTagChanged(adapter->GetID());
+        const MPlug topPlug = MayaHydra::GetTopPlug(plug);
+        // Dirty propagation also reaches the shader outputs (e.g. outColor); one input change
+        // must dirty once.
+        if (!MFnAttribute(topPlug.attribute()).isWritable()) {
+            return;
+        }
+        // Extension and dynamic attributes are not part of the material network, only primvars.
+        if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(topPlug)) {
+            adapter->MaybeMarkPrimvarDirtyForAttributeChange(topPlug);
+            return;
+        }
+        adapter->_DirtySurfaceShaderMaterial();
+    }
+
+    void _DirtySurfaceShaderMaterial()
+    {
+        MayaHydra::DirtyNotifier(this).dirtyMaterial();
+        if (GetMayaHydraSceneIndex()->IsHdSt()) {
+            GetMayaHydraSceneIndex()->MaterialTagChanged(GetID());
         }
     }
 
@@ -304,13 +327,22 @@ private:
         }
     }
 
-    void _CreateSurfaceMaterialCallback()
+    void _RemoveSurfaceShaderCallbacks()
     {
-        _CacheNodeAndTypes();
         if (_surfaceShaderCallback != 0) {
             MNodeMessage::removeCallback(_surfaceShaderCallback);
             _surfaceShaderCallback = 0;
         }
+        if (_surfaceShaderDirtyCallback != 0) {
+            MNodeMessage::removeCallback(_surfaceShaderDirtyCallback);
+            _surfaceShaderDirtyCallback = 0;
+        }
+    }
+
+    void _CreateSurfaceMaterialCallback()
+    {
+        _CacheNodeAndTypes();
+        _RemoveSurfaceShaderCallbacks();
 
         if (_surfaceShader != MObject::kNullObj) {
             MStatus status;
@@ -318,6 +350,11 @@ private:
                 _surfaceShader, _ShaderAttributeChangedCallback, this, &status);
             if (!status) {
                 _surfaceShaderCallback = 0;
+            }
+            _surfaceShaderDirtyCallback = MNodeMessage::addNodeDirtyPlugCallback(
+                _surfaceShader, _ShaderPlugDirtyCallback, this, &status);
+            if (!status) {
+                _surfaceShaderDirtyCallback = 0;
             }
         }
     }
@@ -569,6 +606,7 @@ private:
     // So they live long enough
 
     MCallbackId _surfaceShaderCallback;
+    MCallbackId _surfaceShaderDirtyCallback { 0 };
 #ifdef MAYAHYDRALIB_OIT_ENABLED
     bool _isTranslucent = false;
 #endif
