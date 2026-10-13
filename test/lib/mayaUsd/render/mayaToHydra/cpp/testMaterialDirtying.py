@@ -42,7 +42,7 @@ class TestMaterialDirtying(mtohUtils.MayaHydraBaseTestCase):
 
     # What: a node-dirty on the shader color, without an attribute-changed message, should
     #       dirty the material (Attribute Editor slider drag).
-    # How: setup the scene, then run the C++ test that dgdirties the color and checks notices.
+    # How: setup the scene, then run the C++ test that changes a node driving the color and checks notices.
     # Expect: the shading group material prim gets a material-locator dirty.
     def test_shaderNodeDirtyDirtiesMaterial(self):
         self.setupScene()
