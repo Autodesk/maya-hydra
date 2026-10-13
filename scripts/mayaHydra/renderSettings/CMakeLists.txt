@@ -7,6 +7,7 @@ set(PYTHON_FILES
     output.py
     renderProducts.py
     resolution.py
+    sessionLayer.py
     utils.py
 )
 

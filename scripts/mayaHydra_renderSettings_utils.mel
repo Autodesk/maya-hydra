@@ -85,3 +85,14 @@ global proc mayaHydraSceneDumpSceneIndex(string $hydraSceneDumpSceneIndex)
 {
     python("import mayaHydra.renderSettings.debug as mhDebug; mhDebug.setHydraSceneDumpSceneIndex(" + "\"" + $hydraSceneDumpSceneIndex + "\")");
 }
+
+global proc mayaHydraSetSessionLayer(string $sessionLayerPath)
+{
+    // Use Python raw string to support Windows path backslashes.
+    python("import mayaHydra.renderSettings.sessionLayer as mhSessionLayer; mhSessionLayer.setSessionLayer(" + "r\"" + $sessionLayerPath + "\")");
+}
+
+global proc mayaHydraSetSessionLayerStage(string $stagePath)
+{
+    python("import mayaHydra.renderSettings.sessionLayer as mhSessionLayer; mhSessionLayer.setSessionLayerStage(" + "\"" + $stagePath + "\")");
+}

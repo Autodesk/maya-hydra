@@ -16,6 +16,10 @@
 
 #include <pxr/imaging/hd/sceneGlobalsSchema.h>
 
+#include <mayaHydraLib/mayaUtils.h>
+#include <ufeExtensions/Global.h>
+
+#include <ufe/pathSegment.h>
 #include <ufe/pathString.h>
 
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
@@ -75,8 +79,9 @@ SdfPath _GetSceneIndexPath(const char* usdPrimPath)
 
 SdfPath _GetDefaultRenderSettingsPath()
 {
-    const Ufe::Path appPath
-        = Ufe::PathString::path("UsdDefaultRenderDescription,/Render/SceneRenderSettings");
+    const Ufe::Path appPath = MayaHydra::UsdDefaultRenderDescriptionNodePath()
+        + Ufe::PathSegment(
+            "/Render/SceneRenderSettings", UfeExtensions::getUsdRunTimeId(), '/');
     const SdfPath result = Fvp::sceneIndexPath(appPath);
     EXPECT_FALSE(result.IsEmpty());
     return result;

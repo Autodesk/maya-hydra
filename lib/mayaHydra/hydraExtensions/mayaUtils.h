@@ -23,15 +23,41 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MObject.h>
 #include <maya/MPlug.h>
+#include <maya/MString.h>
+#include <maya/MTypeId.h>
 #include <maya/MTypes.h>
+
+#include <ufe/ufe.h>
 
 #include <string>
 #include <string_view>
 #include <vector>
 
+namespace UFE_VERSIONED_NS {
+class Path;
+}
+
 namespace MAYAHYDRA_NS_DEF {
 
 inline constexpr std::string_view kUsdDefaultRenderDescriptionNodeName = "UsdDefaultRenderDescription";
+
+//! Short-hand for kUsdDefaultRenderDescriptionNodeName as an MString.
+MAYAHYDRALIB_API
+const MString& rdNodeName();
+
+//! Maya type id of the mayaUsd proxy shape node, hardcoded to match
+//! MayaUsd::MAYAUSD_PROXYSHAPE_ID, which maya-usd does not export.
+inline const MTypeId kMayaUsdProxyShapeId(0x58000095);
+
+/**
+ * @brief UFE path to the UsdDefaultRenderDescription node.
+ *
+ * UsdDefaultRenderDescription is a DG node, so the path is a single segment
+ * holding a single component, with '\0' as its path component separator,
+ * which UFE interprets as "no separator".
+ */
+MAYAHYDRALIB_API
+const Ufe::Path& UsdDefaultRenderDescriptionNodePath();
 
 // Names of color tables for indexed colors
 const std::string kActiveColorTableName = "active";
@@ -76,6 +102,16 @@ MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath);
  */
 MAYAHYDRALIB_API
 MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNode);
+
+/**
+ * @brief Get a node from the Maya dependency graph using its name
+ *
+ * @param[in] nodeName is the name of the node to get.
+ *
+ * @return The node in the Maya dependency graph, or a null MObject if the node was not found.
+ */
+MAYAHYDRALIB_API
+MObject GetDependNodeFromNodeName(const MString& nodeName);
 
 /**
  * @brief Get a plug from a dependency node using its name and attribute name.

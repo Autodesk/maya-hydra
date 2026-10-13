@@ -66,6 +66,7 @@ target_sources(${TARGET_NAME}
         testCustomAttributes.cpp
         testCustomAttributeTypes.cpp
         testMaterialBlocking.cpp
+        testMaterialDirtying.cpp
         testPassFiltering.cpp
         testLegacyHighlightPassRouting.cpp
         testDeferredHighlightWireInit.cpp

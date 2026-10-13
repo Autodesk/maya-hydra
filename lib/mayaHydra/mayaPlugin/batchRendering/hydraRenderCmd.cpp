@@ -17,48 +17,33 @@
 
 #include "pluginUtils.h"
 #include "renderSettingsUtils.h"
-#include "renderVarUtils.h"
 #include "pluginDebugCodes.h"
 #include "batchRenderer.h"
 
+#include <mayaHydraLib/mayaUtils.h>
+
 #include <ufeExtensions/Global.h>
 
-#include <flowViewport/imageWriter/fvpImageBufferWriter.h>
+#include <mayaUsdAPI/proxyStage.h>
 
 #include <maya/MArgDatabase.h>
 #include <maya/MAnimControl.h>
-#include <maya/MGlobal.h>
+#include <maya/MDagPath.h>
 #include <maya/MSyntax.h>
 #include <maya/MTime.h>
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/diagnostic.h>
-#include <pxr/base/tf/scoped.h>
 #include <pxr/imaging/glf/diagnostic.h> // For GlfRegisterDefaultDebugOutputMessageCallback()
 #include <pxr/imaging/garch/glApi.h>
 #include <pxr/imaging/garch/glDebugWindow.h>
-#include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
-#include <pxr/usd/usdRender/settings.h>
-#include <pxr/usd/usdRender/product.h>
-#include <pxr/usd/usdRender/var.h>
-#include <pxr/usd/usdRender/tokens.h>
-#include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/sdf/layer.h>
-#include <pxr/base/gf/frustum.h>
-#include <pxr/base/vt/value.h>
 
+#include <ufe/path.h>
 #include <ufe/pathString.h>
-#include <ufe/sceneSegmentHandler.h>
-#include <ufe/sceneItemList.h>
-#include <ufe/runTimeMgr.h>
 
-#include <mayaUsdAPI/proxyStage.h>
-#include <mayaUsdAPI/utils.h>
-
-#include <algorithm>
-#include <filesystem>
-#include <vector>
+#include <string>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -91,7 +76,7 @@ constexpr auto _layerLong = "-layer";
 constexpr auto _gpuEnabledFlag = "-gpu";
 constexpr auto _gpuEnabledFlagLong = "-gpuEnabled";
 
-using namespace MAYAHYDRA_NS_DEF;
+using namespace MayaHydra;
 
 constexpr auto _helpText = R"HELP(For details on args usage please see 
 https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
@@ -119,6 +104,80 @@ bool validRenderer(const TfToken& rendererName)
 
     HfPluginDesc pluginDesc;
     return HdRendererPluginRegistry::GetInstance().GetPluginDesc(rendererName, &pluginDesc);
+}
+
+// The presence of session layer dynamic attributes on the
+// UsdDefaultRenderDescription node indicates use of a -sessionLayer or
+// -sessionLayerStage argument to the Render executable.
+std::string getSessionLayerString(std::string_view s)
+{
+    MPlug plug;
+    if (!GetPlug(rdNodeName(), s.data(), plug)) {
+        return {};
+    }
+
+    return std::string(plug.asString().asChar());
+}
+
+std::string getSessionLayer()
+{
+    return getSessionLayerString("sessionLayer");
+}
+
+Ufe::Path getSessionLayerStage()
+{
+    return Ufe::PathString::path(getSessionLayerString("sessionLayerStage"));
+}
+
+bool applySessionLayer(
+    const std::string& sessionLayer,
+    const Ufe::Path&   sessionLayerStagePath
+)
+{
+    auto layer = SdfLayer::FindOrOpen(sessionLayer);
+    if (!layer) {
+        TF_WARN("applySessionLayer: could not open session layer file '%s'.",
+                sessionLayer.c_str());
+        return false;
+    }
+
+    MObject nodeObj = (sessionLayerStagePath == UsdDefaultRenderDescriptionNodePath())
+        // Stage from UsdDefaultRenderDescriptionNode.
+        ? GetDependNodeFromNodeName(rdNodeName())
+        : [&sessionLayerStagePath]() {
+            // Stage from MayaUsdProxyShape node.
+            MDagPath dagPath = UfeExtensions::ufeToDagPath(sessionLayerStagePath);
+            if (!dagPath.isValid()) {
+                return MObject();
+            }
+
+            // The path may name the proxy shape's parent transform.
+            dagPath.extendToShape();
+
+            MObject nodeObj = dagPath.node();
+            return (kMayaUsdProxyShapeId == MFnDependencyNode(nodeObj).typeId()) ? nodeObj : MObject();
+        }();
+
+    if (nodeObj.isNull()) {
+        TF_WARN("'%s' is not a valid path to a USD stage.",
+                Ufe::PathString::string(sessionLayerStagePath).c_str());
+        return false;
+    }
+
+    const auto stage = MayaUsdAPI::ProxyStage(nodeObj).getUsdStage();
+
+    if (!stage) {
+        TF_WARN("applySessionLayer: could not open the stage at '%s'.",
+                Ufe::PathString::string(sessionLayerStagePath).c_str());
+        return false;
+    }
+
+    // Copy the contents of the argument session layer into the stage's
+    // session layer.
+    auto stageSessionLayer = stage->GetSessionLayer();
+    stageSessionLayer->TransferContent(layer);
+
+    return true;
 }
 
 } // namespace
@@ -158,6 +217,13 @@ const MString HydraRenderCmd::name("hydraRender");
 //======================================================================
 // CLASS HydraRenderCmd 
 //======================================================================
+
+void HydraRenderCmd::displayError(std::string_view error)
+{
+    MPxCommand::displayError(
+        name + ": " + MString(error.data(), static_cast<int>(error.size())),
+        /* showLineNumber = */ true);
+}
 
 MSyntax HydraRenderCmd::createSyntax()
 {
@@ -248,12 +314,11 @@ bool HydraRenderCmd::hydraRender()
         return hydraRenderFromHydraV2RenderSettings();
     }
 
-    displayError(
-        MString("Batch rendering requires USD render settings (with at least one render "
-                 "product) or a render-delegate-owned render pass. No usable USD render "
-                 "settings were found, and render delegate '")
-            + _batchRenderer->GetRendererName().GetText() + "' does not drive the render pass.",
-        true);
+    displayError(std::string("Batch rendering requires USD render settings (with at least one "
+                             "render product) or a render-delegate-owned render pass. No usable "
+                             "USD render settings were found, and render delegate '")
+                 + _batchRenderer->GetRendererName().GetText()
+                 + "' does not drive the render pass.");
     return false;
 }
 
@@ -277,9 +342,7 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
 
         rendererName = TfToken(rn.asChar());
         if (rendererName.IsEmpty()) {
-            displayError(
-                "hydraRender: the -renderer/-r flag was set to an empty renderer name.",
-                true);
+            displayError("the -renderer/-r flag was set to an empty renderer name.");
             return MS::kFailure;
         }
     }
@@ -287,10 +350,8 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
         // Get renderer from the scene.
         rendererName = GetCurrentRenderer();
         if (rendererName.IsEmpty()) {
-            displayError(
-                "hydraRender: no renderer specified. Pass -renderer/-r, or author the "
-                "currentRenderer attribute on the USD render-description node.",
-                true);
+            displayError("no renderer specified. Pass -renderer/-r, or author the "
+                         "currentRenderer attribute on the USD render-description node.");
             return MS::kFailure;
         }
     }
@@ -298,15 +359,30 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
     // Validate the renderer
     if (!validRenderer(rendererName)) {
         displayError(
-            MString("hydraRender: \"") + rendererName.GetText()
-                + "\" is not a registered Hydra renderer. Pass a valid -renderer/-r, or "
-                  "author the currentRenderer attribute on UsdDefaultRenderDescription.",
-            true);
+            std::string("\"") + rendererName.GetText()
+            + "\" is not a registered Hydra renderer. Pass a valid -renderer/-r, or "
+              "author the currentRenderer attribute on UsdDefaultRenderDescription.");
         return MS::kFailure;
     }
 
     if (db.isFlagSet(_gpuEnabledFlag)) {
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_gpuEnabledFlag, 0, _gpuEnabled));
+    }
+
+    // Check if we were asked to add a session layer onto a stage.  If
+    // no explicit sessionLayerStage argument was given to the Render
+    // executable, use the UsdDefaultRenderDescription stage.
+    const auto sessionLayer = getSessionLayer();
+    if (!sessionLayer.empty()) {
+        auto sessionLayerStagePath = getSessionLayerStage();
+        if (sessionLayerStagePath.empty()) {
+            sessionLayerStagePath = UsdDefaultRenderDescriptionNodePath();
+        }
+        if (!applySessionLayer(sessionLayer, sessionLayerStagePath)) {
+            displayError(
+                std::string("failed to apply session layer \"") + sessionLayer + "\".");
+            return MS::kFailure;
+        }
     }
 
     // Create the batch renderer.  The second and third arguments of
