@@ -20,6 +20,7 @@
 #include "envSettings.h"
 
 #include <mayaHydraLib/mayaUtils.h>
+#include <ufeExtensions/Global.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <mayaUsdAPI/utils.h>
@@ -28,6 +29,7 @@
 #include <maya/MRenderUtil.h>
 #include <maya/MTime.h>
 
+#include <ufe/pathSegment.h>
 #include <ufe/pathString.h>
 
 #include <pxr/base/gf/vec2d.h>
@@ -85,7 +87,7 @@ MPlug _GetUsdDefaultRenderDescriptionPlug(const char* attrName)
 {
     MPlug plug;
     if (!TF_VERIFY(
-            GetPlug(kUsdDefaultRenderDescriptionNodeName.data(), attrName, plug),
+            GetPlug(rdNodeName(), attrName, plug),
             "Could not find %s node or %s attribute.",
             kUsdDefaultRenderDescriptionNodeName.data(),
             attrName)) {
@@ -233,9 +235,9 @@ TfToken GetCurrentRenderer()
 
 Ufe::Path GetDefaultRenderSettingsAppPath()
 {
-    constexpr const char* rsPrimPath = "/Render/SceneRenderSettings";
-    return Ufe::PathString::path(
-        std::string(kUsdDefaultRenderDescriptionNodeName) + "," + rsPrimPath);
+    return UsdDefaultRenderDescriptionNodePath()
+        + Ufe::PathSegment(
+            "/Render/SceneRenderSettings", UfeExtensions::getUsdRunTimeId(), '/');
 }
 
 Ufe::Path GetActiveRenderSettingsAppPath()

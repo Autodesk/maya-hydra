@@ -50,12 +50,6 @@ namespace {
 
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
 
-// UFE path to the USD default render description node (a UFE path of a single
-// segment with a single component, the name of the DG node).
-const Ufe::Path usdDefaultRenderDescriptionNodePath(Ufe::PathSegment(
-    Ufe::PathComponent(std::string(MayaHydra::kUsdDefaultRenderDescriptionNodeName)),
-    UfeExtensions::getMayaRunTimeId(), '\0'));
-
 } // namespace
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -111,15 +105,13 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
     _AfterOpenCBId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, _AfterOpenCallback, this, &status);
     TF_VERIFY(status == MS::kSuccess, "MSceneMessage::kAfterOpen callback registration failed.");
 
-    static const MTypeId MAYAUSD_PROXYSHAPE_ID(0x58000095); //Hardcoded
-        
     // Iterate over scene to find out existing node which will miss eventual dagNode added callbacks
     MItDag nodesDagIt(MItDag::kDepthFirst, MFn::kInvalid);
     for (; !nodesDagIt.isDone(); nodesDagIt.next()) {
         MObject dagNode(nodesDagIt.currentItem(&status));
         //Act only on MayaUsdProxyShapeBase nodes
         MFnDependencyNode  dep(dagNode);
-        if (MAYAUSD_PROXYSHAPE_ID != dep.typeId()) {
+        if (kMayaUsdProxyShapeId != dep.typeId()) {
             continue; 
         }
         
@@ -370,7 +362,7 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
     }
 
     MObject nodeObj;
-    if (!GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj)) {
+    if (!GetDependNodeFromNodeName(rdNodeName(), nodeObj)) {
         return;
     }
 
@@ -419,9 +411,9 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
     // Hydra path mapping for the USD default render description is done
     // through a simple prefix path mapper.
     auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(
-        usdDefaultRenderDescriptionNodePath, prefix);
+        UsdDefaultRenderDescriptionNodePath(), prefix);
     Fvp::PathMapperRegistry::Instance().Register(
-        usdDefaultRenderDescriptionNodePath, pathMapper);
+        UsdDefaultRenderDescriptionNodePath(), pathMapper);
 }
 
 void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderDescriptionNode()
@@ -431,7 +423,7 @@ void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderDescriptionNode()
     }
 
     Fvp::PathMapperRegistry::Instance().Unregister(
-        usdDefaultRenderDescriptionNodePath);
+        UsdDefaultRenderDescriptionNodePath());
 
     Fvp::DataProducerSceneIndexInterface::get()
         .removeDataProducerSceneIndex(
