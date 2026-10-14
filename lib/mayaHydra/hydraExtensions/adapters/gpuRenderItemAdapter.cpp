@@ -909,15 +909,24 @@ MayaHydraGpuRenderItemAdapter::_PublishExtStream(
     const bool needsNewBuffer = !buffer
         || (sourceIdentityMatters
                 ? (stream.rawHandle != rawHandle
-                   || stream.numElements != layout.numElements)
+                   || stream.numElements != layout.numElements
+                   // The stride is recorded on the shared buffer's descriptor.
+                   || stream.byteStride != layout.byteStride
+                   || stream.tupleType != layout.elementType)
                 // The copying bridge sized its allocation from the layout, so
                 // any layout change outgrows it.
                 : !layoutMatches);
     if (needsNewBuffer) {
+        // A tightly packed stream publishes a zero byteStride; the buffer needs
+        // the real stride, since HgiGL binds vertex input with it.
+        const size_t vertexStride = layout.byteStride > 0
+            ? layout.byteStride
+            : HdDataSizeOfTupleType(layout.elementType);
         buffer = bridge.Create(
             static_cast<uint32_t>(rawHandle),
             layout.byteSize,
             layout.copyByteSize,
+            static_cast<uint32_t>(vertexStride),
             _ExtStreamName(mvb));
         if (!buffer) {
             TF_DEBUG_GPU_BUFFER_SHARING(
