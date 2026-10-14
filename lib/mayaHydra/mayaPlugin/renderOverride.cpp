@@ -829,6 +829,7 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
     , _colorPreferencesObserver(std::make_shared<ColorPreferencesObserver>(*this))
     , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
+    , _isUsingHdFlash(desc.rendererName == MtohTokens->HdFlashRendererPlugin)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg(
@@ -1013,13 +1014,14 @@ void MtohRenderOverride::UpdateRenderGlobals(
     else {
         // mayaHydraSelectionHighlightMode and mayaHydraForceDisableSelectionHighlight are consumed
         // at resource-init time, so changing either flags a clear and reinitialize on the next
-        // render. The mode only matters for Storm; force-disable affects every renderer.
+        // render. The mode only matters for the renderers that support the outline; force-disable
+        // affects every renderer.
         if (attrName.GetString().find("SelectionHighlight") != std::string::npos) {
-            const bool stormOnly
+            const bool outlineRenderersOnly
                 = attrName.GetString().find("SelectionHighlightMode") != std::string::npos;
             std::lock_guard<std::mutex> lock(_allInstancesMutex);
             for (auto* instance : _allInstances) {
-                if (!stormOnly || instance->_isUsingHdSt) {
+                if (!outlineRenderersOnly || instance->_RendererSupportsOutline()) {
                     instance->_needsClear = true;
                 }
             }
@@ -2148,7 +2150,9 @@ MStatus MtohRenderOverride::Render(
         if (_mayaHydraSceneIndex) {
             _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
         }
+    }
 
+    if (_RendererSupportsOutline()) {
         // Tested before each exchange() so that dirty flags are kept, not consumed, while there is
         // no outline to push them to.
         const bool outlineLive = _outlineManager && _selection;
@@ -2252,7 +2256,9 @@ MStatus MtohRenderOverride::Render(
             _outlineManager->SetInputs(std::move(inputs));
             _pushedOutlineHover = wantedHover;
         }
+    }
 
+    if (_isUsingHdSt) {
 #ifndef MAYAHYDRALIB_OIT_ENABLED
         // This is required for HdStorm to display transparency.
         // We should fix this upstream, so HdStorm can setup
@@ -2282,9 +2288,14 @@ MtohRenderOverride* MtohRenderOverride::GetByName(TfToken rendererName)
     return nullptr;
 }
 
+bool MtohRenderOverride::_RendererSupportsOutline() const
+{
+    return _isUsingHdSt || _isUsingHdFlash;
+}
+
 bool MtohRenderOverride::_UseOutlineSelectionHighlighting() const
 {
-    return _isUsingHdSt && _globals.outlineSelectionHighlight
+    return _RendererSupportsOutline() && _globals.outlineSelectionHighlight
         && !_globals.forceDisableSelectionHighlight;
 }
 
@@ -2313,14 +2324,17 @@ bool MtohRenderOverride::_AnyPanelDrawsWireframes(
 bool MtohRenderOverride::_HitTestEnabled() const
 {
     // Hover needs the pick. mayaHydraForceEnableInteractiveHitTest (script-only, off by default)
-    // runs the pick without drawing hover, for profiling.
+    // runs the pick without drawing hover, for profiling. Storm only until hover supports Flash.
     return _OutlineHoverHighlightingEnabled()
-        || (_globals.forceEnableInteractiveHitTest && _UseOutlineSelectionHighlighting());
+        || (_isUsingHdSt && _globals.forceEnableInteractiveHitTest
+            && _UseOutlineSelectionHighlighting());
 }
 
 bool MtohRenderOverride::_OutlineHoverHighlightingEnabled() const
 {
-    return _globals.outlineHoverHighlighting && _UseOutlineSelectionHighlighting();
+    // Storm only until hover supports Flash.
+    return _isUsingHdSt && _globals.outlineHoverHighlighting
+        && _UseOutlineSelectionHighlighting();
 }
 
 MtohRenderOverride::HoverState* MtohRenderOverride::_GetHoverState(const std::string& panelName)
@@ -2535,6 +2549,17 @@ HVT_NS::Outline::OutlineStyle MtohRenderOverride::_BuildOutlineStyle() const
     // Set explicitly rather than relying on the toolbox default.
     style.enableDefaultOutlines = _globals.enableDefaultOutlines;
 
+    // Debug only: MAYAHYDRA_OUTLINE_VISUALIZATION=primIds | depth | mask5x5 shows an outline
+    // buffer instead of the outline. Read once per session.
+    static const std::string visualization = TfGetenv("MAYAHYDRA_OUTLINE_VISUALIZATION");
+    if (visualization == "primIds") {
+        style.maskVisualizationMode = HVT_NS::Outline::VisualizationMode::VISUALIZE_PRIM_IDS;
+    } else if (visualization == "depth") {
+        style.maskVisualizationMode = HVT_NS::Outline::VisualizationMode::VISUALIZE_DEPTH;
+    } else if (visualization == "mask5x5") {
+        style.maskVisualizationMode = HVT_NS::Outline::VisualizationMode::VISUALIZE_MASK_5x5;
+    }
+
     // The colors above are fallbacks. Colors with a Maya preference equivalent are replaced in
     // full, alpha included.
     Fvp::ColorPreferences& colorPrefs = Fvp::ColorPreferences::getInstance();
@@ -2634,25 +2659,25 @@ void MtohRenderOverride::_InitHydraResources(
             getLayerSettings,
             firstRenderTaskPath,
             hvt::TaskManager::InsertionOrder::insertBefore);
+    }
 
-        // Install the outline on the main Storm pass (pass 0), whose render index contains all
-        // scene geometry. The secondary graphics pass (pass 1) cannot render prim IDs for USD
-        // prims.
-        {
-            constexpr int outlinePassIndex = 0;
-            const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
-            if (outlinePass && _UseOutlineSelectionHighlighting()) {
-                // Insert before colorCorrectionTask so the outline is drawn before PresentTask.
-                const SdfPath ccPath =
-                    outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
-                _outlineManager = std::make_unique<HVT_NS::Outline::OutlineManager>();
-                _outlineManager->Install(*outlinePass,
-                    ccPath,
-                    hvt::TaskManager::InsertionOrder::insertBefore);
-                _outlineManager->SetStyle(_BuildOutlineStyle());
-                // Push the current selection on the next Render.
-                _outlineInputsDirty = true;
-            }
+    // Install the outline on the main pass (pass 0, Storm or Flash), whose render index contains
+    // all scene geometry. The secondary graphics pass (pass 1, Storm, when there are two passes)
+    // cannot render prim IDs for USD prims.
+    if (_UseOutlineSelectionHighlighting()) {
+        constexpr int outlinePassIndex = 0;
+        const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
+        if (outlinePass) {
+            // Insert before colorCorrectionTask so the outline is drawn before PresentTask.
+            const SdfPath ccPath =
+                outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
+            _outlineManager = std::make_unique<HVT_NS::Outline::OutlineManager>();
+            _outlineManager->Install(*outlinePass,
+                ccPath,
+                hvt::TaskManager::InsertionOrder::insertBefore);
+            _outlineManager->SetStyle(_BuildOutlineStyle());
+            // Push the current selection on the next Render.
+            _outlineInputsDirty = true;
         }
     }
 

@@ -788,7 +788,10 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                         // Attribute name
            << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
            << ", $fromAE);\n";
-
+    }
+    // The renderers that support the outline (see MtohRenderOverride::_RendererSupportsOutline()).
+    if (rendererDesc.rendererName == MtohTokens->HdStormRendererPlugin
+        || rendererDesc.rendererName == MtohTokens->HdFlashRendererPlugin) {
         // Dropdown: Outline Selection / Legacy Selection.
         ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
            << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
@@ -796,7 +799,8 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                          // Attribute name
            << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
            << ", $fromAE);\n";
-
+    }
+    if (rendererDesc.rendererName == MtohTokens->HdStormRendererPlugin) {
         // Checkbox, shown only where hover can work: it needs Qt for the cursor position
         // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
         // everywhere, so scenes saved on a capable build load on any build.
