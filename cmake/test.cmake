@@ -719,7 +719,8 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "TMP=${MAYA_APP_TEMP_DIR}"
         "TEMP=${MAYA_APP_TEMP_DIR}"
-        "MAYA_APP_DIR=${MAYA_APP_TEMP_DIR}")
+        "MAYA_APP_DIR=${MAYA_APP_TEMP_DIR}"
+        "MAYA_PROJECTS_DIR=${MAYA_APP_TEMP_DIR}/projects")
     file(MAKE_DIRECTORY ${MAYA_APP_TEMP_DIR})
 
     # Set the Python major version in MAYA_PYTHON_VERSION. Maya 2020 and
