@@ -722,6 +722,13 @@ function(_mayaHydra_setup_test_finalize_env test_name)
         "MAYA_APP_DIR=${MAYA_APP_TEMP_DIR}")
     file(MAKE_DIRECTORY ${MAYA_APP_TEMP_DIR})
 
+    # On macOS, and contrary to documentation as of 2026-10-16, Maya does not derive
+    # the projects root from MAYA_APP_DIR, so MAYA_PROJECTS_DIR must be used.
+    if(IS_MACOSX)
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "MAYA_PROJECTS_DIR=${MAYA_APP_TEMP_DIR}/projects")
+    endif()
+
     # Set the Python major version in MAYA_PYTHON_VERSION. Maya 2020 and
     # earlier that are Python 2 only will simply ignore it.
     # without "MAYA_NO_STANDALONE_ATEXIT=1", standalone.uninitialize() will
