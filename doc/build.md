@@ -69,7 +69,11 @@ The external HVT package must be:
 * API compatible with the HVT commit that the `lib/hydra-viewport-toolbox` submodule points to.
 * built from HVT commit `3620c19` or later, so that its installed `hvtConfig.cmake` works with `find_package(hvt)`.
 
-maya-hydra copies the package's shader resources (`include/hvt/resources`) into its own install, but it does not install the HVT runtime library. Make the HVT library findable at run time yourself, for example by adding its `bin` directory to `PATH` on Windows, or its `lib` directory to `LD_LIBRARY_PATH` on Linux. For the unit tests, this must already be the case when you run CMake, because the test environment captures `PATH` at configure time.
+maya-hydra copies the package's shader resources (`include/hvt/resources`) into its own install, but it does not install the HVT runtime library. Make the HVT library findable at run time yourself, for example by adding its `bin` directory to `PATH` on Windows, or its `lib` directory to `LD_LIBRARY_PATH` on Linux.
+
+For the unit tests, the HVT library path must be set up before you run CMake, because the test environment is built at configure time:
+* On Windows, add the HVT `bin` directory to `PATH`. The test environment captures `PATH` at configure time.
+* On Linux, the test environment does not inherit `LD_LIBRARY_PATH`. Add the HVT `lib` directory to the `ADDITIONAL_LD_LIBRARY_PATH` environment variable instead (see [Dependencies on Linux DSOs when running tests](#dependencies-on-linux-dsos-when-running-tests)).
 
 #### 6. Download the source code
 
