@@ -73,7 +73,7 @@ maya-hydra copies the package's shader resources (`include/hvt/resources`) into 
 
 For the unit tests, the HVT library path must be set up before you run CMake, because the test environment is built at configure time:
 * On Windows, add the HVT `bin` directory to `PATH`. The test environment captures `PATH` at configure time.
-* On Linux, the test environment does not inherit `LD_LIBRARY_PATH`. Add the HVT `lib` directory to the `ADDITIONAL_LD_LIBRARY_PATH` environment variable instead (see [Dependencies on Linux DSOs when running tests](#dependencies-on-linux-dsos-when-running-tests)).
+* On Linux, the test environment does not inherit `LD_LIBRARY_PATH`. If CMake finds MayaUSD, add the HVT `lib` directory to the `ADDITIONAL_LD_LIBRARY_PATH` environment variable before configuring. Otherwise, pass `-DADDITIONAL_LD_LIBRARY_PATH=<hvt lib directory>` to CMake (see [Dependencies on Linux DSOs when running tests](#dependencies-on-linux-dsos-when-running-tests)).
 
 #### 6. Download the source code
 
