@@ -57,6 +57,20 @@ https://www.autodesk.com/developer-network/platform-technologies/maya
 #### 5. Hydra Viewport Toolbox (HVT)
 [Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) is a set of utilities to help you build a Hydra-based viewport. HVT is included as a submodule of the maya-hydra repository, and is built automatically when you build maya-hydra.
 
+To build against an HVT package that you build and install separately, turn off the bundled build and point maya-hydra at the package's install prefix:
+```
+--build-args="-DMAYAHYDRA_BUILD_HVT=OFF,-DHVT_LOCATION=<hvt install prefix>"
+```
+`HVT_LOCATION` is optional if CMake can already find the package through `hvt_DIR` or `CMAKE_PREFIX_PATH`. When `MAYAHYDRA_BUILD_HVT` is OFF, the submodule does not need to be checked out.
+
+The external HVT package must be:
+* built against the same OpenUSD as maya-hydra.
+* built with vanilla OpenUSD settings: `ENABLE_ADSK_OPENUSD_PENDING=OFF` and `ENABLE_DRAW_ORDER=OFF`.
+* API compatible with the HVT commit that the `lib/hydra-viewport-toolbox` submodule points to.
+* built from HVT commit `3620c19` or later, so that its installed `hvtConfig.cmake` works with `find_package(hvt)`.
+
+maya-hydra copies the package's shader resources (`include/hvt/resources`) into its own install, but it does not install the HVT runtime library. Make the HVT library findable at run time yourself, for example by adding its `bin` directory to `PATH` on Windows, or its `lib` directory to `LD_LIBRARY_PATH` on Linux. For the unit tests, this must already be the case when you run CMake, because the test environment captures `PATH` at configure time.
+
 #### 6. Download the source code
 
 Start by cloning the repository and updating the submodules:
@@ -150,6 +164,8 @@ Python_EXECUTABLE           | path to the Python executable to build with       
 PYTHON_INCLUDE_DIR          | directory containing the Python header files               | Determined using the DPython_EXECUTABLE
 PYTHON_LIBRARIES            | path to the Python library to link with                    | Determined using the DPython_EXECUTABLE
 CMAKE_WANT_MATERIALX_BUILD  | enable building with MaterialX (experimental)              | OFF
+MAYAHYDRA_BUILD_HVT         | build the bundled Hydra Viewport Toolbox submodule. Set to OFF to use an installed HVT package (see [Hydra Viewport Toolbox (HVT)](#5-hydra-viewport-toolbox-hvt)) | ON
+HVT_LOCATION                | install prefix of an external HVT package, used when MAYAHYDRA_BUILD_HVT is OFF | empty
 
 ##### Stages
 
