@@ -2549,16 +2549,31 @@ HVT_NS::Outline::OutlineStyle MtohRenderOverride::_BuildOutlineStyle() const
     // Set explicitly rather than relying on the toolbox default.
     style.enableDefaultOutlines = _globals.enableDefaultOutlines;
 
-    // Debug only: MAYAHYDRA_OUTLINE_VISUALIZATION=primIds | depth | mask5x5 shows an outline
-    // buffer instead of the outline. Read once per session.
-    static const std::string visualization = TfGetenv("MAYAHYDRA_OUTLINE_VISUALIZATION");
-    if (visualization == "primIds") {
-        style.maskVisualizationMode = HVT_NS::Outline::VisualizationMode::VISUALIZE_PRIM_IDS;
-    } else if (visualization == "depth") {
-        style.maskVisualizationMode = HVT_NS::Outline::VisualizationMode::VISUALIZE_DEPTH;
-    } else if (visualization == "mask5x5") {
-        style.maskVisualizationMode = HVT_NS::Outline::VisualizationMode::VISUALIZE_MASK_5x5;
-    }
+    // Debug only: MAYAHYDRA_OUTLINE_VISUALIZATION=primIds | depth | mask3x3 | mask5x5 shows an
+    // outline buffer (primIds, depth: the Base layer's) instead of the outline, or the outline
+    // with thin (mask3x3, the default) or thick (mask5x5) edges. Read once per session; an unknown
+    // value warns once and keeps the default.
+    static const HVT_NS::Outline::VisualizationMode visualizationMode = [] {
+        using HVT_NS::Outline::VisualizationMode;
+        const std::string visualization = TfGetenv("MAYAHYDRA_OUTLINE_VISUALIZATION");
+        if (visualization == "primIds") {
+            return VisualizationMode::VISUALIZE_PRIM_IDS;
+        }
+        if (visualization == "depth") {
+            return VisualizationMode::VISUALIZE_DEPTH;
+        }
+        if (visualization == "mask5x5") {
+            return VisualizationMode::VISUALIZE_MASK_5x5;
+        }
+        if (!visualization.empty() && visualization != "mask3x3") {
+            TF_WARN(
+                "Unknown MAYAHYDRA_OUTLINE_VISUALIZATION value '%s': expected primIds, depth, "
+                "mask3x3 or mask5x5. Using mask3x3.",
+                visualization.c_str());
+        }
+        return VisualizationMode::VISUALIZE_MASK_3x3;
+    }();
+    style.maskVisualizationMode = visualizationMode;
 
     // The colors above are fallbacks. Colors with a Maya preference equivalent are replaced in
     // full, alpha included.
