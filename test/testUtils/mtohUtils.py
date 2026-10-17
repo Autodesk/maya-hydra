@@ -23,7 +23,7 @@ import maya.mel
 import fixturesUtils
 import mayaUtils
 import testUtils
-from imageUtils import ImageDiffingTestCase
+from imageUtils import ImageDiffingTestCase, snapshot
 from testUtils import PluginLoaded
 from pxr import Usd
 
@@ -39,8 +39,10 @@ import subprocess  # nosec B404
 import sys
 import math
 
+RENDER_OVERRIDE_PREFIX = "mayaHydraRenderOverride_"
 HD_STORM = "HdStormRendererPlugin"
-HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
+HD_STORM_OVERRIDE = RENDER_OVERRIDE_PREFIX + HD_STORM
+HD_FLASH = "HdFlashRendererPlugin"
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
 def setMayaUseHydra(enable=True):
@@ -70,6 +72,19 @@ SELECTION_HIGHLIGHT_MODE_OUTLINE = "outline"
 SELECTION_HIGHLIGHT_MODE_ENUM_NAMES = {
     SELECTION_HIGHLIGHT_MODE_LEGACY: "Legacy Selection",
     SELECTION_HIGHLIGHT_MODE_OUTLINE: "Outline Selection",
+}
+
+# Set in a test's CTest environment to run it on another Hydra renderer.
+# Defaults to Storm. A non-Storm renderer's name is also its reference-image
+# subfolder, so it must not collide with a mode or an imageVersion.
+HYDRA_RENDERER_ENV_VAR = "MAYAHYDRA_TEST_RENDERER"
+
+HYDRA_RENDERER_STORM = "storm"
+HYDRA_RENDERER_FLASH = "flash"
+
+HYDRA_RENDERER_PLUGINS = {
+    HYDRA_RENDERER_STORM: HD_STORM,
+    HYDRA_RENDERER_FLASH: HD_FLASH,
 }
 
 class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
@@ -139,14 +154,40 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     @classmethod
     def selectionHighlightOutputSuffix(cls):
-        '''Output-directory suffix distinguishing the active mode.
+        '''Output-directory suffix distinguishing the active mode and, off
+        Storm, the Hydra renderer.
 
         fixturesUtils.setUpClass() deletes its output directory on startup, so
-        the two modes, which may run in parallel, need separate directories. A
-        test that builds its own suffix in setUpClass (see testMeshes.py) must
-        include this.
+        runs of one script, which may run in parallel, need separate
+        directories. A test that builds its own suffix in setUpClass (see
+        testMeshes.py) must include this.
         '''
-        return '_' + cls.selectionHighlightMode()
+        suffix = '_' + cls.selectionHighlightMode()
+        if cls.hydraRenderer() != HYDRA_RENDERER_STORM:
+            suffix += '_' + cls.hydraRenderer()
+        return suffix
+
+    # Not named test*: unittest would collect it as a test method.
+    @classmethod
+    def hydraRenderer(cls):
+        '''Return the Hydra renderer this run should use.
+
+        Taken from MAYAHYDRA_TEST_RENDERER. Defaults to Storm.
+        '''
+        renderer = os.environ.get(HYDRA_RENDERER_ENV_VAR, '').strip().lower()
+        if not renderer:
+            return HYDRA_RENDERER_STORM
+        if renderer not in HYDRA_RENDERER_PLUGINS:
+            raise ValueError(
+                "Unknown {} value {!r}; expected one of {}.".format(
+                    HYDRA_RENDERER_ENV_VAR, renderer,
+                    sorted(HYDRA_RENDERER_PLUGINS)))
+        return renderer
+
+    @classmethod
+    def hydraRendererPlugin(cls):
+        '''Return the render delegate plugin name of hydraRenderer().'''
+        return HYDRA_RENDERER_PLUGINS[cls.hydraRenderer()]
 
     @classmethod
     def setUpClass(cls):
@@ -355,6 +396,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         
     def setUp(self):
         self._script_editor_dumped = False
+        # (capture, reference) pairs of snapshots taken without a reference
+        # image, off Storm only (see _snapshotMissingReference()).
+        self._missingReferenceImages = []
         # Enable Maya Script Editor history capture for all tests (dumped on image failure).
         try:
             prev_write = cmds.scriptEditorInfo(q=True, writeHistory=True)
@@ -373,11 +417,16 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         modified = cmds.file(query=True, modified=True)
         assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
 
+        # Despite its name, the flag selects this run's renderer, Storm unless
+        # MAYAHYDRA_TEST_RENDERER says otherwise.
         if self._setHdStormRenderer:
-            self.setHdStormRenderer()
+            self.setHydraRenderer()
 
         # Before cmds.file(modified=False): setting the mode modifies the scene.
         self.applySelectionHighlightMode()
+
+        if self._setHdStormRenderer:
+            self.assertHydraRendererApplied()
 
         # We've just opened a new scene, so we should not be modified.  Setting
         # Storm as the renderer should conceptually not change that status, but
@@ -449,6 +498,15 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                 )
         except Exception:
             pass
+
+        missing = getattr(self, "_missingReferenceImages", None)
+        if missing:
+            self.fail(
+                "No {} reference image for {} snapshot(s). Review each capture, "
+                "then copy it to its reference path:\n{}".format(
+                    self.hydraRenderer(), len(missing),
+                    "\n".join("  {}\n    -> {}".format(capture, reference)
+                              for capture, reference in missing)))
 
     @classmethod
     def tearDownClass(cls):
@@ -526,19 +584,64 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                           file=sys.stderr)
 
     def setHdStormRenderer(self):
+        self._setHydraRendererOverride(HD_STORM)
+
+    def setHydraRenderer(self):
+        '''Set the Hydra renderer this run was registered for.
+
+        Skips the test when that renderer is not available: Maya Hydra's build
+        does not know whether Flash is installed, so its runs are registered
+        everywhere, including Maya Hydra CI, which has no Flash.
+        '''
+        renderer = self.hydraRendererPlugin()
+        if renderer == HD_STORM:
+            self.setHdStormRenderer()
+            return
+        available = cmds.mayaHydra(listRenderers=True)
+        if renderer not in available:
+            self.skipTest(
+                "{}={!r} needs the {} render delegate, which is not "
+                "available; available renderers: {}.".format(
+                    HYDRA_RENDERER_ENV_VAR, self.hydraRenderer(), renderer,
+                    available))
+        self._setHydraRendererOverride(renderer)
+
+    def _setHydraRendererOverride(self, renderer):
         self.setMayaUseHydra(True)
         self.activeEditor = cmds.playblast(activeEditor=1)
         cmds.modelEditor(
             self.activeEditor, e=1,
-            rendererOverrideName=HD_STORM_OVERRIDE)
+            rendererOverrideName=RENDER_OVERRIDE_PREFIX + renderer)
         # During automated tests, tracing demonstrates that the following call
         # to refresh marks the scene as modified, with the modified node being
         # defaultRenderGlobals.  This behavior cannot be reproduced in a
         # non-automated interactive Maya.
         cmds.refresh(f=1)
-        self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
+        self.delegateId = cmds.mayaHydra(renderer=renderer,
                                     sceneDelegateId="MayaHydraSceneDelegate")
-        
+
+    def assertHydraRendererApplied(self):
+        '''Fail if the viewport is not drawn by the renderer this run was
+        registered for.
+
+        Checked off Storm only, where a silent switch (setHdStormRenderer(),
+        makeCubeScene()) would compare Storm output against another renderer's
+        images. Storm runs keep their behavior, some switch to VP2 on purpose.
+        '''
+        renderer = self.hydraRendererPlugin()
+        if renderer == HD_STORM:
+            return
+        editor = cmds.playblast(activeEditor=1)
+        override = cmds.modelEditor(editor, query=True, rendererOverrideName=True)
+        self.assertEqual(
+            override, RENDER_OVERRIDE_PREFIX + renderer,
+            "This run was registered for {} but the viewport uses the {!r} "
+            "override. Storm-only helpers (setHdStormRenderer(), makeCubeScene()) "
+            "cannot run on another renderer.".format(renderer, override))
+        self.assertIn(
+            renderer, cmds.mayaHydra(listActiveRenderers=True),
+            "The {} render override is set but did not initialize.".format(renderer))
+
     def setViewport2Renderer(self):
         self.setMayaUseHydra(False)
         self.activeEditor = cmds.playblast(activeEditor=1)
@@ -642,6 +745,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # Prefer <inputDir>/<mode>/[imageVersion/]image and fall back to the
         # shared image: tests only supply per-mode images where output differs.
         tail = os.path.join(imageVersion, refImage) if imageVersion else refImage
+
+        # Off Storm the beauty shading differs, so every reference image is
+        # per renderer: <inputDir>/<renderer>/[imageVersion/]image, with no
+        # fallback to Storm's images.
+        renderer = self.hydraRenderer()
+        if renderer != HYDRA_RENDERER_STORM:
+            return os.path.join(self._inputDir, renderer, tail)
+
         modeImage = os.path.join(
             self._inputDir, self.selectionHighlightMode(), tail)
         if os.path.isfile(modeImage):
@@ -676,6 +787,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     def assertImagesClose(self, image1, image2, fail, failpercent, image1Version=None, image2Version=None, 
                 hardfail=None, failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         self.assertSelectionHighlightModeApplied()
+        self.assertHydraRendererApplied()
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
         try:
@@ -696,9 +808,37 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             self._dump_script_editor_history("Maya Script Editor history (image diff)")
             raise
 
+    def _snapshotMissingReference(self, refImagePath, imageVersion):
+        '''Off Storm, capture a snapshot whose reference image does not exist
+        and keep going; tearDown() fails with the list. One run thus produces
+        every image to review and copy into <inputDir>/<renderer>/.
+
+        A reference checked more than once in a test keeps every capture
+        (image.png, image_2.png, ...): all of them must match the one baseline.
+
+        Returns whether the reference was missing.
+        '''
+        if (self.hydraRenderer() == HYDRA_RENDERER_STORM
+                or os.path.isfile(refImagePath)):
+            return False
+        snapDir = self.getSnapshotDir()
+        if imageVersion:
+            snapDir = os.path.join(snapDir, imageVersion)
+        stem, ext = os.path.splitext(os.path.basename(refImagePath))
+        count = 1 + sum(1 for _, reference in self._missingReferenceImages
+                        if reference == refImagePath)
+        name = stem + ext if count == 1 else "{}_{}{}".format(stem, count, ext)
+        snapImagePath = os.path.join(snapDir, name)
+        snapshot(snapImagePath)
+        self._missingReferenceImages.append((snapImagePath, refImagePath))
+        return True
+
     def assertSnapshotClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
                 failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+        self.assertHydraRendererApplied()
         refImagePath = self.resolveRefImage(refImage, imageVersion)
+        if self._snapshotMissingReference(refImagePath, imageVersion):
+            return
         try:
             super(MayaHydraBaseTestCase, self).assertSnapshotClose(
                 refImagePath, fail, failpercent, hardfail=hardfail,

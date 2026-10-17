@@ -405,6 +405,52 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
         "HDGP_INCLUDE_DEFAULT_RESOLVER=1")
 endforeach()
 
+# Scripts that also run on Flash: a _flash counterpart with MAYAHYDRA_TEST_RENDERER=flash, in the
+# primary run's mode. Flash reference images live in a "flash" subfolder (see
+# MayaHydraBaseTestCase). Maya Hydra's build does not know whether Flash is installed, so the
+# counterpart skips itself at run time when the Flash render delegate is not available (Maya Hydra
+# CI has no Flash). Hover is not implemented on Flash yet: testOutlineHover*.py are not listed.
+set(FLASH_COUNTERPART_TEST_SCRIPT_FILES
+    testOutlinePointInstances.py
+    testOutlineNativeInstances.py
+    testOutlineRefinement.py
+)
+
+# Registers the Flash counterpart of an interactive test, if its script is listed above.
+#   name_suffix - appended before "_flash", to keep the target unique for
+#                 scripts registered by more than one configuration.
+#   ARGN        - the ENV entries of the configuration being mirrored.
+function(mayaHydra_add_flash_test script name_suffix)
+    get_testfile_and_labels(all_labels test_filename ${script})
+    if(NOT ${test_filename} IN_LIST FLASH_COUNTERPART_TEST_SCRIPT_FILES)
+        return()
+    endif()
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    set(target "${target}${name_suffix}_flash")
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYAHYDRA_TEST_RENDERER=flash"
+            ${mode_env}
+            ${ARGN}
+    )
+    apply_labels_to_test("${all_labels}" ${target})
+endfunction()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
+    mayaHydra_add_flash_test(${script} ""
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1")
+endforeach()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
+    mayaHydra_add_flash_test(${script} "_meshAdapter"
+        "MAYA_HYDRA_USE_MESH_ADAPTER=1"
+        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1")
+endforeach()
+
 # Standalone Python unit tests for pure test utilities. These exercise logic
 # that does not need Maya (e.g. renderManUtils env/platform gating), so they run
 # under mayapy via unittest without initializing a standalone Maya session.
