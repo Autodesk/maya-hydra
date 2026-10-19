@@ -20,7 +20,7 @@ import maya.mel as mel
 
 import fixturesUtils
 import mtohUtils
-from testUtils import rendererUtils
+import rendererUtils
 
 STORM_RENDERER = rendererUtils.getRendererPluginName(rendererUtils.TEST_RENDERER_STORM)
 STORM_OVERRIDE = rendererUtils.getRendererOverrideName(rendererUtils.TEST_RENDERER_STORM)

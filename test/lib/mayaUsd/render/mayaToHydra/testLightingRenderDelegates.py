@@ -25,8 +25,9 @@ import maya.cmds as cmds
 import fixturesUtils
 import mayaUtils
 import mtohUtils
+import rendererUtils
 import renderManUtils
-from testUtils import PluginLoaded, getTestScene, rendererUtils
+from testUtils import PluginLoaded, getTestScene
 
 
 # Maya light names in the test scene (transform names; intensity is on the shape).
