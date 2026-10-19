@@ -112,13 +112,14 @@ if(IS_WINDOWS)
         install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
                 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
     endif()
-    install(
-        FILES 
-            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/hvt.dll
-            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/hvt.pdb
-        DESTINATION 
-            ${CMAKE_INSTALL_PREFIX}/lib
-    )
+    # An external HVT package's runtime is deployed
+    # A static hvt is linked into flowViewport and has no PDB file of its own.
+    if(MAYAHYDRA_BUILD_HVT AND BUILD_SHARED_LIBS)
+        install(FILES $<TARGET_FILE:hvt>
+                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+        install(FILES $<TARGET_PDB_FILE:hvt>
+                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------
