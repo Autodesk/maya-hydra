@@ -380,7 +380,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
         # We've just opened a new scene, so we should not be modified.  Setting
         # a Hydra renderer should conceptually not change that status, but
-        # unfortunately in automated tests it does (see setHdStormRender()
+        # unfortunately in automated tests it does (see setRenderer()
         # method documentation).  Restore modified status to false.
         cmds.file(modified=False)
 
