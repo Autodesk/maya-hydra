@@ -26,26 +26,26 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
 
     def test_RendererSwitching(self):
 
-        # reset all default viewports for VP2 as the test framework sets it to Storm in base class    
+        # reset all default viewports for VP2 as the test framework sets it to Hydra in base class    
         self.setViewport2Renderer()
 
         with PluginLoaded('mayaHydraCppTests'):
-            #Switch to Storm
-            self.setHdStormRenderer()
+            #Switch to Hydra
+            self.setTestRenderer()
             cmds.refresh()
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationWithHydra")
             #Switch to VP2
             self.setViewport2Renderer()
             cmds.refresh()
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationWithoutHydra")
-            #Switch to Storm again
-            self.setHdStormRenderer()
+            #Switch to Hydra again
+            self.setTestRenderer()
             cmds.refresh()
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationWithHydraAgain")
             
     def test_MultipleViewports(self):
 
-        # reset all default viewports for VP2 as the test framework sets it to Storm in base class    
+        # reset all default viewports for VP2 as the test framework sets it to Hydra in base class    
         self.setViewport2Renderer()
         
         with PluginLoaded('mayaHydraCppTests'):
@@ -54,13 +54,13 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
             mel.eval('FourViewLayout')
             #Set focus on persp view
             cmds.setFocus ('modelPanel4') #Is the persp view
-            #Set Storm as the renderer
-            self.setHdStormRenderer()
+            #Set Hydra as the renderer
+            self.setTestRenderer()
             
             #Set focus on model Panel 2 (it's an orthographic view : right) 
             cmds.setFocus ('modelPanel2')
-            #Set Storm as the renderer
-            self.setHdStormRenderer()
+            #Set Hydra as the renderer
+            self.setTestRenderer()
             cmds.refresh()
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewports2Viewports")
             

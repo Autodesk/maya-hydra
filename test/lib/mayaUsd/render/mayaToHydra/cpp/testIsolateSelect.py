@@ -49,7 +49,7 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    # Base class setUp() defines HdStorm as the renderer.
+    # Base class setUp() defines Hydra as the renderer.
 
     _requiredPlugins = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
 
@@ -332,13 +332,13 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("singleViewportIsolateSelectCylinder1.png", 0.1, 2, self.imageVersion)
         
         # Switch to four-up viewport mode.  Set the renderer in each new
-        # viewport to be Hydra Storm.  Viewport 4 is already set.
+        # viewport to be Hydra.  Viewport 4 is already set.
         cmds.FourViewLayout()
         visible = scene.copy()
         notVisible.clear()
         for i in range(1, 4):
             cmds.setFocus('modelPanel'+str(i))
-            self.setHdStormRenderer()
+            self.setTestRenderer()
 
         cmds.select('|pTorus1')
 

@@ -25,7 +25,7 @@ class TestStage(mtohUtils.MayaHydraBaseTestCase):
         import mayaUsd_createStageWithNewLayer
         import mayaUsd.lib
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         # empty scene and expect zero prims
         rprims = self.getIndex()
         self.assertEqual(0, len(rprims))

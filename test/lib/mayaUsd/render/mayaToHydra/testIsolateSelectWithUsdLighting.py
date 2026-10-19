@@ -39,7 +39,7 @@ class TestIsolateSelectWithUsdLighting(mtohUtils.MayaHydraBaseTestCase):
                 "testIsolateSelectWithUsdLighting",
                 "mayaPlusUSDMeshesWithUSDLighting.ma")
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         # Bring the camera in closer.
         self.setBasicCam(5)

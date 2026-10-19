@@ -26,7 +26,7 @@ class TestNamespaces(mtohUtils.MayaHydraBaseTestCase):
 
     def test_namespaces(self):
         '''Test that Maya objects in namespaces are supported.'''
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         # Create a namespace and set it current
         cmds.namespace(add='A')

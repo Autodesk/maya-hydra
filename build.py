@@ -396,17 +396,25 @@ def RunCMake(context, extraArgs=None, stages=None):
 def RunCTest(context, extraArgs=None, runOnlyFailed=False):
     buildDir = context.buildDir
     variant = BuildVariant(context)
+    previousTestRenderer = os.environ.get("MAYAHYDRA_TEST_RENDERER")
+    os.environ["MAYAHYDRA_TEST_RENDERER"] = context.testRenderer
 
-    with CurrentWorkingDirectory(buildDir):
-        Run(context,
-            'ctest '
-            '--output-on-failure ' 
-            '--timeout 500 '
-            '-C {variant} {rerun} '
-            '{extraArgs} '
-            .format(variant=variant,
-                    rerun = '--rerun-failed' if runOnlyFailed else '',
-                    extraArgs=(" ".join(extraArgs) if extraArgs else "")))
+    try:
+        with CurrentWorkingDirectory(buildDir):
+            Run(context,
+                'ctest '
+                '--output-on-failure '
+                '--timeout 500 '
+                '-C {variant} {rerun} '
+                '{extraArgs} '
+                .format(variant=variant,
+                        rerun = '--rerun-failed' if runOnlyFailed else '',
+                        extraArgs=(" ".join(extraArgs) if extraArgs else "")))
+    finally:
+        if previousTestRenderer is None:
+            os.environ.pop("MAYAHYDRA_TEST_RENDERER")
+        else:
+            os.environ["MAYAHYDRA_TEST_RENDERER"] = previousTestRenderer
 
 def RunMakeZipArchive(context):
     installDir = context.instDir
@@ -698,6 +706,9 @@ parser.add_argument("--build-args", type=str, nargs="*", default=[],
 parser.add_argument("--ctest-args", type=str, nargs="*", default=[],
                    help=("Comma-separated list of arguments passed into CTest.(e.g -VV, --output-on-failure)"))
 
+parser.add_argument("--test-renderer", choices=["HdStorm", "HdFlash"], default="HdStorm",
+                    help="Hydra renderer used by the test stage (default: %(default)s).")
+
 parser.add_argument("--stages", type=str, nargs="*", default=['clean','configure','build','install'],
                    help=("Comma-separated list of stages to execute.(possible stages: clean, configure, build, install, test, package)"))
 
@@ -762,6 +773,7 @@ class InstallContext:
         self.buildCoverage = args.build_coverage
 
         self.debugPython = args.debug_python
+        self.testRenderer = args.test_renderer
 
         # Workspace directory 
         self.workspaceDir = os.path.abspath(args.workspace_location)
@@ -856,7 +868,7 @@ class InstallContext:
             if platform_mapping.get(current_platform) in a:
                 exclPlatform.append(a)
 
-        allExcludeLabels = self.kPluginsToExclude + exclPlatform
+        allExcludeLabels = self.kPluginsToExclude + exclPlatform + [self.testRenderer]
         # add -LE args, test with following labels to be skipped
         if allExcludeLabels:
             self.ctestArgs.append(f'{"-LE"} {"|".join(allExcludeLabels)}') 

@@ -43,7 +43,7 @@ class TestIsolateSelectSwitchToVP2(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    # Base class setUp() defines HdStorm as the renderer.
+    # Base class setUp() defines Hydra as the renderer.
 
     _requiredPlugins = ['mayaHydraCppTests']
 
@@ -120,9 +120,9 @@ class TestIsolateSelectSwitchToVP2(mtohUtils.MayaHydraBaseTestCase):
 
         self.assertEqual(viewSelectedChangedCallsPre, viewSelectedChangedCallsVP2)
 
-        # Switch back to Hydra Storm, and make a different isolate selection.
+        # Switch back to Hydra, and make a different isolate selection.
         # The number of Hydra view selected changed calls should increase.
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         cmds.select('|pCube1')
         cmds.editor(modelPanel, edit=True, updateMainConnection=True)

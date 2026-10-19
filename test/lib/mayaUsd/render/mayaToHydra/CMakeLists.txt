@@ -58,7 +58,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
 	testSceneModified.py
-    testIsolateSelectWithGeomSubset.py
+	testIsolateSelectWithGeomSubset.py|skipOnRenderer:HdFlash
     testMayaReference.py
     testTexturedMode.py
     testSelectionColorPreferences.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX

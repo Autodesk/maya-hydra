@@ -39,7 +39,7 @@ class TestMeshGeomSubsets(mtohUtils.MayaHydraBaseTestCase):
         sgB = self._makeShadingGroup("shaderBSG")
         cmds.sets("multiCubeShape", edit=True, forceElement=sgA)
         cmds.sets("multiCubeShape.f[0:2]", edit=True, forceElement=sgB)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhGeomSubsetMeshShape", mesh_shape))
         cmds.refresh()
 
@@ -50,7 +50,7 @@ class TestMeshGeomSubsets(mtohUtils.MayaHydraBaseTestCase):
         mesh_shape = cmds.ls("multiCubeShape", long=True)[0]
         sgA = self._makeShadingGroup("shaderASG")
         cmds.sets("multiCubeShape", edit=True, forceElement=sgA)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhGeomSubsetMeshShape", mesh_shape))
         cmds.refresh()
 
@@ -61,7 +61,7 @@ class TestMeshGeomSubsets(mtohUtils.MayaHydraBaseTestCase):
         nurbs_shape = cmds.ls("nurbsBallShape", long=True)[0]
         sgA = self._makeShadingGroup("shaderASG")
         cmds.sets("nurbsBallShape", edit=True, forceElement=sgA)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhGeomSubsetMeshShape", nurbs_shape))
         cmds.refresh()
 

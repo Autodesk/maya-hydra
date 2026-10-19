@@ -33,14 +33,14 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         mayaUtils.openTestScene(
                 "testStagePayloadsReferences",
                 "FlowerPot.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     def loadUsdReferencesScene(self):
         mayaUtils.openTestScene(
                 "testStagePayloadsReferences",
                 "References.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     def setUpReferenceScene(self):
@@ -61,7 +61,7 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         primRefs = aPrim.GetReferences()
         primRefs.AddReference(sdfRef)
         self.assertTrue(aPrim.HasAuthoredReferences())
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         self.setBasicCam(2)
 
@@ -71,7 +71,7 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         from mayaUsd import lib as mayaUsdLib
         import usdUtils
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         # Create the following hierarchy:
         #

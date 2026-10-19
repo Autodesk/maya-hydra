@@ -72,7 +72,7 @@ class TestIsolateSelectMultipleInstances(mtohUtils.MayaHydraBaseTestCase):
         """
 
         mayaUtils.openTestScene("testBifrost", "bifrost_node_update_hydra.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         proxyShapePathStr = "|mayaUsdProxy1|mayaUsdProxyShape1"
 

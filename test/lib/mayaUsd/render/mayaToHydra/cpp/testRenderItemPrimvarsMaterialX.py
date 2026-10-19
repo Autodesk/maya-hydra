@@ -31,7 +31,7 @@ class TestRenderItemPrimvarsMaterialX(mtohUtils.MayaHydraBaseTestCase):
     # Expect: declared normals/st/tangents cover every point the topology references.
     def test_untexturedMaterialXDeclaresOnlyPopulatedPrimvars(self):
         mayaUtils.openTestScene("testMaterialX", "RedMtlxSphere.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhMeshShape", cmds.ls("pSphereShape1", long=True)[0]))
         cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):

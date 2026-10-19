@@ -34,7 +34,7 @@ class TestUsdIncludedPurposes(mtohUtils.MayaHydraBaseTestCase):
         testFile = mayaUtils.openTestScene(
             "testUsdIncludedPurposes", "includedPurposesTest.ma")
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         cmds.setAttr('defaultRenderGlobals.mayaHydraRenderPurpose', 1)
         cmds.setAttr('defaultRenderGlobals.mayaHydraGuidePurpose',  1)

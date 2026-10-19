@@ -24,7 +24,7 @@ class TestFlowViewportAPIFilterPrims(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupParentChildScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         #Create a maya sphere named parentSphere
         cmds.polyCube(name="parentCube", w=2, h=2, d=2) 
         cmds.polySphere(name="smallSphere") 

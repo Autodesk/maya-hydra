@@ -48,7 +48,7 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
         cmds.mayaHydraSetVisibleFramePasses(edit=True, visible=[0, 1])
         #Workaround for a bug when re-enabling all passes
         self.setViewport2Renderer()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
     #Enable only pass #0 then pass #1 and do snapshots using as an option the aov namre specified
     def EnablePassesOneByOneAndDoSnapshots(self, name, failures, aovName=""):
@@ -146,11 +146,11 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
                 self.fail(f"The following assertions failed:\n" + "\n".join(failures))
     
     def test_ListAovs(self):
-        stormAovs = cmds.mayaHydraSetVisibleFramePasses(listAovs=0)
+        aovs = cmds.mayaHydraSetVisibleFramePasses(listAovs=0)
         if self._usdVersion <= (0, 24, 11):
-            self.assertEqual(stormAovs, ['color', 'primId', 'depth'])
+            self.assertEqual(aovs, ['color', 'primId', 'depth'])
         else:
-            self.assertEqual(stormAovs, ['color', 'primId', 'depth', 'Neye'])
+            self.assertEqual(aovs, ['color', 'primId', 'depth', 'Neye'])
     
     def test_Reset(self):
         with PluginLoaded('mayaHydraFootPrintNode'):

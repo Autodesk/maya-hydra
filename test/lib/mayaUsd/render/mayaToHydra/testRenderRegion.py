@@ -27,7 +27,7 @@ class TestRenderRegion(mtohUtils.MayaHydraBaseTestCase):
 
     def setupScene(self):
         import mayaUsd_createStageWithNewLayer
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
         self.setBasicCam(15)
         torusName = cmds.polyTorus()[0]

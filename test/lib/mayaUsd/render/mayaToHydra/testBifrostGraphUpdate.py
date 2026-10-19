@@ -40,7 +40,7 @@ class TestBifrostGraphUpdate(mtohUtils.MayaHydraBaseTestCase):
 
     def test_BifrostGraphUpdate(self):
         mayaUtils.openTestScene("testBifrost", "bifrost_node_update_hydra.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.verifySnapshot("bifrostBeforeUpdate.png")
         #Update the number of instances in the bifrost graph
         mel.eval("vnnNode \"|createPointInstancerFromUsdFile|createPointInstancerFromUsdFileShape\" \"/scatter_points\" -setPortDefaultValues \"amount\" \"150\";")

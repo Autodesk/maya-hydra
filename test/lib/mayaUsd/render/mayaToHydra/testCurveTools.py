@@ -30,7 +30,7 @@ class TestCurveTools(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestCurveTools, self).setUp()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
         
         # Initialize failure tracking

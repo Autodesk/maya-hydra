@@ -24,6 +24,25 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ```ctest -C RelWithDebInfo -VV --output-on-failure -R testVisibility```
 
+### Selecting a renderer
+
+Tests use HdStorm by default. Set `MAYAHYDRA_TEST_RENDERER` to select HdFlash
+when running CTest directly. Renderer exclusions use the same CTest-label
+mechanism as plugin and platform exclusions: a
+`skipOnRenderer:HdFlash` test entry receives the `HdFlash` label and must be
+excluded when running Flash directly.
+
+On Windows:
+
+```bat
+set MAYAHYDRA_TEST_RENDERER=HdFlash && ctest -C RelWithDebInfo -VV --output-on-failure -LE HdFlash
+```
+
+The outer ECG build script supplies both the environment variable and
+renderer label exclusion automatically:
+
+```build.py <workspace> --renderer HdFlash --stages test```
+
 Note that when running Python tests the Python source is read directly from the source directory.  Therefore, when changing Python test code source, no build needs to be done to update the test, which can be run immediately using ctest.  This is a convenient time saver, as the test development cycle is not edit, build, run, but simply edit and run.  Only if C++ test code is changed is a build then necessary.
 
 ### Running tests with MayaUSD
@@ -103,7 +122,7 @@ For example, you might have some tests that are all related to 'performance', so
 
 To add label in MayaHydra test suite
 1. For any particlar unit test of interest in [CMakeLists.txt](./CMakeLists.txt), add the required labels with the following convention:
-    `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]`
+    `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]|skipOnRenderer:HdFlash`
 2. Where the label groups follows the unit test name and are separated by `'|'`. You may have multiple label groups.
 3. The label groups are of key:values type. They label key can be any meaningful string and has correspondence to the accompanying [json file](../../../../../../maya-hydra/tests-to-run.json)
 4. The label values are comma separated lists. The values are added to the test via cmake's `set_tests_properties`
@@ -129,7 +148,8 @@ Similar pattern applies for exclusion/inclusion of tests by filenames except tha
 Note that `depOnPlugins` key string is only used as cue while adding values in the JSON. The variables in the JSON file and the label values in the CMakeLists.txt are what get used by ctest for label matching.
 `"files_to_exclude": ["testStandardSurface"]`
 
-The supported values for platform exclusion are: "osx", "win", "lin".
+The supported values for platform exclusion are: "osx", "win", "lin". The
+supported renderer exclusion values are: "HdStorm", "HdFlash".
 
 
 

@@ -160,7 +160,7 @@ class TestOutlineHoverPickModes(mtohUtils.MayaHydraBaseTestCase):
 
     def loadUsdScene(self, sceneDir, sceneName, cameraTranslate, cameraRotate):
         self._forceDeterministicMainWindowSize()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         import usdUtils
         usdUtils.createStageFromFile(testUtils.getTestScene(sceneDir, sceneName + '.usda'))
