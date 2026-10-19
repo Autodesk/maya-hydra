@@ -396,25 +396,17 @@ def RunCMake(context, extraArgs=None, stages=None):
 def RunCTest(context, extraArgs=None, runOnlyFailed=False):
     buildDir = context.buildDir
     variant = BuildVariant(context)
-    previousTestRenderer = os.environ.get("MAYAHYDRA_TEST_RENDERER")
-    os.environ["MAYAHYDRA_TEST_RENDERER"] = context.testRenderer
 
-    try:
-        with CurrentWorkingDirectory(buildDir):
-            Run(context,
-                'ctest '
-                '--output-on-failure '
-                '--timeout 500 '
-                '-C {variant} {rerun} '
-                '{extraArgs} '
-                .format(variant=variant,
-                        rerun = '--rerun-failed' if runOnlyFailed else '',
-                        extraArgs=(" ".join(extraArgs) if extraArgs else "")))
-    finally:
-        if previousTestRenderer is None:
-            os.environ.pop("MAYAHYDRA_TEST_RENDERER")
-        else:
-            os.environ["MAYAHYDRA_TEST_RENDERER"] = previousTestRenderer
+    with CurrentWorkingDirectory(buildDir):
+        Run(context,
+            'ctest '
+            '--output-on-failure '
+            '--timeout 500 '
+            '-C {variant} {rerun} '
+            '{extraArgs} '
+            .format(variant=variant,
+                    rerun = '--rerun-failed' if runOnlyFailed else '',
+                    extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
 def RunMakeZipArchive(context):
     installDir = context.instDir
@@ -886,6 +878,14 @@ except Exception as e:
     sys.exit(1)
 
 if __name__ == "__main__":
+    # The test renderer is baked into the CTest definitions at configure time, so
+    # the build must be reconfigured whenever it differs from the build's cache
+    # (or the build directory has never been configured).
+    if 'test' in context.stagesArgs and \
+            GetCachedTestRenderer(context) != context.testRenderer and \
+            'configure' not in context.stagesArgs:
+        context.stagesArgs.append('configure')
+
     # Summarize
     summaryMsg = """
     Building with settings:
