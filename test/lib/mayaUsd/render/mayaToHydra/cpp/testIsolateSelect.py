@@ -49,8 +49,6 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    # Base class setUp() defines Hydra as the renderer.
-
     _requiredPlugins = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
 
     imageVersion = None

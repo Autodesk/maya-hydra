@@ -43,8 +43,6 @@ class TestIsolateSelectSwitchToVP2(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    # Base class setUp() defines Hydra as the renderer.
-
     _requiredPlugins = ['mayaHydraCppTests']
 
     def setupScene(self):
