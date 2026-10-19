@@ -878,14 +878,6 @@ except Exception as e:
     sys.exit(1)
 
 if __name__ == "__main__":
-    # The test renderer is baked into the CTest definitions at configure time, so
-    # the build must be reconfigured whenever it differs from the build's cache
-    # (or the build directory has never been configured).
-    if 'test' in context.stagesArgs and \
-            GetCachedTestRenderer(context) != context.testRenderer and \
-            'configure' not in context.stagesArgs:
-        context.stagesArgs.append('configure')
-
     # Summarize
     summaryMsg = """
     Building with settings:
