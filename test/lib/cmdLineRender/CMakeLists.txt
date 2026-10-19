@@ -414,9 +414,9 @@ mayaHydra_add_cmd_line_render_test(${scene}
 # grey, while the baselines are a dark-red cube and a teal cylinder, so idiff
 # fails.  Camera and geometry are correct; only material resolution is broken.
 set(_skip_materialx_camera_tests FALSE)
-if(IS_LINUX AND MAYA_APP_VERSION VERSION_GREATER 2027)
-    set(_skip_materialx_camera_tests TRUE)
-endif()
+# if(IS_LINUX AND MAYA_APP_VERSION VERSION_GREATER 2027)
+#     set(_skip_materialx_camera_tests TRUE)
+# endif()
 
 if(NOT _skip_materialx_camera_tests)
     # Test a render using a different camera than that from the fallback
