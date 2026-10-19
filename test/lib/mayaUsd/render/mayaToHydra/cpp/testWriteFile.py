@@ -45,7 +45,7 @@ class TestWriteFile(mtohUtils.MayaHydraBaseTestCase):
 
     _requiredPlugins = ['mayaHydraCppTests']
 
-    def test_WriteFileStorm(self):
+    def test_WriteFile(self):
 
         outputFile = os.path.join(self.getSnapshotDir(), 'output.png')
 
@@ -54,7 +54,7 @@ class TestWriteFile(mtohUtils.MayaHydraBaseTestCase):
         with WriteFile(outputFile, 1280, 720):
             cmds.refresh()
 
-        self.assertImagesClose('stormOutput.png', outputFile, 0.1, 2)
+        self.assertImagesClose('writeFileOutput.png', outputFile, 0.1, 2)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
