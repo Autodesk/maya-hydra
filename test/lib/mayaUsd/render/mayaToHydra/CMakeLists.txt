@@ -7,7 +7,19 @@
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 # Tests are run with the VP2 render delegate disabled, to ensure 
 # that mayaHydra does not rely on computations made by VP2 for its use.
-#
+
+# Renderer the MayaHydra tests run against. Baked into every test's environment
+# below, so `ctest` run directly uses it. Set by build.py via -DMAYAHYDRA_TEST_RENDERER.
+# Changing it requires reconfiguring the build.
+set(MAYAHYDRA_TEST_RENDERER_CHOICES HdStorm HdFlash)
+set(MAYAHYDRA_TEST_RENDERER HdStorm CACHE STRING
+    "Hydra renderer used by the MayaHydra tests")
+set_property(CACHE MAYAHYDRA_TEST_RENDERER PROPERTY STRINGS ${MAYAHYDRA_TEST_RENDERER_CHOICES})
+if(NOT MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_TEST_RENDERER_CHOICES)
+    message(FATAL_ERROR "MAYAHYDRA_TEST_RENDERER must be one of "
+        "${MAYAHYDRA_TEST_RENDERER_CHOICES}, got '${MAYAHYDRA_TEST_RENDERER}'.")
+endif()
+
 set(INTERACTIVE_TEST_SCRIPT_FILES
     testSceneStat.py
     testImageDiffing.py
@@ -422,3 +434,15 @@ endforeach()
 
 # C++ unit tests
 add_subdirectory(cpp)
+
+# Bake the test renderer into every test registered in this directory and in
+# cpp/. Applied once here, after all tests exist, so individual mayaUsd_add_test
+# calls don't each have to repeat it. The Python side reads this variable via
+# rendererUtils.getTestRenderer().
+foreach(test_dir ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cpp)
+    get_property(dir_tests DIRECTORY ${test_dir} PROPERTY TESTS)
+    foreach(test_name ${dir_tests})
+        set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT
+            "MAYAHYDRA_TEST_RENDERER=${MAYAHYDRA_TEST_RENDERER}")
+    endforeach()
+endforeach()

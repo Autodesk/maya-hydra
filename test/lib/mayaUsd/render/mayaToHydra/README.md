@@ -26,22 +26,19 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ### Selecting a renderer
 
-Tests use HdStorm by default. Set `MAYAHYDRA_TEST_RENDERER` to select HdFlash
-when running CTest directly. Renderer exclusions use the same CTest-label
-mechanism as plugin and platform exclusions: a
-`skipOnRenderer:HdFlash` test entry receives the `HdFlash` label and must be
-excluded when running Flash directly.
+Tests use HdStorm by default. To run them against HdFlash, pass `--test-renderer HdFlash` to build.py:
 
-On Windows:
+```build.py <workspace> --test-renderer HdFlash --stages test```
 
-```bat
-set MAYAHYDRA_TEST_RENDERER=HdFlash && ctest -C RelWithDebInfo -VV --output-on-failure -LE HdFlash
-```
+This sets the `MAYAHYDRA_TEST_RENDERER` CMake cache variable at configure time. CMake bakes it into the environment of every test, so running `ctest` directly from that build uses the selected renderer without setting any environment variable. The default is HdStorm.
 
-The outer ECG build script supplies both the environment variable and
-renderer label exclusion automatically:
+To change the renderer of an existing build directory without build.py, reconfigure from the build directory:
 
-```build.py <workspace> --renderer HdFlash --stages test```
+```cmake -DMAYAHYDRA_TEST_RENDERER=HdFlash <source-dir>```
+
+Renderer exclusions use the same CTest-label mechanism as plugin and platform exclusions: a `skipOnRenderer:HdFlash` test entry receives the `HdFlash` label. CTest does not apply this automatically, so when running Flash directly, exclude those tests explicitly:
+
+```ctest -C RelWithDebInfo -VV --output-on-failure -LE HdFlash```
 
 Note that when running Python tests the Python source is read directly from the source directory.  Therefore, when changing Python test code source, no build needs to be done to update the test, which can be run immediately using ctest.  This is a convenient time saver, as the test development cycle is not edit, build, run, but simply edit and run.  Only if C++ test code is changed is a build then necessary.
 

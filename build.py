@@ -584,6 +584,10 @@ def BuildAndInstall(context, buildArgs, stages):
             extraArgs.append('-DMAYA_DEVKIT_LOCATION={devkitLocation}'
                              .format(devkitLocation=context.devkitLocation))
 
+        if context.testRenderer:
+            extraArgs.append('-DMAYAHYDRA_TEST_RENDERER={testRenderer}'
+                             .format(testRenderer=context.testRenderer))
+
         extraArgs += buildArgs
         stagesArgs += stages
 
