@@ -79,6 +79,7 @@
 #include <hvt/engine/viewportEngine.h>
 #include <hvt/tasks/resources.h>
 
+#include <pxr/base/js/value.h>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/type.h>
@@ -688,6 +689,27 @@ int GetNearestHitIndex(
     }
 
     return nearestHitIndex;
+}
+
+// Reads "mayaHydra": { "renderSecondaryGraphics": <bool> } from the renderer plugin's
+// plugInfo.json type entry.
+bool rendererDrawsSecondaryGraphics(const TfToken& rendererName)
+{
+    if (rendererName == MtohTokens->HdStormRendererPlugin) {
+        return true;
+    }
+    const TfType rendererType = TfType::FindByName(rendererName.GetString());
+    if (rendererType.IsUnknown()) {
+        return false;
+    }
+    const JsValue mayaHydraMetadata
+        = PlugRegistry::GetInstance().GetDataFromPluginMetaData(rendererType, "mayaHydra");
+    if (!mayaHydraMetadata.IsObject()) {
+        return false;
+    }
+    const JsObject& metadata = mayaHydraMetadata.GetJsObject();
+    const auto      it = metadata.find("renderSecondaryGraphics");
+    return it != metadata.end() && it->second.IsBool() && it->second.GetBool();
 }
 } // namespace
 
@@ -4417,7 +4439,9 @@ void MtohRenderOverride::_CreateFramePassesData()
     // Secondary graphics pass - only create if not using single frame pass
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
-        filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
+        filteringData->_rendererName = rendererDrawsSecondaryGraphics(_rendererDesc.rendererName)
+            ? _rendererDesc.rendererName
+            : MtohTokens->HdStormRendererPlugin;
         filteringData->_includePaths = { _highlightHierarchyPrefix, MayaViewportSceneIndex::DefaultLightPath() }; // include selection highlight prims.
         filteringData->_excludePaths = { };
         filteringData->_removeLights = true; // Remove lights from this pass except for the default light, kept through the include paths
