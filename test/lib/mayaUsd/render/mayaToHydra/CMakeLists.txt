@@ -220,10 +220,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # are only needed where the output differs (see MayaHydraBaseTestCase).
 #
 # Outline is unavailable on USD <= 24.11 (HgiGL corrupts the prim ids the outline
-# shader samples) and on macOS; there every primary run is legacy and there are no
-# _legacy counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+# shader samples), on macOS, and with the HdFlash test renderer (OutlineMaskTask only
+# runs for Storm); there every primary run is legacy and there are no _legacy
+# counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
 # (renderGlobals.cpp) and outlineSelectionHighlightSupported() (mtohUtils.py).
-if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX)
+if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
 else()
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)

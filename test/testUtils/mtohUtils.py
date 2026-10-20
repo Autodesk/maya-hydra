@@ -106,6 +106,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         '''
         if platform.system() == "Darwin":
             return False
+        # OutlineMaskTask only runs for the Storm render delegate.
+        if rendererUtils.getTestRenderer() != rendererUtils.TEST_RENDERER_STORM:
+            return False
         return Usd.GetVersion() > (0, 24, 11)
 
     @classmethod

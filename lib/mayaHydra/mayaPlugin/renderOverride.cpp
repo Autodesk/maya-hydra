@@ -114,6 +114,7 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/imaging/hd/basisCurves.h>
 #include <pxr/imaging/hd/points.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/imaging/hdx/tokens.h>
@@ -1309,6 +1310,25 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
                 tempPrimIds.end());
         }
 
+        // Scene-index-native delegates such as Flash consume geometry directly from their
+        // terminal scene index and therefore do not publish HdRprims. Include their visible
+        // gprims so this testing command remains a renderer-independent view of renderable paths.
+        if (const auto& terminalSceneIndex = renderIndex->GetTerminalSceneIndex()) {
+            for (const SdfPath& primPath :
+                 HdSceneIndexPrimView(terminalSceneIndex, SdfPath::AbsoluteRootPath())) {
+                const HdSceneIndexPrim prim = terminalSceneIndex->GetPrim(primPath);
+                if (!HdPrimTypeIsGprim(prim.primType)) {
+                    continue;
+                }
+                const HdBoolDataSourceHandle visibility =
+                    HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
+                if (visibleOnly && visibility && !visibility->GetTypedValue(0.0f)) {
+                    continue;
+                }
+                tempPrimIds.push_back(primPath);
+            }
+        }
+
         // Concatenate results
         if (tempPrimIds.size()) { 
             primIds.reserve(
@@ -1320,6 +1340,7 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
 
     // Sort them by lexicographically order
     std::sort(primIds.begin(), primIds.end(), std::less<SdfPath>());
+    primIds.erase(std::unique(primIds.begin(), primIds.end()), primIds.end());
     return primIds;
 }
 
