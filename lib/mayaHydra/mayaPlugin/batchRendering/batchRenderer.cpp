@@ -59,6 +59,7 @@
 #include <maya/MMessage.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MStatus.h>
+#include <maya/MTypes.h>
 
 #include <algorithm>
 #include <fstream>
@@ -69,6 +70,13 @@ using namespace MayaHydra;
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+
+// HYDRA-2662: macOS HdStorm after Maya 2027 has a shader compilation error if shadows are enabled.
+#if defined(__APPLE__) && (MAYA_API_VERSION > 20270000)
+constexpr bool kHdStormShadowsSupported = false;
+#else
+constexpr bool kHdStormShadowsSupported = true;
+#endif
 
 // Look at defaultRenderGlobals.hydraSceneDumpPath attribute and
 // dump Hydra scene to that file path.  Hydra scene will be taken from
@@ -333,7 +341,7 @@ void BatchRenderer::_FinalizeHydraBatchRender(const HdxRenderTaskParams& params)
     }
 
     if (_isUsingHdSt) {
-        constexpr auto      enableShadows = true;
+        constexpr auto      enableShadows = kHdStormShadowsSupported;
         HdxShadowTaskParams shadowParams;
         shadowParams.cullStyle = HdCullStyleNothing;
 
@@ -462,7 +470,7 @@ void BatchRenderer::_InitHydraResources()
             TfMakeValidIdentifier(_rendererDesc.rendererName.GetText()).c_str(),
             this)))
     );
-    _taskController->SetEnableShadows(true);
+    _taskController->SetEnableShadows(kHdStormShadowsSupported || !_isUsingHdSt);
     
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
