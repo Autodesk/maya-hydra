@@ -408,46 +408,34 @@ mayaHydra_add_cmd_line_render_test(${scene}
     RENDERER_ARGS "-im ${sceneFileNameNoExt}"
 )
 
-# HYDRA-2610: LookdevXMaya does not load in the Linux Maya 2028 test
-# environment, so the scenes' MaterialX OpenPBR shaders become unknown nodes and
-# Storm/Arnold fall back to the default surface shader.  The renders come out
-# grey, while the baselines are a dark-red cube and a teal cylinder, so idiff
-# fails.  Camera and geometry are correct; only material resolution is broken.
-set(_skip_materialx_camera_tests FALSE)
-if(IS_LINUX AND MAYA_APP_VERSION VERSION_GREATER 2027)
-    set(_skip_materialx_camera_tests TRUE)
-endif()
+# Test a render using a different camera than that from the fallback
+# USD resolution settings: Maya camera.
+set(scene basic/mayaCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    TEST_NAME_SUFFIX Storm
+    RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -im ${sceneFileNameNoExt}"
+)
 
-if(NOT _skip_materialx_camera_tests)
-    # Test a render using a different camera than that from the fallback
-    # USD resolution settings: Maya camera.
-    set(scene basic/mayaCamera.ma)
-    cmake_path(GET scene STEM sceneFileNameNoExt)
+# Test a render using a different camera than that from the fallback
+# USD resolution settings: USD camera.
+set(scene basic/usdCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder storm arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
     mayaHydra_add_cmd_line_render_test(${scene}
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-        RENDERER HdStormRendererPlugin
-        TEST_NAME_SUFFIX Storm
-        RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -im ${sceneFileNameNoExt}"
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
     )
-
-    # Test a render using a different camera than that from the fallback
-    # USD resolution settings: USD camera.
-    set(scene basic/usdCamera.ma)
-    cmake_path(GET scene STEM sceneFileNameNoExt)
-    foreach(folder storm arnold)
-        _mayaHydra_renderer_for_folder(${folder} renderer suffix)
-        mayaHydra_add_cmd_line_render_test(${scene}
-            COPY_SCENE
-            RENDERED_IMAGE_SUBDIR projects/default/images
-            RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-            RENDERER ${renderer}
-            TEST_NAME_SUFFIX ${suffix}
-            RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
-        )
-    endforeach()
-endif()
+endforeach()
 
 # Animated rig render.  As frame number resolution is only available for
 # Hydra v2 render settings renderers, HdStorm is excluded here.
