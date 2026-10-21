@@ -4462,7 +4462,8 @@ void MtohRenderOverride::_CreateFramePassesData()
     // Secondary graphics pass - only create if not using single frame pass
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
-        filteringData->_rendererName = rendererDrawsSecondaryGraphics(_rendererDesc.rendererName)
+        filteringData->_rendererName
+            = (secondaryGraphicsUseActiveRenderer() && rendererDrawsSecondaryGraphics(_rendererDesc.rendererName))
             ? _rendererDesc.rendererName
             : MtohTokens->HdStormRendererPlugin;
         filteringData->_includePaths = { _highlightHierarchyPrefix, MayaViewportSceneIndex::DefaultLightPath() }; // include selection highlight prims.
