@@ -71,8 +71,8 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-// HYDRA-2662: macOS HdStorm after Maya 2027 has a shader compilation error if shadows are enabled.
-#if defined(__APPLE__) && (MAYA_API_VERSION > 20270000)
+// HYDRA-2662: macOS HdStorm has a shader compilation error if shadows are enabled.
+#if defined(__APPLE__) && (PXR_VERSION >= 2605)
 constexpr bool kHdStormShadowsSupported = false;
 #else
 constexpr bool kHdStormShadowsSupported = true;
