@@ -85,6 +85,16 @@ SdfPathVector GetFootPrintMeshPaths(const HdSceneIndexBaseRefPtr& sceneIndex)
     return meshPaths;
 }
 
+// Before USD 26.05, chained dependency forwarding scene indices downstream of maya-hydra each
+// forward the same dependency dirties, so color dirties are counted where maya-hydra emits them.
+// The scene index has no display name, which defaults to its demangled class name.
+HdSceneIndexBaseRefPtr FindDirtySelectionColorsSceneIndex(const HdSceneIndexBaseRefPtr& terminal)
+{
+    return findSceneIndexInTree(terminal, [](const HdSceneIndexBaseRefPtr& sceneIndex) {
+        return TfStringEndsWith(sceneIndex->GetDisplayName(), "MhDirtySelectionColorsSceneIndex");
+    });
+}
+
 void ExecuteAndRefresh(const std::string& melCommand)
 {
     EXPECT_EQ(MGlobal::executeCommand(melCommand.c_str()), MS::kSuccess) << melCommand;
@@ -116,10 +126,13 @@ TEST(FootPrintNotifications, shadedSelectionSendsOneColorDirtyPerChange)
     ASSERT_TRUE(sceneIndex);
     const SdfPathVector meshPaths = GetFootPrintMeshPaths(sceneIndex);
     ASSERT_EQ(meshPaths.size(), 2u);
+    const HdSceneIndexBaseRefPtr dirtySelectionColorsSceneIndex
+        = FindDirtySelectionColorsSceneIndex(sceneIndex);
+    ASSERT_TRUE(dirtySelectionColorsSceneIndex);
 
     for (const std::string& command :
          { "select -replace " + kFootPrintShapeName, std::string("select -clear") }) {
-        SceneIndexNotificationsAccumulator accumulator(sceneIndex);
+        SceneIndexNotificationsAccumulator accumulator(dirtySelectionColorsSceneIndex);
         ExecuteAndRefresh(command);
         for (const auto& meshPath : meshPaths) {
             EXPECT_EQ(CountDirties(accumulator, meshPath, kDisplayColorLocator), 1u)
