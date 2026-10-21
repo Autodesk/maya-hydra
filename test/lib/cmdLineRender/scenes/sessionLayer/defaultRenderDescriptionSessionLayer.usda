@@ -1,0 +1,13 @@
+#usda 1.0
+(
+    defaultPrim = "Render"
+    renderSettingsPrimPath = "/Render/SceneRenderSettings"
+)
+
+over Scope "Render"
+{
+    over RenderSettings "SceneRenderSettings"
+    {
+        int2 resolution = (720, 480)
+    }
+}

@@ -565,6 +565,7 @@ MhExtGpuBufferBridge::Create(
     uint32_t    mayaGlBuffer,
     size_t      byteSize,
     size_t      copyByteSize,
+    uint32_t    vertexStride,
     const char *debugName) const
 {
     if (_kind == _Kind::OpenGL) {
@@ -581,7 +582,7 @@ MhExtGpuBufferBridge::Create(
         // buffer is ordered after that read, and glDeleteBuffers is deferred
         // by the driver until the GPU is finished.
         return static_cast<HgiGLExternalBufferArena *>(_arena)
-            ->RegisterBuffer(mayaGlBuffer, byteSize, kExtBufferUsage);
+            ->RegisterBuffer(mayaGlBuffer, byteSize, kExtBufferUsage, vertexStride);
     }
 
 #if defined(USD_HAS_HGI_VULKAN)

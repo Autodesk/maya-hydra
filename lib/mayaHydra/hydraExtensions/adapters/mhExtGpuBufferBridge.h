@@ -96,8 +96,12 @@ public:
     /// contents. \p byteSize must cover the whole stream, offset included;
     /// \p copyByteSize is the exact span to read out of Maya's buffer, which
     /// is the smaller of the two on an interleaved stream and the only one
-    /// safe to copy. Returns null when the buffer cannot be shared, in which
-    /// case the caller falls back to the CPU primvar.
+    /// safe to copy. \p vertexStride is the stream's per-element stride in
+    /// bytes -- the published byteStride, or the element size when that is 0
+    /// (tightly packed). The OpenGL route records it on the shared buffer's
+    /// descriptor, which HgiGL binds vertex input with, so a consumer can bind
+    /// the buffer in place. Returns null when the buffer cannot be shared, in
+    /// which case the caller falls back to the CPU primvar.
     ///
     /// A copying bridge allocates here, so call it only when the existing
     /// buffer will not do -- see Refresh.
@@ -106,6 +110,7 @@ public:
         uint32_t mayaGlBuffer,
         size_t byteSize,
         size_t copyByteSize,
+        uint32_t vertexStride,
         const char *debugName) const;
 
     /// Bring \p buffer back in step with \p mayaGlBuffer, reusing the

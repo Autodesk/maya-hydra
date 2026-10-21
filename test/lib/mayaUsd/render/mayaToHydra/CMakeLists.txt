@@ -134,6 +134,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     cpp/testMaterialBlocking.py
+    cpp/testMaterialDirtying.py
     cpp/testPassFiltering.py
     cpp/testLegacyHighlightPassRouting.py
     cpp/testDeferredHighlightWireInit.py

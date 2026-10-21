@@ -21,6 +21,7 @@
 #include <maya/MPxCommand.h>
 
 #include <memory>
+#include <string_view>
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -42,6 +43,9 @@ public:
 private:
 
     HydraRenderCmd();
+
+    // Display an error prefixed with the command name, with line numbers.
+    static void displayError(std::string_view error);
 
     bool parseDatabase(const MArgDatabase& db);
     bool initialize();

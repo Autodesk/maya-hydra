@@ -408,46 +408,34 @@ mayaHydra_add_cmd_line_render_test(${scene}
     RENDERER_ARGS "-im ${sceneFileNameNoExt}"
 )
 
-# HYDRA-2610: LookdevXMaya does not load in the Linux Maya 2028 test
-# environment, so the scenes' MaterialX OpenPBR shaders become unknown nodes and
-# Storm/Arnold fall back to the default surface shader.  The renders come out
-# grey, while the baselines are a dark-red cube and a teal cylinder, so idiff
-# fails.  Camera and geometry are correct; only material resolution is broken.
-set(_skip_materialx_camera_tests FALSE)
-if(IS_LINUX AND MAYA_APP_VERSION VERSION_GREATER 2027)
-    set(_skip_materialx_camera_tests TRUE)
-endif()
+# Test a render using a different camera than that from the fallback
+# USD resolution settings: Maya camera.
+set(scene basic/mayaCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    TEST_NAME_SUFFIX Storm
+    RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -im ${sceneFileNameNoExt}"
+)
 
-if(NOT _skip_materialx_camera_tests)
-    # Test a render using a different camera than that from the fallback
-    # USD resolution settings: Maya camera.
-    set(scene basic/mayaCamera.ma)
-    cmake_path(GET scene STEM sceneFileNameNoExt)
+# Test a render using a different camera than that from the fallback
+# USD resolution settings: USD camera.
+set(scene basic/usdCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder storm arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
     mayaHydra_add_cmd_line_render_test(${scene}
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-        RENDERER HdStormRendererPlugin
-        TEST_NAME_SUFFIX Storm
-        RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -im ${sceneFileNameNoExt}"
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
     )
-
-    # Test a render using a different camera than that from the fallback
-    # USD resolution settings: USD camera.
-    set(scene basic/usdCamera.ma)
-    cmake_path(GET scene STEM sceneFileNameNoExt)
-    foreach(folder storm arnold)
-        _mayaHydra_renderer_for_folder(${folder} renderer suffix)
-        mayaHydra_add_cmd_line_render_test(${scene}
-            COPY_SCENE
-            RENDERED_IMAGE_SUBDIR projects/default/images
-            RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-            RENDERER ${renderer}
-            TEST_NAME_SUFFIX ${suffix}
-            RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
-        )
-    endforeach()
-endif()
+endforeach()
 
 # Animated rig render.  As frame number resolution is only available for
 # Hydra v2 render settings renderers, HdStorm is excluded here.
@@ -463,6 +451,75 @@ foreach(folder arnold)
         RENDERER_ARGS "-x 960 -y 540 -s 1 -e 10 -cam \"|camera1_group|camera1\""
     )
 endforeach()
+
+# Session layer renders.  Tests are:
+# - override UsdDefaultRenderDescription stage.  This does not require a
+#   -sessionLayerStage argument.
+# - override MayaUsdProxyShape stage.  This requires a -sessionLayerStage
+#   argument to specify the stage onto which the session layer must be applied.
+# - illegal path to session layer.  This should produce an error and fail.
+# - illegal UFE path to MayaUsdProxyShape stage.  This should produce an error
+#   and fail.
+set(scene sessionLayer/defaultRenderDescriptionRenderSettings.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    # Default output resolution is (2048, 1080), session layer override
+    # sets (720, 480).
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        RENDERER_ARGS "-sessionLayer \"${CMAKE_CURRENT_SOURCE_DIR}/scenes/sessionLayer/defaultRenderDescriptionSessionLayer.usda\" -sessionLayerStage UsdDefaultRenderDescription -im ${sceneFileNameNoExt}"
+    )
+endforeach()
+
+set(scene sessionLayer/proxyShapeRenderSettings.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    # proxyShapeRenderSettings.usda specifies the output resolution to be
+    # (1920, 1080), session layer override in proxyShape sets (720, 480).
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        RENDERER_ARGS "-sessionLayer \"${CMAKE_CURRENT_SOURCE_DIR}/scenes/sessionLayer/proxyShapeSessionLayer.usda\" -sessionLayerStage \"|renderSettings|renderSettingsShape\" -im ${sceneFileNameNoExt}"
+    )
+endforeach()
+
+# Both tests below expect Render to exit non-zero, which WILL_FAIL turns into
+# a pass.  Excluded on macOS, where bin/Render is a wrapper script that does
+# not propagate the real exit code (see the framesSetInvalid comment above).
+if(NOT IS_MACOSX)
+    # Path to session layer invalid: expect failure.
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER HdArnoldRendererPlugin
+        TEST_NAME_SUFFIX failNoSessionLayer
+        RENDERER_ARGS "-sessionLayer failNoSessionLayer.usda -sessionLayerStage \"|renderSettings|renderSettingsShape\" -im ${sceneFileNameNoExt}"
+    )
+    set_tests_properties("${sceneFileNameNoExt}_failNoSessionLayer"
+        PROPERTIES WILL_FAIL TRUE)
+
+    # Session layer stage invalid: expect failure.
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER HdArnoldRendererPlugin
+        TEST_NAME_SUFFIX failNoSessionLayerStage
+        RENDERER_ARGS "-sessionLayer \"${CMAKE_CURRENT_SOURCE_DIR}/scenes/sessionLayer/proxyShapeSessionLayer.usda\" -sessionLayerStage \"|fail|no|session|layer|stage\" -im ${sceneFileNameNoExt}"
+    )
+    set_tests_properties("${sceneFileNameNoExt}_failNoSessionLayerStage"
+        PROPERTIES WILL_FAIL TRUE)
+endif()
 
 # PRMan production rendering tests (Windows only).  Hydra V2 render settings and
 # isolated RenderMan config are applied automatically in cmake/test.cmake when
