@@ -28,15 +28,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testDagChanges.py
     testMeshes.py|skipOnRenderer:HdFlash
     testNamespaces.py|skipOnRenderer:HdFlash
-    testVisibility.py|skipOnRenderer:HdFlash
+    testVisibility.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
     testTransforms.py
-    testRefinement.py|skipOnRenderer:HdFlash
+    testRefinement.py|skipOnRenderer:HdFlash # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
-    testMayaShadingModes.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX
-    testMayaDisplayLayers.py|skipOnRenderer:HdFlash
+    testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testMayaDisplayLayers.py
     testMayaIsolateSelect.py
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
@@ -55,12 +55,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testObjectTemplate.py
     testStandardSurface.py
     testOpenPBRSurface.py
-    testFlowViewportAPI.py|skipOnRenderer:HdFlash
+    testFlowViewportAPI.py
     testStagePayloadsReferences.py
     testNurbsPrimitives.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testCurveTools.py
     testPolygonPrimitives.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testFootPrintNode.py|skipOnRenderer:HdFlash
+    testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
     testUsdTextureToggle.py|skipOnRenderer:HdFlash
@@ -89,7 +89,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testRenderRegion.py
     testConvergence.py
     testFramePasses.py
-    testImagePlanes.py|skipOnRenderer:HdFlash
+    testImagePlanes.py|skipOnRenderer:HdFlash # AGP-1037 : Image plane updates is inconsistent
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
