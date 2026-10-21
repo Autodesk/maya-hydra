@@ -1329,6 +1329,9 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
             }
         }
 
+        // Deduplicate prims in case they were both in the render index and scene index
+        tempPrimIds.erase(std::unique(tempPrimIds.begin(), tempPrimIds.end()), tempPrimIds.end());
+
         // Concatenate results
         if (tempPrimIds.size()) { 
             primIds.reserve(
@@ -1340,7 +1343,6 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
 
     // Sort them by lexicographically order
     std::sort(primIds.begin(), primIds.end(), std::less<SdfPath>());
-    primIds.erase(std::unique(primIds.begin(), primIds.end()), primIds.end());
     return primIds;
 }
 
