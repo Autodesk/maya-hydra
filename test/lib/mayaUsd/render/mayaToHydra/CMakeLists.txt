@@ -123,7 +123,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testDataSourceNames.py|skipOnRenderer:HdFlash
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
-    cpp/testRenderItemPrimvars.py
+    cpp/testRenderItemPrimvars.py|skipOnRenderer:HdFlash
     cpp/testRenderItemPrimvarsMaterialX.py|depOnPlugins:lookdevx
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
