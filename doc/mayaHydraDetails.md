@@ -29,8 +29,6 @@ graph LR
 ### Color Management(CM)
 Maya's Color Managment is applied to all applicable viewports including viewport overrides. MayaHydra plugin override inherits this behavior. So the final frame rendered out from Hydra undergoes Maya's CM. All workflows pertaining to CM within Maya remain the same so user can configure CM with MayaHydra as they would for a VP2 viewport. 
 
-Hydra also support CM internally via Hydra Tasks. In the current version of the plugin, Hydra's CM is not applied. There are a couple of blockers for this to implemented at the moment(5th Oct 2023). USD is on OCIO v1 and Maya uses OCIO v2. There are some incompatibilities with these two versions and can lead to unpredictable behaviour.
-
 ### Data Access and Interpretation
 
 Maya contains many different object types and features that affect how they render.  To try to replicate that rendering, a plugin viewport would have to access the raw data of each object through node attributes and to reimplement the display logic. This makes supporting a wide range of object types and features too costly.
