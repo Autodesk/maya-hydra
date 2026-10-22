@@ -104,6 +104,13 @@ if(IS_WINDOWS)
     _mayaHydra_add_texturing_variant(prman "-x 160 -y 120")
 endif()
 
+# On macOS with HdStorm renders diverge slightly from the baseline in lighting
+# falloff regions.
+set(_hdStorm_fail_arg "")
+if(IS_MACOSX)
+    set(_hdStorm_fail_arg FAIL 0.02)
+endif()
+
 foreach(scene ${STORM_RENDER_SCENES})
     cmake_path(GET scene STEM sceneFileNameNoExt)
     mayaHydra_add_cmd_line_render_test(${scene}
@@ -111,6 +118,7 @@ foreach(scene ${STORM_RENDER_SCENES})
         RENDERER HdStormRendererPlugin
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        ${_hdStorm_fail_arg}
         RENDERER_ARGS "-x 960 -y 540 -im ${sceneFileNameNoExt}"
     )
 endforeach()
@@ -418,6 +426,7 @@ mayaHydra_add_cmd_line_render_test(${scene}
     RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
     RENDERER HdStormRendererPlugin
     TEST_NAME_SUFFIX Storm
+    ${_hdStorm_fail_arg}
     RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -im ${sceneFileNameNoExt}"
 )
 
@@ -427,12 +436,17 @@ set(scene basic/usdCamera.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 foreach(folder storm arnold)
     _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    set(_usdCamera_fail_arg "")
+    if(folder STREQUAL "storm")
+        set(_usdCamera_fail_arg ${_hdStorm_fail_arg})
+    endif()
     mayaHydra_add_cmd_line_render_test(${scene}
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
         RENDERER ${renderer}
         TEST_NAME_SUFFIX ${suffix}
+        ${_usdCamera_fail_arg}
         RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
     )
 endforeach()
