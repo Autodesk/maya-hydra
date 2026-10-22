@@ -25,8 +25,12 @@
 
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/extentSchema.h>
+#include <pxr/imaging/hd/overlayContainerDataSource.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
+#include <pxr/usd/usdGeom/modelAPI.h>
 
 #include <ufe/scene.h>
 #include <ufe/sceneNotification.h>
@@ -149,13 +153,17 @@ MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
     const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
     const MObjectHandle&                   dagNodeHandle,
     const SdfPath&                         sceneIndexPathPrefix,
-    const Ufe::Path&                       sceneIndexAppPath
+    const Ufe::Path&                       sceneIndexAppPath,
+    const std::shared_ptr<UsdStageRefPtr>& sharedStage,
+    const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex
 )
     : ParentClass(sceneIndexChainLastElement)
     , InputSceneIndexUtils(sceneIndexChainLastElement)
     , _sceneIndexPathPrefix(sceneIndexPathPrefix)
     , _usdImagingStageSceneIndex(usdImagingStageSceneIndex)
     , _proxyStage(proxyStage)
+    , _sharedStage(sharedStage)
+    , _extentsHintSceneIndex(extentsHintSceneIndex)
     , _dagNodeHandle(dagNodeHandle)
     , _sceneIndexAppPath(sceneIndexAppPath)
     , _usdPathMapper(std::make_shared<UsdPathMapper>(*this))
@@ -209,12 +217,14 @@ MayaUsdProxyShapeSceneIndexBaseRefPtr MayaUsdProxyShapeSceneIndexBase::New(
     const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
     const MObjectHandle&                   dagNodeHandle,
     const SdfPath&                         sceneIndexPathPrefix,
-    const Ufe::Path&                       sceneIndexAppPath
+    const Ufe::Path&                       sceneIndexAppPath,
+    const std::shared_ptr<UsdStageRefPtr>& sharedStage,
+    const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex
 )
 {
     return TfCreateRefPtr(new MayaUsdProxyShapeSceneIndexBase(
         proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle,
-        sceneIndexPathPrefix, sceneIndexAppPath));
+        sceneIndexPathPrefix, sceneIndexAppPath, sharedStage, extentsHintSceneIndex));
 }
 
 void MayaUsdProxyShapeSceneIndexBase::UpdateTime()
@@ -222,6 +232,19 @@ void MayaUsdProxyShapeSceneIndexBase::UpdateTime()
     if (_usdImagingStageSceneIndex && _dagNodeHandle.isValid()) {
         _usdImagingStageSceneIndex->SetTime(_proxyStage.getTime());//We have the possibility to scale and offset the time in _proxyShapeBase
     }
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::IsModelWithAuthoredExtentsHint(
+    const SdfPath& primPath) const
+{
+    if (!_stage) {
+        return false;
+    }
+
+    const UsdPrim prim = _stage->GetPrimAtPath(primPath);
+    return prim && prim.IsModel()
+        && UsdGeomModelAPI(prim).GetExtentsHintAttr().HasAuthoredValueOpinion()
+        && (!prim.HasPayload() || !prim.IsLoaded());
 }
 
 void MayaUsdProxyShapeSceneIndexBase::_StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice) 
@@ -254,6 +277,13 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
         return;
     }
 
+    _stage.Reset();
+    if (_sharedStage) {
+        _sharedStage->Reset();
+    }
+    if (_extentsHintSceneIndex) {
+        _extentsHintSceneIndex->RefreshSyntheticPrims();
+    }
     _usdImagingStageSceneIndex->SetStage(nullptr);
     _populated = false;
     // Simply mark populate as dirty and do not call
@@ -277,24 +307,56 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
 void MayaUsdProxyShapeSceneIndexBase::_ObjectsChanged(
     const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice)
 {
-    PopulateAndApplyPendingChanges();
+    const bool isResync = !notice.GetNotice().GetResyncedPaths().empty();
+    if (!isResync) {
+        PopulateAndApplyPendingChanges();
+        return;
+    }
+
+    const UsdStageRefPtr stage = _proxyStage.getUsdStage();
+    _stage = stage;
+    if (_sharedStage) {
+        *_sharedStage = stage;
+    }
+    if (_extentsHintSceneIndex) {
+        _extentsHintSceneIndex->RemoveStaleSyntheticPrims();
+    }
+    Populate();
+    _usdImagingStageSceneIndex->ApplyPendingUpdates();
+    if (_extentsHintSceneIndex) {
+        _extentsHintSceneIndex->AddNewSyntheticPrims();
+    }
 }
 
 void MayaUsdProxyShapeSceneIndexBase::PopulateAndApplyPendingChanges() 
 { 
     Populate();
     _usdImagingStageSceneIndex->ApplyPendingUpdates();
+    if (_extentsHintSceneIndex) {
+        _extentsHintSceneIndex->RefreshSyntheticPrims();
+    }
 }
 
 void MayaUsdProxyShapeSceneIndexBase::Populate()
 {
     if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
-        // Check whether the pseudo-root has children
-        if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+        bool hasAuthoredRootPrims = false;
+        if (stage) {
+            const auto rootPrims = stage->GetRootLayer()->GetRootPrims();
+            hasAuthoredRootPrims = rootPrims.begin() != rootPrims.end();
+        }
+        if (hasAuthoredRootPrims) {
             ++_nbPopulateCalls;
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
+            _stage = stage;
+            if (_sharedStage) {
+                *_sharedStage = stage;
+            }
             _usdImagingStageSceneIndex->SetStage(stage);
+            if (_extentsHintSceneIndex) {
+                _extentsHintSceneIndex->RefreshSyntheticPrims();
+            }
             // Set the initial time
             UpdateTime();
             _populated = true;
@@ -322,7 +384,35 @@ Ufe::Path MayaUsdProxyShapeSceneIndexBase::InterpretRprimPath(
 // satisfying HdSceneIndexBase
 HdSceneIndexPrim MayaUsdProxyShapeSceneIndexBase::GetPrim(const SdfPath& primPath) const
 {
-    return GetInputSceneIndex()->GetPrim(primPath);
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+    if (!prim.dataSource || !prim.primType.IsEmpty()
+        || !IsModelWithAuthoredExtentsHint(primPath)) {
+        return prim;
+    }
+
+    HdExtentSchema existingExtent = HdExtentSchema::GetFromParent(prim.dataSource);
+    if (existingExtent.GetMin() && existingExtent.GetMax()) {
+        return prim;
+    }
+
+    VtVec3fArray extentsHint;
+    const UsdPrim primOnStage = _stage->GetPrimAtPath(primPath);
+    if (!UsdGeomModelAPI(primOnStage).GetExtentsHint(&extentsHint)
+        || extentsHint.size() < 2) {
+        return prim;
+    }
+
+    const HdContainerDataSourceHandle extentOverlay
+        = HdRetainedContainerDataSource::New(
+            HdExtentSchemaTokens->extent,
+            HdExtentSchema::Builder()
+                .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(
+                    GfVec3d(extentsHint[0])))
+                .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(
+                    GfVec3d(extentsHint[1])))
+                .Build());
+    prim.dataSource = HdOverlayContainerDataSource::New(extentOverlay, prim.dataSource);
+    return prim;
 }
 
 SdfPathVector MayaUsdProxyShapeSceneIndexBase::GetChildPrimPaths(const SdfPath& primPath) const
