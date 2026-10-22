@@ -270,6 +270,22 @@ HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(
 );
 
 /**
+ * @brief Get the name of the renderer of the (first) Hydra viewport, as reported by the
+ * viewport information interface.
+ *
+ * @return The renderer name, or an empty string if there is no Hydra viewport.
+ */
+std::string GetActiveRendererName();
+
+/**
+ * @brief Whether the given renderer name (from GetActiveRendererName()) is Storm.
+ *
+ * Several light adapters pick their Hydra prim type from this: Storm gets simpleLight,
+ * other renderers get a UsdLux-style type (distantLight, sphereLight, ...).
+ */
+bool IsStormRendererName(const std::string& rendererName);
+
+/**
 * @class A utility class to accumulate and read SceneIndex notifications sent by a SceneIndex.
 */
 class SceneIndexNotificationsAccumulator : public HdSceneIndexObserver

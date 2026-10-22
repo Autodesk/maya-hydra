@@ -20,6 +20,7 @@
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/mixedUtils.h>
 
+#include <flowViewport/API/fvpInformationInterface.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
@@ -195,6 +196,19 @@ Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
     auto selectionSiBase = findSceneIndexInTree(
         sceneIndex, isFvpSelectionSceneIndex);
     return TfDynamic_cast<Fvp::SelectionSceneIndexRefPtr>(selectionSiBase);
+}
+
+std::string GetActiveRendererName()
+{
+    Fvp::InformationInterface::RenderViewDescSet viewDescs;
+    Fvp::InformationInterface::Get().GetAllRenderViewDescs(viewDescs);
+    return viewDescs.empty() ? std::string() : viewDescs.cbegin()->_rendererName;
+}
+
+bool IsStormRendererName(const std::string& rendererName)
+{
+    // Renderer name reported by the viewport information interface for Storm.
+    return rendererName == "GL";
 }
 
 HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(

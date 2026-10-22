@@ -59,10 +59,18 @@ TEST(DataSourceNames, LightContainerAdvertisesAndServesLeafParams)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    // Under Storm a Maya directional light is translated to a simpleLight prim.
-    HdSceneIndexBaseRefPtr sceneIndexWithLight = FindTerminalSceneIndexWithPrim(
-        sceneIndices, "directionalLightShape", HdPrimTypeTokens->simpleLight);
-    ASSERT_TRUE(sceneIndexWithLight) << "directionalLight prim not found in any scene index";
+    // Under Storm a Maya directional light is translated to a simpleLight prim; other
+    // renderers get a distantLight (see MayaHydraDirectionalLightAdapter::LightType).
+    const std::string rendererName = GetActiveRendererName();
+    ASSERT_FALSE(rendererName.empty()) << "No Hydra viewport found to determine the renderer";
+    const TfToken lightType = IsStormRendererName(rendererName) ? HdPrimTypeTokens->simpleLight
+                                                                : HdPrimTypeTokens->distantLight;
+
+    HdSceneIndexBaseRefPtr sceneIndexWithLight
+        = FindTerminalSceneIndexWithPrim(sceneIndices, "directionalLightShape", lightType);
+    ASSERT_TRUE(sceneIndexWithLight)
+        << "directionalLight prim of type " << lightType.GetText()
+        << " not found in any scene index (renderer '" << rendererName << "')";
 
     // Inspect the MayaHydraSceneIndex directly so we read our data source output
     // unfiltered by any downstream terminal scene index.
@@ -71,7 +79,7 @@ TEST(DataSourceNames, LightContainerAdvertisesAndServesLeafParams)
 
     SceneIndexInspector inspector(mayaSceneIndex);
     PrimEntriesVector   foundPrims = inspector.FindPrims(
-        CreatePrimPredicate("directionalLightShape", HdPrimTypeTokens->simpleLight), 1);
+        CreatePrimPredicate("directionalLightShape", lightType), 1);
     ASSERT_GE(foundPrims.size(), 1u) << "directionalLight not found in MayaHydraSceneIndex";
 
     HdSceneIndexPrim prim = foundPrims.front().prim;
