@@ -349,17 +349,12 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
     HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
 
     if (_mayaHydraSceneIndex) {
-        if (!TF_VERIFY(
-                _mayaHydraSceneIndex->useMeshAdapter(),
-                "The environment variable MAYA_HYDRA_USE_MESH_ADAPTER is turned off "
-                "explicitly. Please either remove that environment variable or turn it on to "
-                "use production rendering.")) {
-            return;
-        }
-    }
+        // Batch rendering must use mesh adapter mode for Maya meshes.  The
+        // MAYA_HYDRA_USE_MESH_ADAPTER environment variable is used only for
+        // viewport rendering and has no effect on batch rendering.
+        TF_AXIOM(_mayaHydraSceneIndex->useMeshAdapter());
 
-    // Update shadow collection for lights
-    if (_mayaHydraSceneIndex) {
+        // Update shadow collection for lights
         _mayaHydraSceneIndex->UpdateLightsShadowCollection();
     }
 
