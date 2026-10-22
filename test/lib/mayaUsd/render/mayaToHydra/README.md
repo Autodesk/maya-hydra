@@ -93,11 +93,11 @@ To add a new Python-only test suite :
     if __name__ == '__main__':
         fixturesUtils.runTests(globals())
     ```
-7. Add the name of your test[...].py file to a list in the [current folder's CMakeLists.txt](./CMakeLists.txt). Use `INTERACTIVE_TEST_SCRIPT_FILES` by default. The other lists run the test with a different environment: `INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER` (mesh adapter), `INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE` (VP2 render delegate enabled) and `INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL`.
+7. Add the name of your test[...].py file to a list in the [current folder's CMakeLists.txt](./CMakeLists.txt)
 8. If the test cannot run with some renderer, platform or plugin, add labels (see [Adding labels for tests](#adding-labels-for-tests)). If it is outline-only or legacy-only, add it to the matching list described in [Selection highlighting modes](#selection-highlighting-modes).
 
 Some important notes :
-- Before each test, a new file will be opened and the selected test renderer will be activated (see [How tests use the selected renderer](#how-tests-use-the-selected-renderer)).
+- Before each test, a new file will be opened and the selected test renderer will be activated. If you need to switch between renderers, see [How tests use the selected renderer](#how-tests-use-the-selected-renderer).
 - Some test settings (such as turning color management off, disabling the grid, etc.) are applied by default when opening a scene using `mayaUtils.openNewScene` or `mayaUtils.openTestScene`. The new scene opened before each test is opened using `mayaUtils.openNewScene`, meaning those test settings will automatically be applied before each test. These methods provide the option not to apply those settings if desired, by passing in `useTestSettings=False`. If you want to test a setting that is modified as part of those test settings, you can either re-set it explicitly in the test, and/or load a scene with the desired settings by calling `mayaUtils.openTestScene(<path arguments>, useTestSettings=False)`. In case you want to avoid ever changing the test settings entirely, you can also override the `setUp` method.
 
 # Best practices
@@ -123,8 +123,6 @@ The `assertSnapshotClose` method takes a snapshot of the current viewport and co
 
 To create a reference snapshot, an easy way is to first write your test, and then run it once. The output snapshot of the test will then be located in your build folder under `build/[RelWithDebInfo|Debug]/test/lib/mayaUsd/render/mayaToHydra/[testName]_[TestClassName]_[mode]Output`, where `[mode]` is `outline` or `legacy`. If the snapshot corresponds to the expected result, you can then copy it over to your `[TestName]Test` folder as mentioned above in step 3. This ensures that the reference image was created with the same playblast settings that will be used when running the tests (e.g. width and height). If this method doesn't suit you, you can use the playblast command directly in Maya yourself, or any other method that fits your needs.
 
-On a failed HdFlash comparison, the test code also copies the failing snapshot into `[TestName]Test/flash/` (plus `outline/` and the `imageVersion` subfolder as applicable) so it can be reviewed and committed as the Flash baseline. This is a temporary helper (`_copyFlashBaselineOnFailure` in mtohUtils.py).
-
 ## Reference image lookup
 
 The image passed to `assert[...]` is resolved by `rendererUtils.resolveReferenceImage()` (called by `MayaHydraBaseTestCase.resolveRefImage()`). The first existing file wins:
@@ -136,8 +134,8 @@ The image passed to `assert[...]` is resolved by `rendererUtils.resolveReference
 [TestName]Test/<imageVersion>/<file>
 ```
 
-- `<renderer>` is `storm` or `flash`, `<mode>` is `outline` or `legacy`, and `<imageVersion>` is the optional `imageVersion` argument of the assert (it is never dropped by the fallbacks).
-- Only add a renderer or mode folder when the image differs from the shared baseline. Images at the shared level are used by both renderers and both modes.
+- `<renderer>` is `storm` or `flash`, `<mode>` is `outline` or `legacy`, and `<imageVersion>` is the optional `imageVersion` argument of the assert.
+- Only add a renderer or mode folder when the image differs from the shared baseline. Images at the shared level are used by all renderers and modes.
 - `imageVersion` is chosen per image by the test code (for example a USD version, or a Maya build property such as `RenderItemHasCullModeAPI`). It is not a configuration setting like renderer and mode.
 - Folder names are case sensitive on Linux and macOS, so make sure the `imageVersion` string matches the folder name exactly.
 
@@ -150,9 +148,9 @@ For example, you might have some tests that are all related to 'performance', so
 
 To add label in MayaHydra test suite
 1. For any particlar unit test of interest in [CMakeLists.txt](./CMakeLists.txt), add the required labels with the following convention:
-    `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]|skipOnRenderer:HdFlash`
+    `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]|skipOnRenderer:[HdStorm,HdFlash]`
 2. Where the label groups follows the unit test name and are separated by `'|'`. You may have multiple label groups.
-3. The label groups are of key:values type. The `depOnPlugins` and `skipOnPlatform` values correspond to the accompanying [json file](../../../../../../maya-hydra/tests-to-run.json). `skipOnRenderer` is handled by build.py using the selected test renderer and needs no JSON entry.
+3. The label groups are of key:values type. type. The label key can be any meaningful string and has correspondence to the accompanying [json file](../../../../../../maya-hydra/tests-to-run.json)
 4. The label values are comma separated lists. The values are added to the test via cmake's `set_tests_properties`
 
 MayaHydra currently is filtering tests based on dependent plugins and platform on which to run them.
@@ -160,7 +158,7 @@ MayaHydra currently is filtering tests based on dependent plugins and platform o
 To add flags to ctest commandline, modify the corresponding [JSON file](../../../../../../maya-hydra/tests-to-run.json) to indicate which test to run or skip. 
 For ex: if you want to run only tests tagged with "lookdevx" then edit the json file like so: `"plugins_to_include": ["lookdevx"]`. If the include list is empty, all tests are run by default. Similarly, edit `"plugins_to_exclude"` in the json file to skip test with certain labels.
 
-Note that for platform dependent runs, we only support exclusion mode for a single platform. build.py only excludes the labels listed in `"platforms_to_exclude"` of the json file (currently `["osx"]`) for the current platform. So `skipOnPlatform:osx` skips on MacOS because `"osx"` is in that list; tagging a test with a platform missing from the list has no effect when running through build.py.
+Note that for platform dependent runs, we only support exclusion mode for a single platform. So if you tag the test `skipOnPlatform:osx`, it skips on MacOS. No corresponding changes to json file is required in this case.
 
 Label mapping
 As mentioned earlier in (4), the label key/values in CMakeLists have a correspondence to the values in [JSON file](../../../../../../maya-hydra/tests-to-run.json). For ex:
@@ -176,10 +174,7 @@ Similar pattern applies for exclusion/inclusion of tests by filenames except tha
 Note that `depOnPlugins` key string is only used as cue while adding values in the JSON. The variables in the JSON file and the label values in the CMakeLists.txt are what get used by ctest for label matching.
 `"files_to_exclude": ["testStandardSurface"]`
 
-`files_to_include` and `files_to_exclude` entries are CTest regexes matched against test names. build.py merges `files_to_exclude` with any `-E` passed in `--ctest-args` into a single `-E` (CTest honors only one).
-
-The supported values for platform exclusion are: "osx", "win", "lin". The
-supported renderer exclusion values are: "HdStorm", "HdFlash" (set in CMakeLists.txt only, not in the json file).
+The supported values for platform exclusion are: "osx", "win", "lin".
 
 
 
