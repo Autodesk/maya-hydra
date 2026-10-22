@@ -175,7 +175,7 @@ endif()
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py|skipOnRenderer:HdFlash)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
 endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
