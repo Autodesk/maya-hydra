@@ -26,7 +26,7 @@ namespace {
     std::shared_ptr<InfoClientTest> _infoClientTest;
 
     //Storm renderer name
-    const std::string _stormRendererName ("GL");
+    const std::string _stormRendererName (PXR_NS::GetExpectedTestRendererName());
 }
 
 //The test is done through 3 Steps in the python script testFlowViewportAPIViewportInformation.py, function test_RendererSwitching

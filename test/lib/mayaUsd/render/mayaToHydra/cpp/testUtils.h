@@ -286,6 +286,12 @@ std::string GetActiveRendererName();
 bool IsStormRendererName(const std::string& rendererName);
 
 /**
+ * @brief Renderer name the viewport information interface reports for the renderer selected
+ * for this test run (MAYAHYDRA_TEST_RENDERER): "GL" for Storm (default), "HdFlash" for Flash.
+ */
+std::string GetExpectedTestRendererName();
+
+/**
 * @class A utility class to accumulate and read SceneIndex notifications sent by a SceneIndex.
 */
 class SceneIndexNotificationsAccumulator : public HdSceneIndexObserver

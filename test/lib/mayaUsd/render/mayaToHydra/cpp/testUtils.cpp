@@ -55,6 +55,7 @@
 #include <QApplication>
 
 #include <algorithm>
+#include <cstdlib>
 #include <sstream>
 #include <cctype>
 #include <exception>
@@ -209,6 +210,12 @@ bool IsStormRendererName(const std::string& rendererName)
 {
     // Renderer name reported by the viewport information interface for Storm.
     return rendererName == "GL";
+}
+
+std::string GetExpectedTestRendererName()
+{
+    const char* renderer = std::getenv("MAYAHYDRA_TEST_RENDERER");
+    return (renderer && std::string(renderer) == "HdFlash") ? "HdFlash" : "GL";
 }
 
 HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(
