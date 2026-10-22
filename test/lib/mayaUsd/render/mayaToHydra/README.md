@@ -150,7 +150,7 @@ To add label in MayaHydra test suite
 1. For any particlar unit test of interest in [CMakeLists.txt](./CMakeLists.txt), add the required labels with the following convention:
     `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]|skipOnRenderer:[HdStorm,HdFlash]`
 2. Where the label groups follows the unit test name and are separated by `'|'`. You may have multiple label groups.
-3. The label groups are of key:values type. type. The label key can be any meaningful string and has correspondence to the accompanying [json file](../../../../../../maya-hydra/tests-to-run.json)
+3. The label groups are of key:values type. The label key can be any meaningful string and has correspondence to the accompanying [json file](../../../../../../maya-hydra/tests-to-run.json)
 4. The label values are comma separated lists. The values are added to the test via cmake's `set_tests_properties`
 
 MayaHydra currently is filtering tests based on dependent plugins and platform on which to run them.
