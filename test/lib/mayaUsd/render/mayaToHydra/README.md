@@ -94,7 +94,7 @@ To add a new Python-only test suite :
         fixturesUtils.runTests(globals())
     ```
 7. Add the name of your test[...].py file to a list in the [current folder's CMakeLists.txt](./CMakeLists.txt)
-8. If the test cannot run with some renderer, platform or plugin, add labels (see [Adding labels for tests](#adding-labels-for-tests)). If it is outline-only or legacy-only, add it to the matching list described in [Selection highlighting modes](#selection-highlighting-modes).
+8. If the test cannot run with some renderer, platform or plugin, add labels (see [Adding labels for tests](#adding-labels-for-tests)).
 
 Some important notes :
 - Before each test, a new file will be opened and the selected test renderer will be activated. If you need to switch between renderers, see [How tests use the selected renderer](#how-tests-use-the-selected-renderer).
