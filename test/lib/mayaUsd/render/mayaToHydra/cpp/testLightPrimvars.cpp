@@ -308,13 +308,22 @@ TEST(LightPrimvars, ShadowMapParamsRoundTrip)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    HdSceneIndexBaseRefPtr sceneIndexWithLight = FindTerminalSceneIndexWithPrim(
-        sceneIndices, shapeNamePart, HdPrimTypeTokens->simpleLight);
-    ASSERT_TRUE(sceneIndexWithLight) << "Spot light prim not found in scene index";
+    // Under Storm a Maya spot light is translated to a simpleLight prim; other renderers
+    // get a sphereLight (see MayaHydraSpotLightAdapter::LightType).
+    const std::string rendererName = GetActiveRendererName();
+    ASSERT_FALSE(rendererName.empty()) << "No Hydra viewport found to determine the renderer";
+    const TfToken lightType = IsStormRendererName(rendererName) ? HdPrimTypeTokens->simpleLight
+                                                                : HdPrimTypeTokens->sphereLight;
+
+    HdSceneIndexBaseRefPtr sceneIndexWithLight
+        = FindTerminalSceneIndexWithPrim(sceneIndices, shapeNamePart, lightType);
+    ASSERT_TRUE(sceneIndexWithLight)
+        << "Spot light prim of type " << lightType.GetText()
+        << " not found in scene index (renderer '" << rendererName << "')";
 
     SceneIndexInspector inspector(sceneIndexWithLight);
-    PrimEntriesVector   foundPrims = inspector.FindPrims(
-        CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->simpleLight), 1);
+    PrimEntriesVector   foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, lightType), 1);
     ASSERT_GE(foundPrims.size(), 1u);
 
     HdSceneIndexPrim prim = foundPrims.front().prim;

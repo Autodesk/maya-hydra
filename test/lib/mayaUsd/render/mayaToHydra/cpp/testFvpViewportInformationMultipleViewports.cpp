@@ -25,8 +25,8 @@ namespace {
     //Is a global instance
     std::shared_ptr<InfoClientTest> _infoClientTest;
 
-    //Storm renderer name
-    const std::string _stormRendererName ("GL");
+    //Expected test renderer name
+    const std::string _expectedRendererName (PXR_NS::GetExpectedTestRendererName());
 }
 
 //The test is done through 4 Steps in the python script testFlowViewportAPIViewportInformation.py function test_MultipleViewports
@@ -53,7 +53,7 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
     //We don't call UnregisterInformationClient on purpose as we want to check if the callbacks are called and will unregister it in the code below
 }
 
-//Step 2 : The python script has created 4 viewports and 2 are set to Storm
+//Step 2 : The python script has created 4 viewports and 2 are set to Hydra
 //and _infoClientTest is registered in Fvp::InformationInterface so InfoClientTest::SceneIndexAdded should be have been called twice
 //then it calls viewportInformationMultipleViewports2Viewports
 TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
@@ -66,9 +66,9 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
     informationInterface.GetAllRenderViewDescs(allViewportsInformation);
     ASSERT_EQ(allViewportsInformation.size(), (size_t)2); //we should have 2 Hydra viewports
 
-    //Check renderers name, they all should be Storm
+    //Check renderers name, they all should be the Hydra test renderer
     for (auto info : allViewportsInformation){
-        ASSERT_EQ(info._rendererName, _stormRendererName);
+        ASSERT_EQ(info._rendererName, _expectedRendererName);
     }
 
     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);//Has been called twice
@@ -88,9 +88,9 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports1Viewport)
     informationInterface.GetAllRenderViewDescs(allViewportsInformation);
     ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should have 1 hydra viewport
 
-   //Check renderers name, they all should be Storm
+   //Check renderers name, they all should be the Hydra test renderer
     for (auto info : allViewportsInformation){
-        ASSERT_EQ(info._rendererName, _stormRendererName);
+        ASSERT_EQ(info._rendererName, _expectedRendererName);
     }
 
     //Both should have been called once only
