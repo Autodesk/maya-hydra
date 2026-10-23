@@ -32,7 +32,7 @@ class TestMeshPrimvars(mtohUtils.MayaHydraBaseTestCase):
         # Add a custom attribute (non-param) for NonParamAttrTriggersOnlyPrimvarDirty test
         cmds.addAttr(mesh_shape, longName="testCustomAttr", attributeType="float", defaultValue=0.0)
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhMeshShape", mesh_shape))
         cmds.refresh()
 

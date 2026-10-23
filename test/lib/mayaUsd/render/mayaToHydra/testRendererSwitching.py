@@ -27,9 +27,9 @@ class TestRendererSwitching(mtohUtils.MayaHydraBaseTestCase):
     # the resources by switching to Hydra a second time : this is what this test is for.
     def test_RendererSwitching(self):
         cmds.polySphere() # The crash only occurred when the scene was not empty, so create a dummy sphere.
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.setViewport2Renderer()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

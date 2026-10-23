@@ -34,7 +34,7 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         testFile = mayaUtils.openTestScene(
                 "testStageVariants",
                 "testStageVariants.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
         shapeNode = "variantsShape"

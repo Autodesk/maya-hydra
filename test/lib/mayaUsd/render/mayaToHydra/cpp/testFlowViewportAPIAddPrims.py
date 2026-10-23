@@ -24,7 +24,7 @@ class TestFlowViewportAPIAddPrims(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         #Create a maya sphere named parentSphere
         cmds.polySphere(name="parentSphere") 
         cmds.refresh()

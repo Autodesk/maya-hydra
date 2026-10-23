@@ -40,10 +40,10 @@ class TestMayaComponentsPicking(mtohUtils.MayaHydraBaseTestCase): #Subclassing m
         cmds.select( 'pSphere1.f[1:300]', r=True )
         self.assertSnapshotClose("facesSelVP2" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        self.setHdStormRenderer()
-        self.assertSnapshotClose("facesSelStorm" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.setTestRenderer()
+        self.assertSnapshotClose("facesSelHydra" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.select( 'pSphere1.f[236]', r=True )
-        self.assertSnapshotClose("face236SelStorm" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("face236SelHydra" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Check in wireframe
         cmds.select( 'pSphere1.f[1:200]', r=True )

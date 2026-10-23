@@ -37,7 +37,7 @@ def _scenePath(sceneFileName):
 class TestCancelBatchRender(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _initializeStandalone = False
-    _setHdStormRenderer = False
+    _setTestRenderer = False
     _requiredPlugins = ["mtoa"]
 
     def test_CancelBatchRender(self):

@@ -22,19 +22,19 @@ class TestUVandUDIM(mtohUtils.MayaHydraBaseTestCase):
 
     def test_UVs(self):
         mayaUtils.openTestScene("testUVandUDIM", "testUVs.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
         self.assertSnapshotClose("quads_with_UVs.png", 0.01, 0.2)
 
     def test_UDIMs(self):
         mayaUtils.openTestScene("testUVandUDIM", "testUDIMs.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
         self.assertSnapshotClose("quads_with_UDIMs.png", 0.01, 0.2)
 
     def test_HDR(self):
         mayaUtils.openTestScene("testUVandUDIM", "testHDR.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
         self.assertSnapshotClose("quads_with_HDR.png", 0.05, 0.2)
 

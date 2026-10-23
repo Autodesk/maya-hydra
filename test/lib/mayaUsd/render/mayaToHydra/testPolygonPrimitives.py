@@ -61,7 +61,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         super(TestPolygonPrimitives, self).tearDown()
 
     def setupScene(self, polygonCreationCallable):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         polyCreatorNodeName = polygonCreationCallable()[1]
         cmds.refresh()
         return polyCreatorNodeName

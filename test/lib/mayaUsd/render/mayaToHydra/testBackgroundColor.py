@@ -27,7 +27,7 @@ class TestBackgroundColor(mtohUtils.MayaHydraBaseTestCase):
     def compareBackgroundColor(self, imageName):
         self.setViewport2Renderer()
         self.assertSnapshotClose(imageName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.assertSnapshotClose(imageName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_BackgroundColor(self):

@@ -58,7 +58,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
         self.modifyDefaultLightIntensityByUsdVersion()
 
     def setupScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
     def tearDown(self):
         #is called after each test : finish by a File New command to check that it's not crashing when cleaning up everything'
@@ -119,9 +119,9 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Switch to VP2
             self.setViewport2Renderer()
-            #Switch back to Storm
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("add_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #Switch back to Hydra
+            self.setTestRenderer()
+            self.assertSnapshotClose("add_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test filtering primitives
     def test_FilteringPrimitives(self):
@@ -188,17 +188,17 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Switch to VP2
             self.setViewport2Renderer()
-            #Switch back to Storm
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("filter_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #Switch back to Hydra
+            self.setTestRenderer()
+            self.assertSnapshotClose("filter_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
             #Test unfiltering the sphere after switching renderers (HYDRA-747)
             self.setViewport2Renderer()
             cmds.xform(sphereNode, translation=[0,5,0], scale=[4,4,4])
-            self.setHdStormRenderer()
+            self.setTestRenderer()
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30) #Unfilter the prim
             cmds.refresh()
-            self.assertSnapshotClose("filter_VP2AndThenBackToStorm_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+            self.assertSnapshotClose("filter_VP2AndThenBackToHydra_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
     
     #Test Cube grids parameters
     def test_CubeGrid(self):
@@ -245,9 +245,9 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Switch to VP2
             self.setViewport2Renderer()
-            #Switch back to Storm
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("cubeGrid_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #Switch back to Hydra
+            self.setTestRenderer()
+            self.assertSnapshotClose("cubeGrid_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test multiple nodes
     def test_MultipleNodes(self):
@@ -337,9 +337,9 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Switch to VP2
             self.setViewport2Renderer()
-            #Switch back to Storm
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("multipleNodes_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #Switch back to Hydra
+            self.setTestRenderer()
+            self.assertSnapshotClose("multipleNodes_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test multiple viewports
     def test_MultipleViewports(self):
@@ -348,13 +348,13 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             mel.eval('FourViewLayout')
             #Set focus on persp view
             cmds.setFocus ('modelPanel4') #Is the persp view
-            #Set Storm as the renderer
-            self.setHdStormRenderer()
+            #Set Hydra as the renderer
+            self.setTestRenderer()
             
             #Set focus on model Panel 2 (it's an orthographic view : right) 
             cmds.setFocus ('modelPanel2')
-            #Set Storm as the renderer
-            self.setHdStormRenderer()
+            #Set Hydra as the renderer
+            self.setTestRenderer()
             
             #Create a maya sphere
             sphereNode, sphereShape = cmds.polySphere()
@@ -406,13 +406,13 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             self.setViewport2Renderer()
             self.assertSnapshotClose("multipleViewports_VP2_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             
-            #Switch back to Storm
+            #Switch back to Hydra
             cmds.setFocus ('modelPanel4')
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.setTestRenderer()
+            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             cmds.setFocus ('modelPanel2')
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.setTestRenderer()
+            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

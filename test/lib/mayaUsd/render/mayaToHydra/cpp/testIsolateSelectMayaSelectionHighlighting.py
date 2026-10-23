@@ -43,8 +43,6 @@ class TestIsolateSelectMayaSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    # Base class setUp() defines HdStorm as the renderer.
-
     _requiredPlugins = ['mayaHydraCppTests']
 
     def setupScene(self):

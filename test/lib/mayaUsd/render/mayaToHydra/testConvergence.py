@@ -24,7 +24,7 @@ class TestConvergence(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestConvergence, self).setUp()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     def createMayaCube(self):
@@ -77,7 +77,7 @@ class TestConvergence(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
         return objectName
     
-    def test_HdStormConvergence(self):
+    def test_Convergence(self):
         # Create a scene with varied data
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()

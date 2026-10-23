@@ -26,7 +26,7 @@ class TestPassFiltering(mtohUtils.MayaHydraBaseTestCase):
 
     def loadScene(self):
         mayaUtils.openTestScene("testPassFiltering", "passFilteringScene.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.select(all=True)
         cmds.refresh(force=True)
 

@@ -28,7 +28,7 @@ class TestMayaUsdUfeItems(mtohUtils.MayaHydraBaseTestCase):
         import mayaUsd_createStageWithNewLayer
         from pxr import UsdGeom, UsdLux
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
         usdProxyShapeUfePathString = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         usdStage = mayaUsd.lib.GetPrim(usdProxyShapeUfePathString).GetStage()

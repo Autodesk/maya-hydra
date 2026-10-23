@@ -133,7 +133,7 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
 
     def buildScene(self):
         self._forceDeterministicMainWindowSize()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh(force=True)
 
         spheres = []

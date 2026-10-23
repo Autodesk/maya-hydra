@@ -62,7 +62,7 @@ class TestStageInstanceablePrimsSelHighlight(mtohUtils.MayaHydraBaseTestCase): #
         testFile = mayaUtils.openTestScene(
                 "testStageInstanceablePrimsSelHighlight",
                 "testInstanceablePrimsSelHighlight.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
         #Get the usd prims

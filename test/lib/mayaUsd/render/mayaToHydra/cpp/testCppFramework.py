@@ -24,13 +24,13 @@ class TestCppFramework(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_Pass(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CppFramework.pass")
 
 
     def test_Fail(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         with PluginLoaded('mayaHydraCppTests'):
             with self.assertRaises(RuntimeError):
                 cmds.mayaHydraCppTest(f="CppFramework.fail")

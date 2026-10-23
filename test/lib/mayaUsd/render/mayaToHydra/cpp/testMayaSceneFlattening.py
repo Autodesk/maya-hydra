@@ -22,7 +22,7 @@ class TestMayaSceneFlattening(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupParentChildScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.polySphere(name="parentSphere")
         cmds.polyCube(name="childCube")
         cmds.parent("childCube", "parentSphere")

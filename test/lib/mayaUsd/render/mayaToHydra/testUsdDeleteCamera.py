@@ -36,10 +36,10 @@ class TestUsdDeleteCamera(mtohUtils.MayaHydraBaseTestCase):
     def test_UsdDeleteCamera(self):
         """
         Test that creates a USD stage with a single USD camera, verifies it is
-        shown in the Hydra Storm viewport, then deletes the USD stage and
+        shown in the Hydra viewport, then deletes the USD stage and
         verifies the camera is no longer shown.
         """
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.setBasicCam(dist=5)
 
         import mayaUsd_createStageWithNewLayer

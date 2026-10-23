@@ -78,11 +78,12 @@ class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
 
     #Test arnold lights (e.g., aiSkyDomeLight,etc.) with a maya native sphere and usd sphere.
     def test_ArnoldLights(self):
-        # Load a maya scene with a maya native sphere, usd sphere and some lights, with HdStorm already being the viewport renderer.
+        # Load a maya scene with a maya native sphere, usd sphere and some lights.
         # The sphere is not at the origin on purpose
         testFile = mayaUtils.openTestScene(
                 "testArnoldLights",
                 "testArnoldLights.ma")
+        self.setTestRenderer()
         cmds.refresh()
 
         #Test Lighting Modes

@@ -22,6 +22,7 @@ import maya.mel
 
 import fixturesUtils
 import mayaUtils
+import rendererUtils
 import testUtils
 from imageUtils import ImageDiffingTestCase
 from testUtils import PluginLoaded
@@ -39,8 +40,6 @@ import subprocess  # nosec B404
 import sys
 import math
 
-HD_STORM = "HdStormRendererPlugin"
-HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
 def setMayaUseHydra(enable=True):
@@ -84,7 +83,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     _requiredPlugins = []
     _pluginsToUnload = []
     _initializeStandalone = False
-    _setHdStormRenderer = True
+    _setTestRenderer = True
 
     #The OpenUSD version
     _usdVersion = None
@@ -106,6 +105,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         and MAYAHYDRA_OUTLINE_MODE_AVAILABLE in the mayaToHydra CMakeLists.txt.
         '''
         if platform.system() == "Darwin":
+            return False
+        # OutlineMaskTask only runs for the Storm render delegate.
+        if rendererUtils.getTestRenderer() != rendererUtils.TEST_RENDERER_STORM:
             return False
         return Usd.GetVersion() > (0, 24, 11)
 
@@ -373,15 +375,15 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         modified = cmds.file(query=True, modified=True)
         assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
 
-        if self._setHdStormRenderer:
-            self.setHdStormRenderer()
+        if self._setTestRenderer:
+            self.setTestRenderer()
 
         # Before cmds.file(modified=False): setting the mode modifies the scene.
         self.applySelectionHighlightMode()
 
         # We've just opened a new scene, so we should not be modified.  Setting
-        # Storm as the renderer should conceptually not change that status, but
-        # unfortunately in automated tests it does (see setHdStormRender()
+        # a Hydra renderer should conceptually not change that status, but
+        # unfortunately in automated tests it does (see setRenderer()
         # method documentation).  Restore modified status to false.
         cmds.file(modified=False)
 
@@ -395,9 +397,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         wantedEnumName = SELECTION_HIGHLIGHT_MODE_ENUM_NAMES[mode]
 
         if not cmds.objExists(SELECTION_HIGHLIGHT_MODE_ATTR):
-            # Scoped to Storm: an unfiltered createRenderGlobals instantiates
+            # Scoped to the test renderer: an unfiltered createRenderGlobals instantiates
             # every render delegate, and an unlicensed HdPrman hangs Maya.
-            cmds.mayaHydra(createRenderGlobals=True, renderer=HD_STORM)
+            cmds.mayaHydra(
+                createRenderGlobals=True,
+                renderer=rendererUtils.getTestRendererPluginName())
 
         if not cmds.objExists(SELECTION_HIGHLIGHT_MODE_ATTR):
             raise RuntimeError(
@@ -525,19 +529,28 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                           "complete after %d attempts" % maxAttempts,
                           file=sys.stderr)
 
-    def setHdStormRenderer(self):
+    def setRenderer(self, renderer):
         self.setMayaUseHydra(True)
         self.activeEditor = cmds.playblast(activeEditor=1)
         cmds.modelEditor(
             self.activeEditor, e=1,
-            rendererOverrideName=HD_STORM_OVERRIDE)
+            rendererOverrideName=rendererUtils.getRendererOverrideName(renderer))
         # During automated tests, tracing demonstrates that the following call
         # to refresh marks the scene as modified, with the modified node being
         # defaultRenderGlobals.  This behavior cannot be reproduced in a
         # non-automated interactive Maya.
         cmds.refresh(f=1)
-        self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
-                                    sceneDelegateId="MayaHydraSceneDelegate")
+        self.delegateId = cmds.mayaHydra(
+            renderer=rendererUtils.getRendererPluginName(renderer),
+            sceneDelegateId="MayaHydraSceneDelegate")
+
+    def setTestRenderer(self):
+        """Activate the renderer selected for this CTest invocation."""
+        self.setRenderer(rendererUtils.getTestRenderer())
+
+    def setHdStormRenderer(self):
+        """Activate Storm for a test that explicitly requires it."""
+        self.setRenderer(rendererUtils.TEST_RENDERER_STORM)
         
     def setViewport2Renderer(self):
         self.setMayaUseHydra(False)
@@ -577,7 +590,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         mayaUtils.openNewScene()
         self.cubeTrans = cmds.polyCube()[0]
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         # openNewScene() reset defaultRenderGlobals, so re-apply the mode before
         # the assertions below (the DormantPolyWire prim only exists in legacy).
         self.applySelectionHighlightMode()
@@ -604,7 +617,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             cmds.setAttr("standardSurface1.specularRoughness", 0.4)
 
     def getIndex(self, **kwargs):
-        return cmds.mayaHydra(renderer=HD_STORM, listRenderIndex=True, **kwargs)
+        return cmds.mayaHydra(
+            renderer=rendererUtils.getTestRendererPluginName(),
+            listRenderIndex=True, **kwargs)
 
     def getVisibleIndex(self, **kwargs):
         kwargs['visibleOnly'] = True
@@ -636,17 +651,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.trace(msg.format(str(self.getIndex())))
 
     def resolveRefImage(self, refImage, imageVersion):
-        if os.path.isabs(refImage):
-            return refImage
-
-        # Prefer <inputDir>/<mode>/[imageVersion/]image and fall back to the
-        # shared image: tests only supply per-mode images where output differs.
-        tail = os.path.join(imageVersion, refImage) if imageVersion else refImage
-        modeImage = os.path.join(
-            self._inputDir, self.selectionHighlightMode(), tail)
-        if os.path.isfile(modeImage):
-            return modeImage
-        return os.path.join(self._inputDir, tail)
+        return rendererUtils.resolveReferenceImage(
+            self._inputDir, rendererUtils.getTestRenderer(),
+            self.selectionHighlightMode(), refImage, imageVersion)
 
     def assertSelectionHighlightModeApplied(self):
         '''Fail if the mode this run was registered for is not the one in effect.
@@ -731,7 +738,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     def assertSnapshotAndCompareVp2(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
                 failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.assertSnapshotClose(refImage, fail, failpercent, imageVersion, hardfail=hardfail,
             failrelative=failrelative, warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, perceptual=perceptual)
 
@@ -739,7 +746,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.assertSnapshotSilhouetteClose(refImage, fail, failpercent, imageVersion, hardfail=hardfail,
             failrelative=failrelative, warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, perceptual=perceptual)
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
     def runCppTest(self, testFilter):
         self.assertSelectionHighlightModeApplied()

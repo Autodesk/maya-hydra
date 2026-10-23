@@ -32,7 +32,7 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
         cmds.file(new=True, force=True)
         cmds.polyCube(name="testCube")
         mesh_shape = cmds.ls("testCubeShape", long=True)[0]
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhMeshShape", mesh_shape))
         cmds.optionVar(stringValue=("mhMeshTransform", cmds.ls("testCube", long=True)[0]))
         cmds.refresh()
@@ -56,7 +56,7 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(tip + ".rotateZ", 90)
         cmds.setKeyframe(tip + ".rotateZ")
         cmds.currentTime(1)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhMeshShape", mesh_shape))
         cmds.optionVar(stringValue=("mhMeshTransform", cmds.ls("skinnedCube", long=True)[0]))
         cmds.refresh()

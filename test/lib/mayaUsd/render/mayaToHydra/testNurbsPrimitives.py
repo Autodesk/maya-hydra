@@ -29,7 +29,7 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         makeNurbNodeName = nurbsCreationCallable()[1]
         cmds.refresh()
         return makeNurbNodeName

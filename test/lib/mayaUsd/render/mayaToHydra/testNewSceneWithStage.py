@@ -25,7 +25,7 @@ class TestStage(mtohUtils.MayaHydraBaseTestCase):
         import mayaUsd_createStageWithNewLayer
         import mayaUsd.lib
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         # create an empty USD Stage
         psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         
@@ -34,7 +34,7 @@ class TestStage(mtohUtils.MayaHydraBaseTestCase):
         cmds.file( f=True, new=True )     
         
         # sanity check
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         # start with a maya sphere
         sphere = cmds.polySphere()
         cmds.refresh()

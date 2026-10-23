@@ -49,10 +49,9 @@ namespace
 
 TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
 {
-    // Get the terminal scene indices from Maya Hydra (with Storm renderer)
-    // This assumes the test is run with Storm as the active renderer
+    // Get the terminal scene indices from Maya Hydra
     const auto& si = GetTerminalSceneIndices();
-    ASSERT_GT(si.size(), 0u) << "No terminal scene indices found. Make sure Maya Hydra with Storm is active.";
+    ASSERT_GT(si.size(), 0u) << "No terminal scene indices found. Make sure a Hydra renderer is active.";
     auto siRoot = si.front();
 
     // Set up an observer to track dirty notifications

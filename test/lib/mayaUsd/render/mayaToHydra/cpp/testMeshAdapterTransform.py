@@ -22,7 +22,7 @@ class TestMeshAdapterTransform(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.polyCube(name="testCube")
         cmds.refresh() # Refresh to create the MeshAdapter and its mesh prim at the origin
 

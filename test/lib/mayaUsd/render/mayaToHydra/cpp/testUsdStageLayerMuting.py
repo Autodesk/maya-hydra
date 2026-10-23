@@ -34,7 +34,7 @@ class TestUsdStageLayerMuting(mtohUtils.MayaHydraBaseTestCase):
         import mayaUsd_createStageWithNewLayer
         from pxr import UsdGeom, Sdf
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
         # Create a USD stage

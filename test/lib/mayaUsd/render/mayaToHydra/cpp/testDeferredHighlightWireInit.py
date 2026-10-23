@@ -25,7 +25,7 @@ class TestDeferredHighlightWireInit(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_DeferredHighlightWireInit(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         panel = self.activeEditor
 
         # Shaded only, so a selected shape's wireframe render item is skipped.

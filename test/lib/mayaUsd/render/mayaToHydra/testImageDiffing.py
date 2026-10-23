@@ -40,7 +40,7 @@ class TestImageDiffing(mtohUtils.MayaHydraBaseTestCase):
     CUBE_SCENE_CAMERA_DISTANCE = 2
 
     def setupCubeScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.makeCubeScene(self.CUBE_SCENE_CAMERA_DISTANCE)
 
     def test_assertImagesClose(self):

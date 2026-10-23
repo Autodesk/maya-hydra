@@ -36,6 +36,12 @@ TF_DEFINE_ENV_SETTING(
     true,
     "Set HdArnold render delegate to use Hydra v2 render settings.");
 
+TF_DEFINE_ENV_SETTING(
+    MAYA_HYDRA_SECONDARY_GRAPHICS_USE_ACTIVE_RENDERER,
+    false,
+    "Use the active renderer for the secondary graphics pass if it supports rendering them, "
+    "instead of always using Storm.");
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -59,6 +65,13 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _hdArnoldUseV2RenderSettings
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS);
         return _hdArnoldUseV2RenderSettings;
+    }
+
+    bool secondaryGraphicsUseActiveRenderer()
+    {
+        static const bool _secondaryGraphicsUseActiveRenderer = PXR_NS::TfGetEnvSetting(
+            PXR_NS::MAYA_HYDRA_SECONDARY_GRAPHICS_USE_ACTIVE_RENDERER);
+        return _secondaryGraphicsUseActiveRenderer;
     }
 
 } // namespace MAYAHYDRA_NS_DEF

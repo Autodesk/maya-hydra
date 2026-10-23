@@ -28,10 +28,11 @@ class TestMayaUsdAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
     IMAGE_DIFF_FAIL_PERCENT = 1
 
     def test_MovingUsdStage(self):
-        # Load a maya scene with a sphere prim in a UsdStage and a directional light, with HdStorm already being the viewport renderer.
+        # Load a maya scene with a sphere prim in a UsdStage and a directional light.
         testFile = mayaUtils.openTestScene(
                 "testMayaUsdAPIUsage",
                 "UsdStageWithSphereMatXStdSurf.ma")
+        self.setTestRenderer()
         cmds.refresh()
         self.assertSnapshotClose("mayaUsdAPI_DirectionalLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
@@ -78,9 +79,9 @@ class TestMayaUsdAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
 
         #Switch to VP2
         self.setViewport2Renderer()
-        #Switch back to Storm
-        self.setHdStormRenderer()
-        self.assertSnapshotClose("mayaUsdAPI__VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #Switch back to Hydra
+        self.setTestRenderer()
+        self.assertSnapshotClose("mayaUsdAPI__VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Finish by a File New command
         cmds.file(new=True, force=True)

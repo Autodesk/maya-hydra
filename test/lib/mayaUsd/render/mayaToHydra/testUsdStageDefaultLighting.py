@@ -48,7 +48,7 @@ class TestUsdStageDefaultLighting(mtohUtils.MayaHydraBaseTestCase): #Subclassing
         cmds.setAttr('persp.rotate', xrot, yrot, zrot, type='float3')
 
     def test_UsdStageDefaultLighting(self):
-        self.setHdStormRenderer()        
+        self.setTestRenderer()
         self.setTextureMode(True)
 
         self.setCameraTransform(-21, 7, 18, -20, -50, 0)

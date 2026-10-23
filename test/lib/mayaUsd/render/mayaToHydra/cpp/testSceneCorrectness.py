@@ -28,7 +28,7 @@ class TestSceneCorrectness(mtohUtils.MayaHydraBaseTestCase):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cube.usda')
         usdUtils.createStageFromFile(usdScenePath)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
     def test_HydraFromUsdSceneCorrectness(self):
         self.loadUsdScene()

@@ -34,7 +34,7 @@ def _scenePath(sceneFileName):
 class TestActiveRenderDescriptionSceneGlobals(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _initializeStandalone = True
-    _setHdStormRenderer = False
+    _setTestRenderer = False
     _requiredPlugins = ["mtoa"]
 
     def _runBranch(self, sceneFileName, testCase):

@@ -21,7 +21,7 @@ class TestCamera(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     def test_DefaultCameras(self):

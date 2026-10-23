@@ -37,7 +37,7 @@ class TestMeshAdapterVisibility(mtohUtils.MayaHydraBaseTestCase):
     # Force a full repopulate so InsertDag re-runs with the current visibility state.
     def repopulate(self):
         self.setViewport2Renderer()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     # What: an invisible mesh must not be inserted into the Hydra render index.
@@ -47,7 +47,7 @@ class TestMeshAdapterVisibility(mtohUtils.MayaHydraBaseTestCase):
         if not os.getenv('MAYA_HYDRA_USE_MESH_ADAPTER'):
             self.skipTest("Visibility filtering on InsertDag only applies to the mesh adapter path.")
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         cmds.polyCube(name="visibleCube")
         cmds.polyCube(name="hiddenCube")
@@ -71,7 +71,7 @@ class TestMeshAdapterVisibility(mtohUtils.MayaHydraBaseTestCase):
         if not os.getenv('MAYA_HYDRA_USE_MESH_ADAPTER'):
             self.skipTest("Visibility filtering on InsertDag only applies to the mesh adapter path.")
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         cmds.polyCube(name="childCube")
         group = cmds.group("childCube", name="hiddenGroup")

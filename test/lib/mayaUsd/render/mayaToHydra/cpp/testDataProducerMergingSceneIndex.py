@@ -22,7 +22,7 @@ class TestMergingSceneIndex(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.polySphere(name="aSphere")
         cmds.refresh()
 

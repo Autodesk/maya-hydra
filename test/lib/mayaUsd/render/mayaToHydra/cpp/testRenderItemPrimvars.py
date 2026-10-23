@@ -27,7 +27,7 @@ class TestRenderItemPrimvars(mtohUtils.MayaHydraBaseTestCase):
 
     def setupScene(self, sceneFolder, sceneFile, meshShape):
         mayaUtils.openTestScene(sceneFolder, sceneFile)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhMeshShape", cmds.ls(meshShape, long=True)[0]))
         cmds.refresh()
 

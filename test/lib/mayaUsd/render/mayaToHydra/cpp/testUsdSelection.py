@@ -37,7 +37,7 @@ class TestUsdSelection(mtohUtils.MayaHydraBaseTestCase):
         import mayaUsd_createStageWithNewLayer
         from pxr import UsdGeom
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
         # Create multiple USD stages.  As of 18-Dec-2023, with Arnold loaded,

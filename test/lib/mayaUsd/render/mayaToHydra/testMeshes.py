@@ -93,7 +93,7 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
 
     @unittest.skipUnless(mayaUtils.hydraFixLevel() > 0, "Requires Data Server render item lifescope fix.")
     def test_sweepMesh(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         with PluginLoaded('sweep'):
             mel.eval("performSweepMesh 0")
             cmds.refresh()
@@ -112,7 +112,7 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
 
     def test_meshSolid(self):
         '''Test that meshes are under the common Solid root for lighting / shadowing.'''
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.polySphere(r=1, sx=20, sy=20, ax=[0, 1, 0], cuv=2 , ch=1)
         cmds.refresh()
 

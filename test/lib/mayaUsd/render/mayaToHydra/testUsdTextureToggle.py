@@ -46,7 +46,7 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     def test_UsdTextureToggleInitiallyOn(self):
         self.setTextureMode(True)
         self.setViewport2Renderer()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.assertSnapshotClose("usd_texture_on" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
         self.setTextureMode(False)
@@ -55,7 +55,7 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     def test_UsdTextureToggleInitiallyOff(self):
         self.setTextureMode(False)
         self.setViewport2Renderer()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.assertSnapshotClose("usd_texture_off" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
         self.setTextureMode(True)

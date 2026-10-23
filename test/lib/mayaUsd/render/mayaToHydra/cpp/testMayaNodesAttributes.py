@@ -479,7 +479,7 @@ class TestMayaNodesAttributes(mtohUtils.MayaHydraBaseTestCase):
         shape_name = "pCubeShape1"
         self._has_typed_numeric = _create_custom_attributes(shape_name)
         _set_custom_attribute_values(shape_name)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     # Create scene with mesh, camera (persp), and aiSkyDomeLight for comprehensive primvar tests.
@@ -491,7 +491,7 @@ class TestMayaNodesAttributes(mtohUtils.MayaHydraBaseTestCase):
         # Create aiSkyDomeLight (Arnold light) for light adapter primvar tests.
         light_transform = cmds.createNode('transform', name='aiSkyDomeLight1')
         cmds.createNode('aiSkyDomeLight', name='aiSkyDomeLightShape1', parent=light_transform)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     # Run the C++ test that validates Arnold defaults.

@@ -25,7 +25,7 @@ class TestMayaHydraSceneIndex(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         cmds.group(empty=True, name="group1")
         cmds.group(empty=True, name="group2", parent="group1")
@@ -45,7 +45,7 @@ class TestMayaHydraSceneIndex(mtohUtils.MayaHydraBaseTestCase):
                      "Coverage builds leak the scene index on purpose (CODE_COVERAGE_WORKAROUND)")
     def test_ReleasedOnHydraRebuild(self):
         """The scene index must be destroyed when Hydra resources are rebuilt (HYDRA-2019)"""
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.polySphere(name="sphere1", subdivisionsX=8, subdivisionsY=8)
         cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):

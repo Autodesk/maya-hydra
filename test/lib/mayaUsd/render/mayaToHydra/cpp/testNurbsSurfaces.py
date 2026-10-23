@@ -21,7 +21,7 @@ class TestNurbsSurfaces(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setupScene(self, nurbsCreationCallable):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.loadPlugin('ArubaTessellator')
         nurbsCreationCallable()
         cmds.refresh()
