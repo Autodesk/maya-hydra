@@ -75,6 +75,10 @@ std::filesystem::path  testOutputDir;
 // not get the opportunity to set these, so we keep track of them manually here.
 Qt::MouseButtons      mouseButtons;
 Qt::KeyboardModifiers keyboardModifiers;
+
+// Renderer names reported by the viewport information interface.
+constexpr const char* kStormRendererName = "GL";
+constexpr const char* kFlashRendererName = "HdFlash";
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -208,14 +212,14 @@ std::string GetActiveRendererName()
 
 bool IsStormRendererName(const std::string& rendererName)
 {
-    // Renderer name reported by the viewport information interface for Storm.
-    return rendererName == "GL";
+    return rendererName == kStormRendererName;
 }
 
 std::string GetExpectedTestRendererName()
 {
     const char* renderer = std::getenv("MAYAHYDRA_TEST_RENDERER");
-    return (renderer && std::string(renderer) == "HdFlash") ? "HdFlash" : "GL";
+    const bool isFlash = renderer && std::string(renderer) == kFlashRendererName;
+    return isFlash ? kFlashRendererName : kStormRendererName;
 }
 
 HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(

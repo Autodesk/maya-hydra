@@ -287,7 +287,7 @@ bool IsStormRendererName(const std::string& rendererName);
 
 /**
  * @brief Renderer name the viewport information interface reports for the renderer selected
- * for this test run (MAYAHYDRA_TEST_RENDERER): "GL" for Storm (default), "HdFlash" for Flash.
+ * for this test run (MAYAHYDRA_TEST_RENDERER): "GL" for Storm, "HdFlash" for Flash.
  */
 std::string GetExpectedTestRendererName();
 
