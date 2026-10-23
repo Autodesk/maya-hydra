@@ -102,7 +102,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPathMapperRegistry.py
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
-    cpp/testFlowViewportAPIViewportInformation.py|skipOnRenderer:HdFlash # HYDRA-2676 : Renderer name mismatch, then crash in SceneIndexAdded
+    cpp/testFlowViewportAPIViewportInformation.py
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
     cpp/testFlowViewportAPIFilterPrims.py
@@ -119,8 +119,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneIndexDirtying.py
     cpp/testFvpDirtyNotifier.py
     cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
-    cpp/testLightPrimvars.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2673 : Spot light prim not found in scene index
-    cpp/testDataSourceNames.py|skipOnRenderer:HdFlash # HYDRA-2674 : Directional light prim not found in any scene index
+    cpp/testLightPrimvars.py|depOnPlugins:mtoa
+    cpp/testDataSourceNames.py
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
     cpp/testRenderItemPrimvars.py|skipOnRenderer:HdFlash # HYDRA-2675 : Maya crash (access violation) in UntexturedToTexturedAcquiresUVs
