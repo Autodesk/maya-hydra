@@ -27,7 +27,6 @@
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
 //STL headers
-#include <atomic>
 #include <unordered_set>
 
 
@@ -108,8 +107,8 @@ protected:
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries&           inoutDirtiedPrimEntries,
         std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>& inoutVisited) const;
 
-    // Set on the render thread, read from selection change notifications.
-    std::atomic<bool> _colorDirtiesEnabled { true };
+    // Read from selection change notifications.
+    bool _colorDirtiesEnabled { true };
 };
 
 } // namespace MAYAHYDRA_NS_DEF
