@@ -37,9 +37,6 @@ namespace {
 const std::string kFootPrintShapeName = "footPrintNotifShape";
 const std::string kCubeName = "footPrintNotifCube";
 
-const HdDataSourceLocator kDisplayColorLocator
-    = HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor);
-
 // Footprint prims live under /MhFootPrint_<ptr>. In legacy selection highlighting, the highlight
 // mirror prims live under /FlowViewportSelectionHighlights and are not footprint prims.
 bool IsFootPrintPath(const SdfPath& path)
@@ -57,14 +54,19 @@ bool IsFootPrintMeshPath(const SdfPath& path)
 
 // Each frame pass has its own terminal scene index. Pass filtering keeps the paths of the prims
 // it filters out but returns them with an empty type and drops their dirty notifications, so
-// pick the terminal scene index where the footprint is actually a mesh.
+// pick the terminal scene index where the footprint has a type: a mesh, or basis curves in
+// bounding box display mode.
 HdSceneIndexBaseRefPtr FindFootPrintTerminalSceneIndex()
 {
     return FindTerminalSceneIndexWithPrim(
         GetTerminalSceneIndices(),
         [](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) {
-            return IsFootPrintMeshPath(primPath)
-                && sceneIndex->GetPrim(primPath).primType == HdPrimTypeTokens->mesh;
+            if (!IsFootPrintMeshPath(primPath)) {
+                return false;
+            }
+            const TfToken primType = sceneIndex->GetPrim(primPath).primType;
+            return primType == HdPrimTypeTokens->mesh
+                || primType == HdPrimTypeTokens->basisCurves;
         });
 }
 
@@ -85,8 +87,9 @@ SdfPathVector GetFootPrintMeshPaths(const HdSceneIndexBaseRefPtr& sceneIndex)
     return meshPaths;
 }
 
-// Before USD 26.05, chained dependency forwarding scene indices downstream of maya-hydra each
-// forward the same dependency dirties, so color dirties are counted where maya-hydra emits them.
+// Before USD 26.05, HdDependencyForwardingSceneIndex duplicated dirty notifications, and the
+// terminal scene index can sit behind several of them. So color dirties are counted at the
+// output of MhDirtySelectionColorsSceneIndex, before any duplication.
 // The scene index has no display name, which defaults to its demangled class name.
 HdSceneIndexBaseRefPtr FindDirtySelectionColorsSceneIndex(const HdSceneIndexBaseRefPtr& terminal)
 {
@@ -115,15 +118,12 @@ size_t CountDirties(
     return count;
 }
 
-} // namespace
-
-// In shaded mode the original prims do not read a selection color: the highlight is drawn by
-// the highlight mirror prims in legacy selection highlighting, or by the outline in outline
-// selection highlighting. So only the lead object change dirties their colors.
-TEST(FootPrintNotifications, shadedSelectionSendsOneColorDirtyPerChange)
+// Selects then deselects the footprint, and expects each of its prims to get
+// expectedDirtiesPerChange wireframe color dirties at each change.
+void ExpectShadedSelectionColorDirties(size_t expectedDirtiesPerChange)
 {
     const HdSceneIndexBaseRefPtr sceneIndex = FindFootPrintTerminalSceneIndex();
-    ASSERT_TRUE(sceneIndex);
+    ASSERT_TRUE(sceneIndex) << "No terminal scene index has the footprint as a mesh.";
     const SdfPathVector meshPaths = GetFootPrintMeshPaths(sceneIndex);
     ASSERT_EQ(meshPaths.size(), 2u);
     const HdSceneIndexBaseRefPtr dirtySelectionColorsSceneIndex
@@ -135,10 +135,29 @@ TEST(FootPrintNotifications, shadedSelectionSendsOneColorDirtyPerChange)
         SceneIndexNotificationsAccumulator accumulator(dirtySelectionColorsSceneIndex);
         ExecuteAndRefresh(command);
         for (const auto& meshPath : meshPaths) {
-            EXPECT_EQ(CountDirties(accumulator, meshPath, kDisplayColorLocator), 1u)
+            EXPECT_EQ(
+                CountDirties(accumulator, meshPath, primvarsOverrideWireframeColorLocator),
+                expectedDirtiesPerChange)
                 << command << ": " << DescribeDirtyPrimEntriesSince(accumulator, 0, meshPath);
         }
     }
+}
+
+} // namespace
+
+// In shaded mode the original prims do not read a selection color. In legacy selection
+// highlighting the highlight mirror prims do, and only the lead object change dirties them.
+TEST(FootPrintNotifications, legacyShadedSelectionSendsOneColorDirtyPerChange)
+{
+    // Exactly one: counted where the dirties are emitted, so this holds on every USD version.
+    ExpectShadedSelectionColorDirties(1u);
+}
+
+// With outline selection highlighting, or with highlighting disabled, no prim reads a selection
+// color in shaded mode, so a selection change sends no color dirty.
+TEST(FootPrintNotifications, shadedSelectionWithoutLegacyHighlightSendsNoColorDirty)
+{
+    ExpectShadedSelectionColorDirties(0u);
 }
 
 // Deselecting a footprint that is not the lead object changes no lead, so only the
@@ -146,7 +165,8 @@ TEST(FootPrintNotifications, shadedSelectionSendsOneColorDirtyPerChange)
 TEST(FootPrintNotifications, wireframeNonLeadDeselectDirtiesWireframeColor)
 {
     const HdSceneIndexBaseRefPtr sceneIndex = FindFootPrintTerminalSceneIndex();
-    ASSERT_TRUE(sceneIndex);
+    ASSERT_TRUE(sceneIndex)
+        << "No terminal scene index has the footprint as a mesh or as bounding box curves.";
     const SdfPathVector meshPaths = GetFootPrintMeshPaths(sceneIndex);
     ASSERT_EQ(meshPaths.size(), 2u);
 

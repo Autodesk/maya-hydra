@@ -27,6 +27,7 @@
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
 //STL headers
+#include <atomic>
 #include <unordered_set>
 
 
@@ -42,7 +43,8 @@ typedef PXR_NS::TfRefPtr<const MhDirtySelectionColorsSceneIndex> MhDirtySelectio
 /// re-pull a color that reflects it.
 ///
 /// dirtyLeadObjectRelatedSelections() handles a change of which object is the lead;
-/// dirtySelectionRelatedPrims() a change of what is selected.
+/// dirtySelectionRelatedPrims() a change of what is selected. Both do nothing while
+/// setColorDirtiesEnabled(false) is in effect.
 class MhDirtySelectionColorsSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<MhDirtySelectionColorsSceneIndex>
 {
@@ -71,6 +73,10 @@ public:
     /// Call with the prims that were selected or deselected.
     MAYAHYDRALIB_API
     void dirtySelectionRelatedPrims(const PXR_NS::SdfPathVector& primPaths);
+
+    /// When disabled, both dirty methods do nothing. Disable it when no prim reads the selection
+    /// colors, e.g. shaded display with outline or force-disabled selection highlighting.
+    void setColorDirtiesEnabled(bool enabled) { _colorDirtiesEnabled = enabled; }
 
 protected:
     
@@ -101,6 +107,9 @@ protected:
         const PXR_NS::SdfPath&                                      primPath,
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries&           inoutDirtiedPrimEntries,
         std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>& inoutVisited) const;
+
+    // Set on the render thread, read from selection change notifications.
+    std::atomic<bool> _colorDirtiesEnabled { true };
 };
 
 } // namespace MAYAHYDRA_NS_DEF
