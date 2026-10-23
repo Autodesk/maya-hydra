@@ -18,6 +18,8 @@
 
 #include "renderOverride.h"
 
+#include <mayaHydraLib/tokens.h>
+
 #include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
@@ -781,7 +783,7 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << quote(desc.key.GetText()) // Label
            << ", $fromAE);\n";
     }
-    if (rendererDesc.rendererName == MtohTokens->HdStormRendererPlugin) {
+    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
         ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
            << ',' << quote("Maximum shadow map size") << ',' // Description
            << quote(_MangleName(MtohTokens->mtohMaximumShadowMapResolution).GetString())
