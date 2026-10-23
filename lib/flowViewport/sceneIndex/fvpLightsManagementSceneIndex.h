@@ -97,10 +97,7 @@ private:
         if (!_IsObserved())return;
         _SendPrimsRemoved(entries);
     }
-    void _PrimsDirtied(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries)override{
-        if (!_IsObserved())return;
-        _SendPrimsDirtied(entries);
-    }
+    void _PrimsDirtied(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries)override;
 
     
     bool _IsDefaultLight(const PXR_NS::SdfPath& primPath)const;
