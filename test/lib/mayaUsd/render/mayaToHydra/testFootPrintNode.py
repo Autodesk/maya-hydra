@@ -513,5 +513,29 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
             self.assertEqual(['MhFootPrint1'], cmds.ls(sl=True))
 
+    # Node names must match testFootPrintNotifications.cpp.
+    def _setupNotificationsScene(self, displayAppearance):
+        self.setupScene()
+        cmds.modelEditor(self.activeEditor, edit=True,
+                         displayAppearance=displayAppearance, wireframeOnShaded=False)
+        cmds.polyCube(name="footPrintNotifCube")
+        cmds.createNode("MhFootPrint", name="footPrintNotifShape")
+        cmds.select(clear=True)
+        cmds.refresh(force=True)
+
+    def test_shadedSelectionNotifications(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self._setupNotificationsScene('smoothShaded')
+            cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionSendsOneColorDirtyPerChange")
+
+    def test_wireframeSelectionNotifications(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            # The display appearance survives a new scene, so restore it for the next tests.
+            try:
+                self._setupNotificationsScene('wireframe')
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.wireframeNonLeadDeselectDirtiesWireframeColor")
+            finally:
+                cmds.modelEditor(self.activeEditor, edit=True, displayAppearance='smoothShaded')
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

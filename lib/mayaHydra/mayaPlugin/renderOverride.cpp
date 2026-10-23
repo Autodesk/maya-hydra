@@ -1993,7 +1993,8 @@ MStatus MtohRenderOverride::Render(
             { SdfPath::AbsoluteRootPath() });
     }
 
-    // Dirty only the prims that were selected or deselected. Lead changes are handled by
+    // Dirty only the prims that were selected or deselected, and only when every prim pulls a
+    // wireframe color, for the same reasons as the dormant color above. Lead changes are handled by
     // dirtyLeadObjectRelatedSelections().
     if (_selection && _dirtySelectionColorsSceneIndex && _selectionColorsDirty.exchange(false)) {
         const SdfPathVector& currentlySelected = getFullySelectedPaths();
@@ -2006,7 +2007,7 @@ MStatus MtohRenderOverride::Render(
             _previouslySelectedPaths.end(),
             std::back_inserter(selectionStateChanged));
 
-        if (!selectionStateChanged.empty()) {
+        if (!selectionStateChanged.empty() && pullsWireframeColorPerPrim && !reprWillBePushed) {
             _dirtySelectionColorsSceneIndex->dirtySelectionRelatedPrims(selectionStateChanged);
         }
         _previouslySelectedPaths = currentlySelected;
