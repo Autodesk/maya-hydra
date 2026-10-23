@@ -53,7 +53,7 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)#Clear selection
 
         self.setBasicCam(1)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.mayaHydra(createRenderGlobals=1)
         
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
@@ -81,7 +81,7 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.setAttr('persp.translate', 10, 7.5, 20, type='float3')
         cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.mayaHydra(createRenderGlobals=1)
 
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)

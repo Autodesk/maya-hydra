@@ -33,7 +33,7 @@ class TestRenderItemDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
         cmds.polyCube(name="testCube")
         mesh_shape = cmds.ls("testCubeShape", long=True)[0]
         mesh_transform = cmds.ls("testCube", long=True)[0]
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhMeshShape", mesh_shape))
         cmds.optionVar(stringValue=("mhMeshTransform", mesh_transform))
         cmds.refresh()

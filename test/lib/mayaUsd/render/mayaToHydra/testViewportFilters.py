@@ -210,7 +210,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     
     def test_MotionTrails(self):
         mayaUtils.openTestScene("testViewportFilters", "motionTrails.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.checkFilter("motion_trails", kExcludeMotionTrails, 2)
 
     # TODO : Pivots (not working in Hydra as of 2024-05-03)
@@ -235,7 +235,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
 
     def test_Strokes(self):
         mayaUtils.openTestScene("testViewportFilters", "strokes.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         #For this snapshot with usd 24.11+, we need to modify the default lighting and reset it after the snapshot
         self.modifyDefaultLightIntensityByUsdVersion()
         self.checkFilter("strokes", kExcludeStrokes, 4)

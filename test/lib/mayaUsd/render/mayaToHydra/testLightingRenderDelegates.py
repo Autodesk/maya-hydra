@@ -25,6 +25,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mayaUtils
 import mtohUtils
+import rendererUtils
 import renderManUtils
 from testUtils import PluginLoaded, getTestScene
 
@@ -50,8 +51,8 @@ LIGHT_INTENSITIES = {
 RENDER_DELEGATES = [
     {
         "name": "Storm",
-        "plugin": mtohUtils.HD_STORM,
-        "override": mtohUtils.HD_STORM_OVERRIDE,
+        "plugin": rendererUtils.getRendererPluginName(rendererUtils.TEST_RENDERER_STORM),
+        "override": rendererUtils.getRendererOverrideName(rendererUtils.TEST_RENDERER_STORM),
         "mayaPlugin": None,
         "convergenceTimeout": 0,  # Storm converges immediately
         "failThreshold": 0.1,
@@ -260,7 +261,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
     def loadScene(self):
         """Load the test scene and set the base renderer state."""
         mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self._setupSnapshotViewport()
 
     def test_EachLight_PerRenderDelegate(self):

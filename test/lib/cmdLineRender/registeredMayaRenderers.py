@@ -23,7 +23,7 @@ class RegisteredMayaRenderers(mtohUtils.MayaHydraBaseTestCase):
     # This test does not use interactive Maya, so perform Python
     # initialization, and don't set up Storm as the default viewport renderer.
     _initializeStandalone = True
-    _setHdStormRenderer = False
+    _setTestRenderer = False
 
     def test_registeredRenderers(self):
         """

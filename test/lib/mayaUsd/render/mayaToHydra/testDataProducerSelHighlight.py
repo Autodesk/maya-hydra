@@ -136,26 +136,26 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         ufeGlobalSel.append(self.pPlaneUfeItem)
         self.compareSnapshot("VP2_AllSelected.png", imageVersion=imageVersion)
 
-        #Switch to Storm, we should keep the selected items and their color
-        self.setHdStormRenderer()
-        self.compareSnapshot("Storm_AllSelected.png", imageVersion=imageVersion)
+        #Switch to Hydra, we should keep the selected items and their color
+        self.setTestRenderer()
+        self.compareSnapshot("Hydra_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to wireframe display mode, we should keep the selected items and their color
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
-        self.compareSnapshot("Storm_Wireframe_AllSelected.png", imageVersion=imageVersion)
+        self.compareSnapshot("Hydra_Wireframe_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to bounding box display mode, we should keep the selected items and their color
         #For this snapshot and only for it, we need to modify the default lighting and reset it after the snapshot
         cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
         self.modifyDefaultLightIntensityByUsdVersion()
-        self.compareSnapshot("Storm_BoundingBox_AllSelected.png", imageVersion=imageVersion)
+        self.compareSnapshot("Hydra_BoundingBox_AllSelected.png", imageVersion=imageVersion)
         self.resetDefaultLightIntensityByUsdVersion()
 
         #Switch to wireframe on shaded display mode, we should keep the selected items and their color
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
-        self.compareSnapshot("Storm_WireOnShaded_AllSelected.png", imageVersion=imageVersion)
+        self.compareSnapshot("Hydra_WireOnShaded_AllSelected.png", imageVersion=imageVersion)
 
     def impl_LeadAndActiveColorsSelectionHighlighting(self, baseImageVersion: str):
         finalImageVersion = baseImageVersion
@@ -168,34 +168,34 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         # Select objects to check if the lead / active selection highlight colors work
         ufeGlobalSel =  ufe.GlobalSelection.get()
         ufeGlobalSel.clear()
-        assertSnapshotCloseImpl("Storm_0_NoSelected.png")
+        assertSnapshotCloseImpl("Hydra_0_NoSelected.png")
         ufeGlobalSel.append(self.pSphere1UfeItem)
-        assertSnapshotCloseImpl("Storm_1_S1Selected.png")
+        assertSnapshotCloseImpl("Hydra_1_S1Selected.png")
         ufeGlobalSel.append(self.pSphere2UfeItem)
-        assertSnapshotCloseImpl("Storm_2_S2Selected.png")
+        assertSnapshotCloseImpl("Hydra_2_S2Selected.png")
         ufeGlobalSel.append(self.pTorusUfeItem)
-        assertSnapshotCloseImpl("Storm_3_TSelected.png")
+        assertSnapshotCloseImpl("Hydra_3_TSelected.png")
         ufeGlobalSel.append(self.pPlaneUfeItem)
-        assertSnapshotCloseImpl("Storm_4_PSelected.png")
+        assertSnapshotCloseImpl("Hydra_4_PSelected.png")
 
         #Remove the lead object
         ufeGlobalSel.remove(self.pPlaneUfeItem)
-        assertSnapshotCloseImpl("Storm_5_PRemoved.png")
+        assertSnapshotCloseImpl("Hydra_5_PRemoved.png")
 
         #Remove a non lead object
         ufeGlobalSel.remove(self.pSphere1UfeItem)
-        assertSnapshotCloseImpl("Storm_6_S1Removed.png")
+        assertSnapshotCloseImpl("Hydra_6_S1Removed.png")
 
         # De-select everything
         ufeGlobalSel.clear()
-        assertSnapshotCloseImpl("Storm_0_NoSelected.png")
+        assertSnapshotCloseImpl("Hydra_0_NoSelected.png")
 
     def test_LeadAndActiveColorsSelectionHighlighting(self):
         
         self.loadFileAndInitUfeVariables()
 
-        #Switch to HdStorm
-        self.setHdStormRenderer()
+        #Switch to Hydra
+        self.setTestRenderer()
         cmds.refresh()
 
         panel = mayaUtils.activeModelPanel()
@@ -216,8 +216,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         
         self.loadFileAndInitUfeVariables()
 
-        #Switch to HdStorm
-        self.setHdStormRenderer()
+        #Switch to Hydra
+        self.setTestRenderer()
         cmds.refresh()
 
         imageVersion = None

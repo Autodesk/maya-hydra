@@ -36,7 +36,7 @@ HD_ARNOLD_OVERRIDE = "mayaHydraRenderOverride_" + HD_ARNOLD
 class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _requiredPlugins = ['mtoa']
-    _setHdStormRenderer = False     # Need to use Arnold renderer for the tests
+    _setTestRenderer = False     # Need to use Arnold renderer for the tests
 
     def _setArnoldRenderer(self):
         """Activate the Arnold Hydra renderer so mtoaSIP is in the scene index chain."""

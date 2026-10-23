@@ -33,7 +33,7 @@ class TestMaterialXOnNative(mtohUtils.MayaHydraBaseTestCase):
     def test_MaterialX(self):
         mayaUtils.openTestScene("testMaterialX", "RedMtlxSphere.ma")
         self.setBasicCam(2)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.verifySnapshot("RedMtlxSphere.png")
 
 if __name__ == '__main__':

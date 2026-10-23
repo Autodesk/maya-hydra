@@ -19,8 +19,6 @@ import mtohUtils
 class TestSceneModified(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
-    # Base class setUp() defines HdStorm as the renderer.
-
     def test_sceneModified(self):
         # Though it modifies node 'defaultRenderGlobals' (as reported by
         # 'ls -modified'), loading the mayaHydra plugin should not cause

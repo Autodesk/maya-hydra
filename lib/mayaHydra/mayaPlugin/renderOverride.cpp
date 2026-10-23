@@ -115,6 +115,7 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/imaging/hd/basisCurves.h>
 #include <pxr/imaging/hd/points.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/imaging/hdx/tokens.h>
@@ -1330,6 +1331,28 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
                     }),
                 tempPrimIds.end());
         }
+
+        // Scene-index-native delegates such as Flash consume geometry directly from their
+        // terminal scene index and therefore do not publish HdRprims. Include their visible
+        // gprims so this testing command remains a renderer-independent view of renderable paths.
+        if (const auto& terminalSceneIndex = renderIndex->GetTerminalSceneIndex()) {
+            for (const SdfPath& primPath :
+                 HdSceneIndexPrimView(terminalSceneIndex, SdfPath::AbsoluteRootPath())) {
+                const HdSceneIndexPrim prim = terminalSceneIndex->GetPrim(primPath);
+                if (!HdPrimTypeIsGprim(prim.primType)) {
+                    continue;
+                }
+                const HdBoolDataSourceHandle visibility =
+                    HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
+                if (visibleOnly && visibility && !visibility->GetTypedValue(0.0f)) {
+                    continue;
+                }
+                tempPrimIds.push_back(primPath);
+            }
+        }
+
+        // Deduplicate prims in case they were both in the render index and scene index
+        tempPrimIds.erase(std::unique(tempPrimIds.begin(), tempPrimIds.end()), tempPrimIds.end());
 
         // Concatenate results
         if (tempPrimIds.size()) { 
@@ -4439,7 +4462,8 @@ void MtohRenderOverride::_CreateFramePassesData()
     // Secondary graphics pass - only create if not using single frame pass
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
-        filteringData->_rendererName = rendererDrawsSecondaryGraphics(_rendererDesc.rendererName)
+        filteringData->_rendererName
+            = (secondaryGraphicsUseActiveRenderer() && rendererDrawsSecondaryGraphics(_rendererDesc.rendererName))
             ? _rendererDesc.rendererName
             : MtohTokens->HdStormRendererPlugin;
         filteringData->_includePaths = { _highlightHierarchyPrefix, MayaViewportSceneIndex::DefaultLightPath() }; // include selection highlight prims.

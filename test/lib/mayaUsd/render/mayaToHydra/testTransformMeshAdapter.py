@@ -63,7 +63,7 @@ class TestTransformMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
     def test_mayaNurbsCurve(self):
         mayaUtils.openNewScene()
         self.setBasicCam(5)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         imageVersion = 'osx' if platform.system() == 'Darwin' else None
 

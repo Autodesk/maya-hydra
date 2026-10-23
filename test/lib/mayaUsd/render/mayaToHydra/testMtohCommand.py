@@ -20,6 +20,10 @@ import maya.mel as mel
 
 import fixturesUtils
 import mtohUtils
+import rendererUtils
+
+STORM_RENDERER = rendererUtils.getRendererPluginName(rendererUtils.TEST_RENDERER_STORM)
+STORM_OVERRIDE = rendererUtils.getRendererOverrideName(rendererUtils.TEST_RENDERER_STORM)
 
 class TestCommand(unittest.TestCase):
     _file = __file__
@@ -45,7 +49,7 @@ class TestCommand(unittest.TestCase):
     def test_listRenderers(self):
         renderers = cmds.mayaHydra(listRenderers=1)
         self.assertEqual(renderers, cmds.mayaHydra(lr=1))
-        self.assertIn(mtohUtils.HD_STORM, renderers)
+        self.assertIn(STORM_RENDERER, renderers)
         if self.has_embree():
             self.assertIn("HdEmbreeRendererPlugin", renderers)
 
@@ -58,12 +62,12 @@ class TestCommand(unittest.TestCase):
         mtohUtils.setMayaUseHydra(True)
         cmds.modelEditor(
             activeEditor, e=1,
-            rendererOverrideName=mtohUtils.HD_STORM_OVERRIDE)
+            rendererOverrideName=STORM_OVERRIDE)
         cmds.refresh(f=1)
 
         activeRenderers = cmds.mayaHydra(listActiveRenderers=1)
         self.assertEqual(activeRenderers, cmds.mayaHydra(lar=1))
-        self.assertEqual(activeRenderers, [mtohUtils.HD_STORM])
+        self.assertEqual(activeRenderers, [STORM_RENDERER])
 
         if self.has_embree():
             mtohUtils.setMayaUseHydra(True)
@@ -89,9 +93,9 @@ class TestCommand(unittest.TestCase):
         self.assertRaises(RuntimeError, mel.eval,
                           "mayaHydra -getRendererDisplayName")
 
-        displayName = cmds.mayaHydra(renderer=mtohUtils.HD_STORM,
+        displayName = cmds.mayaHydra(renderer=STORM_RENDERER,
                                 getRendererDisplayName=True)
-        self.assertEqual(displayName, cmds.mayaHydra(r=mtohUtils.HD_STORM, gn=True))
+        self.assertEqual(displayName, cmds.mayaHydra(r=STORM_RENDERER, gn=True))
         self.assertEqual(displayName, "GL")
 
         if self.has_embree():

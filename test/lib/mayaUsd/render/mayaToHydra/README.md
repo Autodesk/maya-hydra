@@ -24,6 +24,34 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ```ctest -C RelWithDebInfo -VV --output-on-failure -R testVisibility```
 
+### Selecting a renderer
+
+Tests use HdStorm by default. To run them against HdFlash, pass `--test-renderer HdFlash` to build.py:
+
+```build.py <workspace> --test-renderer HdFlash --stages test```
+
+This sets the `MAYAHYDRA_TEST_RENDERER` CMake cache variable at configure time. CMake bakes it into the environment of every test, so running `ctest` directly from that build uses the selected renderer without setting any environment variable. _Setting the variable in your shell has no effect on `ctest`._ The default is HdStorm.
+
+Renderer exclusions use the same CTest-label mechanism as plugin and platform exclusions: a `skipOnRenderer:HdFlash` test entry receives the `HdFlash` label. `build.py --stages test` automatically excludes the label of the selected renderer.
+
+## How tests use the selected renderer
+
+- Before each test, `MayaHydraBaseTestCase.setUp` calls `self.setTestRenderer()`, which activates the renderer selected above. Set `_setTestRenderer = False` in your class to opt out.
+- Use `self.setTestRenderer()` to return to the selected renderer mid-test. `self.setHdStormRenderer()` always forces Storm, and `self.setViewport2Renderer()` switches to VP2.
+- `rendererUtils.py` (in testUtils) holds the renderer data: plugin name, viewport override name and reference-image folder (`storm` or `flash`).
+
+## Selection highlighting modes
+
+Selection highlighting has two modes: `outline` (screen-space outline) and `legacy` (wireframe highlight prims). The mode is read from `MAYAHYDRA_SELECTION_HIGHLIGHT_MODE`. If it is unset, it defaults to `outline` where supported, otherwise `legacy`.
+
+Outline is not available on macOS, with HdFlash, or with USD 24.11 and older. In those configurations every test runs in legacy only.
+
+Where outline is available, the CMakeLists registers each interactive test twice: the primary run (outline) and a `<test>_legacy` run. Two lists in the CMakeLists control exceptions:
+- `NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES`: outline-only tests, which get no `_legacy` run.
+- `OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES`: tests that cannot run in outline. Their primary run is forced to legacy, with no `_legacy` run.
+
+Use `self.selectionHighlightMode()` in tests whose expectations depend on the mode. Keep `outlineSelectionHighlightSupported()` (mtohUtils.py), `MAYAHYDRA_OUTLINE_MODE_AVAILABLE` (CMakeLists.txt) and `MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT` (renderGlobals.cpp) in sync.
+
 Note that when running Python tests the Python source is read directly from the source directory.  Therefore, when changing Python test code source, no build needs to be done to update the test, which can be run immediately using ctest.  This is a convenient time saver, as the test development cycle is not edit, build, run, but simply edit and run.  Only if C++ test code is changed is a build then necessary.
 
 ### Running tests with MayaUSD
@@ -65,10 +93,11 @@ To add a new Python-only test suite :
     if __name__ == '__main__':
         fixturesUtils.runTests(globals())
     ```
-7. Add the name of your test[...].py file to the list of `TEST_SCRIPT_FILES` in the [current folder's CMakeLists.txt](./CMakeLists.txt)
+7. Add the name of your test[...].py file to a list in the [current folder's CMakeLists.txt](./CMakeLists.txt)
+8. If the test cannot run with some renderer, platform or plugin, add labels (see [Adding labels for tests](#adding-labels-for-tests)).
 
 Some important notes :
-- Before each test, a new file will be opened and the renderer will be switched to Hydra. If you need to switch between renderers, you can use the `self.setHdStormRenderer()` and `self.setViewport2Renderer()` methods.
+- Before each test, a new file will be opened and the selected test renderer will be activated. If you need to switch between renderers, see [How tests use the selected renderer](#how-tests-use-the-selected-renderer).
 - Some test settings (such as turning color management off, disabling the grid, etc.) are applied by default when opening a scene using `mayaUtils.openNewScene` or `mayaUtils.openTestScene`. The new scene opened before each test is opened using `mayaUtils.openNewScene`, meaning those test settings will automatically be applied before each test. These methods provide the option not to apply those settings if desired, by passing in `useTestSettings=False`. If you want to test a setting that is modified as part of those test settings, you can either re-set it explicitly in the test, and/or load a scene with the desired settings by calling `mayaUtils.openTestScene(<path arguments>, useTestSettings=False)`. In case you want to avoid ever changing the test settings entirely, you can also override the `setUp` method.
 
 # Best practices
@@ -92,7 +121,23 @@ For the `assert[...]Close` methods, you will need to pass in a fail threshold fo
 
 The `assertSnapshotClose` method takes a snapshot of the current viewport and compares it with the reference image, to ensure the visual result is similar enough.
 
-To create a reference snapshot, an easy way is to first write your test, and then run it once. The output snapshot of the test will then be located in your build folder under `build/[RelWithDebInfo|Debug]/test/lib/mayaUsd/render/mayaToHydra/[testName]`. If the snapshot corresponds to the expected result, you can then copy it over to your `[TestName]Test` folder as mentioned above in step 3. This ensures that the reference image was created with the same playblast settings that will be used when running the tests (e.g. width and height). If this method doesn't suit you, you can use the playblast command directly in Maya yourself, or any other method that fits your needs.
+To create a reference snapshot, an easy way is to first write your test, and then run it once. The output snapshot of the test will then be located in your build folder under `build/[RelWithDebInfo|Debug]/test/lib/mayaUsd/render/mayaToHydra/[testName]_[TestClassName]_[mode]Output`, where `[mode]` is `outline` or `legacy`. If the snapshot corresponds to the expected result, you can then copy it over to your `[TestName]Test` folder as mentioned above in step 3. This ensures that the reference image was created with the same playblast settings that will be used when running the tests (e.g. width and height). If this method doesn't suit you, you can use the playblast command directly in Maya yourself, or any other method that fits your needs.
+
+## Reference image lookup
+
+The image passed to `assert[...]` is resolved by `rendererUtils.resolveReferenceImage()` (called by `MayaHydraBaseTestCase.resolveRefImage()`). The first existing file wins:
+
+```
+[TestName]Test/<renderer>/<mode>/<imageVersion>/<file>
+[TestName]Test/<renderer>/<imageVersion>/<file>
+[TestName]Test/<mode>/<imageVersion>/<file>
+[TestName]Test/<imageVersion>/<file>
+```
+
+- `<renderer>` is `storm` or `flash`, `<mode>` is `outline` or `legacy`, and `<imageVersion>` is the optional `imageVersion` argument of the assert.
+- Only add a renderer or mode folder when the image differs from the shared baseline. Images at the shared level are used by all renderers and modes.
+- `imageVersion` is chosen per image by the test code (for example a USD version, or a Maya build property such as `RenderItemHasCullModeAPI`). It is not a configuration setting like renderer and mode.
+- Folder names are case sensitive on Linux and macOS, so make sure the `imageVersion` string matches the folder name exactly.
 
 :warning: **Important note** : While there *is* an `assertSnapshotEqual` method, its use is discouraged, as renders can differ very slightly between renderer architectures.
 
@@ -103,15 +148,15 @@ For example, you might have some tests that are all related to 'performance', so
 
 To add label in MayaHydra test suite
 1. For any particlar unit test of interest in [CMakeLists.txt](./CMakeLists.txt), add the required labels with the following convention:
-    `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]`
+    `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]|skipOnRenderer:[HdStorm,HdFlash]`
 2. Where the label groups follows the unit test name and are separated by `'|'`. You may have multiple label groups.
-3. The label groups are of key:values type. They label key can be any meaningful string and has correspondence to the accompanying [json file](../../../../../../maya-hydra/tests-to-run.json)
+3. The label groups are of key:values type. The label key can be any meaningful string and has correspondence to the accompanying [json file](../../../../../../maya-hydra/tests-to-run.json)
 4. The label values are comma separated lists. The values are added to the test via cmake's `set_tests_properties`
 
 MayaHydra currently is filtering tests based on dependent plugins and platform on which to run them.
 
 To add flags to ctest commandline, modify the corresponding [JSON file](../../../../../../maya-hydra/tests-to-run.json) to indicate which test to run or skip. 
-For ex: if you want to run only tests tagged with "lookdevx" then edit the json file like so: `"plugins_to_include": ["lookdevx]`. If the include list is empty, all tests are run by default. Similarly, edit `"plugin_to_exclude"` in the json file to skip test with certain labels.
+For ex: if you want to run only tests tagged with "lookdevx" then edit the json file like so: `"plugins_to_include": ["lookdevx"]`. If the include list is empty, all tests are run by default. Similarly, edit `"plugins_to_exclude"` in the json file to skip test with certain labels.
 
 Note that for platform dependent runs, we only support exclusion mode for a single platform. So if you tag the test `skipOnPlatform:osx`, it skips on MacOS. No corresponding changes to json file is required in this case.
 

@@ -57,7 +57,7 @@ class TestMayaNodesAttributesDirtying(mtohUtils.MayaHydraBaseTestCase):
         for node in (mesh_shape, cam_shape, light_shape, material_sg):
             _ensure_ext_dirty(node)
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhDirtyMeshShape", mesh_shape))
         cmds.optionVar(stringValue=("mhDirtyCameraShape", cam_shape))
         cmds.optionVar(stringValue=("mhDirtyLightShape", light_shape))

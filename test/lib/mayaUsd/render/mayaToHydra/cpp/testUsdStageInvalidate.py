@@ -23,8 +23,6 @@ class TestUsdStageInvalidate(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    # Base class setUp() defines HdStorm as the renderer.
-
     def setupScene(self):
         usdScenePath = testUtils.getTestScene('testUsdNativeInstances', 'instancedCubeHierarchies.usda')
         usdUtils.createStageFromFile(usdScenePath)

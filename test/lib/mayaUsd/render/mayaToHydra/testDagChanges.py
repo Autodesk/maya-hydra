@@ -319,7 +319,7 @@ class TestUndo(DagChangesBaseTestCase):
             mayaUtils.openNewScene()
             self.setBasicCam(dist=10)
 
-            self.setHdStormRenderer()
+            self.setTestRenderer()
 
             if maya.mel.eval("defaultShaderName") == "standardSurface1":
                 color = (0.8, 0.8, 0.8)

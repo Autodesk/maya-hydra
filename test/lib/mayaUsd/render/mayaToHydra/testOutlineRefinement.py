@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-# The outline of a selected mesh must follow the surface Storm draws, which is the subdivided
+# The outline of a selected mesh must follow the surface drawn, which is the subdivided
 # limit surface when the mesh is refined, not its control cage.
 
 import os

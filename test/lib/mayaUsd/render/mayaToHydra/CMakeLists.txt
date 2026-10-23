@@ -7,28 +7,40 @@
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 # Tests are run with the VP2 render delegate disabled, to ensure 
 # that mayaHydra does not rely on computations made by VP2 for its use.
-#
+
+# Renderer the MayaHydra tests run against. Baked into every test's environment
+# below, so `ctest` run directly uses it. Set by build.py via -DMAYAHYDRA_TEST_RENDERER.
+# Changing it requires reconfiguring the build.
+set(MAYAHYDRA_TEST_RENDERER_CHOICES HdStorm HdFlash)
+set(MAYAHYDRA_TEST_RENDERER HdStorm CACHE STRING
+    "Hydra renderer used by the MayaHydra tests")
+set_property(CACHE MAYAHYDRA_TEST_RENDERER PROPERTY STRINGS ${MAYAHYDRA_TEST_RENDERER_CHOICES})
+if(NOT MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_TEST_RENDERER_CHOICES)
+    message(FATAL_ERROR "MAYAHYDRA_TEST_RENDERER must be one of "
+        "${MAYAHYDRA_TEST_RENDERER_CHOICES}, got '${MAYAHYDRA_TEST_RENDERER}'.")
+endif()
+
 set(INTERACTIVE_TEST_SCRIPT_FILES
-    testSceneStat.py
+    testSceneStat.py|skipOnRenderer:HdFlash # HYDRA-2670 : Scene statistics report 1 primitive instead of 3
     testImageDiffing.py
     testMtohCommand.py
     testBasicRender.py
     testDagChanges.py
-    testMeshes.py
-    testNamespaces.py
+    testMeshes.py|skipOnRenderer:HdFlash # HYDRA-2665 : Inconsistent number of prims reported
+    testNamespaces.py|skipOnRenderer:HdFlash # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
     testTransforms.py
-    testRefinement.py
+    testRefinement.py|skipOnRenderer:HdFlash # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
-    testUSDLights.py
+    testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
     testUVandUDIM.py
 	testPurposeRenderTag.py
 
@@ -36,7 +48,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
-    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx # HYDRA-2209: re-enable on OSX
+    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-2209: re-enable on OSX | HYDRA-2677 : Maya crash in IsStormRenderDelegate / FramePass::Initialize
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
@@ -51,14 +63,14 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
-    testUsdTextureToggle.py
-    testUsdStageDefaultLighting.py
+    testUsdTextureToggle.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
+    testUsdStageDefaultLighting.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
     testPassingNormalsOnMayaNative.py
     testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
 	testSceneModified.py
-    testIsolateSelectWithGeomSubset.py
+	testIsolateSelectWithGeomSubset.py
     testMayaReference.py
     testTexturedMode.py
     testSelectionColorPreferences.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -68,7 +80,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#Disabled tests on OSX
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | HYDRA-2681 : Snapshot mismatch after instance scale
     testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -77,7 +89,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testRenderRegion.py
     testConvergence.py
     testFramePasses.py
-    testImagePlanes.py
+    testImagePlanes.py|skipOnRenderer:HdFlash # AGP-1037 : Image plane updates is inconsistent
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -90,28 +102,28 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPathMapperRegistry.py
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
-    cpp/testFlowViewportAPIViewportInformation.py
+    cpp/testFlowViewportAPIViewportInformation.py|skipOnRenderer:HdFlash # HYDRA-2676 : Renderer name mismatch, then crash in SceneIndexAdded
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
     cpp/testFlowViewportAPIFilterPrims.py
     cpp/testSceneCorrectness.py
     cpp/testPrimInstancing.py
-    cpp/testPicking.py
+    cpp/testPicking.py|skipOnRenderer:HdFlash # HYDRA-2671 : Picking finds 0 prims
     cpp/testUsdPointInstancePicking.py
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdNestedNativeInstancePicking.py
     cpp/testUsdPickKind.py
     cpp/testNurbsSurfaces.py
-    cpp/testGeomSubsetsPicking.py
+    cpp/testGeomSubsetsPicking.py|skipOnRenderer:HdFlash # HYDRA-2672 : Geom subset picking doesn't update UFE selection
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testFvpDirtyNotifier.py
     cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
-    cpp/testLightPrimvars.py|depOnPlugins:mtoa
-    cpp/testDataSourceNames.py
+    cpp/testLightPrimvars.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2673 : Spot light prim not found in scene index
+    cpp/testDataSourceNames.py|skipOnRenderer:HdFlash # HYDRA-2674 : Directional light prim not found in any scene index
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
-    cpp/testRenderItemPrimvars.py
+    cpp/testRenderItemPrimvars.py|skipOnRenderer:HdFlash # HYDRA-2675 : Maya crash (access violation) in UntexturedToTexturedAcquiresUVs
     cpp/testRenderItemPrimvarsMaterialX.py|depOnPlugins:lookdevx
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
@@ -133,7 +145,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 # HYDRA-1245.
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
-        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-723 : Light intensity not matching Storm/Arnold
         cpp/testIsolateSelect.py
         cpp/testIsolateSelectSwitchToVP2.py
         cpp/testIsolateSelectMayaSelectionHighlighting.py
@@ -147,7 +159,7 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         # fixed.  The isolate-select behaviour itself passes (all visibility
         # assertions and snapshot comparisons succeed before the crash).
         #testIsolateSelectPerShape.py
-        testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost
+        testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost|skipOnRenderer:HdFlash # HYDRA-2678 : cmds.select rejects USD instance paths
     )
 endif()
 
@@ -168,7 +180,7 @@ endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
 if (NOT CODE_COVERAGE)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py|skipOnRenderer:HdFlash) # HYDRA-2679 : Prim origin path mismatch, then stack overflow
 endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
@@ -177,12 +189,12 @@ endif()
 # INTERACTIVE_TEST_SCRIPT_FILES, it cannot write to an output directory, because running
 # both versions of the test in parallel will conflict.
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
-    testMeshes.py
+    testMeshes.py|skipOnRenderer:HdFlash # HYDRA-2665 : Inconsistent number of prims reported
     testTransformMeshAdapter.py
     testMeshAdapterVisibility.py
-    cpp/testMeshAdapterTransform.py
+    cpp/testMeshAdapterTransform.py|skipOnRenderer:HdFlash # HYDRA-2666 : Dirtying is not received properly
     cpp/testMeshPrimvars.py
-    cpp/testMeshDirtyLocators.py
+    cpp/testMeshDirtyLocators.py|skipOnRenderer:HdFlash # HYDRA-2667 : visibility update not received properly
     cpp/testMeshGeomSubsets.py
     cpp/testMeshSubdivTags.py
 )
@@ -191,8 +203,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
 # enabled.  We must fix this, to ensure that mayaHydra does not rely
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
-	testViewportFilters.py|depOnPlugins:mtoa
-    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX
+	testViewportFilters.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2668 : Some objects are not filtered properly
+    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX | HYDRA-2680 : Snapshot mismatches (3 tests)
     testBoundingBox.py
 	#Disabled tests on OSX
 	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -209,10 +221,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # are only needed where the output differs (see MayaHydraBaseTestCase).
 #
 # Outline is unavailable on USD <= 24.11 (HgiGL corrupts the prim ids the outline
-# shader samples) and on macOS; there every primary run is legacy and there are no
-# _legacy counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+# shader samples), on macOS, and with the HdFlash test renderer (OutlineMaskTask only
+# runs for Storm); there every primary run is legacy and there are no _legacy
+# counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
 # (renderGlobals.cpp) and outlineSelectionHighlightSupported() (mtohUtils.py).
-if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX)
+if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
 else()
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)
@@ -423,3 +436,15 @@ endforeach()
 
 # C++ unit tests
 add_subdirectory(cpp)
+
+# Bake the test renderer into every test registered in this directory and in
+# cpp/. Applied once here, after all tests exist, so individual mayaUsd_add_test
+# calls don't each have to repeat it. The Python side reads this variable via
+# rendererUtils.getTestRenderer().
+foreach(test_dir ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cpp)
+    get_property(dir_tests DIRECTORY ${test_dir} PROPERTY TESTS)
+    foreach(test_name ${dir_tests})
+        set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT
+            "MAYAHYDRA_TEST_RENDERER=${MAYAHYDRA_TEST_RENDERER}")
+    endforeach()
+endforeach()

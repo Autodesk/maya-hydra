@@ -42,7 +42,7 @@ class TestDataSourceNames(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr("perspShape.fStop", 5.6)
         cmds.setAttr("perspShape.focusDistance", 12.0)
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     # What: light container advertises and serves its leaf params.
