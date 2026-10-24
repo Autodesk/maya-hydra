@@ -19,8 +19,8 @@ target_sources(${TARGET_NAME}
         mayaHydraCppTestsCmd.cpp
         testColorPreferences.cpp
         testCppFramework.cpp
-        testFvpDirtyNotifier.cpp
         testFootPrintNotifications.cpp
+        testFvpDirtyNotifier.cpp
         testHydraPrim.cpp
         testMayaHydraSceneIndex.cpp
         testMayaSceneFlattening.cpp

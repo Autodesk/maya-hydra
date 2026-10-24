@@ -267,6 +267,39 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
     return prim;
 }
 
+void LightsManagementSceneIndex::_PrimsDirtied(
+    const HdSceneIndexBase&                         sender,
+    const HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    if (!_IsObserved()) {
+        return;
+    }
+
+    _SendPrimsDirtied(entries);
+
+    if (_lightingMode != LightingMode::kSelectedLightsOnly) {
+        return;
+    }
+
+    // A selections dirty maps to no dirty bits on a light, so the lights whose enabled state
+    // depends on that selection (the prim or its descendants) must be dirtied explicitly.
+    static const HdDataSourceLocator selectionsLocator = HdSelectionsSchema::GetDefaultLocator();
+    HdSceneIndexObserver::DirtiedPrimEntries lightEntries;
+    for (const auto& entry : entries) {
+        if (!entry.dirtyLocators.Intersects(selectionsLocator)) {
+            continue;
+        }
+        for (const SdfPath& path : HdSceneIndexPrimView(GetInputSceneIndex(), entry.primPath)) {
+            if (HdPrimTypeIsLight(GetInputSceneIndex()->GetPrim(path).primType)) {
+                lightEntries.push_back({ path, HdLightSchema::GetDefaultLocator() });
+            }
+        }
+    }
+    if (!lightEntries.empty()) {
+        _SendPrimsDirtied(lightEntries);
+    }
+}
+
 void LightsManagementSceneIndex::SetDisabledLightsPrims(
     const std::set<PXR_NS::SdfPath>& disabledLightsPrims)
 {
