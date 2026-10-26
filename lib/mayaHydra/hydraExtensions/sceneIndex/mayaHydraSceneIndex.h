@@ -58,29 +58,26 @@ class Hgi;
 struct MayaHydraInitData
 {
     MayaHydraInitData(
-        TfToken        nameIn,
         HdRenderIndex& renderIndexIn,
         const SdfPath& delegateIDIn,
-        bool           isHdStIn,
+        TfToken        rendererNameIn,
         Hgi*           hgiIn = nullptr)
-        : name(nameIn)
-        , renderIndex(renderIndexIn)
+        : renderIndex(renderIndexIn)
         , delegateID(delegateIDIn)
-        , isHdSt(isHdStIn)
+        , rendererName(rendererNameIn)
         , hgi(hgiIn)
     {
     }
 
-    TfToken        name;
     HdRenderIndex& renderIndex;
-    SdfPath        delegateID;
-    bool           isHdSt;
+    const SdfPath  delegateID;
+    const TfToken  rendererName;
     /// The Hgi behind the render index's render delegate, owned by the render
     /// override. Required to share a GPU buffer with the renderer: the arena
     /// that wraps the buffer comes from this Hgi, and a consumer rejects a
     /// buffer minted by a different one, since its handle names an object on
     /// another device. Null means no sharing -- the CPU primvar path is used.
-    Hgi*           hgi = nullptr;
+    Hgi* const     hgi;
 };
 
 class MayaHydraSceneIndex;
@@ -99,7 +96,7 @@ public:
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
     static MayaHydraSceneIndexRefPtr New(
-        MayaHydraInitData& initData,
+        const MayaHydraInitData& initData,
         bool interactive) {
         return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive));
     }
@@ -327,7 +324,7 @@ public:
 private:
 
     MayaHydraSceneIndex(
-        MayaHydraInitData& initData,
+        const MayaHydraInitData& initData,
         bool interactive);
 
     template <typename AdapterPtr, typename Map>

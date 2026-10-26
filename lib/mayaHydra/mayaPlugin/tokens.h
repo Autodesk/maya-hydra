@@ -23,7 +23,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 // clang-format off
 #define MTOH_TOKENS \
-    (HdStormRendererPlugin) \
     (mtohMaximumShadowMapResolution) \
     (mayaHydraRefinementLevel) \
     (mayaHydraSelectionHighlightMode) \

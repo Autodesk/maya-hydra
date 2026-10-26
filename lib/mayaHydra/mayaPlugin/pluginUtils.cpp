@@ -28,6 +28,8 @@
 #include "renderGlobals.h"
 #include "tokens.h"
 
+#include <mayaHydraLib/tokens.h>
+
 #include <pxr/imaging/glf/contextCaps.h>
 #if HD_API_VERSION >= 98 // PXR_VERSION > 2605
 #include <pxr/imaging/hd/rendererCreateArgsSchema.h>
@@ -83,7 +85,7 @@ MtohInitializeRenderPlugins()
             }
 
             // Storm requires GlfContextCaps initialization.
-            if (pluginDesc.id == MtohTokens->HdStormRendererPlugin) {
+            if (pluginDesc.id == MayaHydraRendererTokens->HdStormRendererPlugin) {
                 GlfContextCaps::InitInstance();
             }
 

@@ -21,6 +21,7 @@
 
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/mixedUtils.h>
+#include <mayaHydraLib/tokens.h>
 
 #include <flowViewport/imageWriter/fvpRenderBufferWriter.h>
 #include <flowViewport/imageWriter/fvpTextureBufferWriter.h>
@@ -228,7 +229,7 @@ MStatus BatchRendererHydraV1RenderSettings::Render(
     }
 
     // Set MSAA as per Maya AntiAliasing settings
-    if (renderer._isUsingHdSt) {
+    if (renderer._rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
         // Maya's MSAA toggle settings
         constexpr bool isMultiSampled = true;
 
@@ -347,7 +348,9 @@ MStatus BatchRendererHydraV1RenderSettings::Render(
 
             // For non-color AOVs (e.g. depth/alpha), prefer render buffers to preserve
             // single-channel formats and avoid GPU texture-only paths.
-            const bool useTextureWriter = renderer._isUsingHdSt;
+            const bool useTextureWriter
+                = renderer._rendererDesc.rendererName
+                == MayaHydraRendererTokens->HdStormRendererPlugin;
             Writer::Ptr writer = useTextureWriter
                 ? Writer::Ptr(std::make_shared<Fvp::TextureBufferWriter>(
                       &renderer._engine, renderer._hgi.get(), aovToken))
