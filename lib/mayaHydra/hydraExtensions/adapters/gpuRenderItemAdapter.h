@@ -174,7 +174,8 @@ private:
     // one is not enough. Once true, the mesh runs in direct mode (zero-copy).
     // Only consulted when MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
     bool _classifiedAsAnimating = false;
-    // Geometry-only changes since the last topology change.
+    // Geometry-only changes since the last topology change, while unclassified in
+    // hybrid mode; saturates at the promotion threshold.
     int _geomOnlyUpdatesSinceTopo = 0;
 
     // Whether the streams published on the current update allow direct binding. Decided once

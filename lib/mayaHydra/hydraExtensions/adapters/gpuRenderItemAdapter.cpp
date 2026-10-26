@@ -584,13 +584,19 @@ void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool 
     // per-prim draws.
     const _GpuBufferSharingMode sharingMode = _GetGpuBufferSharingMode();
     const bool                  hybridMode = sharingMode == _GpuBufferSharingMode::Hybrid;
-    if (topoChanged) {
-        _geomOnlyUpdatesSinceTopo = 0;
-    } else if (geomChanged) {
-        ++_geomOnlyUpdatesSinceTopo;
+    // Counted only while a hybrid mesh is still unclassified, and saturated at the
+    // threshold, so it stays bounded for the life of the item.
+    constexpr int kGeomOnlyUpdatesToPromote = 2;
+    if (hybridMode && !_classifiedAsAnimating) {
+        if (topoChanged) {
+            _geomOnlyUpdatesSinceTopo = 0;
+        } else if (geomChanged && _geomOnlyUpdatesSinceTopo < kGeomOnlyUpdatesToPromote) {
+            ++_geomOnlyUpdatesSinceTopo;
+        }
     }
-    if (hybridMode && geomChanged && !topoChanged && _geomOnlyUpdatesSinceTopo >= 2
-        && _extPositions && !_classifiedAsAnimating) {
+    if (hybridMode && geomChanged && !topoChanged
+        && _geomOnlyUpdatesSinceTopo >= kGeomOnlyUpdatesToPromote && _extPositions
+        && !_classifiedAsAnimating) {
         // No dirty emitted here. On the next stream read _PublishExtStream sees
         // that the cached allowDirectBind is now stale and republishes every
         // vertex-layer primvar, which dirties it. UV/tangent (not rewritten
