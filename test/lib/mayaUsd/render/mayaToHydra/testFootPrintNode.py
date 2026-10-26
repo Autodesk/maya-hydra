@@ -22,9 +22,14 @@ import mtohUtils
 import mayaUtils
 import rendererUtils
 import maya.mel as mel
+import maya.utils
 import platform
 import unittest
 from testUtils import PluginLoaded
+
+FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME = "mayaHydraForceDisableSelectionHighlight"
+FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR = "defaultRenderGlobals.{}".format(
+    FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME)
 
 class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -523,19 +528,45 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         cmds.select(clear=True)
         cmds.refresh(force=True)
 
+    # Toggling it re-initializes Hydra, like a selection highlighting mode switch.
+    def _setForceDisableSelectionHighlight(self, disable):
+        cmds.setAttr(FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR, disable)
+        cmds.mayaHydra(updateRenderGlobals=FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME)
+        cmds.refresh(force=True)
+        maya.utils.processIdleEvents()
+        cmds.refresh(force=True)
+
     def test_shadedSelectionNotifications(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             self._setupNotificationsScene('smoothShaded')
-            cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionSendsOneColorDirtyPerChange")
+            if self.selectionHighlightMode() == mtohUtils.SELECTION_HIGHLIGHT_MODE_LEGACY:
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.legacyShadedSelectionSendsOneColorDirtyPerChange")
+            else:
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionWithoutLegacyHighlightSendsNoColorDirty")
 
-    def test_wireframeSelectionNotifications(self):
+    def test_shadedSelectionNotificationsHighlightDisabled(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self._setupNotificationsScene('smoothShaded')
+            try:
+                self._setForceDisableSelectionHighlight(True)
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionWithoutLegacyHighlightSendsNoColorDirty")
+            finally:
+                self._setForceDisableSelectionHighlight(False)
+
+    def _testPerPrimWireframeColorNotifications(self, displayAppearance):
         with PluginLoaded('mayaHydraFootPrintNode'):
             # The display appearance survives a new scene, so restore it for the next tests.
             try:
-                self._setupNotificationsScene('wireframe')
+                self._setupNotificationsScene(displayAppearance)
                 cmds.mayaHydraCppTest(f="FootPrintNotifications.wireframeNonLeadDeselectDirtiesWireframeColor")
             finally:
                 cmds.modelEditor(self.activeEditor, edit=True, displayAppearance='smoothShaded')
+
+    def test_wireframeSelectionNotifications(self):
+        self._testPerPrimWireframeColorNotifications('wireframe')
+
+    def test_boundingBoxSelectionNotifications(self):
+        self._testPerPrimWireframeColorNotifications('boundingBox')
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
