@@ -512,7 +512,11 @@ static const char* _ExtStreamName(MHWRender::MVertexBuffer* mvb)
     return "<unknown>";
 }
 
+double sUpdateTime = 0.0; // main thread, see SetUpdateTime
+
 } // namespace
+
+void MayaHydraGpuRenderItemAdapter::SetUpdateTime(double time) { sUpdateTime = time; }
 
 MayaHydraGpuRenderItemAdapter::MayaHydraGpuRenderItemAdapter(
     const MDagPath&      dagPath,
@@ -574,12 +578,22 @@ size_t MayaHydraGpuRenderItemAdapter::_StoredStreamCount(const TfToken& primvar)
 void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool topoChanged)
 {
     // In hybrid mode a mesh starts batched (allowDirectBind=false) so static
-    // meshes aggregate from frame one; the first real deform (geom/topo change
-    // on a mesh that already published a buffer -- filtering the initial
-    // populate frame) sticky-promotes it to direct mode (zero per-frame copy).
+    // meshes aggregate from frame one; the first real deform sticky-promotes it
+    // to direct mode (zero per-frame copy). A deform is a geometry-only change of
+    // a mesh that already published a buffer (filtering the initial populate
+    // frame), at a new animation time. Not a topology change, and not VP2
+    // re-sending geometry at the same time: a display-mode toggle releases the
+    // old items' buffers (geom+topo) and populates the new ones over several
+    // updates at one time, which would otherwise promote rigid meshes for good -
+    // direct ranges do not aggregate, so playback then pays per-prim draws.
     const _GpuBufferSharingMode sharingMode = _GetGpuBufferSharingMode();
     const bool                  hybridMode = sharingMode == _GpuBufferSharingMode::Hybrid;
-    if (hybridMode && (geomChanged || topoChanged) && _extPositions && !_classifiedAsAnimating) {
+    const bool                  newTime = !(_lastGeomTime == sUpdateTime);
+    if (geomChanged || topoChanged) {
+        _lastGeomTime = sUpdateTime;
+    }
+    if (hybridMode && geomChanged && !topoChanged && newTime && _extPositions
+        && !_classifiedAsAnimating) {
         // No dirty emitted here. On the next stream read _PublishExtStream sees
         // that the cached allowDirectBind is now stale and republishes every
         // vertex-layer primvar, which dirties it. UV/tangent (not rewritten
