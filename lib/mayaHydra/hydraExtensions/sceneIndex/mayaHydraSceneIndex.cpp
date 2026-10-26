@@ -38,7 +38,6 @@
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
-#include <maya/MAnimControl.h>
 #include <maya/MDGMessage.h>
 #include <maya/MDagMessage.h>
 #include <maya/MDagPath.h>
@@ -540,11 +539,6 @@ void MayaHydraSceneIndex::UpdateRenderItems(
     const RenderItemUpdateOptions&              options)
 {
     MH_PROFILE_FUNCTION();
-
-#if defined(USD_HAS_GPU_BUFFER_SHARING)
-    // Before any item update: the hybrid classifier compares it across an item's updates.
-    MayaHydraGpuRenderItemAdapter::SetUpdateTime(MAnimControl::currentTime().value());
-#endif
 
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;

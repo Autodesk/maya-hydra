@@ -27,7 +27,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <limits>
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -58,12 +57,6 @@ public:
     /// renderer's \p hgi can consume VP2's buffers.
     MAYAHYDRALIB_API
     static bool IsEligible(const MRenderItem& ri, Hgi* hgi);
-
-    /// Animation time of the render item update in progress, set by
-    /// MayaHydraSceneIndex::UpdateRenderItems before any item is updated. The hybrid classifier
-    /// compares it across an item's updates. Main thread.
-    MAYAHYDRALIB_API
-    static void SetUpdateTime(double time);
 
     /// Returns the primvar's externally-owned GPU buffer as an
     /// HdExtGpuBufferSchema container, or a null handle when the primvar has
@@ -174,16 +167,15 @@ private:
     mutable std::atomic<uint8_t> _lazyCpuBufferTriggeredMask { 0 };
 
     // Hybrid-mode classifier. Starts false so the mesh runs in batch mode
-    // (allowDirectBind=false, GPU-to-GPU blit). Flips to true (sticky) on a
-    // geometry-only change (MVS_changedGeometry without MVS_changedTopo) of a mesh
-    // that already has a published buffer, at a different animation time than
-    // its previous geometry update - i.e. a deform. A topology change, or VP2
-    // re-sending a rigid mesh at the same time (e.g. while a display-mode toggle
-    // repopulates it), is not one. Once true, the mesh runs in direct mode
-    // (zero-copy). Only consulted when MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
+    // (allowDirectBind=false, GPU-to-GPU blit). Flips to true (sticky) on the
+    // second geometry-only change (MVS_changedGeometry without MVS_changedTopo)
+    // since the mesh was last (re)populated - i.e. a deform. VP2 sends one such
+    // change after populating a rigid mesh (e.g. after a display-mode toggle), so
+    // one is not enough. Once true, the mesh runs in direct mode (zero-copy).
+    // Only consulted when MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
     bool _classifiedAsAnimating = false;
-    // Update time (SetUpdateTime) of this item's previous geometry/topology update.
-    double _lastGeomTime = std::numeric_limits<double>::quiet_NaN();
+    // Geometry-only changes since the last topology change.
+    int _geomOnlyUpdatesSinceTopo = 0;
 
     // Whether the streams published on the current update allow direct binding. Decided once
     // per update in _BeginGeometryUpdate.
