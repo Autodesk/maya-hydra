@@ -594,9 +594,8 @@ void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool 
             ++_geomOnlyUpdatesSinceTopo;
         }
     }
-    if (hybridMode && geomChanged && !topoChanged
-        && _geomOnlyUpdatesSinceTopo >= kGeomOnlyUpdatesToPromote && _extPositions
-        && !_classifiedAsAnimating) {
+    if (hybridMode && geomChanged && _geomOnlyUpdatesSinceTopo >= kGeomOnlyUpdatesToPromote
+        && _extPositions && !_classifiedAsAnimating) {
         // No dirty emitted here. On the next stream read _PublishExtStream sees
         // that the cached allowDirectBind is now stale and republishes every
         // vertex-layer primvar, which dirties it. UV/tangent (not rewritten
