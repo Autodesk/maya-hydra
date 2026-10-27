@@ -60,7 +60,7 @@ class TestCurrentRendererSelection(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
     _initializeStandalone = True
-    _setHdStormRenderer = False
+    _setTestRenderer = False
     _requiredPlugins = ['mtoa']
 
     # Baselines live alongside the scene under scenes/basic/, matching the

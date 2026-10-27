@@ -23,7 +23,7 @@ class TestMeshSubdivTags(mtohUtils.MayaHydraBaseTestCase):
 
     # Build a Catmull-Clark cube whose subdivisionTags exercises edge creases and vertex creases.
     def setupCreasedCube(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.polyCube(name="creasedCube")
         cmds.setAttr("creasedCubeShape.displaySmoothMesh", 2)  # 2 = catmullClark
 

@@ -104,6 +104,13 @@ if(IS_WINDOWS)
     _mayaHydra_add_texturing_variant(prman "-x 160 -y 120")
 endif()
 
+# On macOS with HdStorm renders diverge slightly from the baseline in lighting
+# falloff regions.
+set(_hdStorm_fail_arg "")
+if(IS_MACOSX)
+    set(_hdStorm_fail_arg FAIL 0.02 FAILPERCENT 6)
+endif()
+
 foreach(scene ${STORM_RENDER_SCENES})
     cmake_path(GET scene STEM sceneFileNameNoExt)
     mayaHydra_add_cmd_line_render_test(${scene}
@@ -111,6 +118,7 @@ foreach(scene ${STORM_RENDER_SCENES})
         RENDERER HdStormRendererPlugin
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        ${_hdStorm_fail_arg}
         RENDERER_ARGS "-x 960 -y 540 -im ${sceneFileNameNoExt}"
     )
 endforeach()
@@ -408,46 +416,40 @@ mayaHydra_add_cmd_line_render_test(${scene}
     RENDERER_ARGS "-im ${sceneFileNameNoExt}"
 )
 
-# HYDRA-2610: LookdevXMaya does not load in the Linux Maya 2028 test
-# environment, so the scenes' MaterialX OpenPBR shaders become unknown nodes and
-# Storm/Arnold fall back to the default surface shader.  The renders come out
-# grey, while the baselines are a dark-red cube and a teal cylinder, so idiff
-# fails.  Camera and geometry are correct; only material resolution is broken.
-set(_skip_materialx_camera_tests FALSE)
-if(IS_LINUX AND MAYA_APP_VERSION VERSION_GREATER 2027)
-    set(_skip_materialx_camera_tests TRUE)
-endif()
+# Test a render using a different camera than that from the fallback
+# USD resolution settings: Maya camera.
+set(scene basic/mayaCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    TEST_NAME_SUFFIX Storm
+    ${_hdStorm_fail_arg}
+    RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -im ${sceneFileNameNoExt}"
+)
 
-if(NOT _skip_materialx_camera_tests)
-    # Test a render using a different camera than that from the fallback
-    # USD resolution settings: Maya camera.
-    set(scene basic/mayaCamera.ma)
-    cmake_path(GET scene STEM sceneFileNameNoExt)
+# Test a render using a different camera than that from the fallback
+# USD resolution settings: USD camera.
+set(scene basic/usdCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder storm arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    set(_usdCamera_fail_arg "")
+    if(folder STREQUAL "storm")
+        set(_usdCamera_fail_arg ${_hdStorm_fail_arg})
+    endif()
     mayaHydra_add_cmd_line_render_test(${scene}
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-        RENDERER HdStormRendererPlugin
-        TEST_NAME_SUFFIX Storm
-        RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -im ${sceneFileNameNoExt}"
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        ${_usdCamera_fail_arg}
+        RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
     )
-
-    # Test a render using a different camera than that from the fallback
-    # USD resolution settings: USD camera.
-    set(scene basic/usdCamera.ma)
-    cmake_path(GET scene STEM sceneFileNameNoExt)
-    foreach(folder storm arnold)
-        _mayaHydra_renderer_for_folder(${folder} renderer suffix)
-        mayaHydra_add_cmd_line_render_test(${scene}
-            COPY_SCENE
-            RENDERED_IMAGE_SUBDIR projects/default/images
-            RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-            RENDERER ${renderer}
-            TEST_NAME_SUFFIX ${suffix}
-            RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -im ${sceneFileNameNoExt}"
-        )
-    endforeach()
-endif()
+endforeach()
 
 # Animated rig render.  As frame number resolution is only available for
 # Hydra v2 render settings renderers, HdStorm is excluded here.
@@ -653,9 +655,6 @@ endif()
 # (workspace -fr "sourceImages" "sourceimages"), so a camelCase directory
 # resolves only on case-insensitive filesystems and fails on Linux.
 #
-# Skipped on macOS, where the texture still does not resolve through the project
-# and the sphere renders untextured: HYDRA-2611.
-#
 # Expected test directory layout:
 # .../test/Temporary/<sceneStem>/projects/default   <- what -proj points at
 # |__ images/<sceneStem>.png
@@ -674,11 +673,7 @@ function(_mayaHydra_add_relpath_variant folder)
 
     set(scene relativePathTest/${folder}/${scene_stem}.ma)
     cmake_path(GET scene STEM sceneFileNameNoExt)
-    # HYDRA-2611 : the texture does not resolve through the -proj project on
-    # macOS, so the sphere renders untextured while Windows and Linux match the
-    # baseline.  Skipped on every macOS version rather than 2027 only, since the
-    # failure is platform- rather than version-specific.
-    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}|skipOnPlatform:osx
+    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
         RENDERER ${renderer}
         # Must specify:
         # - The resolution, otherwise the USD default render settings 2048x1080

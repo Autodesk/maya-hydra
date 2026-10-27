@@ -34,13 +34,11 @@ from maya.api import OpenMaya as om
 
 import ufe
 import ufeUtils, testUtils
+import rendererUtils
 
 import os
 
 mayaSeparator = "|"
-
-HD_STORM = "HdStormRendererPlugin"
-HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 
 def createUfePathSegment(mayaPath):
     """
@@ -70,7 +68,7 @@ def getMayaSelectionList():
 def isHydraRenderer():
     activeEditor = cmds.playblast(activeEditor=1)
     activeRenderer = cmds.modelEditor(activeEditor, q=True,rendererOverrideName=True)
-    return activeRenderer == HD_STORM_OVERRIDE
+    return activeRenderer == rendererUtils.getTestRendererOverrideName()
 
 def resetDefaultLightIntensity():
     """If the current Maya version supports setting the default light intensity,

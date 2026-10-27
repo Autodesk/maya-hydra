@@ -35,7 +35,7 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
         testFile = mayaUtils.openTestScene(
             "testTexturedMode", "texturedUsdSphere.ma")
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         self.setBasicCam(3)
 
         panel = self.activeEditor

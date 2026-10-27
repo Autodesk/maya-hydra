@@ -64,7 +64,7 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
 
         mayaUtils.openNewScene()
         self.setBasicCam(10)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         # Create a USD stage
         usdProxyShapeUfePathString = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -104,7 +104,7 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
     def test_mayaCamera(self):
         mayaUtils.openNewScene()
         self.setBasicCam(10)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         camTrans, camShape = cmds.camera(name='testCam')
 
@@ -132,7 +132,7 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
     def test_mayaLight(self):
         mayaUtils.openNewScene()
         self.setBasicCam(10)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
 
         lightShape = cmds.directionalLight(name='mayaDirectionalLightShape')
         lightTrans = cmds.listRelatives(lightShape, parent=True)[0]

@@ -33,7 +33,7 @@ class TestPurposeRenderTag(mtohUtils.MayaHydraBaseTestCase):
         usdScenePath = testUtils.getTestScene('testDefaultMaterial', 'PoolBallFlat_animated.usdz')
         proxyShapePathStr = usdUtils.createStageFromFile(usdScenePath)
         self._stage = mayaUsd.lib.GetPrim(proxyShapePathStr).GetStage()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayTextures=True)  
         self.setBasicCam(5)
         cmds.refresh()

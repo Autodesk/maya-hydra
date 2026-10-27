@@ -29,7 +29,7 @@ class TestMaterialBlocking(mtohUtils.MayaHydraBaseTestCase):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testMaterialBlocking', 'materialBindingsScene.usda')
         usdUtils.createStageFromFile(usdScenePath)
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         sn = ufe.GlobalSelection.get()
         sn.clear()
         cubeMeshPath = "|materialBindingsScene|materialBindingsSceneShape,/scene/cubes/cube0/cubeMesh"

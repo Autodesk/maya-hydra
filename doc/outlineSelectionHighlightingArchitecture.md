@@ -390,7 +390,9 @@ selection. Dirtying a path walks its entire subtree, and a prim that stayed sele
 changed colour — so adding one object to a large selection would otherwise re-walk all of it. The
 invalidation is done from `Render()` rather than from `SelectionChanged()` for two reasons: the Fvp
 selection is guaranteed to have been updated by then, and scene index mutation belongs on the render
-thread.
+thread. It is skipped altogether when no prim pulls a wireframe colour (shaded and textured styles
+outside bounding box mode, where only the legacy `*WhSi` prims would), and when a repr change is
+about to dirty every prim anyway.
 
 ## Debug visualization
 

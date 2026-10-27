@@ -79,6 +79,7 @@
 #include <hvt/engine/viewportEngine.h>
 #include <hvt/tasks/resources.h>
 
+#include <pxr/base/js/value.h>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/type.h>
@@ -114,6 +115,7 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/imaging/hd/basisCurves.h>
 #include <pxr/imaging/hd/points.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/imaging/hdx/tokens.h>
@@ -689,6 +691,27 @@ int GetNearestHitIndex(
 
     return nearestHitIndex;
 }
+
+// Reads "mayaHydra": { "renderSecondaryGraphics": <bool> } from the renderer plugin's
+// plugInfo.json type entry.
+bool rendererDrawsSecondaryGraphics(const TfToken& rendererName)
+{
+    if (rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
+        return true;
+    }
+    const TfType rendererType = TfType::FindByName(rendererName.GetString());
+    if (rendererType.IsUnknown()) {
+        return false;
+    }
+    const JsValue mayaHydraMetadata
+        = PlugRegistry::GetInstance().GetDataFromPluginMetaData(rendererType, "mayaHydra");
+    if (!mayaHydraMetadata.IsObject()) {
+        return false;
+    }
+    const JsObject& metadata = mayaHydraMetadata.GetJsObject();
+    const auto      it = metadata.find("renderSecondaryGraphics");
+    return it != metadata.end() && it->second.IsBool() && it->second.GetBool();
+}
 } // namespace
 
 class MtohRenderOverride::SelectionObserver : public Ufe::Observer
@@ -828,8 +851,8 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _ufeSn(Ufe::NamedSelection::get("MayaSelectTool"))
     , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
     , _colorPreferencesObserver(std::make_shared<ColorPreferencesObserver>(*this))
-    , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
-    , _isUsingHdFlash(desc.rendererName == MtohTokens->HdFlashRendererPlugin)
+    , _isUsingHdSt(desc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin)
+    , _isUsingHdFlash(desc.rendererName == MayaHydraRendererTokens->HdFlashRendererPlugin)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg(
@@ -1310,6 +1333,28 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
                     }),
                 tempPrimIds.end());
         }
+
+        // Scene-index-native delegates such as Flash consume geometry directly from their
+        // terminal scene index and therefore do not publish HdRprims. Include their visible
+        // gprims so this testing command remains a renderer-independent view of renderable paths.
+        if (const auto& terminalSceneIndex = renderIndex->GetTerminalSceneIndex()) {
+            for (const SdfPath& primPath :
+                 HdSceneIndexPrimView(terminalSceneIndex, SdfPath::AbsoluteRootPath())) {
+                const HdSceneIndexPrim prim = terminalSceneIndex->GetPrim(primPath);
+                if (!HdPrimTypeIsGprim(prim.primType)) {
+                    continue;
+                }
+                const HdBoolDataSourceHandle visibility =
+                    HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
+                if (visibleOnly && visibility && !visibility->GetTypedValue(0.0f)) {
+                    continue;
+                }
+                tempPrimIds.push_back(primPath);
+            }
+        }
+
+        // Deduplicate prims in case they were both in the render index and scene index
+        tempPrimIds.erase(std::unique(tempPrimIds.begin(), tempPrimIds.end()), tempPrimIds.end());
 
         // Concatenate results
         if (tempPrimIds.size()) { 
@@ -1950,7 +1995,8 @@ MStatus MtohRenderOverride::Render(
             { SdfPath::AbsoluteRootPath() });
     }
 
-    // Dirty only the prims that were selected or deselected. Lead changes are handled by
+    // Dirty only the prims that were selected or deselected, and only when every prim pulls a
+    // wireframe color, for the same reasons as the dormant color above. Lead changes are handled by
     // dirtyLeadObjectRelatedSelections().
     if (_selection && _dirtySelectionColorsSceneIndex && _selectionColorsDirty.exchange(false)) {
         const SdfPathVector& currentlySelected = getFullySelectedPaths();
@@ -1963,7 +2009,7 @@ MStatus MtohRenderOverride::Render(
             _previouslySelectedPaths.end(),
             std::back_inserter(selectionStateChanged));
 
-        if (!selectionStateChanged.empty()) {
+        if (!selectionStateChanged.empty() && pullsWireframeColorPerPrim && !reprWillBePushed) {
             _dirtySelectionColorsSceneIndex->dirtySelectionRelatedPrims(selectionStateChanged);
         }
         _previouslySelectedPaths = currentlySelected;
@@ -2677,8 +2723,8 @@ void MtohRenderOverride::_InitHydraResources(
     }
 
     // Install the outline on the main pass (pass 0, Storm or Flash), whose render index contains
-    // all scene geometry. The secondary graphics pass (pass 1, Storm, when there are two passes)
-    // cannot render prim IDs for USD prims.
+    // all scene geometry. The secondary graphics pass (pass 1, when there are two passes) holds no
+    // USD prims, so it cannot render their prim IDs.
     if (_UseOutlineSelectionHighlighting()) {
         constexpr int outlinePassIndex = 0;
         const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
@@ -2752,10 +2798,9 @@ void MtohRenderOverride::_InitHydraResources(
     }
 
     MayaHydraInitData mhInitData(
-        TfToken("MayaHydraSceneIndex"),
         *renderIndex(),
         MAYA_NATIVE_ROOT,
-        _isUsingHdSt,
+        _rendererDesc.rendererName,
         _hgi.get()
     );
 
@@ -4414,7 +4459,7 @@ void MtohRenderOverride::_CreateFramePassesData()
     // Check if we should use single frame pass when using the same renderer
     static const bool _useSingleFramePass = useSingleFramePass();
     const bool shouldUseSingleFramePass = _useSingleFramePass && 
-        (_rendererDesc.rendererName == MtohTokens->HdStormRendererPlugin);
+        (_rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin);
 
     // Main pass
     {
@@ -4457,7 +4502,10 @@ void MtohRenderOverride::_CreateFramePassesData()
     // Secondary graphics pass - only create if not using single frame pass
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
-        filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
+        filteringData->_rendererName
+            = (secondaryGraphicsUseActiveRenderer() && rendererDrawsSecondaryGraphics(_rendererDesc.rendererName))
+            ? _rendererDesc.rendererName
+            : MayaHydraRendererTokens->HdStormRendererPlugin;
         filteringData->_includePaths = { _highlightHierarchyPrefix, MayaViewportSceneIndex::DefaultLightPath() }; // include selection highlight prims.
         filteringData->_excludePaths = { };
         filteringData->_removeLights = true; // Remove lights from this pass except for the default light, kept through the include paths

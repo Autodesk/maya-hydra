@@ -32,7 +32,7 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
         # Add a custom attribute (non-param) for NonParamAttrTriggersOnlyPrimvarDirty test
         cmds.addAttr(camera_shape, longName="testCustomAttr", attributeType="float", defaultValue=0.0)
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhCameraShape", camera_shape))
         cmds.refresh()
 

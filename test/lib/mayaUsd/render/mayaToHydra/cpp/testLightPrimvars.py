@@ -46,7 +46,7 @@ class TestLightPrimvars(mtohUtils.MayaHydraBaseTestCase):
             # aiShadowDensity (not in param attr list) - for NonParamAttrTriggersOnlyPrimvarDirty
             cmds.setAttr(light_shape + ".aiShadowDensity", 0)
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhLightShape", light_shape))
         cmds.refresh()
 
@@ -85,7 +85,7 @@ class TestLightPrimvars(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(light_shape + ".dmapBias", 0.02)
         cmds.setAttr(light_shape + ".dmapFilterSize", 4)
 
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.optionVar(stringValue=("mhLightShape", light_shape))
         cmds.refresh()
 

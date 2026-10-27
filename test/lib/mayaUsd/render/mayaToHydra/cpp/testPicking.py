@@ -25,7 +25,7 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestPicking, self).setUp()
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.refresh()
 
     def createMayaCube(self):

@@ -27,6 +27,7 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
+#include <mayaHydraLib/tokens.h>
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/envSetting.h>
@@ -461,12 +462,12 @@ private:
 
 } // namespace
 
-MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool interactive)
+MayaHydraSceneIndex::MayaHydraSceneIndex(const MayaHydraInitData& initData, bool interactive)
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(&initData.renderIndex)
     , _hgi(initData.hgi)
-    , _isHdSt(initData.isHdSt)
+    , _isHdSt(initData.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin)
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
@@ -1065,9 +1066,6 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
             }
             _adaptersToRebuild.clear();
         }
-    }
-    if (!IsHdSt()) {
-        return;
     }
 }
 

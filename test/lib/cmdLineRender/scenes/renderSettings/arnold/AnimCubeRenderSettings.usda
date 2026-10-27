@@ -28,7 +28,7 @@ def Scope "Cameras"
         float horizontalAperture = 35.999928
         float verticalAperture = 23.999952
         float3 xformOp:rotateXYZ = (77.90114, 1.8477291, -22.117052)
-        double3 xformOp:translate = (-2.046467287095833, -6.962612043589754, 2.00237962266086)
+        double3 xformOp:translate = (-0.8813206001615739, -1.7006160535364172, 0.6076817035668484)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
     }
 }

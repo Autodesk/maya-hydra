@@ -20,13 +20,11 @@ import maya.api.OpenMaya as om
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+import rendererUtils
 import maya.mel as mel
 import platform
 import unittest
 from testUtils import PluginLoaded
-
-HD_STORM = "HdStormRendererPlugin"
-HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 
 class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -49,7 +47,7 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         cmds.file(new=True, force=True)
 
     def setupScene(self):
-        self.setHdStormRenderer()
+        self.setTestRenderer()
         cmds.move(7.714, 5.786, 7.714, 'persp')
         cmds.refresh()
 
@@ -117,9 +115,9 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
             #Switch to VP2
             self.setViewport2Renderer()
-            #Switch back to Storm
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("add_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #Switch back to Hydra
+            self.setTestRenderer()
+            self.assertSnapshotClose("add_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test FootPrint grids parameters
     def test_FootPrintAttributes(self):
@@ -140,9 +138,9 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
             #Switch to VP2
             self.setViewport2Renderer()
-            #Switch back to Storm
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("footPrint_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #Switch back to Hydra
+            self.setTestRenderer()
+            self.assertSnapshotClose("footPrint_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     # Step .size through several values (mimics AE slider scrub) and verify the
     # viewport updates at each step via targeted Hydra dirty locators.
@@ -421,9 +419,9 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
             #Switch to VP2
             self.setViewport2Renderer()
-            #Switch back to Storm
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("multipleNodes_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #Switch back to Hydra
+            self.setTestRenderer()
+            self.assertSnapshotClose("multipleNodes_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test multiple viewports
     def test_MultipleViewports(self):
@@ -432,19 +430,23 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             mel.eval('FourViewLayout')
             #Set focus on persp view
             cmds.setFocus ('modelPanel4') #Is the persp view
-            #Set Storm as the renderer
-            self.setHdStormRenderer()
+            #Set Hydra as the renderer
+            self.setTestRenderer()
             modelPanel4 = cmds.playblast(activeEditor=1)
             rendererOverrideNameModPanel4 = cmds.modelEditor(modelPanel4, q=1,rendererOverrideName=1)
-            self.assertTrue(rendererOverrideNameModPanel4 == HD_STORM_OVERRIDE)
+            self.assertTrue(
+                rendererOverrideNameModPanel4
+                == rendererUtils.getTestRendererOverrideName())
 
             #Set focus on model Panel 1 (it's an orthographic view : top) 
             cmds.setFocus ('modelPanel1')
-            #Set Storm as the renderer
-            self.setHdStormRenderer()
+            #Set Hydra as the renderer
+            self.setTestRenderer()
             modelPanel1 = cmds.playblast(activeEditor=1)
             rendererOverrideNameModPanel1 = cmds.modelEditor(modelPanel1, q=1,rendererOverrideName=1)
-            self.assertTrue(rendererOverrideNameModPanel1 == HD_STORM_OVERRIDE)
+            self.assertTrue(
+                rendererOverrideNameModPanel1
+                == rendererUtils.getTestRendererOverrideName())
             
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName1 = cmds.createNode("MhFootPrint", n="nodeShape1")
@@ -467,13 +469,13 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             self.setViewport2Renderer()
             self.assertSnapshotClose("multipleViewports_VP2_modPan3.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             
-            #Switch back to Storm
+            #Switch back to Hydra
             cmds.setFocus ('modelPanel4')
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.setTestRenderer()
+            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             cmds.setFocus ('modelPanel1')
-            self.setHdStormRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan3.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.setTestRenderer()
+            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan3.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test loading a scene
     def test_Load(self):
@@ -510,6 +512,30 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             cmds.mayaHydraCppTest('|transform1|MhFootPrint1', f="TestUsdPicking.pickPrim")
 
             self.assertEqual(['MhFootPrint1'], cmds.ls(sl=True))
+
+    # Node names must match testFootPrintNotifications.cpp.
+    def _setupNotificationsScene(self, displayAppearance):
+        self.setupScene()
+        cmds.modelEditor(self.activeEditor, edit=True,
+                         displayAppearance=displayAppearance, wireframeOnShaded=False)
+        cmds.polyCube(name="footPrintNotifCube")
+        cmds.createNode("MhFootPrint", name="footPrintNotifShape")
+        cmds.select(clear=True)
+        cmds.refresh(force=True)
+
+    def test_shadedSelectionNotifications(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self._setupNotificationsScene('smoothShaded')
+            cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionSendsOneColorDirtyPerChange")
+
+    def test_wireframeSelectionNotifications(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            # The display appearance survives a new scene, so restore it for the next tests.
+            try:
+                self._setupNotificationsScene('wireframe')
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.wireframeNonLeadDeselectDirtiesWireframeColor")
+            finally:
+                cmds.modelEditor(self.activeEditor, edit=True, displayAppearance='smoothShaded')
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

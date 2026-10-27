@@ -20,6 +20,7 @@ target_sources(${TARGET_NAME}
         testColorPreferences.cpp
         testCppFramework.cpp
         testFvpDirtyNotifier.cpp
+        testFootPrintNotifications.cpp
         testHydraPrim.cpp
         testMayaHydraSceneIndex.cpp
         testMayaSceneFlattening.cpp
