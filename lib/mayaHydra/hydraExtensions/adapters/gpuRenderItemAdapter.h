@@ -167,12 +167,16 @@ private:
     mutable std::atomic<uint8_t> _lazyCpuBufferTriggeredMask { 0 };
 
     // Hybrid-mode classifier. Starts false so the mesh runs in batch mode
-    // (allowDirectBind=false, GPU-to-GPU blit). Flips to true (sticky) the first
-    // time MVS_changedGeometry/MVS_changedTopo fires on a mesh that already has
-    // a published buffer (filtering out the initial population frame). Once
-    // true, the mesh runs in direct mode (zero-copy). Only consulted when
-    // MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
+    // (allowDirectBind=false, GPU-to-GPU blit). Flips to true (sticky) on the
+    // second geometry-only change (MVS_changedGeometry without MVS_changedTopo)
+    // since the mesh was last (re)populated - i.e. a deform. VP2 sends one such
+    // change after populating a rigid mesh (e.g. after a display-mode toggle), so
+    // one is not enough. Once true, the mesh runs in direct mode (zero-copy).
+    // Only consulted when MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
     bool _classifiedAsAnimating = false;
+    // Geometry-only changes since the last topology change, while unclassified in
+    // hybrid mode; saturates at the promotion threshold.
+    int _geomOnlyUpdatesSinceTopo = 0;
 
     // Whether the streams published on the current update allow direct binding. Decided once
     // per update in _BeginGeometryUpdate.
