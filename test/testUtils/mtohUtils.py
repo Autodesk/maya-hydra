@@ -71,16 +71,6 @@ SELECTION_HIGHLIGHT_MODE_ENUM_NAMES = {
     SELECTION_HIGHLIGHT_MODE_OUTLINE: "Outline Selection",
 }
 
-# Set to 1 in the CTest environment of a renderer counterpart run: a test of
-# the HdStorm configuration also registered with another MAYAHYDRA_TEST_RENDERER
-# (see the _flash counterparts in the mayaToHydra CMakeLists.txt). The build
-# does not know whether that renderer is installed, so such a run skips itself
-# when it is not (Maya Hydra CI has no Flash).
-TEST_RENDERER_COUNTERPART_ENV_VAR = "MAYAHYDRA_TEST_RENDERER_COUNTERPART"
-
-def isTestRendererCounterpart():
-    return os.environ.get(TEST_RENDERER_COUNTERPART_ENV_VAR, '').strip() == '1'
-
 class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     '''Base class for mayaHydra unit tests.'''
 
@@ -112,10 +102,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         '''Whether the outline mode is offered in this configuration.
 
         Must match MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT in renderGlobals.cpp
-        and MAYAHYDRA_OUTLINE_MODE_AVAILABLE in the mayaToHydra CMakeLists.txt.
-        Storm and Flash both draw the outline; the HdFlash test configuration
-        still pins every run to legacy in the CMakeLists, so only the _flash
-        counterparts of the HdStorm configuration use outline on Flash.
+        and MAYAHYDRA_OUTLINE_SUPPORTED in the mayaToHydra CMakeLists.txt. Storm
+        and Flash both draw the outline.
         '''
         if platform.system() == "Darwin":
             return False
@@ -151,18 +139,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     @classmethod
     def selectionHighlightOutputSuffix(cls):
-        '''Output-directory suffix distinguishing the active mode and, for a
-        renderer counterpart run, its renderer.
+        '''Output-directory suffix distinguishing the active mode.
 
         fixturesUtils.setUpClass() deletes its output directory on startup, so
-        runs of one script, which may run in parallel, need separate
-        directories. A test that builds its own suffix in setUpClass (see
-        testMeshes.py) must include this.
+        the two modes, which may run in parallel, need separate directories. A
+        test that builds its own suffix in setUpClass (see testMeshes.py) must
+        include this.
         '''
-        suffix = '_' + cls.selectionHighlightMode()
-        if isTestRendererCounterpart():
-            suffix += '_' + rendererUtils.getTestRendererReferenceFolder()
-        return suffix
+        return '_' + cls.selectionHighlightMode()
 
     @classmethod
     def setUpClass(cls):
@@ -559,21 +543,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             sceneDelegateId="MayaHydraSceneDelegate")
 
     def setTestRenderer(self):
-        """Activate the renderer selected for this CTest invocation.
-
-        Skips the test in a renderer counterpart run (see
-        isTestRendererCounterpart()) when that renderer is not available.
-        """
-        renderer = rendererUtils.getTestRenderer()
-        if isTestRendererCounterpart():
-            pluginName = rendererUtils.getRendererPluginName(renderer)
-            available = cmds.mayaHydra(listRenderers=True)
-            if pluginName not in available:
-                self.skipTest(
-                    "This {} counterpart run needs the {} render delegate, "
-                    "which is not available; available renderers: {}.".format(
-                        renderer, pluginName, available))
-        self.setRenderer(renderer)
+        """Activate the renderer selected for this CTest invocation."""
+        self.setRenderer(rendererUtils.getTestRenderer())
 
     def setHdStormRenderer(self):
         """Activate Storm for a test that explicitly requires it."""

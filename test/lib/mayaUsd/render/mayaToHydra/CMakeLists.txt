@@ -224,16 +224,24 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # shader samples) and on macOS; there every primary run is legacy and there are no
 # _legacy counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
 # (renderGlobals.cpp) and outlineSelectionHighlightSupported() (mtohUtils.py).
-# Flash draws the outline too, but the HdFlash test configuration stays legacy-only
-# for now: outline on Flash is covered by the _flash counterparts below.
-if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
+if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX)
+    set(MAYAHYDRA_OUTLINE_SUPPORTED TRUE)
+else()
+    set(MAYAHYDRA_OUTLINE_SUPPORTED FALSE)
+endif()
+
+# Storm and Flash both draw the outline, but only the HdStorm test renderer runs
+# every test in outline with a _legacy counterpart. The HdFlash test renderer runs
+# the outline-only scripts below in outline and every other test in legacy.
+if(MAYAHYDRA_OUTLINE_SUPPORTED AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
 else()
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)
 endif()
 
 # Hover needs Qt6: without it the plugin has no hover event filter, and the test
-# imports PySide6 at module scope, so it cannot skip itself.
+# imports PySide6 at module scope, so it cannot skip itself. Hover is not
+# implemented on Flash yet, hence MAYAHYDRA_OUTLINE_MODE_AVAILABLE (HdStorm only).
 if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
@@ -244,7 +252,8 @@ endif()
 # Also runs with MAYA_HYDRA_USE_MESH_ADAPTER=1, an opt-in path (the viewport default is render items).
 # It is the only path where a Maya native mesh reaches Hydra with a refine level > 0 (Smooth Mesh
 # Preview), so the outline must follow the refined surface there too.
-if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+# Run with both test renderers; Flash reference images are in each test's "flash" subfolder.
+if(MAYAHYDRA_OUTLINE_SUPPORTED)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
         testOutlinePointInstances.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
@@ -288,6 +297,9 @@ set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
 function(mayaHydra_primary_mode_env out_var test_filename)
     if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE AND
        NOT ${test_filename} IN_LIST OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES)
+        set(${out_var} "" PARENT_SCOPE)
+    elseif(MAYAHYDRA_OUTLINE_SUPPORTED AND
+           ${test_filename} IN_LIST NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES)
         set(${out_var} "" PARENT_SCOPE)
     else()
         set(${out_var} "MAYAHYDRA_SELECTION_HIGHLIGHT_MODE=legacy" PARENT_SCOPE)
@@ -419,58 +431,6 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
         "HDGP_INCLUDE_DEFAULT_RESOLVER=1")
 endforeach()
 
-# Scripts of the HdStorm configuration that also run on Flash: a _flash counterpart with
-# MAYAHYDRA_TEST_RENDERER=HdFlash, in the primary run's mode. They cover outline on Flash, which the
-# HdFlash configuration does not run (see MAYAHYDRA_OUTLINE_MODE_AVAILABLE). Flash reference images
-# live in a "flash" subfolder (see rendererUtils.resolveReferenceImage()). The build does not know
-# whether Flash is installed, so MAYAHYDRA_TEST_RENDERER_COUNTERPART=1 makes the counterpart skip
-# itself at run time when the Flash render delegate is not available. Hover is not implemented on
-# Flash yet: testOutlineHover*.py are not listed.
-set(FLASH_COUNTERPART_TEST_SCRIPT_FILES
-    testOutlinePointInstances.py
-    testOutlineNativeInstances.py
-    testOutlineRefinement.py
-)
-
-# Registers the Flash counterpart of an interactive test, if its script is listed above.
-#   name_suffix - appended before "_flash", to keep the target unique for
-#                 scripts registered by more than one configuration.
-#   ARGN        - the ENV entries of the configuration being mirrored.
-function(mayaHydra_add_flash_test script name_suffix)
-    if(NOT MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
-        return()
-    endif()
-    get_testfile_and_labels(all_labels test_filename ${script})
-    if(NOT ${test_filename} IN_LIST FLASH_COUNTERPART_TEST_SCRIPT_FILES)
-        return()
-    endif()
-    mayaHydra_primary_mode_env(mode_env ${test_filename})
-    mayaUsd_get_unittest_target(target ${test_filename})
-    set(target "${target}${name_suffix}_flash")
-    mayaUsd_add_test(${target}
-        INTERACTIVE
-        PYTHON_SCRIPT ${test_filename}
-        ENV
-            "MAYAHYDRA_TEST_RENDERER=HdFlash"
-            "MAYAHYDRA_TEST_RENDERER_COUNTERPART=1"
-            ${mode_env}
-            ${ARGN}
-    )
-    apply_labels_to_test("${all_labels}" ${target})
-endfunction()
-
-foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
-    mayaHydra_add_flash_test(${script} ""
-        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
-        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1")
-endforeach()
-
-foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
-    mayaHydra_add_flash_test(${script} "_meshAdapter"
-        "MAYA_HYDRA_USE_MESH_ADAPTER=1"
-        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1")
-endforeach()
-
 # Standalone Python unit tests for pure test utilities. These exercise logic
 # that does not need Maya (e.g. renderManUtils env/platform gating), so they run
 # under mayapy via unittest without initializing a standalone Maya session.
@@ -493,15 +453,10 @@ add_subdirectory(cpp)
 # Bake the test renderer into every test registered in this directory and in
 # cpp/. Applied once here, after all tests exist, so individual mayaUsd_add_test
 # calls don't each have to repeat it. The Python side reads this variable via
-# rendererUtils.getTestRenderer(). A test that sets its own renderer (the _flash
-# counterparts) keeps it.
+# rendererUtils.getTestRenderer().
 foreach(test_dir ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cpp)
     get_property(dir_tests DIRECTORY ${test_dir} PROPERTY TESTS)
     foreach(test_name ${dir_tests})
-        get_property(test_env TEST ${test_name} PROPERTY ENVIRONMENT)
-        if("${test_env}" MATCHES "MAYAHYDRA_TEST_RENDERER=")
-            continue()
-        endif()
         set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT
             "MAYAHYDRA_TEST_RENDERER=${MAYAHYDRA_TEST_RENDERER}")
     endforeach()

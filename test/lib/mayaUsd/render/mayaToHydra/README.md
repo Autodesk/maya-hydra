@@ -40,21 +40,19 @@ Renderer exclusions use the same CTest-label mechanism as plugin and platform ex
 - Use `self.setTestRenderer()` to return to the selected renderer mid-test. `self.setHdStormRenderer()` always forces Storm, and `self.setViewport2Renderer()` switches to VP2.
 - `rendererUtils.py` (in testUtils) holds the renderer data: plugin name, viewport override name and reference-image folder (`storm` or `flash`).
 
-## Flash counterparts in the HdStorm configuration
-
-The scripts listed in `FLASH_COUNTERPART_TEST_SCRIPT_FILES` (CMakeLists.txt) also get a `<test>_flash` run in the HdStorm configuration, with `MAYAHYDRA_TEST_RENDERER=HdFlash` and `MAYAHYDRA_TEST_RENDERER_COUNTERPART=1`. They cover outline selection highlighting on Flash, which the HdFlash configuration does not run yet. The build does not know whether Flash is installed, so a counterpart skips itself when the Flash render delegate is not available. Its output directory ends in `_flash`, so it can run in parallel with the Storm run.
-
 ## Selection highlighting modes
 
 Selection highlighting has two modes: `outline` (screen-space outline) and `legacy` (wireframe highlight prims). The mode is read from `MAYAHYDRA_SELECTION_HIGHLIGHT_MODE`. If it is unset, it defaults to `outline` where supported, otherwise `legacy`.
 
-Outline is not available on macOS, or with USD 24.11 and older. In those configurations, and in the HdFlash configuration (for now; see the Flash counterparts above), every test runs in legacy only.
+Outline is not available on macOS, or with USD 24.11 and older. In those configurations every test runs in legacy only.
 
-Where outline is available, the CMakeLists registers each interactive test twice: the primary run (outline) and a `<test>_legacy` run. Two lists in the CMakeLists control exceptions:
+With HdFlash, the outline-only tests (`NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES`, except the hover tests: hover is Storm only) run in outline and every other test runs in legacy only.
+
+With HdStorm, where outline is available, the CMakeLists registers each interactive test twice: the primary run (outline) and a `<test>_legacy` run. Two lists in the CMakeLists control exceptions:
 - `NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES`: outline-only tests, which get no `_legacy` run.
 - `OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES`: tests that cannot run in outline. Their primary run is forced to legacy, with no `_legacy` run.
 
-Use `self.selectionHighlightMode()` in tests whose expectations depend on the mode. Keep `outlineSelectionHighlightSupported()` (mtohUtils.py), `MAYAHYDRA_OUTLINE_MODE_AVAILABLE` (CMakeLists.txt) and `MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT` (renderGlobals.cpp) in sync.
+Use `self.selectionHighlightMode()` in tests whose expectations depend on the mode. Keep `outlineSelectionHighlightSupported()` (mtohUtils.py), `MAYAHYDRA_OUTLINE_SUPPORTED` (CMakeLists.txt) and `MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT` (renderGlobals.cpp) in sync.
 
 Note that when running Python tests the Python source is read directly from the source directory.  Therefore, when changing Python test code source, no build needs to be done to update the test, which can be run immediately using ctest.  This is a convenient time saver, as the test development cycle is not edit, build, run, but simply edit and run.  Only if C++ test code is changed is a build then necessary.
 
