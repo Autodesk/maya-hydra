@@ -108,7 +108,7 @@ endif()
 # falloff regions.
 set(_hdStorm_fail_arg "")
 if(IS_MACOSX)
-    set(_hdStorm_fail_arg FAIL 0.02)
+    set(_hdStorm_fail_arg FAIL 0.02 FAILPERCENT 6)
 endif()
 
 foreach(scene ${STORM_RENDER_SCENES})

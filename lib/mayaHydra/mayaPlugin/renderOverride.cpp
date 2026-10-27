@@ -696,7 +696,7 @@ int GetNearestHitIndex(
 // plugInfo.json type entry.
 bool rendererDrawsSecondaryGraphics(const TfToken& rendererName)
 {
-    if (rendererName == MtohTokens->HdStormRendererPlugin) {
+    if (rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
         return true;
     }
     const TfType rendererType = TfType::FindByName(rendererName.GetString());
@@ -851,7 +851,7 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _ufeSn(Ufe::NamedSelection::get("MayaSelectTool"))
     , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
     , _colorPreferencesObserver(std::make_shared<ColorPreferencesObserver>(*this))
-    , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
+    , _isUsingHdSt(desc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg(
@@ -2767,10 +2767,9 @@ void MtohRenderOverride::_InitHydraResources(
     }
 
     MayaHydraInitData mhInitData(
-        TfToken("MayaHydraSceneIndex"),
         *renderIndex(),
         MAYA_NATIVE_ROOT,
-        _isUsingHdSt,
+        _rendererDesc.rendererName,
         _hgi.get()
     );
 
@@ -4429,7 +4428,7 @@ void MtohRenderOverride::_CreateFramePassesData()
     // Check if we should use single frame pass when using the same renderer
     static const bool _useSingleFramePass = useSingleFramePass();
     const bool shouldUseSingleFramePass = _useSingleFramePass && 
-        (_rendererDesc.rendererName == MtohTokens->HdStormRendererPlugin);
+        (_rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin);
 
     // Main pass
     {
@@ -4475,7 +4474,7 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_rendererName
             = (secondaryGraphicsUseActiveRenderer() && rendererDrawsSecondaryGraphics(_rendererDesc.rendererName))
             ? _rendererDesc.rendererName
-            : MtohTokens->HdStormRendererPlugin;
+            : MayaHydraRendererTokens->HdStormRendererPlugin;
         filteringData->_includePaths = { _highlightHierarchyPrefix, MayaViewportSceneIndex::DefaultLightPath() }; // include selection highlight prims.
         filteringData->_excludePaths = { };
         filteringData->_removeLights = true; // Remove lights from this pass except for the default light, kept through the include paths

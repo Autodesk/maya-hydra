@@ -26,6 +26,7 @@
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
+#include <mayaHydraLib/tokens.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
@@ -156,7 +157,6 @@ BatchRenderer::BatchRenderer(const MtohRendererDescription& desc)
     , _hgi(Hgi::CreatePlatformDefaultHgi())
     , _hgiDriver { HgiTokens->renderDriver, VtValue(_hgi.get()) }
     , _fvpSelectionTracker(new Fvp::SelectionTracker)
-    , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg(
@@ -340,16 +340,17 @@ void BatchRenderer::_FinalizeHydraBatchRender(const HdxRenderTaskParams& params)
         entry.second->Update();
     }
 
-    if (_isUsingHdSt) {
-        constexpr auto      enableShadows = kHdStormShadowsSupported;
-        HdxShadowTaskParams shadowParams;
-        shadowParams.cullStyle = HdCullStyleNothing;
+    // HdxTaskController::_CreateRenderGraph() creates lighting and shadow
+    // tasks only when the render delegate is Storm.  The non-Storm branch
+    // creates only a single untagged render task, no HdxSimpleLightTask and no
+    // HdxShadowTask.  Correspondingly, both SetEnableShadows() and
+    // SetShadowParams() are guarded no-ops when those task IDs are empty.
+    constexpr auto      enableShadows = kHdStormShadowsSupported;
+    HdxShadowTaskParams shadowParams;
+    shadowParams.cullStyle = HdCullStyleNothing;
 
-        // The light & shadow parameters currently (19.11-20.08) are only used for tasks specific
-        // to Storm.
-        _taskController->SetEnableShadows(enableShadows);
-        _taskController->SetShadowParams(shadowParams);
-    }
+    _taskController->SetEnableShadows(enableShadows);
+    _taskController->SetShadowParams(shadowParams);
 }
 
 void BatchRenderer::_ExecuteHydraBatchRenderFrame()
@@ -357,17 +358,12 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
     HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
 
     if (_mayaHydraSceneIndex) {
-        if (!TF_VERIFY(
-                _mayaHydraSceneIndex->useMeshAdapter(),
-                "The environment variable MAYA_HYDRA_USE_MESH_ADAPTER is turned off "
-                "explicitly. Please either remove that environment variable or turn it on to "
-                "use production rendering.")) {
-            return;
-        }
-    }
+        // Batch rendering must use mesh adapter mode for Maya meshes.  The
+        // MAYA_HYDRA_USE_MESH_ADAPTER environment variable is used only for
+        // viewport rendering and has no effect on batch rendering.
+        TF_AXIOM(_mayaHydraSceneIndex->useMeshAdapter());
 
-    // Update shadow collection for lights
-    if (_mayaHydraSceneIndex) {
+        // Update shadow collection for lights
         _mayaHydraSceneIndex->UpdateLightsShadowCollection();
     }
 
@@ -470,13 +466,14 @@ void BatchRenderer::_InitHydraResources()
             TfMakeValidIdentifier(_rendererDesc.rendererName.GetText()).c_str(),
             this)))
     );
-    _taskController->SetEnableShadows(kHdStormShadowsSupported || !_isUsingHdSt);
+    // See comment in _FinalizeHydraBatchRender(): SetEnableShadows() is
+    // HdStorm-only.
+    _taskController->SetEnableShadows(kHdStormShadowsSupported);
     
     MayaHydraInitData mhInitData(
-        TfToken("MayaHydraSceneIndex"),
         *renderIndex(),
         MAYA_NATIVE_ROOT,
-        _isUsingHdSt,
+        _rendererDesc.rendererName,
         _hgi.get()
     );
 
