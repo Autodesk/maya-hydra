@@ -2097,28 +2097,15 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
-    const GfRange2f displayWindow(GfVec2f(0.0f), GfVec2f(width, height));
-    GfRect2i renderRegion = MayaHydraRenderRegionCommand::getRenderRegion().has_value() ? MayaHydraRenderRegionCommand::getRenderRegion().value() : GfRect2i(GfVec2i(0.0f), GfVec2i(width, height));
-    // Sanitize render region to avoid crash for some renderers (e.g., HdPrman-26)
-    const int minX = std::clamp(renderRegion.GetMinX(), 0, width - 1);
-    const int minY = std::clamp(renderRegion.GetMinY(), 0, height - 1);
-    const int maxX = std::clamp(renderRegion.GetMaxX(), minX, width - 1);
-    const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
-    renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
-    for (int i = 0; i < numFramePasses; ++i) {
-        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-        if (!currentPass) {
-            continue;
-        }
-        currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
-    }
-
     // Storm renders through the free camera, built from Maya's view and projection matrices. The
-    // camera prim does not translate every Maya projection input (overscan, resolution gate,
-    // film transforms, 2D pan/zoom), and Storm is picked with Maya's matrices, so binding the prim
+    // camera prim does not translate every Maya projection input (resolution gate, film
+    // transforms, 2D pan/zoom), and Storm is picked with Maya's matrices, so binding the prim
     // would desync the draw from the pick. Other delegates bind the prim for the render
     // parameters the free camera lacks.
     SdfPath cameraPath;
+    // The free camera already has overscan baked into Maya's projection matrix, so
+    // default to the null operand here, and only set it when using the camera prim.
+    double  overscan = 1.0;
     if (useCameraPrim() && !_isUsingHdSt) {
         MStatus        status;
         const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
@@ -2131,16 +2118,38 @@ MStatus MtohRenderOverride::Render(
                 // TODO: Support orthographic cameras.
                 if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
                     cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+                    if (!cameraPath.IsEmpty()) {
+                        const double cameraOverscan = camera.overscan(&status);
+                        if (status == MStatus::kSuccess && cameraOverscan > 0.0) {
+                            overscan = cameraOverscan;
+                        }
+                    }
                 }
             }
         }
     }
+
+    // From https://github.com/PixarAnimationStudios/OpenUSD/blob/v26.05/pxr/imaging/cameraUtil/framing.h#L37-L38 :
+    // "In particular, overscan can be achieved by making the dataWindow larger than the displayWindow."
+    // Shrinking the display window about the render buffer center makes the data window extend beyond it.
+    const GfVec2f bufferCenter(width * 0.5f, height * 0.5f);
+    const GfVec2f displayHalfSize(
+        static_cast<float>(width * 0.5 / overscan), static_cast<float>(height * 0.5 / overscan));
+    const GfRange2f displayWindow(bufferCenter - displayHalfSize, bufferCenter + displayHalfSize);
+    GfRect2i renderRegion = MayaHydraRenderRegionCommand::getRenderRegion().has_value() ? MayaHydraRenderRegionCommand::getRenderRegion().value() : GfRect2i(GfVec2i(0.0f), GfVec2i(width, height));
+    // Sanitize render region to avoid crash for some renderers (e.g., HdPrman-26)
+    const int minX = std::clamp(renderRegion.GetMinX(), 0, width - 1);
+    const int minY = std::clamp(renderRegion.GetMinY(), 0, height - 1);
+    const int maxX = std::clamp(renderRegion.GetMaxX(), minX, width - 1);
+    const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
+    renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
 
     for (int i = 0; i < numFramePasses; ++i) {
         const hvt::FramePassPtr& currentPass = _GetFramePass(i);
         if (!currentPass) {
             continue;
         }
+        currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
         currentPass->params().renderParams.camera = cameraPath;
         // A bound camera prim carries its own window policy, translated from the Maya film fit,
         // so disable the override. The free camera needs the default override back, since the
