@@ -48,7 +48,7 @@
 //  - macOS: not supported.
 // Keep in sync with outlineSelectionHighlight's default in renderGlobals.h,
 // MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in test/testUtils/mtohUtils.py and
-// MAYAHYDRA_OUTLINE_MODE_AVAILABLE in test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
+// MAYAHYDRA_OUTLINE_SUPPORTED in test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
 #if PXR_VERSION <= 2411 || defined(__APPLE__)
 #define MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
 #endif

@@ -2393,7 +2393,7 @@ void MtohRenderOverride::_InstallHoverEventFilter(const MString& panelName)
 {
 #ifdef MAYAHYDRA_HAS_QT
     // Installed regardless of the highlight mode (see setup()), but only for Storm, the only
-    // renderer that can use the outline.
+    // renderer with hover highlighting (see _OutlineHoverHighlightingEnabled()).
     if (!_isUsingHdSt) {
         return;
     }

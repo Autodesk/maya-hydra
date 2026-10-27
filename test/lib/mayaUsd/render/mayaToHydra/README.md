@@ -44,7 +44,7 @@ Renderer exclusions use the same CTest-label mechanism as plugin and platform ex
 
 Selection highlighting has two modes: `outline` (screen-space outline) and `legacy` (wireframe highlight prims). The mode is read from `MAYAHYDRA_SELECTION_HIGHLIGHT_MODE`. If it is unset, it defaults to `outline` where supported, otherwise `legacy`.
 
-Outline is not available on macOS, or with USD 24.11 and older. In those configurations every test runs in legacy only.
+Outline is not available on macOS or with USD 24.11 and older. In those configurations every test runs in legacy only.
 
 With HdFlash, the outline-only tests (`NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES`, except the hover tests: hover is Storm only) run in outline and every other test runs in legacy only.
 
