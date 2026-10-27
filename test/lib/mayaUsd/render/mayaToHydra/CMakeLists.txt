@@ -87,6 +87,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#HYDRA-1660 re-enable testMayaDisplayModes
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
+    testCameraOverscan.py
     testConvergence.py
     testFramePasses.py
     testImagePlanes.py|skipOnRenderer:HdFlash # AGP-1037 : Image plane updates is inconsistent
