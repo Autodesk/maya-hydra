@@ -78,7 +78,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.select(clear=True)#Clear selection
 
             #Original images are located for example in maya-hydra\test\lib\mayaUsd\render\mayaToHydra\FlowViewportAPITest
-            self.assertSnapshotClose("add_NodeCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("add_NodeCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Move the transform node, the added prims (cube grid) should move as well
             # Get the transform node of the MhFlowViewportAPILocator
@@ -86,7 +86,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             self.assertIsNotNone(transformNode)
             cmds.move(10, 5, -5, transformNode)
             cmds.refresh()
-            self.assertSnapshotClose("add_NodeMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("add_NodeMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
         
             #Hide the transform node, this should hide the MhFlowViewportAPILocator node and the added prims as well.
             cmds.hide(transformNode)
@@ -94,7 +94,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Unhide the transform node, this should unhide the MhFlowViewportAPILocator node and the added prims as well.
             cmds.showHidden(transformNode)
-            self.assertSnapshotClose("add_NodeUnhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("add_NodeUnhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Delete the shape node, this should hide the added prims as well
             cmds.delete(flowViewportNodeName)
@@ -102,7 +102,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             
             #Undo the delete, the node should be visible again so do the added prims
             cmds.undo()
-            self.assertSnapshotClose("add_NodeDeletedUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("add_NodeDeletedUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Redo the delete, the added prims should be hidden
             cmds.redo()
@@ -110,18 +110,18 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Undo the delete again, the added prims should be visible
             cmds.undo()
-            self.assertSnapshotClose("add_NodeDeletedUndoAgain.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("add_NodeDeletedUndoAgain.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Move transform node again to see if it still updates the added prims transform
             cmds.move(-20, -5, 0, transformNode)
             cmds.refresh()
-            self.assertSnapshotClose("add_NodeMovedAfterDeletionAndUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("add_NodeMovedAfterDeletionAndUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Switch to VP2
             self.setViewport2Renderer()
             #Switch back to Hydra
             self.setTestRenderer()
-            self.assertSnapshotClose("add_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("add_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
     #Test filtering primitives
     def test_FilteringPrimitives(self):
@@ -137,7 +137,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.select(clear=True)#Clear selection
             cmds.refresh()
             #Original images are located for example in maya-hydra\test\lib\mayaUsd\render\mayaToHydra\FlowViewportAPITest
-            self.assertSnapshotClose("filter_NodeCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_NodeCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Move the transform node, the added prims (cube grid) should move as well
             # Get the transform node of the MhFlowViewportAPILocator
@@ -145,23 +145,23 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             self.assertIsNotNone(transformNode)
             cmds.move(15, 0, 0, transformNode)
             cmds.refresh()
-            self.assertSnapshotClose("filter_NodeMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_NodeMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Change sphere attributes to add more vertices/polygons, our filtering hides a prim when its number of vertices is greater than 10 000.
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 200)
             cmds.setAttr(sphereShape + '.subdivisionsHeight', 200)
             cmds.refresh()
-            self.assertSnapshotClose("filter_SphereFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_SphereFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Decreasing the number of vertices of this sphere under 10 000 should make it visible again (not filtered)
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30)
             cmds.refresh()
-            self.assertSnapshotClose("filter_SphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_SphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Increasing again the number of vertices above 10 000 should make it filtered again (invisible)
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 200)
             cmds.refresh()
-            self.assertSnapshotClose("filter_SphereFilteredAgain.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_SphereFilteredAgain.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Hide the transform node, this should hide the MhFlowViewportAPILocator shape node and disable the filtering as well.
             cmds.hide(transformNode)
@@ -169,7 +169,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Unhide the transform node, this should unhide the MhFlowViewportAPILocator node and enable the filtering as well.
             cmds.showHidden(transformNode)
-            self.assertSnapshotClose("filter_NodeUnhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_NodeUnhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Delete the shape node, this should disable filtering
             cmds.delete(flowViewportNodeName)
@@ -177,7 +177,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             
             #Undo the delete, the node should be visible again and filtering be enabled
             cmds.undo()
-            self.assertSnapshotClose("filter_NodeDeletedUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_NodeDeletedUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Redo the delete, filtering should be disabled
             cmds.redo()
@@ -190,7 +190,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             self.setViewport2Renderer()
             #Switch back to Hydra
             self.setTestRenderer()
-            self.assertSnapshotClose("filter_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Test unfiltering the sphere after switching renderers (HYDRA-747)
             self.setViewport2Renderer()
@@ -198,7 +198,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             self.setTestRenderer()
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30) #Unfilter the prim
             cmds.refresh()
-            self.assertSnapshotClose("filter_VP2AndThenBackToHydra_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+            self.assertSnapshotClose("filter_VP2AndThenBackToHydra_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion(self.imageVersion))
     
     #Test Cube grids parameters
     def test_CubeGrid(self):
@@ -208,7 +208,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             #Create a MhFlowViewportAPILocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName = cmds.createNode("MhFlowViewportAPILocator")
             cmds.select(clear=True)#Clear selection
-            self.assertSnapshotClose("cubeGrid_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("cubeGrid_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Get the matrix and set a rotation of 70 degress around Y axis.
             matrix = cmds.getAttr(flowViewportNodeName + '.cubeInitalTransform')
@@ -241,13 +241,13 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.setAttr(flowViewportNodeName + '.cubeOpacity', 0.3)
             cmds.setAttr(flowViewportNodeName + '.cubesDeltaTrans', 5, 5, 5, type="double3")
             cmds.refresh()
-            self.assertSnapshotClose("cubeGrid_WithInstancingModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("cubeGrid_WithInstancingModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Switch to VP2
             self.setViewport2Renderer()
             #Switch back to Hydra
             self.setTestRenderer()
-            self.assertSnapshotClose("cubeGrid_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("cubeGrid_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
     #Test multiple nodes
     def test_MultipleNodes(self):
@@ -310,7 +310,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.move(-30, 0, -30, transformNode2)
             cmds.refresh()
             
-            self.assertSnapshotClose("multipleNodes_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleNodes_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Modify the color of node #2, it shouldn't change node's #1 color
             cmds.setAttr(flowViewportNodeName2 + '.cubeColor', 1.0, 1.0, 1.0, type="double3")
@@ -321,25 +321,25 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.rotate(-30, 45, 0, transformNode2)
             cmds.scale(2, 1, 1, transformNode2)
             cmds.refresh()
-            self.assertSnapshotClose("multipleNodes_AfterModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleNodes_AfterModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Remove instancing, the cubes should stay at the same place
             cmds.setAttr(flowViewportNodeName2 + '.cubesUseInstancing', False)
-            self.assertSnapshotClose("multipleNodes_AfterModifsRemoveInstancing.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleNodes_AfterModifsRemoveInstancing.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Hide node #1
             cmds.hide(transformNode1)
-            self.assertSnapshotClose("multipleNodes_Node1Hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleNodes_Node1Hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Unhide node #1
             cmds.showHidden(transformNode1)
-            self.assertSnapshotClose("multipleNodes_Node1Unhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleNodes_Node1Unhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Switch to VP2
             self.setViewport2Renderer()
             #Switch back to Hydra
             self.setTestRenderer()
-            self.assertSnapshotClose("multipleNodes_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleNodes_VP2AndThenBackToHydra.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
     #Test multiple viewports
     def test_MultipleViewports(self):
@@ -377,26 +377,26 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.refresh()
             
             cmds.setFocus ('modelPanel4')
-            self.assertSnapshotClose("multipleViewports_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
-            self.assertSnapshotClose("multipleViewports_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Change sphere attributes to add more vertices/polygons, our filtering removes a prim when its number of vertices is greater than 10 000.
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 200)
             cmds.setAttr(sphereShape + '.subdivisionsHeight', 200)
             cmds.refresh()
             cmds.setFocus ('modelPanel4')
-            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
-            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             
             #Remove filtering by decreasing the number of vertices
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30)
             cmds.refresh()
             cmds.setFocus ('modelPanel4')
-            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
-            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             
             #Switch to VP2
             cmds.setFocus ('modelPanel4')
@@ -409,10 +409,10 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             #Switch back to Hydra
             cmds.setFocus ('modelPanel4')
             self.setTestRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
             self.setTestRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

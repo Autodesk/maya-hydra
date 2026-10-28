@@ -151,7 +151,7 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         from mayaUsd import lib as mayaUsdLib
         self.loadUsdPayloadScene()
         self.modifyDefaultLightIntensityByUsdVersion()
-        self.assertSnapshotClose("payloadSceneLoadedPotA.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("payloadSceneLoadedPotA.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
        
         #Change the variant
         shapeNode = "FlowerPotShape"
