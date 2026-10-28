@@ -46,6 +46,8 @@
 // "Legacy Selection" only):
 //  - USD <= 24.11: HgiGL corrupts the integer prim ids the outline compute shader samples.
 //  - macOS: not supported.
+// Renderers other than Storm and Flash never use it either
+// (MtohRenderOverride::_RendererSupportsOutline()).
 // Keep in sync with outlineSelectionHighlight's default in renderGlobals.h,
 // MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in test/testUtils/mtohUtils.py and
 // MAYAHYDRA_OUTLINE_SUPPORTED in test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.

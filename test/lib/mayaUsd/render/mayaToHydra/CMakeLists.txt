@@ -220,29 +220,25 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # wireframe highlight. Per-mode reference images live in a "<mode>" subfolder and
 # are only needed where the output differs (see MayaHydraBaseTestCase).
 #
-# Outline is unavailable on USD <= 24.11 (HgiGL corrupts the prim ids the outline
-# shader samples) and on macOS; there every primary run is legacy and there are no
-# _legacy counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
-# (renderGlobals.cpp) and outlineSelectionHighlightSupported() (mtohUtils.py).
-if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX)
+# MAYAHYDRA_OUTLINE_SUPPORTED: the plugin offers the Outline mode with the test
+# renderer. Outline is unavailable on USD <= 24.11 (HgiGL corrupts the prim ids the
+# outline shader samples), on macOS, and with renderers other than Storm and Flash
+# (MtohRenderOverride::_RendererSupportsOutline()); there every run is legacy and
+# there are no _legacy counterparts. Keep in sync with
+# MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT (renderGlobals.cpp) and
+# outlineSelectionHighlightSupported() (mtohUtils.py).
+set(MAYAHYDRA_OUTLINE_TEST_RENDERERS HdStorm HdFlash)
+if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX
+   AND MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_OUTLINE_TEST_RENDERERS)
     set(MAYAHYDRA_OUTLINE_SUPPORTED TRUE)
 else()
     set(MAYAHYDRA_OUTLINE_SUPPORTED FALSE)
 endif()
 
-# Storm and Flash both draw the outline, but only the HdStorm test renderer runs
-# every test in outline with a _legacy counterpart. The HdFlash test renderer runs
-# the outline-only scripts below in outline and every other test in legacy.
-if(MAYAHYDRA_OUTLINE_SUPPORTED AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
-    set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
-else()
-    set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)
-endif()
-
-# Hover needs Qt6: without it the plugin has no hover event filter, and the test
-# imports PySide6 at module scope, so it cannot skip itself. Hover is not
-# implemented on Flash yet, hence MAYAHYDRA_OUTLINE_MODE_AVAILABLE (HdStorm only).
-if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+# Hover highlighting is Storm only (MtohRenderOverride::_OutlineHoverHighlightingEnabled()).
+# It also needs Qt6: without it the plugin has no hover event filter, and the test
+# imports PySide6 at module scope, so it cannot skip itself.
+if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_SUPPORTED AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
         testOutlineHoverPickModes.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
@@ -295,11 +291,8 @@ set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
 
 # The ENV entry pinning a primary run's mode, empty when it can use the default.
 function(mayaHydra_primary_mode_env out_var test_filename)
-    if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE AND
+    if(MAYAHYDRA_OUTLINE_SUPPORTED AND
        NOT ${test_filename} IN_LIST OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES)
-        set(${out_var} "" PARENT_SCOPE)
-    elseif(MAYAHYDRA_OUTLINE_SUPPORTED AND
-           ${test_filename} IN_LIST NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES)
         set(${out_var} "" PARENT_SCOPE)
     else()
         set(${out_var} "MAYAHYDRA_SELECTION_HIGHLIGHT_MODE=legacy" PARENT_SCOPE)
@@ -387,7 +380,7 @@ endforeach()
 #                 scripts registered by more than one configuration.
 #   ARGN        - the ENV entries of the configuration being mirrored.
 function(mayaHydra_add_legacy_mode_test script name_suffix)
-    if(NOT MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+    if(NOT MAYAHYDRA_OUTLINE_SUPPORTED)
         return()
     endif()
     get_testfile_and_labels(all_labels test_filename ${script})
