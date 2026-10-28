@@ -574,12 +574,28 @@ size_t MayaHydraGpuRenderItemAdapter::_StoredStreamCount(const TfToken& primvar)
 void MayaHydraGpuRenderItemAdapter::_BeginGeometryUpdate(bool geomChanged, bool topoChanged)
 {
     // In hybrid mode a mesh starts batched (allowDirectBind=false) so static
-    // meshes aggregate from frame one; the first real deform (geom/topo change
-    // on a mesh that already published a buffer -- filtering the initial
-    // populate frame) sticky-promotes it to direct mode (zero per-frame copy).
+    // meshes aggregate from frame one; the first real deform sticky-promotes it
+    // to direct mode (zero per-frame copy). A deform is a second geometry-only
+    // change since the mesh was last (re)populated (topology change) and
+    // published a buffer. A display-mode toggle releases the old items' buffers
+    // (geom+topo) and populates the new ones, after which VP2 sends one more
+    // geometry-only change. Counting that as a deform would promote rigid meshes
+    // for good, and direct ranges do not aggregate, so playback would then pay
+    // per-prim draws.
     const _GpuBufferSharingMode sharingMode = _GetGpuBufferSharingMode();
     const bool                  hybridMode = sharingMode == _GpuBufferSharingMode::Hybrid;
-    if (hybridMode && (geomChanged || topoChanged) && _extPositions && !_classifiedAsAnimating) {
+    // Counted only while a hybrid mesh is still unclassified, and saturated at the
+    // threshold, so it stays bounded for the life of the item.
+    constexpr int kGeomOnlyUpdatesToPromote = 2;
+    if (hybridMode && !_classifiedAsAnimating) {
+        if (topoChanged) {
+            _geomOnlyUpdatesSinceTopo = 0;
+        } else if (geomChanged && _geomOnlyUpdatesSinceTopo < kGeomOnlyUpdatesToPromote) {
+            ++_geomOnlyUpdatesSinceTopo;
+        }
+    }
+    if (hybridMode && geomChanged && _geomOnlyUpdatesSinceTopo >= kGeomOnlyUpdatesToPromote
+        && _extPositions && !_classifiedAsAnimating) {
         // No dirty emitted here. On the next stream read _PublishExtStream sees
         // that the cached allowDirectBind is now stale and republishes every
         // vertex-layer primvar, which dirties it. UV/tangent (not rewritten

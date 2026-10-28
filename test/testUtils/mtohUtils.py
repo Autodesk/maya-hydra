@@ -653,6 +653,22 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             self._inputDir, rendererUtils.getTestRenderer(),
             self.selectionHighlightMode(), refImage, imageVersion)
 
+    @classmethod
+    def macOSFlashImageVersion(cls, imageVersion=None):
+        '''imageVersion for images that macOS Flash renders without transparency.
+
+        AGP-1068: the macOS Flash renderer drops material color and
+        transparency, so those images need their own baselines, stored under
+        flash/osx. An image that already has an imageVersion of its own keeps it,
+        nested under the macOS folder (flash/osx/<imageVersion>). Outside macOS
+        Flash the argument is returned untouched, which selects the shared
+        baselines.
+        '''
+        if (platform.system() == 'Darwin'
+                and rendererUtils.getTestRenderer() == rendererUtils.TEST_RENDERER_FLASH):
+            return os.path.join('osx', imageVersion) if imageVersion else 'osx'
+        return imageVersion
+
     def assertSelectionHighlightModeApplied(self):
         '''Fail if the mode this run was registered for is not the one in effect.
 
