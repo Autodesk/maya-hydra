@@ -101,11 +101,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     def outlineSelectionHighlightSupported(cls):
         '''Whether the outline mode is offered in this configuration.
 
-        Must match MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT in renderGlobals.cpp
-        and MAYAHYDRA_OUTLINE_SUPPORTED in the mayaToHydra CMakeLists.txt. Storm
-        and Flash both draw the outline.
+        Must match MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT in renderGlobals.cpp,
+        MtohRenderOverride::_RendererSupportsOutline() and MAYAHYDRA_OUTLINE_SUPPORTED
+        in the mayaToHydra CMakeLists.txt.
         '''
         if platform.system() == "Darwin":
+            return False
+        if not rendererUtils.rendererSupportsOutlineSelectionHighlighting(
+                rendererUtils.getTestRenderer()):
             return False
         return Usd.GetVersion() > (0, 24, 11)
 
