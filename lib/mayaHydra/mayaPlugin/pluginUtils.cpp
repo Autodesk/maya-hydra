@@ -40,6 +40,7 @@
 
 #include <maya/MGlobal.h>
 #include <filesystem>
+#include <unordered_map>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -58,6 +59,28 @@ namespace {
     constexpr auto OPTIONS_SUFFIX      = "BatchRenderOptionsString";
 
     std::filesystem::path _mayaHydraPluginLocation;
+
+// MayaHydra's defaults for render settings that differ from the render delegate's own.
+// Keyed by render setting id; applied to every renderer that declares the setting.
+const std::unordered_map<TfToken, VtValue, TfToken::HashFunctor>& _RenderSettingDefaultOverrides()
+{
+    static const std::unordered_map<TfToken, VtValue, TfToken::HashFunctor> overrides = {
+        { TfToken("hdFlash:showSkyBackground"), VtValue(true) },
+        { TfToken("hdFlash:useAreaLightGuides"), VtValue(false) },
+    };
+    return overrides;
+}
+
+void _ApplyRenderSettingDefaultOverrides(HdRenderSettingDescriptorList& descriptors)
+{
+    const auto& overrides = _RenderSettingDefaultOverrides();
+    for (auto& desc : descriptors) {
+        const auto it = overrides.find(desc.key);
+        if (it != overrides.end()) {
+            desc.defaultValue = it->second;
+        }
+    }
+}
 
 std::pair<
     const MayaHydra::MtohRendererDescriptionVector&,
@@ -109,6 +132,7 @@ MtohInitializeRenderPlugins()
                 rendererSettingDescriptors = delegate->GetRenderSettingDescriptors();
                 plugin->DeleteRenderDelegate(delegate);
             }
+            _ApplyRenderSettingDefaultOverrides(rendererSettingDescriptors);
 
             auto& settingDescriptors = store.second.emplace(renderer, std::move(rendererSettingDescriptors)).first->second;
 
