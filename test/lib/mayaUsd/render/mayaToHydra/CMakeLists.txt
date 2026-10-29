@@ -38,8 +38,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
-	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
-    #testMayaLights.py
+	testMayaLights.py
     testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
     testUVandUDIM.py
 	testPurposeRenderTag.py
