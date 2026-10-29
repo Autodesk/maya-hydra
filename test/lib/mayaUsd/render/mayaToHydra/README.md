@@ -44,13 +44,13 @@ Renderer exclusions use the same CTest-label mechanism as plugin and platform ex
 
 Selection highlighting has two modes: `outline` (screen-space outline) and `legacy` (wireframe highlight prims). The mode is read from `MAYAHYDRA_SELECTION_HIGHLIGHT_MODE`. If it is unset, it defaults to `outline` where supported, otherwise `legacy`.
 
-Outline is not available on macOS, with HdFlash, or with USD 24.11 and older. In those configurations every test runs in legacy only.
+Outline is not available on macOS, with USD 24.11 and older, or with renderers other than HdStorm and HdFlash. In those configurations every test runs in legacy only.
 
-Where outline is available, the CMakeLists registers each interactive test twice: the primary run (outline) and a `<test>_legacy` run. Two lists in the CMakeLists control exceptions:
+Where outline is available (`MAYAHYDRA_OUTLINE_SUPPORTED`), with HdStorm and HdFlash alike, the CMakeLists registers each interactive test twice: the primary run (outline) and a `<test>_legacy` run. The hover tests are registered with HdStorm only: hover is Storm only. A renderer's images that differ per mode go in `<test>/<renderer>/<mode>/` (for example `flash/legacy/`), before the shared `<test>/<mode>/` images in the lookup. Two lists in the CMakeLists control exceptions:
 - `NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES`: outline-only tests, which get no `_legacy` run.
 - `OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES`: tests that cannot run in outline. Their primary run is forced to legacy, with no `_legacy` run.
 
-Use `self.selectionHighlightMode()` in tests whose expectations depend on the mode. Keep `outlineSelectionHighlightSupported()` (mtohUtils.py), `MAYAHYDRA_OUTLINE_MODE_AVAILABLE` (CMakeLists.txt) and `MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT` (renderGlobals.cpp) in sync.
+Use `self.selectionHighlightMode()` in tests whose expectations depend on the mode. Keep `outlineSelectionHighlightSupported()` (mtohUtils.py) and the renderer data in rendererUtils.py, `MAYAHYDRA_OUTLINE_SUPPORTED` (CMakeLists.txt) and `MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT` (renderGlobals.cpp) in sync.
 
 Note that when running Python tests the Python source is read directly from the source directory.  Therefore, when changing Python test code source, no build needs to be done to update the test, which can be run immediately using ctest.  This is a convenient time saver, as the test development cycle is not edit, build, run, but simply edit and run.  Only if C++ test code is changed is a build then necessary.
 

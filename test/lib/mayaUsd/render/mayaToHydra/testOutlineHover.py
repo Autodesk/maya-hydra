@@ -57,11 +57,11 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
     def compareSnapshot(self, referenceFilename):
         """Compare a snapshot, collecting failures so one bad frame does not hide the rest.
 
-        Captures at the panel's actual size; see TARGET_VIEWPORT_SIZE.
+        Captures at TARGET_VIEWPORT_SIZE, not at the panel's actual size: the panel converges
+        within _SIZE_CONVERGENCE_TOLERANCE, so its size can differ by a pixel between runs.
         """
         try:
-            widget = self._viewWidget(self._activeView())
-            width, height = widget.width(), widget.height()
+            width, height = TARGET_VIEWPORT_SIZE
 
             refImagePath = self.resolveRefImage(referenceFilename, None)
             snapImagePath = os.path.join(self.getSnapshotDir(), referenceFilename)

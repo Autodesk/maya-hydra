@@ -46,9 +46,11 @@
 // "Legacy Selection" only):
 //  - USD <= 24.11: HgiGL corrupts the integer prim ids the outline compute shader samples.
 //  - macOS: not supported.
+// Renderers other than Storm and Flash never use it either
+// (MtohRenderOverride::_RendererSupportsOutline()).
 // Keep in sync with outlineSelectionHighlight's default in renderGlobals.h,
 // MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in test/testUtils/mtohUtils.py and
-// MAYAHYDRA_OUTLINE_MODE_AVAILABLE in test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
+// MAYAHYDRA_OUTLINE_SUPPORTED in test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
 #if PXR_VERSION <= 2411 || defined(__APPLE__)
 #define MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
 #endif
@@ -790,7 +792,10 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                         // Attribute name
            << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
            << ", $fromAE);\n";
-
+    }
+    // The renderers that support the outline (see MtohRenderOverride::_RendererSupportsOutline()).
+    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin
+        || rendererDesc.rendererName == MayaHydraRendererTokens->HdFlashRendererPlugin) {
         // Dropdown: Outline Selection / Legacy Selection.
         ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
            << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
@@ -798,7 +803,8 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                          // Attribute name
            << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
            << ", $fromAE);\n";
-
+    }
+    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
         // Checkbox, shown only where hover can work: it needs Qt for the cursor position
         // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
         // everywhere, so scenes saved on a capable build load on any build.

@@ -41,7 +41,8 @@ TF_DECLARE_PUBLIC_TOKENS(GeomSubsetsPickModeTokens, MAYAHYDRALIB_API, GEOMSUBSET
 
 // clang-format off
 #define MAYAHYDRA_RENDERER_TOKENS \
-    (HdStormRendererPlugin)
+    (HdStormRendererPlugin) \
+    (HdFlashRendererPlugin)
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(MayaHydraRendererTokens, MAYAHYDRALIB_API, MAYAHYDRA_RENDERER_TOKENS);

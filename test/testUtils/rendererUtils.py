@@ -26,10 +26,13 @@ _TEST_RENDERER_DATA = {
     TEST_RENDERER_STORM: {
         "pluginName": "HdStormRendererPlugin",
         "referenceFolder": "storm",
+        # Must match MtohRenderOverride::_RendererSupportsOutline().
+        "outlineSelectionHighlighting": True,
     },
     TEST_RENDERER_FLASH: {
         "pluginName": "HdFlashRendererPlugin",
         "referenceFolder": "flash",
+        "outlineSelectionHighlighting": True,
     },
 }
 
@@ -53,6 +56,10 @@ def getRendererOverrideName(renderer):
 def getRendererReferenceFolder(renderer):
     """Return the reference image folder for a renderer."""
     return getRendererData(renderer)["referenceFolder"]
+
+def rendererSupportsOutlineSelectionHighlighting(renderer):
+    """Return whether the plugin offers the outline selection highlight with a renderer."""
+    return getRendererData(renderer).get("outlineSelectionHighlighting", False)
 
 def getTestRenderer(environment=None):
     """Return the requested test renderer, defaulting to HdStorm."""
