@@ -240,8 +240,11 @@ private:
     VtValue _GetUsedGPUMemory() const;
     HVT_NS::Outline::OutlineStyle _BuildOutlineStyle() const;
 
-    /// Whether the outline is the selection highlight. Stricter than the render global: only Storm
-    /// can host the outline tasks.
+    /// Whether this override's renderer can host the outline tasks: Storm or Flash.
+    bool _RendererSupportsOutline() const;
+
+    /// Whether the outline is the selection highlight. Stricter than the render global: only a
+    /// renderer that can host the outline tasks uses it (see _RendererSupportsOutline()).
     bool _UseOutlineSelectionHighlighting() const;
 
     /// Whether the legacy wireframe highlight is suppressed: either the outline replaces it, or
@@ -252,10 +255,10 @@ private:
     bool _AnyPanelDrawsWireframes(const std::string& currentPanel, unsigned int currentStyle) const;
 
     /// Whether the per-mouse-move pick runs: when hover highlighting is on, or in outline mode when
-    /// mayaHydraForceEnableInteractiveHitTest forces it for profiling.
+    /// mayaHydraForceEnableInteractiveHitTest forces it for profiling. Storm only for now.
     bool _HitTestEnabled() const;
 
-    /// Whether the resolved hover is drawn using outlines.
+    /// Whether the resolved hover is drawn using outlines. Storm only for now.
     bool _OutlineHoverHighlightingEnabled() const;
 
     /// What the hover highlights: the items a click at the cursor would select, in the render
@@ -577,6 +580,7 @@ private:
 
     bool _needToReplaceSelection = false;
     const bool _isUsingHdSt = false;
+    const bool _isUsingHdFlash = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
