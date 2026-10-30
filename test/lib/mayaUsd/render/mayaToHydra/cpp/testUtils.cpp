@@ -20,6 +20,7 @@
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/mixedUtils.h>
 
+#include <flowViewport/API/fvpInformationInterface.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
@@ -54,6 +55,7 @@
 #include <QApplication>
 
 #include <algorithm>
+#include <cstdlib>
 #include <sstream>
 #include <cctype>
 #include <exception>
@@ -73,6 +75,10 @@ std::filesystem::path  testOutputDir;
 // not get the opportunity to set these, so we keep track of them manually here.
 Qt::MouseButtons      mouseButtons;
 Qt::KeyboardModifiers keyboardModifiers;
+
+// Renderer names reported by the viewport information interface.
+constexpr const char* kStormRendererName = "GL";
+constexpr const char* kFlashRendererName = "HdFlash";
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -195,6 +201,25 @@ Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
     auto selectionSiBase = findSceneIndexInTree(
         sceneIndex, isFvpSelectionSceneIndex);
     return TfDynamic_cast<Fvp::SelectionSceneIndexRefPtr>(selectionSiBase);
+}
+
+std::string GetActiveRendererName()
+{
+    Fvp::InformationInterface::RenderViewDescSet viewDescs;
+    Fvp::InformationInterface::Get().GetAllRenderViewDescs(viewDescs);
+    return viewDescs.empty() ? std::string() : viewDescs.cbegin()->_rendererName;
+}
+
+bool IsStormRendererName(const std::string& rendererName)
+{
+    return rendererName == kStormRendererName;
+}
+
+std::string GetExpectedTestRendererName()
+{
+    const char* renderer = std::getenv("MAYAHYDRA_TEST_RENDERER");
+    const bool isFlash = renderer && std::string(renderer) == kFlashRendererName;
+    return isFlash ? kFlashRendererName : kStormRendererName;
 }
 
 HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(
