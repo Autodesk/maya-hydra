@@ -44,41 +44,29 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-        imageVersion = None
-        if self._usdVersion >= (0, 26, 5):
-            imageVersion = "usd26.05+"
+        self.assertSnapshotClose(
+            "untextured.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD,
+            self.IMAGE_DIFF_FAIL_PERCENT
+        )
+
+        cmds.modelEditor(panel, edit=True, displayTextures=True)
+        cmds.refresh()
+
+        self.assertSnapshotClose(
+            "textured.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD,
+            self.IMAGE_DIFF_FAIL_PERCENT
+        )
+
+        cmds.modelEditor(panel, edit=True, displayTextures=False)
+        cmds.refresh()
 
         self.assertSnapshotClose(
             "untextured.png",
             self.IMAGE_DIFF_FAIL_THRESHOLD,
-            self.IMAGE_DIFF_FAIL_PERCENT,
-            imageVersion
+            self.IMAGE_DIFF_FAIL_PERCENT
         )
-
-        # HYDRA-2370: OpenPBR/MaterialX Storm shader compile failure
-        # (AIRY_FRESNEL_ITERATIONS) on USD 26.05+. Re-enable when fixed.
-        # Wrap the entire enable/refresh/disable sequence so USD 26.05+ never
-        # triggers the failing shader compile path.
-        if imageVersion is None:
-            cmds.modelEditor(panel, edit=True, displayTextures=True)
-            cmds.refresh()
-
-            self.assertSnapshotClose(
-                "textured.png",
-                self.IMAGE_DIFF_FAIL_THRESHOLD,
-                self.IMAGE_DIFF_FAIL_PERCENT,
-                imageVersion
-            )
-
-            cmds.modelEditor(panel, edit=True, displayTextures=False)
-            cmds.refresh()
-
-            self.assertSnapshotClose(
-                "untextured.png",
-                self.IMAGE_DIFF_FAIL_THRESHOLD,
-                self.IMAGE_DIFF_FAIL_PERCENT,
-                imageVersion
-            )
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
