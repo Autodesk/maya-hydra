@@ -207,7 +207,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
     testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX | HYDRA-2680 : Snapshot mismatches (3 tests)
     testBoundingBox.py
 	#Disabled tests on OSX
-	testDataProducerSelHighlight.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-1033 : Flash wireframe-on-shaded baselines pending
+	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 )
 
 # Interactive unit test scripts for Hydra Generative Procedurals.
