@@ -39,6 +39,7 @@
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
+#include <mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndexBase.h>
 #include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
@@ -3137,6 +3138,52 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _bboxSceneIndex->AddExcludedSceneRoot(
         MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
     _lastFilteringSceneIndexBeforeCustomFiltering = _bboxSceneIndex;
+
+    // Re-wrap extentsHint bounds downstream of the data producer so they use
+    // Maya's dormant, active, and lead wireframe colors while preserving the
+    // original prim path for click and marquee picking.
+    auto extentsHintBboxSceneIndex = Fvp::BboxSceneIndex::New(
+        _lastFilteringSceneIndexBeforeCustomFiltering,
+        _wireframeColorInterfaceImp,
+        Fvp::BboxSceneIndex::Mode::EmptyModelsWithExtents,
+        [this](const SdfPath& primPath) {
+            if (!_sceneIndexRegistry) {
+                return false;
+            }
+
+            const auto registration
+                = _sceneIndexRegistry->GetSceneIndexRegistrationForRprim(primPath);
+            if (!registration) {
+                return false;
+            }
+
+            const auto proxySceneIndex = TfDynamic_cast<
+                MayaUsdProxyShapeSceneIndexBaseRefPtr>(registration->pluginSceneIndex);
+            if (!proxySceneIndex) {
+                return false;
+            }
+
+            const SdfPath usdPath = primPath.ReplacePrefix(
+                registration->sceneIndexPathPrefix,
+                SdfPath::AbsoluteRootPath());
+            return proxySceneIndex->IsModelWithAuthoredExtentsHint(usdPath);
+        },
+        [this](const SdfPath& primPath) {
+            const auto preferenceColor = [](const TfToken& token) {
+                GfVec4f color(1.0f);
+                Fvp::ColorPreferences::getInstance().getColor(token, color);
+                return color;
+            };
+            if (!_selection->IsFullySelected(primPath)) {
+                return preferenceColor(FvpColorPreferencesTokens->polymeshDormant);
+            }
+            return preferenceColor(
+                _leadObjectPathTracker->isLeadObject(primPath)
+                    ? FvpColorPreferencesTokens->wireframeSelection
+                    : FvpColorPreferencesTokens->wireframeSelectionSecondary);
+        });
+    extentsHintBboxSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT);
+    _lastFilteringSceneIndexBeforeCustomFiltering = extentsHintBboxSceneIndex;
 
     // Repr selector Scene Index
     _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex =
