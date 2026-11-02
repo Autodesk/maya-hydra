@@ -182,6 +182,11 @@ LightsManagementSceneIndex::LightsManagementSceneIndex(const HdSceneIndexBaseRef
     InputSceneIndexUtils(inputSceneIndex)
     ,_defaultLightPath(defaultLightPath)
 {
+    for (const SdfPath& path : HdSceneIndexPrimView(inputSceneIndex)) {
+        if (HdPrimTypeIsLight(inputSceneIndex->GetPrim(path).primType)) {
+            _lightPaths.insert(path);
+        }
+    }
 }
 
 void LightsManagementSceneIndex::SetLightingMode(LightingMode lightingMode) 
@@ -207,11 +212,9 @@ void LightsManagementSceneIndex::SetShadowsEnabled(bool shadowsEnabled)
 void LightsManagementSceneIndex::_DirtyAllLightsPrims()
 {
     HdSceneIndexObserver::DirtiedPrimEntries entries;
-    for (const SdfPath& path : HdSceneIndexPrimView(GetInputSceneIndex())) {
-        auto primType = GetInputSceneIndex()->GetPrim(path).primType;
-        if (HdPrimTypeIsLight(primType)) {
-            entries.push_back({ path, HdLightSchema::GetDefaultLocator() });
-        }
+    entries.reserve(_lightPaths.size());
+    for (const SdfPath& path : _lightPaths) {
+        entries.push_back({ path, HdLightSchema::GetDefaultLocator() });
     }
     _SendPrimsDirtied(entries);
 }
@@ -267,6 +270,45 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
     return prim;
 }
 
+void LightsManagementSceneIndex::_PrimsAdded(
+    const HdSceneIndexBase&                       sender,
+    const HdSceneIndexObserver::AddedPrimEntries& entries)
+{
+    // A prim can be re-added with a different type.
+    for (const auto& entry : entries) {
+        if (HdPrimTypeIsLight(entry.primType)) {
+            _lightPaths.insert(entry.primPath);
+        } else {
+            _lightPaths.erase(entry.primPath);
+        }
+    }
+
+    if (!_IsObserved()) {
+        return;
+    }
+    _SendPrimsAdded(entries);
+}
+
+void LightsManagementSceneIndex::_PrimsRemoved(
+    const HdSceneIndexBase&                         sender,
+    const HdSceneIndexObserver::RemovedPrimEntries& entries)
+{
+    // A removed entry removes its whole subtree.
+    for (const auto& entry : entries) {
+        const auto first = _lightPaths.lower_bound(entry.primPath);
+        auto       last = first;
+        while (last != _lightPaths.end() && last->HasPrefix(entry.primPath)) {
+            ++last;
+        }
+        _lightPaths.erase(first, last);
+    }
+
+    if (!_IsObserved()) {
+        return;
+    }
+    _SendPrimsRemoved(entries);
+}
+
 void LightsManagementSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase&                         sender,
     const HdSceneIndexObserver::DirtiedPrimEntries& entries)
@@ -289,10 +331,10 @@ void LightsManagementSceneIndex::_PrimsDirtied(
         if (!entry.dirtyLocators.Intersects(selectionsLocator)) {
             continue;
         }
-        for (const SdfPath& path : HdSceneIndexPrimView(GetInputSceneIndex(), entry.primPath)) {
-            if (HdPrimTypeIsLight(GetInputSceneIndex()->GetPrim(path).primType)) {
-                lightEntries.push_back({ path, HdLightSchema::GetDefaultLocator() });
-            }
+        for (auto it = _lightPaths.lower_bound(entry.primPath);
+             it != _lightPaths.end() && it->HasPrefix(entry.primPath);
+             ++it) {
+            lightEntries.push_back({ *it, HdLightSchema::GetDefaultLocator() });
         }
     }
     if (!lightEntries.empty()) {

@@ -99,5 +99,25 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #Shadow ON
         #self.verifyLightingModes(True)
 
+    # Deselecting a light that is not the lead object changes no lead, so only its selection
+    # change can turn it off.
+    def test_USDLightsDeselectNonLeadLight(self):
+        testFile = mayaUtils.openTestScene(
+                "testUSDLights",
+                "testUSDLights.ma")
+        self.setTestRenderer()
+        panel = mayaUtils.activeModelPanel()
+        cmds.modelEditor(panel, edit=True, shadows=False)
+        cmds.modelEditor(panel, edit=True, displayLights="selected")
+
+        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DistantLight1', r=True )
+        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DiskLight1', add=True )
+        cmds.refresh()
+
+        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DistantLight1', deselect=True )
+        cmds.refresh()
+        imageVersion = "usd26.05+" if self._usdVersion >= (0, 26, 5) else None
+        self.assertSnapshotClose("diskLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

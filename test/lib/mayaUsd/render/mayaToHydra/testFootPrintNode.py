@@ -547,11 +547,12 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     def test_shadedSelectionNotificationsHighlightDisabled(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             self._setupNotificationsScene('smoothShaded')
+            wasDisabled = cmds.getAttr(FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR)
             try:
                 self._setForceDisableSelectionHighlight(True)
                 cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionWithoutLegacyHighlightSendsNoColorDirty")
             finally:
-                self._setForceDisableSelectionHighlight(False)
+                self._setForceDisableSelectionHighlight(wasDisabled)
 
     def _testPerPrimWireframeColorNotifications(self, displayAppearance):
         with PluginLoaded('mayaHydraFootPrintNode'):
