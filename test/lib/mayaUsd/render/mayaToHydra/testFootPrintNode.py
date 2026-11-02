@@ -22,14 +22,9 @@ import mtohUtils
 import mayaUtils
 import rendererUtils
 import maya.mel as mel
-import maya.utils
 import platform
 import unittest
 from testUtils import PluginLoaded
-
-FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME = "mayaHydraForceDisableSelectionHighlight"
-FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR = "defaultRenderGlobals.{}".format(
-    FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME)
 
 class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -528,14 +523,6 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         cmds.select(clear=True)
         cmds.refresh(force=True)
 
-    # Toggling it re-initializes Hydra, like a selection highlighting mode switch.
-    def _setForceDisableSelectionHighlight(self, disable):
-        cmds.setAttr(FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR, disable)
-        cmds.mayaHydra(updateRenderGlobals=FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME)
-        cmds.refresh(force=True)
-        maya.utils.processIdleEvents()
-        cmds.refresh(force=True)
-
     def test_shadedSelectionNotifications(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             self._setupNotificationsScene('smoothShaded')
@@ -547,12 +534,12 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     def test_shadedSelectionNotificationsHighlightDisabled(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             self._setupNotificationsScene('smoothShaded')
-            wasDisabled = cmds.getAttr(FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR)
+            wasDisabled = cmds.getAttr(mtohUtils.FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR)
             try:
-                self._setForceDisableSelectionHighlight(True)
+                self.setForceDisableSelectionHighlight(True)
                 cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionWithoutLegacyHighlightSendsNoColorDirty")
             finally:
-                self._setForceDisableSelectionHighlight(wasDisabled)
+                self.setForceDisableSelectionHighlight(wasDisabled)
 
     def _testPerPrimWireframeColorNotifications(self, displayAppearance):
         with PluginLoaded('mayaHydraFootPrintNode'):

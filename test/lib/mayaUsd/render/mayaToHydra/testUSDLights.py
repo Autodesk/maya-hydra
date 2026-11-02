@@ -18,8 +18,14 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+import mayaUsd.lib
 import platform
 import unittest
+
+STAGE_SHAPE_PATH = '|testUSDLights:stage1|testUSDLights:stageShape1'
+DISK_LIGHT_PRIM_PATH = '/DiskLight1'
+DISK_LIGHT_PATH = STAGE_SHAPE_PATH + ',' + DISK_LIGHT_PRIM_PATH
+DISTANT_LIGHT_PATH = STAGE_SHAPE_PATH + ',/DistantLight1'
 
 class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -99,25 +105,44 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #Shadow ON
         #self.verifyLightingModes(True)
 
-    # Deselecting a light that is not the lead object changes no lead, so only its selection
-    # change can turn it off.
-    def test_USDLightsDeselectNonLeadLight(self):
-        testFile = mayaUtils.openTestScene(
-                "testUSDLights",
-                "testUSDLights.ma")
+    def _openSceneInSelectedLightsMode(self):
+        mayaUtils.openTestScene("testUSDLights", "testUSDLights.ma")
         self.setTestRenderer()
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, shadows=False)
         cmds.modelEditor(panel, edit=True, displayLights="selected")
-
-        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DistantLight1', r=True )
-        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DiskLight1', add=True )
         cmds.refresh()
 
-        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DistantLight1', deselect=True )
+    # Selects the distant and disk lights, the disk light last so that it is the lead object, then
+    # deselects the distant light. That changes no lead, so only the selection change of the
+    # distant light can turn it off.
+    def _verifyDeselectNonLeadLight(self):
+        cmds.select(DISTANT_LIGHT_PATH, r=True)
+        cmds.select(DISK_LIGHT_PATH, add=True)
+        cmds.refresh()
+
+        cmds.select(DISTANT_LIGHT_PATH, deselect=True)
         cmds.refresh()
         imageVersion = "usd26.05+" if self._usdVersion >= (0, 26, 5) else None
         self.assertSnapshotClose("diskLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+
+    def test_USDLightsDeselectNonLeadLight(self):
+        self._openSceneInSelectedLightsMode()
+        self._verifyDeselectNonLeadLight()
+
+    # Lights removed and added once Hydra is running must still follow their selection.
+    def test_USDLightsReAddedLightFollowsSelection(self):
+        self._openSceneInSelectedLightsMode()
+
+        stage = mayaUsd.lib.GetPrim(STAGE_SHAPE_PATH).GetStage()
+        diskLight = stage.GetPrimAtPath(DISK_LIGHT_PRIM_PATH)
+        self.assertTrue(diskLight.IsValid())
+        diskLight.SetActive(False)
+        cmds.refresh()
+        diskLight.SetActive(True)
+        cmds.refresh()
+
+        self._verifyDeselectNonLeadLight()
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

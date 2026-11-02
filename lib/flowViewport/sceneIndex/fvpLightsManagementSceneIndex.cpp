@@ -171,6 +171,19 @@ bool _IsPrimOrAncestorSelected(const SdfPath& primPath,  const HdSceneIndexPrim&
     return false;
 }
 
+// The paths at or under prefix. Not SdfPathFindPrefixedRange(): its std::lower_bound is linear on
+// set iterators, std::set::lower_bound is logarithmic.
+std::pair<std::set<SdfPath>::const_iterator, std::set<SdfPath>::const_iterator>
+_FindPrefixedRange(const std::set<SdfPath>& paths, const SdfPath& prefix)
+{
+    const auto first = paths.lower_bound(prefix);
+    auto       last = first;
+    while (last != paths.end() && last->HasPrefix(prefix)) {
+        ++last;
+    }
+    return { first, last };
+}
+
 } // end of anonymous namespace
 
 /// This is a filtering scene index that manages lights primitives
@@ -295,11 +308,7 @@ void LightsManagementSceneIndex::_PrimsRemoved(
 {
     // A removed entry removes its whole subtree.
     for (const auto& entry : entries) {
-        const auto first = _lightPaths.lower_bound(entry.primPath);
-        auto       last = first;
-        while (last != _lightPaths.end() && last->HasPrefix(entry.primPath)) {
-            ++last;
-        }
+        const auto [first, last] = _FindPrefixedRange(_lightPaths, entry.primPath);
         _lightPaths.erase(first, last);
     }
 
@@ -331,9 +340,8 @@ void LightsManagementSceneIndex::_PrimsDirtied(
         if (!entry.dirtyLocators.Intersects(selectionsLocator)) {
             continue;
         }
-        for (auto it = _lightPaths.lower_bound(entry.primPath);
-             it != _lightPaths.end() && it->HasPrefix(entry.primPath);
-             ++it) {
+        const auto [first, last] = _FindPrefixedRange(_lightPaths, entry.primPath);
+        for (auto it = first; it != last; ++it) {
             lightEntries.push_back({ *it, HdLightSchema::GetDefaultLocator() });
         }
     }
