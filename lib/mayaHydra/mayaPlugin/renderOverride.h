@@ -573,6 +573,10 @@ private:
 
     GfVec4d _viewport;
 
+    /// Camera prim last warned about for a projection that the solved framing cannot reproduce.
+    /// Cleared once that camera's projection becomes solvable again, so a later failure warns again.
+    SdfPath _unsolvableFramingWarnedCamera;
+
     int _currentOperation = -1;    
 
     bool _needToReplaceSelection = false;

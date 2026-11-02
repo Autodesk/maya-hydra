@@ -49,6 +49,7 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
+#include <flowViewport/fvpCameraFraming.h>
 #include <flowViewport/fvpDirtyNotifier.h>
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
@@ -165,6 +166,7 @@
 #include <iterator>
 #include <limits>
 #include <set>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -2105,49 +2107,97 @@ MStatus MtohRenderOverride::Render(
     const int maxX = std::clamp(renderRegion.GetMaxX(), minX, width - 1);
     const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
     renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
-    for (int i = 0; i < numFramePasses; ++i) {
-        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-        if (!currentPass) {
-            continue;
-        }
-        currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
-    }
 
-    // Storm renders through the free camera, built from Maya's view and projection matrices. The
-    // camera prim does not translate every Maya projection input (overscan, resolution gate,
-    // film transforms, 2D pan/zoom), and Storm is picked with Maya's matrices, so binding the prim
-    // would desync the draw from the pick. Other delegates bind the prim for the render
-    // parameters the free camera lacks.
+    // Every delegate renders through the camera prim translated from the Maya or USD camera, so
+    // that it gets the render parameters the free camera lacks. Orthographic cameras still use
+    // the free camera.
     SdfPath cameraPath;
-    if (useCameraPrim() && !_isUsingHdSt) {
-        MStatus        status;
-        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-        if (status == MStatus::kSuccess) {
-            const MString ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+    {
+        MStatus       status;
+        const MString ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+        if (status == MStatus::kSuccess && ufeCameraPathString.length() > 0) {
             const Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-            // TODO: Support USD cameras.
             if (ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-                MFnCamera camera(camPath, &status);
-                // TODO: Support orthographic cameras.
-                if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
-                    cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+                const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+                if (status == MStatus::kSuccess) {
+                    MFnCamera camera(camPath, &status);
+                    // TODO: Support orthographic cameras.
+                    if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
+                        cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+                    }
+                }
+            } else {
+                // USD camera. Orthographic USD cameras are rejected per pass below.
+                try {
+                    cameraPath = Fvp::sceneIndexPath(ufeCameraPath);
+                }
+                // An exception must not escape the draw callback. On failure, cameraPath stays
+                // empty, so the passes below use the free camera.
+                catch (const std::out_of_range& e) {
+                    TF_WARN(
+                        "Cannot resolve the camera prim of %s (%s). The viewport uses the free "
+                        "camera instead.",
+                        ufeCameraPathString.asChar(),
+                        e.what());
                 }
             }
         }
     }
 
+    // The camera prim holds the raw camera attributes, shared by every panel looking through that
+    // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
+    // disabling window conforming and solving the display window so that the framed prim
+    // projection equals Maya's projection matrix.
+    const GfVec2i panelSize(width, height);
+    bool          framingUnsolvable = false;
+    bool          framingSolved = false;
     for (int i = 0; i < numFramePasses; ++i) {
         const hvt::FramePassPtr& currentPass = _GetFramePass(i);
         if (!currentPass) {
             continue;
         }
-        currentPass->params().renderParams.camera = cameraPath;
-        // A bound camera prim carries its own window policy, translated from the Maya film fit,
-        // so disable the override. The free camera needs the default override back, since the
-        // camera path goes empty again when switching to an ortho or USD camera.
-        currentPass->params().renderParams.overrideWindowPolicy = cameraPath.IsEmpty()
-            ? std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit)
-            : std::nullopt;
+        auto& params = currentPass->params();
+
+        std::optional<GfMatrix4d> cameraPrimProjection;
+        if (!cameraPath.IsEmpty()) {
+            // Compute the base projection matrix of the camera prim.
+            cameraPrimProjection = Fvp::computeCameraPrimProjection(
+                currentPass->GetRenderIndex()->GetTerminalSceneIndex(), cameraPath);
+        }
+
+        if (!cameraPrimProjection) {
+            params.viewInfo.framing = CameraUtilFraming(displayWindow, renderRegion);
+            params.renderParams.camera = SdfPath();
+            params.renderParams.overrideWindowPolicy
+                = std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit);
+            continue;
+        }
+
+        const std::optional<GfRange2f> solvedWindow
+            = Fvp::solveDisplayWindow(projectionMatrix, *cameraPrimProjection, panelSize);
+        if (solvedWindow) {
+            framingSolved = true;
+        } else {
+            framingUnsolvable = true;
+        }
+
+        params.viewInfo.framing
+            = CameraUtilFraming(solvedWindow.value_or(displayWindow), renderRegion);
+        params.renderParams.camera = cameraPath;
+        params.renderParams.overrideWindowPolicy
+            = std::optional<CameraUtilConformWindowPolicy>(CameraUtilDontConform);
+    }
+
+    if (framingUnsolvable) {
+        if (_unsolvableFramingWarnedCamera != cameraPath) {
+            TF_WARN(
+                "The projection of camera %s cannot be reproduced through its camera prim (for "
+                "example because of film roll). The viewport may not match Maya's framing.",
+                cameraPath.GetText());
+            _unsolvableFramingWarnedCamera = cameraPath;
+        }
+    } else if (framingSolved && _unsolvableFramingWarnedCamera == cameraPath) {
+        _unsolvableFramingWarnedCamera = SdfPath();
     }
 
     // Update all registered plugin before render.

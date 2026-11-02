@@ -70,12 +70,14 @@ static float _ReadArnoldFocusDistanceIfSet(MFnCamera& camera)
 
 // Attributes that affect HdCamera params (from GetCameraParamValue). When these change,
 // we mark DirtyParams | DirtyPrimvar in one call to avoid duplicates.
+// The callbacks match the top-level plug, so the compound parents (cameraAperture, filmOffset,
+// shake) must be listed for changes to their children to be detected.
 static const char* const kCameraParamAttributeNames[] = {
     "nearClipPlane", "farClipPlane", "shutterAngle", "focusDistance", "focalLength",
-    "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
-    "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
-    "verticalShake", "filmFit", "depthOfField", "aiEnableDOF", "aiFocusDistance",
-    "orthographic",
+    "fStop", "cameraAperture", "horizontalFilmAperture", "verticalFilmAperture",
+    "lensSqueezeRatio", "shakeEnabled", "filmOffset", "horizontalFilmOffset",
+    "verticalFilmOffset", "shake", "horizontalShake", "verticalShake", "filmFit",
+    "depthOfField", "aiEnableDOF", "aiFocusDistance", "orthographic",
 };
 
 static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)

@@ -78,6 +78,27 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
         return objectName
 
+    def createMayaCubeAt(self, translation):
+        objectName = cmds.polyCube()[0]
+        cmds.move(*translation)
+        cmds.select(clear=True)
+        cmds.refresh()
+        return objectName
+
+    def lookThroughOverscanPanZoomCamera(self):
+        # Overscan and 2D pan/zoom exist only in Maya's projection matrix, which the pick uses. The
+        # test objects are off-center so that a pick that ignores them misses.
+        cameraTransform, cameraShape = cmds.camera()
+        cmds.xform(cameraTransform, translation=[0, 2, 15])
+        cmds.setAttr(cameraShape + '.overscan', 1.3)
+        cmds.setAttr(cameraShape + '.panZoomEnabled', True)
+        cmds.setAttr(cameraShape + '.horizontalPan', 0.3)
+        cmds.setAttr(cameraShape + '.verticalPan', 0.1)
+        cmds.setAttr(cameraShape + '.zoom', 0.6)
+        cmds.lookThru(mayaUtils.activeModelPanel(), cameraTransform)
+        cmds.select(clear=True)
+        cmds.refresh()
+
     def test_PickMayaMesh(self):
         cubeObjectName = self.createMayaCube()
         with PluginLoaded('mayaHydraCppTests'):
@@ -124,6 +145,23 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
                 usdMayaCubeName, "mesh",
                 usdCubeName, "mesh",
                 usdRectLightName, "rectLight",
+                f="TestPicking.marqueeSelect")
+
+    # The pick must follow the camera's overscan and pan/zoom, as the draw does.
+    def test_PickWithOverscanPanZoomCamera(self):
+        self.lookThroughOverscanPanZoomCamera()
+        cubeObjectName = self.createMayaCubeAt([5, 3, 0])
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestPicking.pickObject")
+
+    def test_MarqueeSelectionWithOverscanPanZoomCamera(self):
+        self.lookThroughOverscanPanZoomCamera()
+        firstCubeName = self.createMayaCubeAt([5, 3, 0])
+        secondCubeName = self.createMayaCubeAt([1.5, 0, 0])
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                firstCubeName, "mesh",
+                secondCubeName, "mesh",
                 f="TestPicking.marqueeSelect")
 
 if __name__ == '__main__':
