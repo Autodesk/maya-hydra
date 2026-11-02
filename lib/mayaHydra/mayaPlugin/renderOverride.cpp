@@ -1964,9 +1964,11 @@ MStatus MtohRenderOverride::Render(
     // bounding box mode. Otherwise only the legacy *WhSi highlight prims do.
     const bool pullsWireframeColorPerPrim = wantedRepr.needsReprChanged || usingBBoxMode;
 
-    // The selection notification reads this value until the next Render(), so a lead change can be
-    // skipped for a panel that is not drawn next. A panel needing other colors re-pushes the repr
-    // or toggles the bbox mode, which dirties all prims.
+    // Read by the lead-change notification until the next Render(), so it can be false while
+    // another panel needs selection colors. That panel still re-pulls them: the repr and bbox
+    // scene indices are shared, and this value is only false for the Default repr without bbox, so
+    // a panel pulling per-prim colors always re-pushes its repr or re-enables bbox, which dirties
+    // every prim. _SuppressLegacySelectionHighlight() is global, so it does not vary per panel.
     if (_dirtySelectionColorsSceneIndex) {
         _dirtySelectionColorsSceneIndex->setColorDirtiesEnabled(
             pullsWireframeColorPerPrim || !_SuppressLegacySelectionHighlight());
