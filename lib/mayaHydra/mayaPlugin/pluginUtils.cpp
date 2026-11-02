@@ -30,6 +30,7 @@
 
 #include <mayaHydraLib/tokens.h>
 
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/glf/contextCaps.h>
 #if HD_API_VERSION >= 98 // PXR_VERSION > 2605
 #include <pxr/imaging/hd/rendererCreateArgsSchema.h>
@@ -76,9 +77,23 @@ void _ApplyRenderSettingDefaultOverrides(HdRenderSettingDescriptorList& descript
     const auto& overrides = _RenderSettingDefaultOverrides();
     for (auto& desc : descriptors) {
         const auto it = overrides.find(desc.key);
-        if (it != overrides.end()) {
-            desc.defaultValue = it->second;
+        if (it == overrides.end()) {
+            continue;
         }
+
+        // renderGlobals.cpp builds the Maya attribute from the type held by the default
+        // value, so an override must have the same type the render delegate declared.
+        if (desc.defaultValue.GetType() != it->second.GetType()) {
+            TF_WARN(
+                "Ignoring default override for render setting '%s': the render delegate "
+                "declares type %s, but the override has type %s",
+                desc.key.GetText(),
+                desc.defaultValue.GetTypeName().c_str(),
+                it->second.GetTypeName().c_str());
+            continue;
+        }
+
+        desc.defaultValue = it->second;
     }
 }
 
