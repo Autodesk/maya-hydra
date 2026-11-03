@@ -30,6 +30,7 @@
 
 #include <mayaHydraLib/tokens.h>
 
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/glf/contextCaps.h>
 #if HD_API_VERSION >= 98 // PXR_VERSION > 2605
 #include <pxr/imaging/hd/rendererCreateArgsSchema.h>
@@ -40,6 +41,7 @@
 
 #include <maya/MGlobal.h>
 #include <filesystem>
+#include <unordered_map>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -58,6 +60,42 @@ namespace {
     constexpr auto OPTIONS_SUFFIX      = "BatchRenderOptionsString";
 
     std::filesystem::path _mayaHydraPluginLocation;
+
+// MayaHydra's defaults for render settings that differ from the render delegate's own.
+// Keyed by render setting id; applied to every renderer that declares the setting.
+const std::unordered_map<TfToken, VtValue, TfToken::HashFunctor>& _RenderSettingDefaultOverrides()
+{
+    static const std::unordered_map<TfToken, VtValue, TfToken::HashFunctor> overrides = {
+        { TfToken("hdFlash:showSkyBackground"), VtValue(true) },
+        { TfToken("hdFlash:useAreaLightGuides"), VtValue(false) },
+    };
+    return overrides;
+}
+
+void _ApplyRenderSettingDefaultOverrides(HdRenderSettingDescriptorList& descriptors)
+{
+    const auto& overrides = _RenderSettingDefaultOverrides();
+    for (auto& desc : descriptors) {
+        const auto it = overrides.find(desc.key);
+        if (it == overrides.end()) {
+            continue;
+        }
+
+        // renderGlobals.cpp builds the Maya attribute from the type held by the default
+        // value, so an override must have the same type the render delegate declared.
+        if (desc.defaultValue.GetType() != it->second.GetType()) {
+            TF_WARN(
+                "Ignoring default override for render setting '%s': the render delegate "
+                "declares type %s, but the override has type %s",
+                desc.key.GetText(),
+                desc.defaultValue.GetTypeName().c_str(),
+                it->second.GetTypeName().c_str());
+            continue;
+        }
+
+        desc.defaultValue = it->second;
+    }
+}
 
 std::pair<
     const MayaHydra::MtohRendererDescriptionVector&,
@@ -109,6 +147,7 @@ MtohInitializeRenderPlugins()
                 rendererSettingDescriptors = delegate->GetRenderSettingDescriptors();
                 plugin->DeleteRenderDelegate(delegate);
             }
+            _ApplyRenderSettingDefaultOverrides(rendererSettingDescriptors);
 
             auto& settingDescriptors = store.second.emplace(renderer, std::move(rendererSettingDescriptors)).first->second;
 
