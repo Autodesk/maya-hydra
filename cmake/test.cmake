@@ -1,5 +1,7 @@
 set(MAYA_HYDRA_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+include("${CMAKE_CURRENT_LIST_DIR}/testConditions.cmake")
+
 # Paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold plugin).
 # Sources (first wins): -DADDITIONAL_PXR_PLUGINPATH_NAME=... or $ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}
 # On Windows use forward slashes or escaped backslashes.
@@ -224,25 +226,61 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     apply_labels_to_test("${ALL_LABELS}" ${test_name})
 endfunction()
 
+# Turns "|"-separated key:value tag groups into a label list.
+#
+# The two disable groups are evaluated here rather than contributing their
+# values as labels. "disabledOn:" yields the disabledOnCurrentConfig sentinel
+# plus a label per tracking issue, but only when its conditions match this
+# configuration; its conditions never become labels. "disabled:" yields the
+# disabled sentinel plus a label per tracking issue. See
+# cmake/testConditions.cmake for what each accepts.
+function(mayaHydra_parse_test_label_groups all_labels tag_groups)
+    set(collect_labels "")
+    # Accepts a raw tag string as well as an already-split list.
+    string(REPLACE "|" ";" groups "${tag_groups}")
+    foreach(item ${groups})
+        string(REPLACE ":" ";" key_and_values "${item}")
+        list(GET key_and_values 0 key)
+        if(key STREQUAL "disabledOn")
+            list(LENGTH key_and_values key_and_values_length)
+            if(key_and_values_length LESS 2)
+                message(FATAL_ERROR
+                    "Tag group \"${item}\" must be disabledOn:<conditions>:<issues>")
+            endif()
+            # list(SUBLIST) rejects a begin index past the end, so the length
+            # is checked above rather than left to the call below.
+            list(SUBLIST key_and_values 1 -1 group_values)
+            mayaHydra_parse_disabled_on_group(group_matches issues "${group_values}")
+            if(group_matches)
+                list(APPEND collect_labels "disabledOnCurrentConfig" ${issues})
+            endif()
+        elseif(key STREQUAL "disabled")
+            list(LENGTH key_and_values key_and_values_length)
+            if(key_and_values_length LESS 2)
+                message(FATAL_ERROR "Tag group \"${item}\" has no tracking issue")
+            endif()
+            list(GET key_and_values 1 values)
+            string(REPLACE "," ";" issues "${values}")
+            mayaHydra_validate_tracking_issues("${issues}" "disabled:")
+            list(APPEND collect_labels "disabled" ${issues})
+        else()
+            # find_labels only writes its output when the group has values.
+            set(label_list "")
+            find_labels(${item} label_list)
+            list(APPEND collect_labels ${label_list})
+        endif()
+    endforeach()
+    set(${all_labels} ${collect_labels} PARENT_SCOPE)
+endfunction()
+
 function(get_testfile_and_labels all_labels test_filename test_script)
     # fetch labels for each test file
     string(REPLACE "|" ";" tests_with_tags ${test_script})
-    list(GET tests_with_tags 0 filename)
+    list(POP_FRONT tests_with_tags filename)
     # set the test file to input as no labels were passed
     set(${test_filename} ${filename} PARENT_SCOPE)
-    list(LENGTH tests_with_tags length)
-    math(EXPR one_less_length "${length} - 1")
-    if(length GREATER 1)        
-        set(collect_labels "")
-        foreach(i RANGE 1 ${one_less_length})
-            list(GET tests_with_tags ${i} item)
-            find_labels(${item} label_list)
-            list(APPEND collect_labels ${label_list})
-        endforeach()
-        set(${all_labels} ${collect_labels} PARENT_SCOPE)    
-    else()
-        set(${all_labels} "" PARENT_SCOPE)
-    endif()
+    mayaHydra_parse_test_label_groups(parsed_labels "${tests_with_tags}")
+    set(${all_labels} "${parsed_labels}" PARENT_SCOPE)
 endfunction()
 
 function(apply_labels_to_test test_labels test_file)
@@ -254,6 +292,20 @@ function(apply_labels_to_test test_labels test_file)
             set_property(TEST ${test_file} APPEND PROPERTY LABELS ${label})
             message(STATUS "Added test label \"${label}\" for ${test_file}")
         endforeach()
+    endif()
+    if("disabledOnCurrentConfig" IN_LIST test_labels)
+        set(reason "disabledOn conditions match this configuration")
+    elseif("disabled" IN_LIST test_labels)
+        set(reason "disabled by tag")
+    endif()
+    if(DEFINED reason)
+        set_property(TEST ${test_file} PROPERTY DISABLED True)
+        # The tracking issues are the only labels shaped like one: plugin,
+        # platform and renderer labels cannot match.
+        set(issues "${test_labels}")
+        list(FILTER issues INCLUDE REGEX "^[A-Z]+-[0-9]+$")
+        list(JOIN issues ", " issues_text)
+        message(STATUS "Disabled ${test_file} : ${reason} (${issues_text})")
     endif()
 endfunction()
 

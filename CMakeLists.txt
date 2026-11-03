@@ -323,6 +323,11 @@ if (BUILD_TESTS)
         COMMAND ${CMAKE_COMMAND}
             -P "${CMAKE_SOURCE_DIR}/cmake/tests/testResolveUsdLocation.cmake"
     )
+    add_test(
+        NAME mayaHydra_disabledOnConditions
+        COMMAND ${CMAKE_COMMAND}
+            -P "${CMAKE_SOURCE_DIR}/cmake/tests/testDisabledOnConditions.cmake"
+    )
     add_subdirectory(test)
 endif()
 

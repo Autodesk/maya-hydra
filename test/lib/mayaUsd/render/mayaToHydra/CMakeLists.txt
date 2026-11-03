@@ -5,13 +5,23 @@
 # See accompanying README.md for currently supported list of label mapping.
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
+# To disable a test only on a combination of conditions, which the groups above
+# cannot express, use disabledOn: with conditions that must all hold and the
+# issues tracking the work of re-enabling it, as in
+# testMyTestFile.py|disabledOn:maya2027,osx:HYDRA-2709. See
+# cmake/testConditions.cmake.
+# To disable a test on every configuration, use disabled: with the issues
+# tracking the work of re-enabling it, as in
+# testMyTestFile.py|disabled:HYDRA-1940. Prefer this over commenting the test
+# out, which hides it from ctest.
 # Tests are run with the VP2 render delegate disabled, to ensure 
 # that mayaHydra does not rely on computations made by VP2 for its use.
 
 # Renderer the MayaHydra tests run against. Baked into every test's environment
 # below, so `ctest` run directly uses it. Set by build.py via -DMAYAHYDRA_TEST_RENDERER.
 # Changing it requires reconfiguring the build.
-set(MAYAHYDRA_TEST_RENDERER_CHOICES HdStorm HdFlash)
+# MAYAHYDRA_TEST_RENDERER_CHOICES comes from cmake/testConditions.cmake, which
+# also accepts those names as disabledOn: conditions.
 set(MAYAHYDRA_TEST_RENDERER HdStorm CACHE STRING
     "Hydra renderer used by the MayaHydra tests")
 set_property(CACHE MAYAHYDRA_TEST_RENDERER PROPERTY STRINGS ${MAYAHYDRA_TEST_RENDERER_CHOICES})
@@ -33,23 +43,22 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
     testTransforms.py
-    testRefinement.py|skipOnRenderer:HdFlash # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
+    testRefinement.py|skipOnRenderer:HdFlash|disabledOn:maya2027,lin:AGP-1034,AGP-1035 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
-	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
-    #testMayaLights.py
+    testMayaLights.py|disabled:HYDRA-1940 # Does not pass on Maya 2026
     testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
     testUsdAreaLightGizmos.py
-    testUVandUDIM.py
+    testUVandUDIM.py|disabled:HYDRA-2709,AGP-734
 	testPurposeRenderTag.py
 
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
-	testMayaLightingModes.py|depOnPlugins:mtoa
-    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-2209: re-enable on OSX | HYDRA-2677 : Maya crash in IsStormRenderDelegate / FramePass::Initialize
+	testMayaLightingModes.py|depOnPlugins:mtoa|disabledOn:maya2027,osx:HYDRA-1727
+    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2677 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : Maya crash in IsStormRenderDelegate / FramePass::Initialize
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
@@ -85,8 +94,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-	#HYDRA-1660 re-enable testMayaDisplayModes
-	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+	testMayaDisplayModes.py|skipOnPlatform:osx|disabled:HYDRA-1660 # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
     testConvergence.py
     testFramePasses.py
@@ -159,8 +167,8 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         # unloaded on Windows/macOS, so disable the test until HYDRA-2416 is
         # fixed.  The isolate-select behaviour itself passes (all visibility
         # assertions and snapshot comparisons succeed before the crash).
-        #testIsolateSelectPerShape.py
-        testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost|skipOnRenderer:HdFlash # HYDRA-2678 : cmds.select rejects USD instance paths
+        testIsolateSelectPerShape.py|disabled:HYDRA-2416
+        testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2678 # HYDRA-2678 : cmds.select rejects USD instance paths
     )
 endif()
 
@@ -169,7 +177,7 @@ if(MAYA_APP_VERSION VERSION_GREATER 2026)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         # HYDRA-2415: aiStandIn/aiVolume custom-node teardown crashes Maya with the
         # V2 locator-notification path while HdArnold is active (SIGSEGV / pure virtual).
-        #cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
+        cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa|disabled:HYDRA-2415
         cpp/testArnoldCustomAttributesMayaNodes.py|depOnPlugins:mtoa
     )
 endif()
