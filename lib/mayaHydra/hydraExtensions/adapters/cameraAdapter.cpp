@@ -31,6 +31,8 @@
 #include <maya/MFnAttribute.h>
 #include <maya/MFnCamera.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MFnTransform.h>
+#include <maya/MMatrix.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 
@@ -232,6 +234,31 @@ void MayaHydraCameraAdapter::RemovePrim()
 bool MayaHydraCameraAdapter::HasType(const TfToken& typeId) const { return typeId == CameraType(); }
 
 VtValue MayaHydraCameraAdapter::Get(const TfToken& key) { return MayaHydraShapeAdapter::Get(key); }
+
+GfMatrix4d MayaHydraCameraAdapter::_ComputeTransform() const
+{
+    // VP2 removes the camera transform's own scale from the view matrix, so scaling that
+    // transform does not change the image. Remove it here too, or the camera prim's view matrix
+    // squeezes the image and no longer matches the pick, which uses VP2's view matrix.
+    MDagPath transformPath = GetDagPath();
+    transformPath.pop();
+    MStatus      status;
+    MFnTransform transform(transformPath, &status);
+    double       scale[3] = { 1.0, 1.0, 1.0 };
+
+    // Sanity check.
+    if (!status || !transform.getScale(scale) || scale[0] == 0.0 || scale[1] == 0.0
+        || scale[2] == 0.0) {
+        return MayaHydraShapeAdapter::_ComputeTransform();
+    }
+
+    // Row vectors: the inverse scale applies first, in the camera transform's local space.
+    MMatrix inverseScale;
+    for (int i = 0; i < 3; ++i) {
+        inverseScale.matrix[i][i] = 1.0 / scale[i];
+    }
+    return MayaHydra::GetGfMatrixFromMaya(inverseScale * GetDagPath().inclusiveMatrix());
+}
 
 VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
 {

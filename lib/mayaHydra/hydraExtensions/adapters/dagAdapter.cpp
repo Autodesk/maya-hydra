@@ -199,7 +199,7 @@ GfMatrix4d MayaHydraDagAdapter::GetTransform()
         if (IsInstanced()) {
             _transform.SetIdentity();
         } else {
-            _transform = GetGfMatrixFromMaya(_dagPath.inclusiveMatrix());
+            _transform = _ComputeTransform();
         }
         _invalidTransform = false;
     }
@@ -215,7 +215,7 @@ bool MayaHydraDagAdapter::UpdateTransformIfChanged()
         if (IsInstanced()) {
             newTransform.SetIdentity();
         } else {
-            newTransform = GetGfMatrixFromMaya(_dagPath.inclusiveMatrix());
+            newTransform = _ComputeTransform();
         }
     }
 
@@ -233,8 +233,13 @@ MayaHydraDagAdapter::SampleTransform(size_t maxSampleCount, float* times, GfMatr
 {
     return GetMayaHydraSceneIndex()->SampleValues(maxSampleCount, times, samples, [&]() -> GfMatrix4d {
         MayaHydra::DgAccessLock dgLock;
-        return GetGfMatrixFromMaya(_dagPath.inclusiveMatrix());
+        return _ComputeTransform();
     });
+}
+
+GfMatrix4d MayaHydraDagAdapter::_ComputeTransform() const
+{
+    return GetGfMatrixFromMaya(_dagPath.inclusiveMatrix());
 }
 
 void MayaHydraDagAdapter::RefreshInstancingState()

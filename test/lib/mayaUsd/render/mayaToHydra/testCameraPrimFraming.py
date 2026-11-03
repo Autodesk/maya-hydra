@@ -81,6 +81,13 @@ class TestCameraPrimFraming(mtohUtils.MayaHydraBaseTestCase):
         self.setCameraAttr('filmTranslateV', -0.1)
         self.verifySnapshot('filmTranslate.png')
 
+    def test_ScaledCamera(self):
+        self.setupScene()
+        # VP2 ignores the camera transform's own scale, so the image must match the unscaled
+        # camera's default Horizontal fit.
+        cmds.xform(self.cameraTransform, scale=[2, 1, 0.5])
+        self.verifySnapshot('filmFit_horizontal.png')
+
     def test_RenderRegion(self):
         self.setupScene()
         self.setCameraAttr('overscan', 1.2)
