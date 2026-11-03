@@ -156,8 +156,9 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
 
     def test_MarqueeSelectionWithOverscanPanZoomCamera(self):
         self.lookThroughOverscanPanZoomCamera()
+        # Keep both cubes near the view center, or a wide viewport clips one of them.
         firstCubeName = self.createMayaCubeAt([5, 3, 0])
-        secondCubeName = self.createMayaCubeAt([1.5, 0, 0])
+        secondCubeName = self.createMayaCubeAt([2, 4, 0])
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 firstCubeName, "mesh",
