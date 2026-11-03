@@ -1,16 +1,23 @@
 # USD 26.05+ Baselines — USDLightsTest
 
-| Image | Source |
-|-------|--------|
-| `allLights.png` | **New in USD 26.05** — updated baseline from failing preflight |
-| `domeLight.png` | Copied from `usd25.11/` — no visual change in USD 26.05 |
-| `flatLight.png` | Copied from `usd25.11/` — no visual change in USD 26.05 |
+| Image | Why |
+|-------|-----|
+| `domeLight.png` | The USD sphere takes slightly different dome lighting in USD 26.05 |
 
-## Why unchanged images are copied here instead of relying on usd25.11/
+Every other image this test captures matches its `usd25.11+` or root baseline on
+USD 26.05 and is deliberately absent, so it keeps resolving to those folders.
 
-The test framework's `resolveRefImage` builds the baseline path as
-`<inputDir>/<imageVersion>/<imageName>` with no fallback to the parent folder.
-If `imageVersion` is set to `"usd26.05+"` and a file is missing from this folder,
-the test will fail with a missing file error rather than falling back to `usd25.11/`.
-Therefore all images that this test compares with `imageVersion` must be present here,
-even those whose pixel content is identical to the `usd25.11/` version.
+## About the difference
+
+The change is confined to the USD sphere and is close to invisible: against
+`usd25.11+/domeLight.png` the mean error is 9.1e-05, but 858 pixels (0.536%)
+still land over the 0.01 per-pixel threshold, just past the 0.5% the test
+allows. It is deterministic and identical in both selection highlight modes.
+
+## Adding an image here
+
+The test passes `domeImageVersion` only to the `domeLight` assert. An image
+needs its own branch in `testUSDLights.py` before it can live here, and
+`resolveRefImage` has no fallback to the parent folder: an image asserted with
+this `imageVersion` but missing from this folder fails with a missing file
+error rather than falling back to `usd25.11+/`.

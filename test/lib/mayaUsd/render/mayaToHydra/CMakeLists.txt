@@ -41,6 +41,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
     testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
+    testUsdAreaLightGizmos.py
     testUVandUDIM.py
 	testPurposeRenderTag.py
 

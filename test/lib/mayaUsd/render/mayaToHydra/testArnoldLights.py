@@ -40,12 +40,12 @@ class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
         #Turn on/off shadows
         cmds.modelEditor(panel, edit=True, shadows=shadowOn)
 
-        # Dome lighting change in USD 25.11+
+        # Dome lighting change in USD 25.11+, and the USD sphere again in USD 26.05+.
         imageVersion = None
         if self._usdVersion >= (0, 26, 5):
             imageVersion = "usd26.05+"
         elif self._usdVersion >= (0, 25, 11):
-            imageVersion = "usd25.11"
+            imageVersion = "usd25.11+"
 
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
