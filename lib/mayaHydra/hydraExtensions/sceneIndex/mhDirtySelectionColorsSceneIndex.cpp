@@ -40,6 +40,10 @@ static const HdDataSourceLocatorSet primvarsColorsLocatorSet{ primvarsOverrideWi
 
 void MhDirtySelectionColorsSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections)
 {
+    if (!_colorDirtiesEnabled) {
+        return;
+    }
+
     // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
 
@@ -62,6 +66,10 @@ void MhDirtySelectionColorsSceneIndex::dirtyLeadObjectRelatedSelections(const Fv
 
 void MhDirtySelectionColorsSceneIndex::dirtySelectionRelatedPrims(const SdfPathVector& primPaths)
 {
+    if (!_colorDirtiesEnabled) {
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries   dirtiedPrimEntries;
     std::unordered_set<SdfPath, SdfPath::Hash> visited;
     for (const auto& primPath : primPaths) {

@@ -89,18 +89,9 @@ private:
         const PXR_NS::SdfPath&                defaultLightPath);
 
     //From HdSingleInputFilteringSceneIndexBase
-    void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
-        if (!_IsObserved())return;
-        _SendPrimsAdded(entries);
-    }
-    void _PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)override{
-        if (!_IsObserved())return;
-        _SendPrimsRemoved(entries);
-    }
-    void _PrimsDirtied(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries)override{
-        if (!_IsObserved())return;
-        _SendPrimsDirtied(entries);
-    }
+    void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
+    void _PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)override;
+    void _PrimsDirtied(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries)override;
 
     
     bool _IsDefaultLight(const PXR_NS::SdfPath& primPath)const;
@@ -110,6 +101,8 @@ private:
     bool _shadowsEnabled = true;
     PXR_NS::SdfPath _defaultLightPath;
     std::set<PXR_NS::SdfPath> _disabledLightsPrims;
+    // Sorted, so the lights at or under a path form a contiguous range.
+    std::set<PXR_NS::SdfPath> _lightPaths;
 };
 
 }//end of namespace FVP_NS_DEF

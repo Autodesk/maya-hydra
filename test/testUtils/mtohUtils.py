@@ -49,14 +49,20 @@ def setMayaUseHydra(enable=True):
     if cmds.optionVar(query="mayaUseHydra") != value:
         cmds.optionVar(intValue=("mayaUseHydra", value))
 
+RENDER_GLOBALS_NODE = "defaultRenderGlobals"
+
 # Selection highlighting mode: a defaultRenderGlobals enum attribute. Only
 # "Legacy Selection" is offered on USD <= 24.11 and on macOS (see
 # renderGlobals.cpp), so enum indices differ between configurations and are
 # resolved by name.
 SELECTION_HIGHLIGHT_MODE_NAME = "mayaHydraSelectionHighlightMode"
-SELECTION_HIGHLIGHT_MODE_NODE = "defaultRenderGlobals"
 SELECTION_HIGHLIGHT_MODE_ATTR = "{}.{}".format(
-    SELECTION_HIGHLIGHT_MODE_NODE, SELECTION_HIGHLIGHT_MODE_NAME)
+    RENDER_GLOBALS_NODE, SELECTION_HIGHLIGHT_MODE_NAME)
+
+# Disables selection highlighting in every mode. Toggling it re-initializes Hydra.
+FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME = "mayaHydraForceDisableSelectionHighlight"
+FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR = "{}.{}".format(
+    RENDER_GLOBALS_NODE, FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME)
 
 # Set in a test's CTest environment to pick its mode. Defaults to outline.
 SELECTION_HIGHLIGHT_MODE_ENV_VAR = "MAYAHYDRA_SELECTION_HIGHLIGHT_MODE"
@@ -413,7 +419,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # Enum indices differ between configurations: resolve by name.
         enumNames = cmds.attributeQuery(
             SELECTION_HIGHLIGHT_MODE_NAME,
-            node=SELECTION_HIGHLIGHT_MODE_NODE,
+            node=RENDER_GLOBALS_NODE,
             listEnum=True)[0].split(':')
 
         if wantedEnumName not in enumNames:
@@ -425,17 +431,28 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                     mode, wantedEnumName, platform.system(),
                     str(self._usdVersion), enumNames))
 
-        wantedIndex = enumNames.index(wantedEnumName)
-        if cmds.getAttr(SELECTION_HIGHLIGHT_MODE_ATTR) == wantedIndex:
+        self.setHydraReinitializingRenderGlobal(
+            SELECTION_HIGHLIGHT_MODE_NAME, enumNames.index(wantedEnumName))
+
+    def setForceDisableSelectionHighlight(self, disable):
+        self.setHydraReinitializingRenderGlobal(FORCE_DISABLE_SELECTION_HIGHLIGHT_NAME, disable)
+
+    @staticmethod
+    def setHydraReinitializingRenderGlobal(attrName, value):
+        '''Set a defaultRenderGlobals attribute whose change re-initializes Hydra,
+        such as the selection highlighting mode, and apply it.
+        '''
+        attr = "{}.{}".format(RENDER_GLOBALS_NODE, attrName)
+        if cmds.getAttr(attr) == value:
             # Already set: avoid updateRenderGlobals re-initializing Hydra.
             return
 
-        cmds.setAttr(SELECTION_HIGHLIGHT_MODE_ATTR, wantedIndex)
+        cmds.setAttr(attr, value)
 
         # The render override only re-reads the globals on updateRenderGlobals.
-        cmds.mayaHydra(updateRenderGlobals=SELECTION_HIGHLIGHT_MODE_NAME)
+        cmds.mayaHydra(updateRenderGlobals=attrName)
 
-        # The first refresh performs the mode switch, which queues "ogs -reset" on
+        # The first refresh re-initializes Hydra, which queues "ogs -reset" on
         # the idle queue to re-send the VP2 render items. Drain it and refresh
         # again, or the viewport has no Maya-native geometry.
         cmds.refresh(force=True)
@@ -686,7 +703,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                 SELECTION_HIGHLIGHT_MODE_ATTR))
         enumNames = cmds.attributeQuery(
             SELECTION_HIGHLIGHT_MODE_NAME,
-            node=SELECTION_HIGHLIGHT_MODE_NODE,
+            node=RENDER_GLOBALS_NODE,
             listEnum=True)[0].split(':')
         actualEnumName = enumNames[cmds.getAttr(SELECTION_HIGHLIGHT_MODE_ATTR)]
         self.assertEqual(
