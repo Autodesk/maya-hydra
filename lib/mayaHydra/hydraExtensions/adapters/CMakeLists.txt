@@ -58,12 +58,27 @@ if (USD_HAS_GPU_BUFFER_SHARING)
             gpuRenderItemAdapter.cpp
             mhExtGpuBufferBridge.cpp
             mhExtGpuBufferReadback.cpp
+            mhExtGpuStreams.cpp
     )
     list(APPEND HEADERS
         gpuRenderItemAdapter.h
         mhExtGpuBufferBridge.h
+        mhExtGpuStreams.h
     )
 endif()
+
+# The render item override carrier path: the payload type, its adapter, and the
+# MPxRenderItemOverride that fills the payload (registered by the plugin).
+target_sources(${TARGET_NAME}
+    PRIVATE
+        renderItemOverrideAdapter.cpp
+        renderItemOverrideCreator.cpp
+)
+list(APPEND HEADERS
+    renderItemOverrideAdapter.h
+    renderItemOverrideCreator.h
+    renderItemPayload.h
+)
 
 if (MAYA_HAS_RENDER_ITEM_CULL_MODE_API)
     target_compile_definitions(${TARGET_NAME}

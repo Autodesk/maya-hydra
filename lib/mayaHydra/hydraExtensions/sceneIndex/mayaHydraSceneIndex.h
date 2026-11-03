@@ -46,6 +46,10 @@
 
 #include <unordered_map>
 
+// Global scope, like its MUserData base: declared inside the pxr namespace
+// below it would name a different type.
+class MayaHydraRenderItemPayload;
+
 UFE_NS_DEF { class Path; }
 
 // Forward declaration so that qualified friend declaration is valid.
@@ -54,6 +58,7 @@ namespace MAYAHYDRA_NS_DEF { class BatchRenderer; }
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
+class MayaHydraRenderItemOverrideAdapter;
 
 struct MayaHydraInitData
 {
@@ -208,6 +213,12 @@ public:
 
     GfInterval GetCurrentTimeSamplingInterval() const;
 
+    /// The current Maya frame, captured on the main thread at the start of
+    /// UpdateRenderItems. For code reached during Hydra sync - velocity
+    /// motion keys (GetOpenTransform, SamplePrimvar) run on Storm's worker
+    /// threads, where MAnimControl must not be called.
+    double GetCurrentFrame() const { return _currentFrame; }
+
     /// True once _Destroy() has started, and for the rest of this object's life: after an
     /// explicit _Destroy() the object may outlive its render index as an inert shell.
     /// Reentrant Maya callbacks during teardown must no-op (see ShouldSkipHydraUpdates());
@@ -321,6 +332,11 @@ public:
 
     GfBBox3d GetBoundingBox() const;
 
+    /// Set by the plugin when it registers (true) or withdraws (false) the render item
+    /// override creator (adapters/renderItemOverrideCreator.h). Carriers exist only
+    /// while it is registered, so every carrier branch keys on this. Main thread.
+    static void SetRenderItemOverrideEnabled(bool enabled) { _renderItemOverrideEnabled = enabled; }
+
 private:
 
     MayaHydraSceneIndex(
@@ -351,9 +367,37 @@ private:
     // Create the material(s) for a mesh and, when it has more than one shading
     // group, emit one HdGeomSubset (faceSet + material binding) per assignment so
     // per-face/multi-material meshes shade correctly. See the .cpp for details.
-    void _InsertGeomSubsetsForMesh(const MDagPath& dag, const SdfPath& meshPrimId);
+    //
+    // polygonFaceOffsets maps the mesh's polygons onto the prim's published faces
+    // when those are not the polygons themselves (a render item override carrier publishes
+    // VP2's triangles); null means the faces ARE the polygons. Returns the number
+    // of subsets inserted, named geomSubset_0 .. geomSubset_<n-1>.
+    int _InsertGeomSubsetsForMesh(
+        const MDagPath&   dag,
+        const SdfPath&    meshPrimId,
+        const VtIntArray* polygonFaceOffsets = nullptr);
+    // Re-publish a carrier shaded prim's geomSubsets: remove the ones it had,
+    // insert the current set.
+    void _UpdateRenderItemOverrideGeomSubsets(
+        const MayaHydraRenderItemPayload& customData,
+        MayaHydraRenderItemOverrideAdapter&    carrier);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(int fastId);
+
+    // ---- Render item override carrier harvest -------------------------
+    // Carrier render items arrive from Maya with their geometry already
+    // translated (MayaHydraRenderItemPayload via MRenderItem custom data), so
+    // they skip MGeometry translation: UpdateRenderItems serves each through a
+    // MayaHydraRenderItemOverrideAdapter, from the payload.
+
+    /// True when the render item override carrier path is active: the plugin has
+    /// registered the creator (SetRenderItemOverrideEnabled). Off means we
+    /// never pay a getCustomData() probe per render item on the stock path.
+    static bool _RenderItemOverrideEnabled();
+    static bool _renderItemOverrideEnabled;
+    // Drop the carrier adapters (and so the prims) of a shape being deleted.
+    void _RemoveCarriersOf(const MObject& obj);
+
     bool
     _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
     SdfPath _GetRenderItemPrimPath(const MRenderItem& ri);
@@ -369,6 +413,18 @@ private:
     HdRenderIndex* _renderIndex = nullptr;
     Hgi*           _hgi = nullptr;
     bool           _isTearingDown = false;
+
+    // See GetCurrentFrame().
+    double _currentFrame = 0.0;
+
+    // Velocity motion samples (MAYAHYDRA_MOTION_SAMPLING_MODE=velocity): adapters
+    // whose last published keys carry motion. A frame that brings an adapter no
+    // new matrix / points sends it no notification, so Storm would keep those
+    // keys - a streak on an object that stopped moving. UpdateRenderItems
+    // re-dirties every entry that was not refreshed this frame, once, then drops
+    // it. Keyed by pointer, held weakly: adapters are owned elsewhere.
+    std::unordered_map<MayaHydraRenderItemAdapter*, std::weak_ptr<MayaHydraRenderItemAdapter>>
+        _velocityBlurred;
 
     // Adapters
     AdapterMap<MayaHydraLightAdapterPtr>                   _lightAdapters;

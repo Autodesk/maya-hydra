@@ -26,19 +26,27 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/profilingUtils.h>
+#include <mayaHydraLib/adapters/renderItemOverrideAdapter.h>
+#include <mayaHydraLib/adapters/renderItemPayload.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 #include <mayaHydraLib/tokens.h>
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/materialBindingSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/rprim.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
+#include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
+#include <maya/MAnimControl.h>
+#include <maya/MDGContextGuard.h>   // batched shutter capture
 #include <maya/MDGMessage.h>
 #include <maya/MDagMessage.h>
 #include <maya/MDagPath.h>
@@ -52,7 +60,9 @@
 #include <maya/MObjectArray.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MPlug.h>
+#include <maya/MSharedPtr.h>
 #include <maya/MString.h>
+#include <maya/MUserData.h>
 #include <ufe/pathString.h>
 
 #include <mayaHydraLib/adapters/mhDirtyNotifier.h>
@@ -63,6 +73,9 @@
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <ufeExtensions/Global.h>
 
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 #include <algorithm>
 #include <array>
 #include <string_view>
@@ -141,9 +154,15 @@ bool filterMesh(const MRenderItem& ri, bool useMeshAdapter)
 // Names of the VP2 wireframe items used as the object-level selection highlight. Deliberately
 // not exhaustive, so no other visual cue is hidden. Matched by name rather than primitive type
 // because VP2 can reuse an item after changing its type.
-constexpr std::array<std::string_view, 2> kSelectionHighlightWireNames = {
+//
+// originU / originV are a NURBS surface's first U and V isoparms. A shaded panel draws them only
+// because the surface is selected, so there they are part of its highlight. A wireframe panel
+// still draws them, as it does the other wires here.
+constexpr std::array<std::string_view, 4> kSelectionHighlightWireNames = {
     "DormantPolyWire",     // polygon mesh
-    "DormantIsoparmWire"   // NURBS surface
+    "DormantIsoparmWire",  // NURBS surface
+    "originU",             // NURBS surface origin, U direction
+    "originV"              // NURBS surface origin, V direction
 };
 
 // Whether the item name is in kSelectionHighlightWireNames. Kept free of Maya DAG access so the
@@ -424,7 +443,16 @@ bool UpdateRenderItemWireframeColor(
     const MayaHydraRenderItemAdapterPtr& ria)
 {
     MColor wireframeColor;
+    // Prefer the LIVE sourceDagPath, exactly as before, and fall back to the
+    // adapter's copy only when there is none. That keeps ordinary render items
+    // byte-identical to upstream - including the case where a reparent changes
+    // sourceDagPath while the adapter still holds the path it was built with -
+    // and still works for a render item override carrier, which has no sourceDagPath
+    // at all and carries its shape's path on the adapter instead.
     MDagPath dagPath = ri.sourceDagPath();
+    if (!dagPath.isValid()) {
+        dagPath = ria->GetDagPath();
+    }
     if (dagPath.isValid()) {
         // This is a color managed VP2 color, it will need to be unmanaged at some point
         wireframeColor = MGeometryUtilities::wireframeColor(dagPath);
@@ -526,6 +554,8 @@ void MayaHydraSceneIndex::_Destroy()
     _cameraAdapters.clear();
     _renderItemsAdaptersFast.clear();
     _customAdapters.clear();
+    // Render item override carriers need no teardown of their own: they are
+    // MayaHydraRenderItemOverrideAdapters living in _renderItemsAdapters, cleared above.
 
     // Unregister the fallback path mapper, but only if it is still ours: a replacement
     // scene index may already have registered its own.
@@ -541,6 +571,11 @@ void MayaHydraSceneIndex::UpdateRenderItems(
 {
     MH_PROFILE_FUNCTION();
 
+    const bool carriersEnabled = _RenderItemOverrideEnabled();
+
+    // Main thread: the one place the frame is read. Hydra sync reads this copy.
+    _currentFrame = MAnimControl::currentTime().value();
+
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;
     for (size_t i = 0; i < scene.mRemovalCount; i++) {
@@ -553,6 +588,10 @@ void MayaHydraSceneIndex::UpdateRenderItems(
 
     // Coalesce DirtyPrims notifications produced per render item.
     const Fvp::DirtyNotifier::DirtyBatchGuard dirtyBatchGuard(*this);
+
+    // Evaluate-mode shutter captures queued by this pass's transform updates,
+    // sampled in one batch after the loop (see CaptureShutterSample).
+    std::vector<MayaHydraRenderItemAdapterPtr> shutterCaptures;
 
     // My version, does minimal update
     // This loop could, in theory, be parallelized.  Unclear how large the gains would be, but maybe
@@ -573,6 +612,19 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
 
+        // Is this a render item override carrier? A carrier has no
+        // sourceDagPath, no MGeometry and no VP2 shader, so the two
+        // places that read those have to take the payload instead. Everything
+        // else below - registration, material, wireframe colour, removal - is
+        // shared, which is the entire point of carriers being adapters: picking
+        // and the rest come from _renderItemsAdapters, not from a bespoke path.
+        MayaHydraRenderItemPayload* customData = nullptr;
+        if (carriersEnabled) {
+            MSharedPtr<MUserData> userData = ri.getCustomData();
+            customData = userData
+                ? dynamic_cast<MayaHydraRenderItemPayload*>(userData.get())
+                : nullptr;
+        }
         // Cached null adapter: an item Hydra deliberately does not translate.
         if (!isNewRenderitem && ria == nullptr) {
             continue;
@@ -593,10 +645,23 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // When the outline owns the highlight, that wire must be hidden or the object is
         // highlighted twice. The name is tested first because sourceDagPath() returns by value.
         bool isHighlightWire = false;
-        if (classifyHighlightWire && isSelectionHighlightWireName(riName.asChar())) {
-            isHighlightWire = isReplaceableHighlightWireShape(ri.sourceDagPath());
+        if (classifyHighlightWire) {
+            if (customData) {
+                // A render item override carrier's wireframe item is the same highlight wire under another
+                // name, and has no sourceDagPath. A curve's line item is the object, not a
+                // highlight.
+                if (customData->kind == MayaHydraRenderItemPayload::kWireframe) {
+                    isHighlightWire = isReplaceableHighlightWireShape(customData->dagPath);
+                }
+            } else if (isSelectionHighlightWireName(riName.asChar())) {
+                isHighlightWire = isReplaceableHighlightWireShape(ri.sourceDagPath());
+            }
         }
-        const bool neededByAnyPanel = !isHighlightWire || options.anyViewportDrawsWireframes;
+        // A carrier wire is always translated, then hidden through the adapter: its payload's
+        // geometry arrives only with a delta, so one skipped here and translated later by the
+        // reconsider pass would be created without points.
+        const bool neededByAnyPanel
+            = !isHighlightWire || options.anyViewportDrawsWireframes || customData != nullptr;
         const bool visibleInThisPanel = !isHighlightWire || options.viewportDrawsWireframes;
 
         // Storm still syncs invisible rprims, so skip translating an unneeded wire instead of
@@ -626,11 +691,42 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         }
 
         if (isNewRenderitem) {
+            SdfPath  slowId;
+            MDagPath dagPath;
+            if (customData) {
+                dagPath = customData->dagPath;
+                // A payload made before its shape was deleted can still be
+                // harvested once: the node survives outside the DAG (for undo)
+                // with an empty path, which GetPrimPath cannot map. Skip it
+                // without caching a null adapter; its removal follows.
+                if (!dagPath.isValid() || dagPath.fullPathName().length() == 0) {
+                    continue;
+                }
+                // Same scheme as everything else - GetPrimPath on the shape DAG
+                // path - so selection, which maps a Maya selection to
+                // GetPrimPath(<selected transform>), resolves these by ancestor
+                // match. The leaf distinguishes a shape's carrier prims: it is the carrier's
+                // MRenderItem::name(), which Maya sets to the name of the VP2 render item it
+                // replaces (StandardShadedItem, DormantPolyWire, DormantIsoparmWire, ...), so
+                // a lookup by item name finds the stock prim ("<shape prim>/DormantPolyWire_<id>")
+                // and the carrier ("<shape prim>/DormantPolyWire") alike.
+                const SdfPath shapePath = GetPrimPath(dagPath, /*isSprim*/ false);
+                if (!shapePath.IsEmpty()) {
+                    slowId = shapePath.AppendChild(
+                        TfToken(TfMakeValidIdentifier(riName.asChar())));
+                }
+            } else {
+                slowId = _GetRenderItemPrimPath(ri);
+                // MAYA-128021: We do not currently support maya instances.
+                dagPath = ri.sourceDagPath();
+            }
+
             // First check if the new render item should have a null adapter
             bool createNullRenderItemAdapter = false;
 
-            // ProxyGeometryItems are a special type of dummy render item created internally by Maya
-            // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
+            // ProxyGeometryItems are a special type of dummy render item created internally by
+            // Maya to implement and handle MPxDrawOverride. We do not need to translate these
+            // to Hydra.
             if (riName == "ProxyGeometryItem") {
                 createNullRenderItemAdapter = true;
             }
@@ -644,12 +740,18 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             }
 
             // Meshes can optionally be handled by the mesh adapter, rather than by
-            // render items.
-            if (filterMesh(ri, useMeshAdapter())) {
+            // render items. A shaded render item override carrier of a mesh stands in for its
+            // StandardShadedItem, so it is dropped the same way; otherwise the shape gets a
+            // second mesh prim next to the mesh adapter's. Carriers are tested by kind and
+            // shape type, not by filterMesh(): every shaded carrier is named
+            // StandardShadedItem, as VP2 names every shape's shaded item, but only a mesh's
+            // has a mesh adapter to take over.
+            if ((!customData && filterMesh(ri, useMeshAdapter()))
+                || (customData && useMeshAdapter()
+                    && customData->kind == MayaHydraRenderItemPayload::kShadedMesh
+                    && dagPath.hasFn(MFn::kMesh))) {
                 createNullRenderItemAdapter = true;
             }
-        
-            const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
             // Maya/MtoA adds texturedSkyDome mesh object for VP2.
             // We do not want that to be translated to Hydra
@@ -662,18 +764,22 @@ void MayaHydraSceneIndex::UpdateRenderItems(
                 continue;
             }
 
-            // Otherwise create a valid adapter
-            // MAYA-128021: We do not currently support maya instances.
-            MDagPath dagPath(ri.sourceDagPath());
+            if (customData) {
+                ria = std::static_pointer_cast<MayaHydraRenderItemAdapter>(
+                    std::make_shared<MayaHydraRenderItemOverrideAdapter>(
+                        dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri)));
+            }
+            else {
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
-            if (MayaHydraGpuRenderItemAdapter::IsEligible(ri, GetHgi())) {
-                ria = std::make_shared<MayaHydraGpuRenderItemAdapter>(
-                    dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
-            } else
+                if (MayaHydraGpuRenderItemAdapter::IsEligible(ri, GetHgi())) {
+                    ria = std::make_shared<MayaHydraGpuRenderItemAdapter>(
+                        dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
+                } else
 #endif
-            {
-                ria = std::make_shared<MayaHydraRenderItemAdapter>(
-                    dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
+                {
+                    ria = std::make_shared<MayaHydraRenderItemAdapter>(
+                        dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
+                }
             }
 
             // HYDRA-1992 : Order is important here. Downstream scene indices
@@ -683,23 +789,82 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             // be setup properly.
             _AddRenderItem(ria);
             ria->Populate();
-            ria->CreateCallbacks(); // Handle custom attribute changes
+            // Handle custom attribute changes. Carriers too: the producer's DG hooks
+            // report geometry, topology, visibility, matrix and effect, but not
+            // extension/dynamic attributes, which are all this callback reacts to.
+            // A carrier's node is its shape (customData->dagPath), not a
+            // sourceDagPath, so the callback attaches to the right node.
+            ria->CreateCallbacks();
 
             // Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(
                 isRenderItem_aiSkyDomeLightTriangleShape(ri));
         }
 
+        // The cached adapter must be a carrier adapter whenever the item carries a
+        // payload. Checked rather than assumed: a mismatch would otherwise be an
+        // invalid downcast below.
+        std::shared_ptr<MayaHydraRenderItemOverrideAdapter> carrier;
+        if (customData) {
+            carrier = std::dynamic_pointer_cast<MayaHydraRenderItemOverrideAdapter>(ria);
+            if (!TF_VERIFY(
+                    carrier,
+                    "Render item %d carries a render item override payload but its adapter is "
+                    "not a MayaHydraRenderItemOverrideAdapter",
+                    fastId)) {
+                continue;
+            }
+        }
+
+        // A newly harvested carrier must build EVERYTHING, whatever this frame's
+        // delta happens to say. Maya flags everything on a carrier's first
+        // publish, but the consumer does not necessarily see the item on that frame -
+        // and material in particular is gated on MVS_changedEffect, so missing it
+        // once leaves the prim unshaded until something unrelated dirties the
+        // effect. For a non-carrier this is a no-op: effFlags == flags.
+        unsigned int effFlags = flags;
+        if (customData && isNewRenderitem) {
+            effFlags |= MVS::MVS_changedGeometry | MVS::MVS_changedTopo
+                | MVS::MVS_changedVisibility | MVS::MVS_changedMatrix
+                | MVS::MVS_changedEffect;
+        }
+
         // _GetRenderItemMaterial is expensive: it ultimately calls
         // MFnDagNode::getConnectedSetsAndMembers, which walks the Maya DG for
         // every set the shape belongs to. That cost is wasted on frames where
         // nothing material-related has changed (the common animation case).
-        if (flags & MDataServerOperation::MViewportScene::MVS_changedEffect) {
+        if (effFlags & MDataServerOperation::MViewportScene::MVS_changedEffect) {
             SdfPath material;
             MObject shadingEngineNode;
-            if (!_GetRenderItemMaterial(ri, material, shadingEngineNode)) {
-                if (material != kInvalidMaterial) {
-                    CreateMaterial(material, shadingEngineNode);
+            if (customData) {
+                // _GetRenderItemMaterial reaches the shading engine through
+                // ri.sourceDagPath(), which a carrier does not have. The
+                // wireframe carrier needs nothing here - it reports kLines, and
+                // that helper would hand back the empty fallback material anyway,
+                // which is exactly what makes the lines unlit.
+                //
+                // The isNull() guard is deliberate and carrier-only:
+                // kInvalidMaterial is the "use the fallback" sentinel GetMaterialId
+                // tests for (:1147), and an EMPTY path is NOT that sentinel - so
+                // without it a carrier with no shading engine would call
+                // CreateMaterial(SdfPath(), MObject::kNullObj).
+                if (customData->kind == MayaHydraRenderItemPayload::kShadedMesh
+                    && customData->dagPath.isValid()) {
+                    shadingEngineNode = FindShadingEngine(customData->dagPath);
+                    if (!shadingEngineNode.isNull()) {
+                        material = GetMaterialPath(shadingEngineNode);
+                        if (TfMapLookupPtr(_materialAdapters, material) == nullptr) {
+                            CreateMaterial(material, shadingEngineNode);
+                        }
+                    }
+                }
+            } else {
+                // Unchanged from upstream, deliberately: no carrier logic leaks
+                // into the render-item path.
+                if (!_GetRenderItemMaterial(ri, material, shadingEngineNode)) {
+                    if (material != kInvalidMaterial) {
+                        CreateMaterial(material, shadingEngineNode);
+                    }
                 }
             }
 
@@ -710,10 +875,16 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // Some custom render items (Ufe cameras) don't send the dirty wireframe color notification
         // but they change wireframe color by resetting their effect so we catch it this way.
         bool wireframeColorDirty = isNewRenderitem ||
-            (flags & (MVS::MVS_changedWireframeColor | MVS::MVS_changedEffect));
+            (effFlags & (MVS::MVS_changedWireframeColor | MVS::MVS_changedEffect));
 #else
         bool wireframeColorDirty = true;
 #endif
+        // Before anything reads the carrier's DAG path (wireframe colour,
+        // transform, level of detail): it may have moved under this adapter.
+        if (carrier) {
+            carrier->SetDagPath(customData->dagPath);
+        }
+
         if (wireframeColorDirty) {
             wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria);
         }
@@ -722,11 +893,47 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // updates the stored transform value, and UpdateFromDelta sends out
         // PrimsDirtied notifications. If an observer receiving the PrimsDirtied 
         // notifications pulls on the transform, it needs to be up to date.
-        if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
-            ria->UpdateTransform(ri);
+        if (effFlags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
+            if (carrier) {
+                // A carrier carries no MRenderItem
+                // matrix; the DAG path in the payload is the authority.
+                carrier->UpdateRenderItemOverrideTransform();
+            } else {
+                ria->UpdateTransform(ri);
+            }
+            if (ria->ShutterCapturePending()) {
+                shutterCaptures.push_back(ria);
+            }
         }
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColorDirty);
-        ria->UpdateFromDelta(data);
+
+        if (customData) {
+            // Populate from the payload rather than from MGeometry. A new
+            // carrier has to be told to build everything: Maya only
+            // flags everything on the first publish, and by the time we see the item
+            // that flag may already have been consumed.
+            // The transform was already applied just above - effFlags carries
+            // MVS_changedMatrix for a new carrier - so UpdateFromRenderItemOverride only has
+            // to emit the notification for it.
+            MH_PROFILE_SCOPE("UpdateRenderItems: UpdateFromRenderItemOverride");
+            carrier->UpdateFromRenderItemOverride(*customData, effFlags, wireframeColorDirty);
+
+            // PER-MATERIAL SUBSETS. One carrier prim per shape, where VP2 made
+            // one render item per shading group - so without these every face
+            // drew with the shape's first material. Re-published when the faces
+            // they index change (topology), when the assignment can have
+            // (effect), and after the prim was re-inserted, which removed them.
+            if (customData->kind == MayaHydraRenderItemPayload::kShadedMesh) {
+                const bool lost = carrier->ConsumeGeomSubsetsLost();
+                if (lost || isNewRenderitem
+                    || (effFlags & (MVS::MVS_changedEffect | MVS::MVS_changedTopo))) {
+                    _UpdateRenderItemOverrideGeomSubsets(*customData, *carrier);
+                }
+            }
+        } else {
+            const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(
+                ri, flags, wireframeColorDirty);
+            ria->UpdateFromDelta(data);
+        }
 
         // Cached for RefreshRenderItemLegacyHighlightTreatment. A selection state change always
         // arrives as a delta for this wire, so writing it only on deltas keeps it current.
@@ -734,6 +941,54 @@ void MayaHydraSceneIndex::UpdateRenderItems(
 
         // After UpdateFromDelta, so a VP2 visibility change in this delta does not override it.
         ria->SetWireframeSelectionHighlightEnabled(visibleInThisPanel);
+
+        // Velocity keys published this frame: track them so a later frame that
+        // brings no change can retract them (see _velocityBlurred).
+        if (ria->PublishedVelocityAt(_currentFrame)) {
+            _velocityBlurred[ria.get()] = ria;
+        }
+    }
+
+    // RETRACT STALE VELOCITY KEYS. An adapter that showed velocity blur on an
+    // earlier frame and was not refreshed on this one has stopped moving; dirty
+    // it once so Storm re-reads its keys, which now resolve to "no motion"
+    // (the frame no longer matches the one they were computed for). Inside the
+    // dirty batch, so it coalesces with this frame's notifications.
+    for (auto it = _velocityBlurred.begin(); it != _velocityBlurred.end();) {
+        const MayaHydraRenderItemAdapterPtr adapter = it->second.lock();
+        if (!adapter || adapter.get() != it->first) {
+            it = _velocityBlurred.erase(it);
+        } else if (!adapter->PublishedVelocityAt(_currentFrame)) {
+            adapter->DirtyStaleVelocity();
+            it = _velocityBlurred.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // BATCHED SHUTTER SAMPLING. One DG context switch per shutter time for every
+    // item whose matrix changed, instead of two per item: a timed context
+    // evaluates into its own datablocks, so the upstream rig (joints, controls)
+    // is computed once per shutter time and every later item reuses it. Inside
+    // the dirty batch, so the keys are in place before any notification leaves.
+    if (!shutterCaptures.empty()) {
+        const GfInterval shutter = GetCurrentTimeSamplingInterval();
+        const MTime      now     = MAnimControl::currentTime();
+        {
+            MDGContextGuard guard(now + shutter.GetMin());
+            for (const auto& ria : shutterCaptures) {
+                ria->CaptureShutterSample(/*open*/ true);
+            }
+        }
+        {
+            MDGContextGuard guard(now + shutter.GetMax());
+            for (const auto& ria : shutterCaptures) {
+                ria->CaptureShutterSample(/*open*/ false);
+            }
+        }
+        for (const auto& ria : shutterCaptures) {
+            ria->FinishShutterCapture();
+        }
     }
 }
 
@@ -1344,6 +1599,29 @@ void MayaHydraSceneIndex::_RemoveRenderItem(int fastId)
     }
 }
 
+// ---- Render item override carrier harvest --------------------------------
+//
+// There is deliberately very little here. Carriers used to be published straight
+// into the retained scene index by a bespoke path (since
+// removed), which drew correctly and silently broke everything keyed on the
+// adapter registry - picking above all. They now go through the ordinary
+// MayaHydraRenderItemAdapter flow in UpdateRenderItems, as
+// MayaHydraRenderItemOverrideAdapter, so registration, picking, materials, bounding boxes
+// and removal are all shared code. The only carrier-specific logic left is the
+// handful of branches in UpdateRenderItems where the adapter path would
+// otherwise read ri.sourceDagPath() or MGeometry.
+
+bool MayaHydraSceneIndex::_renderItemOverrideEnabled = false;
+
+bool MayaHydraSceneIndex::_RenderItemOverrideEnabled()
+{
+    // Carriers exist only while the plugin has the creator registered with Maya -
+    // a registration is the whole opt-in on the Maya side - so key on that (the plugin
+    // sets it, SetRenderItemOverrideEnabled), not on the env setting. Off means
+    // the stock path never pays a getCustomData() probe per render item.
+    return _renderItemOverrideEnabled;
+}
+
 void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
 {
     _MapAdapter<MayaHydraAdapter>(
@@ -1707,6 +1985,43 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
             _customNodesToAdd.erase(itCustom, _customNodesToAdd.end());
         }
     }
+
+    _RemoveCarriersOf(obj);
+}
+
+// A deleted shape's render item override carriers leave the index NOW, not on the next
+// refresh. Maya removes their render items too, but that reaches us only as
+// removals in the next UpdateRenderItems - so until something
+// redraws, the index still listed prims for a shape that no longer exists. A
+// stock render item has the same lag, but its prim name usually changed in the
+// meantime; a carrier prim keeps its path, so the stale entry is visible.
+//
+// Dropping the adapter removes the prim (~MayaHydraRenderItemAdapter). Maya's
+// removal of the same ids then finds nothing and is a no-op, and a carrier
+// still harvested once more is skipped: its payload path is empty for a
+// node outside the DAG.
+void MayaHydraSceneIndex::_RemoveCarriersOf(const MObject& obj)
+{
+    if (!_RenderItemOverrideEnabled() || obj.isNull() || !obj.hasFn(MFn::kShape)) {
+        return;
+    }
+
+    std::vector<int> fastIds;
+    for (const auto& entry : _renderItemsAdaptersFast) {
+        const auto carrier
+            = std::dynamic_pointer_cast<MayaHydraRenderItemOverrideAdapter>(entry.second);
+        if (!carrier) {
+            continue;
+        }
+        MStatus       status;
+        const MObject node = carrier->GetDagPath().node(&status);
+        if (status && node == obj) {
+            fastIds.push_back(entry.first);
+        }
+    }
+    for (const int fastId : fastIds) {
+        _RemoveRenderItem(fastId);
+    }
 }
 
 // Create the material(s) bound to a mesh and, for multi-material meshes, the
@@ -1727,8 +2042,10 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 // When a mesh has both a whole-object assignment and per-face assignments, the
 // whole-object subset is skipped to avoid overlapping subsets with undefined
 // material precedence; the whole-object material remains the mesh's binding.
-void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
-    const MDagPath& dag, const SdfPath& meshPrimId)
+int MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
+    const MDagPath&   dag,
+    const SdfPath&    meshPrimId,
+    const VtIntArray* polygonFaceOffsets)
 {
     std::vector<ShadingAssignment> assignments;
     GetAllShadingAssignments(dag, assignments);
@@ -1741,17 +2058,25 @@ void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
     }
 
     if (assignments.size() <= 1) {
-        return;
+        return 0;
     }
 
     // geomSubsets only apply to meshes; bail out for any other (incl. plugin) shape.
     if (!dag.hasFn(MFn::kMesh)) {
-        return;
+        return 0;
     }
     MStatus meshStatus;
     MFnMesh mesh(dag, &meshStatus);
     if (!meshStatus) {
-        return;
+        return 0;
+    }
+
+    // A mapping for a different polygon count is stale - built for topology the
+    // mesh no longer has. Publishing it would bind materials to the wrong faces.
+    const int numPolygons = mesh.numPolygons();
+    if (polygonFaceOffsets
+        && polygonFaceOffsets->size() != static_cast<size_t>(numPolygons) + 1u) {
+        return 0;
     }
 
     // A whole-object (null component) assignment covers every face. If the mesh
@@ -1798,6 +2123,21 @@ void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
             continue;
         }
 
+        // Polygons -> the prim's own faces, when they differ.
+        if (polygonFaceOffsets && !faceIndices.empty()) {
+            const VtIntArray& offsets = *polygonFaceOffsets;
+            VtIntArray        mapped;
+            for (const int polygon : faceIndices) {
+                if (polygon < 0 || polygon >= numPolygons) {
+                    continue;
+                }
+                for (int face = offsets[polygon]; face < offsets[polygon + 1]; ++face) {
+                    mapped.push_back(face);
+                }
+            }
+            faceIndices.swap(mapped);
+        }
+
         if (faceIndices.empty()) {
             continue;
         }
@@ -1825,6 +2165,33 @@ void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
                 HdMaterialBindingsSchema::BuildRetained(
                     TfArraySize(purposes), purposes, materialBindingSources)) }});
     }
+    return subsetIndex;
+}
+
+void MayaHydraSceneIndex::_UpdateRenderItemOverrideGeomSubsets(
+    const MayaHydraRenderItemPayload& customData,
+    MayaHydraRenderItemOverrideAdapter&    carrier)
+{
+    const SdfPath& primId = carrier.GetID();
+
+    const int previous = carrier.GetGeomSubsetCount();
+    if (previous > 0) {
+        HdSceneIndexObserver::RemovedPrimEntries removed;
+        removed.reserve(static_cast<size_t>(previous));
+        for (int i = 0; i < previous; ++i) {
+            removed.push_back({ primId.AppendChild(TfToken("geomSubset_" + std::to_string(i))) });
+        }
+        RemovePrims(removed);
+    }
+    carrier.SetGeomSubsetCount(0);
+
+    // No mapping (smooth mesh preview), or no shape: the prim's single
+    // material binding stays in charge, exactly as before subsets existed.
+    if (customData.polygonFaceOffsets.empty() || !customData.dagPath.isValid()) {
+        return;
+    }
+    carrier.SetGeomSubsetCount(
+        _InsertGeomSubsetsForMesh(customData.dagPath, primId, &customData.polygonFaceOffsets));
 }
 
 void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)

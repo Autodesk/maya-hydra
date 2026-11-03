@@ -53,6 +53,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraSceneIndex;
+class MhExtGpuStreams;
 
 /**
  * \brief MayaHydraAdapter is the base class for all adapters. An adapter is used to translate from
@@ -82,6 +83,9 @@ public:
     MAYAHYDRALIB_API
     /// Return a value for the requested Hydra data source key.
     virtual VtValue Get(const TfToken& key);
+    /// Return the vertex streams this adapter shares with the renderer as GPU buffers, or null
+    /// when it shares none.
+    virtual const MhExtGpuStreams* GetExtGpuStreams() const { return nullptr; }
     /// Return the underlying Maya node.
     const MObject&  GetNode() const { return _node; }
     MAYAHYDRALIB_API
