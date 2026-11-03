@@ -1966,6 +1966,16 @@ MStatus MtohRenderOverride::Render(
     // bounding box mode. Otherwise only the legacy *WhSi highlight prims do.
     const bool pullsWireframeColorPerPrim = wantedRepr.needsReprChanged || usingBBoxMode;
 
+    // Read by the lead-change notification until the next Render(), so it can be false while
+    // another panel needs selection colors. That panel still re-pulls them: the repr and bbox
+    // scene indices are shared, and this value is only false for the Default repr without bbox, so
+    // a panel pulling per-prim colors always re-pushes its repr or re-enables bbox, which dirties
+    // every prim. _SuppressLegacySelectionHighlight() is global, so it does not vary per panel.
+    if (_dirtySelectionColorsSceneIndex) {
+        _dirtySelectionColorsSceneIndex->setColorDirtiesEnabled(
+            pullsWireframeColorPerPrim || !_SuppressLegacySelectionHighlight());
+    }
+
     // A prim's wireframe color is only re-pulled when the prim is dirtied, so selection and color
     // preference changes must dirty the affected prims. Done here rather than in the notification
     // handlers because the Fvp selection is up to date by now, scene index mutation belongs on the
@@ -1996,8 +2006,8 @@ MStatus MtohRenderOverride::Render(
     }
 
     // Dirty only the prims that were selected or deselected, and only when every prim pulls a
-    // wireframe color, for the same reasons as the dormant color above. Lead changes are handled by
-    // dirtyLeadObjectRelatedSelections().
+    // wireframe color, for the same reasons as the dormant color above. Lead changes are dirtied by
+    // MhLeadObjectPathTracker, subject to setColorDirtiesEnabled() above.
     if (_selection && _dirtySelectionColorsSceneIndex && _selectionColorsDirty.exchange(false)) {
         const SdfPathVector& currentlySelected = getFullySelectedPaths();
 
