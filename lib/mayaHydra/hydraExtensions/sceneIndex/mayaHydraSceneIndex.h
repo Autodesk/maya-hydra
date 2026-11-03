@@ -45,6 +45,7 @@
 #include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <unordered_map>
+#include <unordered_set>
 
 UFE_NS_DEF { class Path; }
 
@@ -376,6 +377,9 @@ private:
     AdapterMap<MayaHydraShapeAdapterPtr>                   _shapeAdapters;
     AdapterMap<MayaHydraRenderItemAdapterPtr>              _renderItemsAdapters;
     std::unordered_map<int, MayaHydraRenderItemAdapterPtr> _renderItemsAdaptersFast;
+    // Fast ids of the selection highlight wires UpdateRenderItems skipped (not translated, so not
+    // in _renderItemsAdaptersFast), to skip them again without classifying them on every delta.
+    std::unordered_set<int>                                _skippedHighlightWires;
     AdapterMap<MayaHydraMaterialAdapterPtr>                _materialAdapters;
     AdapterMap<MayaHydraCustomDagAdapterPtr>              _customAdapters;
     std::vector<MCallbackId>                               _callbacks;
