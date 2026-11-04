@@ -68,6 +68,7 @@ const std::unordered_map<TfToken, VtValue, TfToken::HashFunctor>& _RenderSetting
     static const std::unordered_map<TfToken, VtValue, TfToken::HashFunctor> overrides = {
         { TfToken("hdFlash:showSkyBackground"), VtValue(true) },
         { TfToken("hdFlash:useAreaLightGuides"), VtValue(false) },
+        { TfToken("hdFlash:useAsyncTextureLoading"), VtValue(false) },
     };
     return overrides;
 }
