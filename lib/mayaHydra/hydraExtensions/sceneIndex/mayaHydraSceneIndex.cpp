@@ -207,6 +207,17 @@ bool isReplaceableHighlightWireShape(const MDagPath& itemDagPath)
     return (MHWRender::kActive == displayStatus) || (MHWRender::kLead == displayStatus);
 }
 
+// Delta bits that a selection or templating change sets on a highlight wire. A delta without any
+// of them, such as the matrix-only deltas of playback, cannot change whether the outline replaces
+// the wire, so the wire is not classified again.
+constexpr unsigned int kHighlightWireReclassifyBits
+    = MDataServerOperation::MViewportScene::MVS_changedVisibility
+    | MDataServerOperation::MViewportScene::MVS_changedEffect
+#ifdef MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API
+    | MDataServerOperation::MViewportScene::MVS_changedWireframeColor
+#endif
+    ;
+
 bool isRenderItem_aiSkyDomeLightTriangleShape(const MRenderItem& renderItem)
 {
     static const std::string _aiSkyDomeLight("aiSkyDomeLight");
@@ -553,6 +564,7 @@ void MayaHydraSceneIndex::_Destroy()
     _materialAdapters.clear();
     _cameraAdapters.clear();
     _renderItemsAdaptersFast.clear();
+    _skippedHighlightWires.clear();
     _customAdapters.clear();
     // Render item override carriers need no teardown of their own: they are
     // MayaHydraRenderItemOverrideAdapters living in _renderItemsAdapters, cleared above.
@@ -634,27 +646,53 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             continue;
         }
 
-        // MRenderItem::name() returns by value, so only fetch it when it is read.
         const bool classifyHighlightWire = !options.legacyMayaNativeHighlightEnabled;
-        MString    riName;
-        if (isNewRenderitem || classifyHighlightWire) {
+        const bool mayReclassify = (flags & kHighlightWireReclassifyBits) != 0;
+
+        // A wire skipped below has no adapter, so it comes back as a new item on every delta. It
+        // stays skipped until a delta that could change its classification, or until a panel
+        // draws wireframes.
+        if (isNewRenderitem && !unchanged && classifyHighlightWire && !mayReclassify
+            && !options.anyViewportDrawsWireframes && _skippedHighlightWires.count(fastId) != 0) {
+            continue;
+        }
+
+        // MRenderItem::name() returns by value, so only fetch it for a new item. An existing
+        // adapter caches whether its name is a selection highlight wire name.
+        MString riName;
+        if (isNewRenderitem) {
             riName = ri.name();
         }
 
         // VP2 highlights a selected shape by showing its wireframe item in the selection color.
         // When the outline owns the highlight, that wire must be hidden or the object is
         // highlighted twice. The name is tested first because sourceDagPath() returns by value.
+        // An existing wire keeps its cached classification on a delta that cannot change it.
         bool isHighlightWire = false;
         if (classifyHighlightWire) {
             if (customData) {
                 // A render item override carrier's wireframe item is the same highlight wire under another
                 // name, and has no sourceDagPath. A curve's line item is the object, not a
                 // highlight.
-                if (customData->kind == MayaHydraRenderItemPayload::kWireframe) {
-                    isHighlightWire = isReplaceableHighlightWireShape(customData->dagPath);
+                if (isNewRenderitem) {
+                    if (customData->kind == MayaHydraRenderItemPayload::kWireframe) {
+                        isHighlightWire = isReplaceableHighlightWireShape(customData->dagPath);
+                    }
+                } else if (ria->GetIsSelectionHighlightWireCandidate()) {
+                    isHighlightWire = mayReclassify
+                        ? isReplaceableHighlightWireShape(customData->dagPath)
+                        : ria->GetIsReplaceableHighlightWire();
                 }
-            } else if (isSelectionHighlightWireName(riName.asChar())) {
-                isHighlightWire = isReplaceableHighlightWireShape(ri.sourceDagPath());
+            } else {
+                if (isNewRenderitem) {
+                    if (isSelectionHighlightWireName(riName.asChar())) {
+                        isHighlightWire = isReplaceableHighlightWireShape(ri.sourceDagPath());
+                    }
+                } else if (ria->GetIsSelectionHighlightWireCandidate()) {
+                    isHighlightWire = mayReclassify
+                        ? isReplaceableHighlightWireShape(ri.sourceDagPath())
+                        : ria->GetIsReplaceableHighlightWire();
+                }
             }
         }
         // A carrier wire is always translated, then hidden through the adapter: its payload's
@@ -671,23 +709,28 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         // Must not be recorded as a null adapter: a later delta or the reconsider pass has to be
         // able to translate it.
         if (isNewRenderitem && !neededByAnyPanel) {
+            _skippedHighlightWires.insert(fastId);
             continue;
         }
 
-        // Maya sent no visibility bits for an unchanged item, so take them from the item.
-        if (unchanged) {
-            flags |= MDataServerOperation::MViewportScene::MVS_changedVisibility;
-            if (ri.isEnabled()) {
-                flags |= MDataServerOperation::MViewportScene::MVS_visible;
-            }
-        }
-
-        // A previously skipped wire is first translated on a later delta (a deselection, or the
-        // reconsider pass), which may omit the matrix and effect bits. Force them so a new
-        // adapter is always fully initialized; otherwise the wire would draw at the origin.
         if (isNewRenderitem) {
+            _skippedHighlightWires.erase(fastId);
+
+            // A new adapter must be fully initialized, whatever the delta carried. A previously
+            // skipped wire is first translated on a later delta (a deselection, or the reconsider
+            // pass), which may omit the matrix and effect bits; without them the wire would draw
+            // at the origin.
             flags |= MDataServerOperation::MViewportScene::MVS_changedMatrix
                 | MDataServerOperation::MViewportScene::MVS_changedEffect;
+
+            // In the reconsider pass Maya sent no delta at all for the item, so its visibility,
+            // which a new adapter would otherwise never receive, comes from the item itself.
+            if (unchanged) {
+                flags |= MDataServerOperation::MViewportScene::MVS_changedVisibility;
+                if (ri.isEnabled()) {
+                    flags |= MDataServerOperation::MViewportScene::MVS_visible;
+                }
+            }
         }
 
         if (isNewRenderitem) {
@@ -780,6 +823,16 @@ void MayaHydraSceneIndex::UpdateRenderItems(
                     ria = std::make_shared<MayaHydraRenderItemAdapter>(
                         dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
                 }
+            }
+
+            // Set in every highlight mode, so the cached value stays valid if the mode changes
+            // later without a Hydra rebuild.
+            if (customData) {
+                ria->SetIsSelectionHighlightWireCandidate(
+                    customData->kind == MayaHydraRenderItemPayload::kWireframe);
+            } else {
+                ria->SetIsSelectionHighlightWireCandidate(
+                    isSelectionHighlightWireName(riName.asChar()));
             }
 
             // HYDRA-1992 : Order is important here. Downstream scene indices
@@ -1588,6 +1641,9 @@ void MayaHydraSceneIndex::_AddRenderItem(const MayaHydraRenderItemAdapterPtr& ri
 
 void MayaHydraSceneIndex::_RemoveRenderItem(int fastId)
 {
+    // A skipped highlight wire has no adapter, only this entry.
+    _skippedHighlightWires.erase(fastId);
+
     MayaHydraRenderItemAdapterPtr ria = nullptr;
     if (_GetRenderItem(fastId, ria)) {
         if (ria != nullptr) {

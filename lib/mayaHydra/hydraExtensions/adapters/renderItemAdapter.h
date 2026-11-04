@@ -277,6 +277,19 @@ public:
     MAYAHYDRALIB_API
     bool GetIsReplaceableHighlightWire() const { return _isReplaceableHighlightWire; }
 
+    /// Whether the item name is one of the VP2 selection-highlight wireframe names, the first test
+    /// for GetIsReplaceableHighlightWire. A render item keeps its name for its whole life, so
+    /// this is set once, when the adapter is created, instead of copying the name with
+    /// MRenderItem::name() on every delta.
+    MAYAHYDRALIB_API
+    void SetIsSelectionHighlightWireCandidate(bool val)
+    {
+        _isSelectionHighlightWireCandidate = val;
+    }
+
+    MAYAHYDRALIB_API
+    bool GetIsSelectionHighlightWireCandidate() const { return _isSelectionHighlightWireCandidate; }
+
 protected:
     /// Dirty state of each vertex stream, collected over one UpdateFromDelta call.
     struct _StreamDirty
@@ -408,6 +421,7 @@ protected:
     bool                        _isInPlayback = false;
     bool                        _wireframeSelectionHighlightEnabled = true;
     bool                        _isReplaceableHighlightWire = false;
+    bool                        _isSelectionHighlightWireCandidate = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;

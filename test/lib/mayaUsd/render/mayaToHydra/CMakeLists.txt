@@ -81,7 +81,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#Disabled tests on OSX
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | HYDRA-2681 : Snapshot mismatch after instance scale
+    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -205,7 +205,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 	testViewportFilters.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2668 : Some objects are not filtered properly
-    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX | HYDRA-2680 : Snapshot mismatches (3 tests)
+    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX
     testBoundingBox.py
 	#Disabled tests on OSX
 	testDataProducerSelHighlight.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-1033 : Flash wireframe-on-shaded baselines pending
