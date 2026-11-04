@@ -119,8 +119,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
 
         cmds.select(DISTANT_LIGHT_PATH, deselect=True)
         cmds.refresh()
-        imageVersion = "usd26.05+" if self._usdVersion >= (0, 26, 5) else None
-        self.assertSnapshotClose("diskLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        self.assertSnapshotClose("diskLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_USDLightsDeselectNonLeadLight(self):
         self._openSceneInSelectedLightsMode()
