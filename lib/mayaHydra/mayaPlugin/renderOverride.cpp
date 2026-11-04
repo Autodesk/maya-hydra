@@ -2171,24 +2171,10 @@ MStatus MtohRenderOverride::Render(
     // delegate. The Storm-specific task setup below only disables the shadow task;
     // other delegates rely on the lights management scene index turning off shadow
     // casting on the light prims themselves.
-    // The toggle is a per-panel modelEditor setting, read with a query. kGlobalShadowOn on
-    // the light parameters is only published for lights that cast shadows, so it can't
-    // see the toggle being off. It is kept as the fallback for renders that don't target
-    // a model panel.
-    bool    enableShadows = true;
-    MString shadowPanelName;
-    int     panelShadowsOn = 1;
-    if (drawContext.renderingDestination(shadowPanelName) == MHWRender::MFrameContext::k3dViewport
-        && shadowPanelName.length() > 0
-        && MGlobal::executeCommand(
-            MString("modelEditor -q -shadows \"") + shadowPanelName + "\"",
-            panelShadowsOn,
-            /*displayEnabled*/ false,
-            /*undoEnabled*/ false)) {
-        enableShadows = panelShadowsOn != 0;
-    } else if (
-        auto* lightParam = drawContext.getLightParameterInformation(
-            0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit)) {
+    bool  enableShadows = false;
+    auto* lightParam = drawContext.getLightParameterInformation(
+        0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
+    if (lightParam != nullptr) {
         MIntArray intVals;
         if (lightParam->getParameter(
                 MHWRender::MLightParameterInformation::kGlobalShadowOn, intVals)
