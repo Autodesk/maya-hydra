@@ -2171,6 +2171,10 @@ MStatus MtohRenderOverride::Render(
     // delegate. The Storm-specific task setup below only disables the shadow task;
     // other delegates rely on the lights management scene index turning off shadow
     // casting on the light prims themselves.
+    // MLightParameterInformation::getParameter(kGlobalShadowOn) only actually
+    // returns data when the shadows are enabled. If there is no light or shadows
+    // are off, the call will not be successful. Therefore, assume shadows are off
+    // by default, and only enable them if they are.
     bool  enableShadows = false;
     auto* lightParam = drawContext.getLightParameterInformation(
         0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
