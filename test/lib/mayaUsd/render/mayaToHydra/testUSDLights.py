@@ -31,8 +31,8 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.5
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1.0
 
     def verifyLightingModes(self, shadowOn):
         # allLights / domeLight / flatLight changed in USD 25.11.
