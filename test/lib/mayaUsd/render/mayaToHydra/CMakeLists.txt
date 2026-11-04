@@ -40,7 +40,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaIsolateSelect.py
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
-    testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
+    testUSDLights.py
     testUsdAreaLightGizmos.py
     testUVandUDIM.py
 	testPurposeRenderTag.py
@@ -146,7 +146,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 # HYDRA-1245.
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
-        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-723 : Light intensity not matching Storm/Arnold
+        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
         cpp/testIsolateSelect.py
         cpp/testIsolateSelectSwitchToVP2.py
         cpp/testIsolateSelectMayaSelectionHighlighting.py
