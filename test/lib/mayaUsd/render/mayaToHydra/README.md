@@ -176,9 +176,6 @@ Note that `depOnPlugins` key string is only used as cue while adding values in t
 
 The supported values for platform exclusion are: "osx", "win", "lin".
 
-To exclude tests only when an environment condition holds, use `files_to_exclude_when_env`. Each key is `NAME=VALUE` (exact match) or `NAME!=VALUE` (an unset variable counts as not equal), and each value is a list of test-name patterns, merged into the same `-E` as `files_to_exclude`. For example, to skip a test only under render item override (on unless `MAYAHYDRA_RENDER_ITEM_OVERRIDE=0`):
-`"files_to_exclude_when_env": { "MAYAHYDRA_RENDER_ITEM_OVERRIDE!=0": ["testMayaComponentsPicking"] }`
-
 
 
 # Utilities

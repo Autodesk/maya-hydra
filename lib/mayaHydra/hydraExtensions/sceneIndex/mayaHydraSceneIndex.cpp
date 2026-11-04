@@ -566,6 +566,7 @@ void MayaHydraSceneIndex::_Destroy()
     _renderItemsAdaptersFast.clear();
     _skippedHighlightWires.clear();
     _customAdapters.clear();
+    _velocityBlurred.clear();
     // Render item override carriers need no teardown of their own: they are
     // MayaHydraRenderItemOverrideAdapters living in _renderItemsAdapters, cleared above.
 
@@ -898,7 +899,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(
                 //
                 // The isNull() guard is deliberate and carrier-only:
                 // kInvalidMaterial is the "use the fallback" sentinel GetMaterialId
-                // tests for (:1147), and an EMPTY path is NOT that sentinel - so
+                // tests for, and an EMPTY path is NOT that sentinel - so
                 // without it a carrier with no shading engine would call
                 // CreateMaterial(SdfPath(), MObject::kNullObj).
                 if (customData->kind == MayaHydraRenderItemPayload::kShadedMesh
@@ -1665,7 +1666,9 @@ void MayaHydraSceneIndex::_RemoveRenderItem(int fastId)
 // MayaHydraRenderItemOverrideAdapter, so registration, picking, materials, bounding boxes
 // and removal are all shared code. The only carrier-specific logic left is the
 // handful of branches in UpdateRenderItems where the adapter path would
-// otherwise read ri.sourceDagPath() or MGeometry.
+// otherwise read ri.sourceDagPath() or MGeometry, plus geomSubset publication
+// (_UpdateRenderItemOverrideGeomSubsets) and eager removal on shape deletion
+// (_RemoveCarriersOf).
 
 bool MayaHydraSceneIndex::_renderItemOverrideEnabled = false;
 
@@ -2069,9 +2072,12 @@ void MayaHydraSceneIndex::_RemoveCarriersOf(const MObject& obj)
         if (!carrier) {
             continue;
         }
+        // The path may no longer resolve mid-removal (a deleted parent can be
+        // detached before its shape's removal message fires); the MObject the
+        // carrier was created for still identifies the shape.
         MStatus       status;
         const MObject node = carrier->GetDagPath().node(&status);
-        if (status && node == obj) {
+        if ((status && node == obj) || carrier->GetNode() == obj) {
             fastIds.push_back(entry.first);
         }
     }

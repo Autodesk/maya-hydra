@@ -1139,8 +1139,8 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
     //
     // There is one MtohRenderOverride per renderer, and switching renderer does
     // not tear the old one down immediately. The previous version took the first
-    // instance with a render index and stopped, so after switching Storm ->
-    // Flash it happily reported STORM's (by then empty) scene and returned all
+    // instance with a render index and stopped, so after a renderer switch it
+    // reported the previous renderer's (by then empty) scene and returned all
     // zeros. That is indistinguishable from "the scene is empty", which made the
     // command useless for exactly the renderer-comparison it was reached for.
     //
@@ -1174,16 +1174,16 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
         return stats;
     }
 
-    // Which renderer answered, so a Storm-vs-Flash comparison cannot silently
+    // Which renderer answered, so a renderer comparison cannot silently
     // compare one renderer against itself.
     stats["renderer." + std::string(instance->_rendererDesc.rendererName.GetText())] = 1;
 
     // THIS COMMAND ONLY SEES RenderIndex-BASED RENDERERS.
     //
     // Everything below walks HdRenderIndex::GetRprimIds(). A renderer that does
-    // not go through the render index - HdFlash, for one - populates nothing
+    // not go through the render index populates nothing
     // there, so every count comes back 0 and reads exactly like an empty scene.
-    // That cost real debugging time: a Flash viewport with visible geometry
+    // That cost real debugging time: a viewport with visible geometry
     // reported "primitives 0", which was taken as evidence the prims were
     // missing.
     //

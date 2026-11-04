@@ -143,9 +143,10 @@ public:
     /// Shutter transform keys; equal to GetTransform() - which the matrix data
     /// source reads as no motion - with motion samples off. How they are made
     /// depends on MAYAHYDRA_MOTION_SAMPLING_MODE (UseVelocityMotionSamples):
-    ///   evaluate (default): captured in UpdateTransform by evaluating the source
-    ///       DAG at shutter open and close (MDGContextGuard). Exact, but two DG
-    ///       evaluations per changed item per frame.
+    ///   evaluate (default): UpdateTransform queues a capture, and the source DAG
+    ///       is evaluated at shutter open and close in one batch for all queued
+    ///       items (see CaptureShutterSample). Exact, but two DG evaluations per
+    ///       frame while motion samples are on.
     ///   velocity: derived when read, from the matrix's per-frame velocity (this
     ///       frame's minus the previous frame's). No DG evaluation; a straight
     ///       line between two frames, and no motion on the first frame, after a
@@ -389,7 +390,8 @@ protected:
     MAYAHYDRALIB_API
     void _QueueShutterCapture(const GfMatrix4d& centre, const MDagPath& dag, const GfMatrix4d& centreDag);
 
-    // Data is protected, methods above stay private: MayaHydraRenderItemOverrideAdapter
+    // Data is protected (as are the shutter helpers above; _RemoveRprim and
+    // _InsertRprim stay private): MayaHydraRenderItemOverrideAdapter
     // (the carrier adapter) populates these from a producer-supplied payload instead of
     // from MGeometry, and then every accessor on this class - Get(),
     // GetMeshTopology(), GetBasisCurvesTopology(), GetPrimvarDescriptors(),

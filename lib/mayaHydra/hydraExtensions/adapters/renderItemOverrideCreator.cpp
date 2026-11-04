@@ -87,7 +87,8 @@ const MString kDrawClassifications[] = {
 
 // ---------------------------------------------------------------------------
 // Our payload type. Kept distinct from the public MayaHydraRenderItemPayload base so
-// the harvest side can dynamic_cast to exactly what this override produced.
+// updateRenderItem can dynamic_cast to exactly what this override attached. The
+// scene index harvests through the base.
 // ---------------------------------------------------------------------------
 class MhBridgeRenderItemPayload : public MayaHydraRenderItemPayload
 {
@@ -281,9 +282,9 @@ void clearRenderItemOverrideGeometry(Data& customData)
 //
 // withTopology gates the arrays that only move on a TOPOLOGY edit: face counts,
 // face indices and the edge list. Copying those on every deformation frame is
-// hundreds of KB per mesh per frame of pure waste. Points, normals and UVs do
-// follow deformation, so they are not gated (UVs can be edited without a
-// topology change, and Maya reports that as a geometry change).
+// hundreds of KB per mesh per frame of pure waste. Points and normals follow
+// deformation, so they are not gated. UVs are re-copied only on a topology
+// change or when Maya reports them changed (uvsChanged); see below.
 void fillRenderItemOverrideGeometry(
     MhBridgeRenderItemPayload&         customData,
     const MRenderItemOverrideGeometry& geometry,
@@ -421,16 +422,16 @@ void fillRenderItemOverrideGeometry(
 }
 
 // ---------------------------------------------------------------------------
-// The override. One instance per carried mesh.
+// The override. One instance per carried object.
 // ---------------------------------------------------------------------------
 class MayaHydraRenderItemOverride : public MHWRender::MPxRenderItemOverride
 {
 public:
     static MHWRender::MPxRenderItemOverride* creator(const MObject& node)
     {
-        // Claim every mesh Maya routes here. A per-object filter would go HERE -
+        // Claim every object Maya routes here. A per-object filter would go HERE -
         // returning nullptr leaves an object to ordinary VP2 drawing - but
-        // the render item override path is a whole-viewport mode, so declining a mesh would just make
+        // the render item override path is a whole-viewport mode, so declining an object would just make
         // it vanish from the Hydra viewport.
         return new MayaHydraRenderItemOverride(node);
     }
@@ -464,7 +465,7 @@ public:
         }
 
         // Refresh geometry ONLY when the delta actually touched it. A
-        // presentation-only update (selection, display style) arrives with an
+        // presentation-only update (selection, display style) arrives with
         // NO geometry and must not clobber the arrays - which is exactly why this
         // is gated on the geometry bits rather than run unconditionally.
         //
@@ -485,8 +486,8 @@ public:
         }
 
         // Everything else - transform, visibility, wireframe colour and the dirty
-        // notifications for all of it - is applied by MayaHydraRenderItemOverrideAdapter
-        // when the scene index harvests this render item. Those need the scene
+        // notifications for all of it - is applied by the scene index and
+        // MayaHydraRenderItemOverrideAdapter when the scene index harvests this render item. Those need the scene
         // index and the adapter, neither of which an override can see.
     }
 
@@ -552,7 +553,7 @@ public:
             return MhExtGpuStreams::IsEnabled() && renderer && renderer->drawAPIIsOpenGL();
         }();
         // And only for a renderer that binds device streams: one that cannot
-        // (Flash) would read them back anyway, and on CPU points the carrier's
+        // would read them back anyway, and on CPU points the carrier's
         // readback, motion blur samples and the rest all apply. Maya asks on
         // every publish, so a renderer switch takes effect on the next one.
         return usable && MhExtGpuStreams::RendererBindsDeviceStreams();

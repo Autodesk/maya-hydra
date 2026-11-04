@@ -572,10 +572,11 @@ void MhExtGpuStreams::BeginUpdate(bool geomChanged, bool topoChanged)
     _useDirectBind = sharingMode == _GpuBufferSharingMode::Direct
         || (hybridMode && _classifiedAsAnimating);
 
-    // Reached for every GPU render item on every update, before any decision
-    // about individual streams. Silence here therefore means UpdateFromDelta is
-    // not running for this prim at all -- render items are not flowing --
-    // rather than that sharing was declined.
+    // Reached on every geometry update of an adapter that shares streams
+    // (UpdateFromDelta for GPU render items, the device-stream update for render
+    // item override carriers), before any decision about individual streams.
+    // Silence here therefore means geometry updates are not flowing for this
+    // prim, rather than that sharing was declined.
     TF_DEBUG_GPU_BUFFER_SHARING(
         "[%s] update: mode=%d directBind=%s geomChanged=%s topoChanged=%s\n",
         _owner.GetID().GetText(),
@@ -900,7 +901,7 @@ MhExtGpuStreams::_Publish(
     }
 
     // What goes into the scene index is a WEAK reference; the strong one is
-    // kept below, in the adapter. A strong reference here would let any scene
+    // kept below, in the stream (_Stream::buffer). A strong reference here would let any scene
     // index that caches or flattens this container pin GPU memory for the life
     // of the renderer.
     stream.schema =

@@ -134,14 +134,16 @@ public:
     float        shutterOpenOffset  = 0.0f;
     float        shutterCloseOffset = 0.0f;
 
-    // kWireframe only: vertex pairs indexing the same dedup points, produced by
+    // Line-list kinds only (isLineList: kWireframe, kCurve, kBoundingBox): vertex
+    // pairs indexing the same dedup points, produced by
     // VP2's own edge list so hard/soft and shared-edge behaviour
     // matches what VP2 draws.
     PXR_NS::VtIntArray edgeIndices;
 
     // Object-space extent, computed by Maya (MRenderItemOverrideGeometry::bounds,
-    // which says why the consumer does not derive it from `points`). Stale while
-    // vertexBufferOnGPU is set: it is the last CPU-side geometry's.
+    // which says why the consumer does not derive it from `points`). While
+    // vertexBufferOnGPU is set these are the GPU deformer's own bounds, or EMPTY
+    // (min > max) when Maya has none; the adapter then falls back to the DAG node.
     PXR_NS::GfRange3d bounds;
 
     // GPU-DEFORMED OBJECTS, when the override asked for device data

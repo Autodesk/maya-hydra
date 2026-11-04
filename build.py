@@ -756,22 +756,6 @@ class InstallContext:
             if key == "files_to_exclude":
                 self.kFilesToExclude = values
 
-        # "files_to_exclude_when_env": {"NAME=VALUE" or "NAME!=VALUE": [patterns]} -
-        # extra -E patterns applied only when the condition holds. "=" is an exact
-        # match; for "!=" an unset variable counts as not equal. Added after the
-        # loop so "files_to_exclude" cannot overwrite them.
-        envExcludes = []
-        for condition, patterns in ctest_labels_config.get("files_to_exclude_when_env", {}).items():
-            negate = "!=" in condition
-            name, sep, value = condition.partition("!=" if negate else "=")
-            if not sep or not name:
-                print(f"Ignoring malformed files_to_exclude_when_env key: {condition}")
-                continue
-            if (os.environ.get(name) == value) != negate:
-                envExcludes.extend(patterns)
-        if envExcludes:
-            self.kFilesToExclude = list(self.kFilesToExclude) + envExcludes
-
     def __init__(self, args):
         # Assume the project's top level cmake is in the current source directory
         self.mayaHydraSrcDir = os.path.normpath(

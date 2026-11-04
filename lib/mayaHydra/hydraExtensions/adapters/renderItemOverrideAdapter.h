@@ -41,7 +41,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 //     auto adapter = FindAdapter<MayaHydraRenderItemAdapter>(hitId);
 //     if (!adapter) { return false; }
 //
-// (mayaViewportSceneIndex.cpp:455) so every click on a carrier fell through with
+// so every click on a carrier fell through with
 // no diagnostic. The same lookup backs GetMaterialId, GetShadingStyle,
 // GetBoundingBox, GetLightedPrimPaths and RebuildAdapterOnIdle. Re-implementing
 // each of those beside the adapter was a treadmill.
@@ -81,6 +81,8 @@ public:
     // UpdateFromDelta, minus everything that reads Maya geometry.
     // wireframeColorChanged is a separate argument rather than an MVS bit because
     // MVS_changedWireframeColor does not exist in every supported Maya.
+    // On MVS_changedMatrix this only notifies: call UpdateRenderItemOverrideTransform
+    // first, so an observer pulling the transform sees the new value.
     void UpdateFromRenderItemOverride(
         const MayaHydraRenderItemPayload& customData,
         unsigned int                           flags,
@@ -181,8 +183,9 @@ private:
     // the two were published on.
     VtVec3fArray _prevPositions;
 
-    // The payload's cached shutter points, with the CPU points they belong to
-    // (see SamplePrimvar). Empty when this publish carried none.
+    // The payload's cached shutter points and the shutter offsets they were
+    // built for (see SamplePrimvar); they belong to _positions. Empty when this
+    // publish carried none.
     VtVec3fArray _shutterOpenPoints;
     VtVec3fArray _shutterClosePoints;
     float        _shutterOpenOffset  = 0.0f;

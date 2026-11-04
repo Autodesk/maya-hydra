@@ -41,7 +41,7 @@ HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
 // A linear curve can be described either way: VP2 render items use 2-vertex `segmented` pieces,
 // while render item override carriers (MAYAHYDRA_RENDER_ITEM_OVERRIDE) describe a NURBS curve as one `nonperiodic`
-// polyline (HdFlash does not draw `segmented`). Rewrite a nonperiodic topology into the
+// polyline (some renderers do not draw `segmented`). Rewrite a nonperiodic topology into the
 // equivalent segmented edge list, so both compare against the same reference files.
 HdDataSourceBaseHandle asSegmentedTopology(const HdDataSourceBaseHandle& dataSource)
 {

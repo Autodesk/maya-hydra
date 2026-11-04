@@ -152,9 +152,12 @@ already in it were classified before. `uninitializePlugin` deregisters
 **first**, before anything else is torn down, so Maya never calls into a
 module that is unloading.
 
-Switching the renderer needs nothing from
-MayaHydra: Maya republishes every carried item with full change flags when the
-render override changes, just as it does for stock render items.
+Maya republishes every carried item with full change flags when the render
+override changes, just as it does for stock render items. The only thing
+MayaHydra does on a switch is republish whether the new renderer binds device
+streams (`MhExtGpuStreams::SetRendererBindsDeviceStreams`, from
+`MtohRenderOverride::setup` and `_InitHydraResources`); `supportsGPUVertexBuffer()`
+picks that up on the next publish.
 
 ## The override
 
@@ -291,7 +294,7 @@ payload instead:
 | Adapter | `MayaHydraRenderItemAdapter` or `MayaHydraGpuRenderItemAdapter` | `MayaHydraRenderItemOverrideAdapter` |
 | Material | `_GetRenderItemMaterial(ri)` | `FindShadingEngine(payload.dagPath)`, shaded mesh only |
 | Transform | `UpdateTransform(ri)` | `UpdateRenderItemOverrideTransform()`, from the DAG path |
-| Geometry | `UpdateFromDelta` | `UpdateFromRenderItemOverride(payload, flags)` |
+| Geometry | `UpdateFromDelta` | `UpdateFromRenderItemOverride(payload, flags, wireframeColorChanged)` |
 
 ### Prim paths
 
@@ -353,7 +356,7 @@ shape of the base `UpdateFromDelta`, minus everything that reads Maya geometry.
 | Flag | Effect |
 | --- | --- |
 | `MVS_changedVisibility` | `_visible` from `MVS_visible`; visibility dirty |
-| `MVS_changedMatrix` | Transform from `dagPath.inclusiveMatrix()`; transform dirty |
+| `MVS_changedMatrix` | Transform dirty only: the scene index has already applied the transform with `UpdateRenderItemOverrideTransform()`, from `dagPath.inclusiveMatrix()`, so it can join the batched shutter capture |
 | `MVS_changedGeometry` | Points, normals and UVs from the payload; extent from the payload's bounds |
 | `MVS_changedTopo` | Mesh or curve topology rebuilt; topology dirty only if the indices really changed |
 | `MVS_changedEffect` | Material binding dirty (the material was set by the scene index) |
@@ -489,8 +492,7 @@ mode, and the scene index's batched shutter capture in evaluate mode.
   fallback.
 - Vertex colours are not carried.
 - Component overlays (vertex, edge and face display in component mode) are not
-  carried yet. `testMayaComponentsPicking` is skipped under the render item
-  override through `files_to_exclude_when_env` in `tests-to-run.json`.
+  carried yet.
 - Carriers are always drawn double-sided (no back-face culling).
 - Smooth mesh preview publishes no polygon map, so a multi-material mesh draws
   with one material while it is on, and no shutter samples.

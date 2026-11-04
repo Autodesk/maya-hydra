@@ -177,17 +177,17 @@ size_t MayaHydraRenderItemOverrideAdapter::SamplePrimvar(
     VtVec3fArray       closePts(n);
     GfVec3f*           open   = openPts.data();
     GfVec3f*           close  = closePts.data();
-    float              maxDelta = 0.0f;
+    float              maxDeltaSq = 0.0f;   // squared: no sqrt per vertex
     for (size_t i = 0; i < n; ++i) {
         const GfVec3f velPerFrame = (curr[i] - prev[i]) * invDF;
         open[i]  = curr[i] + velPerFrame * sOpen;
         close[i] = curr[i] + velPerFrame * sClose;
-        const float d = (close[i] - open[i]).GetLength();
-        if (d > maxDelta) {
-            maxDelta = d;
+        const float d2 = (close[i] - open[i]).GetLengthSq();
+        if (d2 > maxDeltaSq) {
+            maxDeltaSq = d2;
         }
     }
-    if (maxDelta <= 1e-6f) {
+    if (maxDeltaSq <= 1e-12f) {   // |close - open| <= 1e-6
         return 0;   // not moving: the live points stand
     }
 
@@ -280,7 +280,8 @@ void MayaHydraRenderItemOverrideAdapter::UpdateFromRenderItemOverride(
     unsigned int                flags,
     bool                        wireframeColorChanged)
 {
-    // Both line kinds take the same DATA path - points plus an edge list, no
+    // All line kinds (wireframe, curve, bounding box) take the same DATA path -
+    // points plus an edge list, no
     // normals, no UVs. They are held apart in the payload because their meaning
     // differs (see MayaHydraRenderItemPayload::kCurve), not because the arrays do.
     const bool isWire = customData.isLineList();
@@ -309,8 +310,27 @@ void MayaHydraRenderItemOverrideAdapter::UpdateFromRenderItemOverride(
     }
 
     if (matrixChanged) {
-        UpdateRenderItemOverrideTransform();
+        // The caller already applied the transform (UpdateRenderItemOverrideTransform),
+        // before the shutter capture batch is collected; only the notification is left.
         notifier.dirtyTransform();
+    }
+
+    // The producer flags topology for edits that keep the connectivity (a vertex
+    // move, a UV edit, the full re-publish that builds a newly visible wire
+    // shell on selection). Diff it against what was published, so neither the
+    // renderer's mesh rebuild nor the velocity history reset below runs for
+    // nothing. Same rule as the base, which diffs the index buffer
+    // (RenderItemShouldEmitTopologyLocators). Meshes only: wires and curves
+    // keep no velocity history and always rebuild their edge topology.
+    bool meshConnectivityChanged = false;
+    if (topoChanged && !isWire) {
+        const auto* previous  = dynamic_cast<const HdMeshTopology*>(_topology.get());
+        const auto  sameArray = [](const VtIntArray& a, const VtIntArray& b) {
+            return a.IsIdentical(b) || a == b;
+        };
+        meshConnectivityChanged = !previous
+            || !sameArray(previous->GetFaceVertexCounts(), customData.faceVertexCounts)
+            || !sameArray(previous->GetFaceVertexIndices(), customData.faceVertexIndices);
     }
 
     if (geomChanged || topoChanged) {
@@ -357,11 +377,15 @@ void MayaHydraRenderItemOverrideAdapter::UpdateFromRenderItemOverride(
 
         // Velocity history (see SamplePrimvar): the outgoing points become the
         // previous frame's when a new frame brings new points. Reset by anything
-        // that breaks the vertex correspondence - topology, storage kind, count -
-        // and not kept at all with motion samples off.
+        // that breaks the vertex correspondence - a real connectivity change,
+        // storage kind, count - and not kept at all with motion samples off.
+        // Not by a topology FLAG alone: selecting a mesh re-publishes it with
+        // one, and for a carrier whose blur comes from velocity (no Maya shutter
+        // points, e.g. smooth mesh preview) that reset dropped the blur until two
+        // more frames had played.
         const bool   motionOn = GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled();
         const double now      = motionOn ? GetMayaHydraSceneIndex()->GetCurrentFrame() : 0.0;
-        if (onDevice || isWire || topoChanged || !motionOn
+        if (onDevice || isWire || meshConnectivityChanged || !motionOn
             || _positions.size() != customData.points.size()) {
             _prevPositions    = VtVec3fArray();
             _hasPrevPositions = false;
@@ -411,13 +435,13 @@ void MayaHydraRenderItemOverrideAdapter::UpdateFromRenderItemOverride(
         // Extent: O(1). Maya computes it while it builds the points
         // (MRenderItemOverrideGeometry::bounds), precisely so this is not a
         // per-vertex loop here - the base gets it just as cheaply from
-        // ri.boundingBox() (renderItemAdapter.cpp:289), which a carried render
+        // ri.boundingBox(), which a carried render
         // item does not have.
         // Deriving it from _positions on this thread, twice per shape (shaded +
         // wireframe) every frame, was a measurable playback regression.
         //
         // Maya has no bbox-changed flag, so diff before overwriting and only
-        // dirty on a real change - same as the base (renderItemAdapter.cpp:293).
+        // dirty on a real change - same as the base.
         //
         // Device-resident data too: Maya reports the GPU deformer's own
         // bounding box for device data, and an EMPTY one only when it has
@@ -442,17 +466,17 @@ void MayaHydraRenderItemOverrideAdapter::UpdateFromRenderItemOverride(
 
     if (topoChanged) {
         if (isWire) {
-            // WRAP MODE MATTERS, and the two line kinds need different ones.
+            // WRAP MODE MATTERS: a curve needs a different one from the segment
+            // kinds (wireframe, bounding box).
             //
             // A mesh WIREFRAME really is a bag of disconnected 2-vertex edges,
             // so `segmented` with explicit index pairs is right - and it is what
             // the base builds for a Maya kLines render item.
             //
             // A CURVE is one connected polyline. Describing it as N independent
-            // segments is wrong on its own terms, and it is also what HdFlash
-            // would not draw: Flash renders `nonperiodic` (the wrap the base
-            // uses for a kLineStrip item) but not `segmented`. Storm accepts
-            // both, which is why this only showed up on one renderer.
+            // segments is wrong on its own terms, and some renderers draw
+            // `nonperiodic` (the wrap the base uses for a kLineStrip item) but
+            // not `segmented`.
             const size_t numEdges = customData.edgeIndices.size() / 2u;
 
             // Only treat it as a polyline when the edge list really is the
@@ -499,17 +523,8 @@ void MayaHydraRenderItemOverrideAdapter::UpdateFromRenderItemOverride(
             }
             notifier.dirtyBasisCurvesTopology();
         } else {
-            // The producer flags topology for edits that keep the connectivity
-            // (a vertex move, a UV edit); re-dirtying it would make the renderer
-            // rebuild the mesh for nothing. Same rule as the base, which diffs the
-            // index buffer (RenderItemShouldEmitTopologyLocators).
-            const auto* previous = dynamic_cast<const HdMeshTopology*>(_topology.get());
-            const auto  sameArray = [](const VtIntArray& a, const VtIntArray& b) {
-                return a.IsIdentical(b) || a == b;
-            };
-            if (!previous
-                || !sameArray(previous->GetFaceVertexCounts(), customData.faceVertexCounts)
-                || !sameArray(previous->GetFaceVertexIndices(), customData.faceVertexIndices)) {
+            // Only a real connectivity change rebuilds (see meshConnectivityChanged).
+            if (meshConnectivityChanged) {
                 // subdivisionScheme is always "none": the producer already handed us
                 // Maya's OWN subdivided result when smooth preview is on, so letting
                 // Hydra subdivide again would double-subdivide.
@@ -545,7 +560,7 @@ void MayaHydraRenderItemOverrideAdapter::UpdateFromRenderItemOverride(
         // retained-prim design avoided this by binding the material before
         // AddPrims; on the adapter path this notification is what replaces that.
         //
-        // The base class does the same thing (renderItemAdapter.cpp:271).
+        // The base class does the same thing.
         notifier.dirtyMaterialBinding();
     }
 }

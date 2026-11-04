@@ -448,8 +448,9 @@ have buffers: the ones the deformer writes.
 sharing is enabled, VP2 is on OpenGL, and the active renderer binds device
 streams (`MhExtGpuStreams::RendererBindsDeviceStreams()`, set by the render
 override for the renderer in use). Maya then skips its readback for
-GPU-deformed carriers and describes the deformer's position and normal buffers
-instead (`MRenderItemOverrideGeometry::gpuVertexBuffer`). The bridge copies each
+GPU-deformed carriers and describes the deformer's position and normal buffers,
+plus a device copy of the UVs, instead (`MRenderItemOverrideGeometry::gpuVertexBuffer`).
+The override copies each
 description into an `MhExtGpuSource` in the payload, because the handle is
 borrowed for the duration of `updateRenderItem`. The adapter publishes the
 sources through its own `MhExtGpuStreams` with `ShareDeviceOnly`.
@@ -462,8 +463,9 @@ the lazy value for any stream `IsShared` reports, whether or not it has a
 schema.
 
 The first sync of each object always reads back, because the override instance
-that answers `supportsGPUVertexBuffer()` does not exist yet. Bounds come from
-the DAG node while the data is on the device.
+that answers `supportsGPUVertexBuffer()` does not exist yet. Bounds for device
+data are the GPU deformer's own, as Maya reports them; the DAG node's bounding
+box is used only when Maya reports none.
 
 ## Frame synchronization (Vulkan route)
 

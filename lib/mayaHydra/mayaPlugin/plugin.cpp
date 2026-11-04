@@ -202,7 +202,7 @@ bool          gRenderItemOverrideRegistered = false;
 // straight to us instead of building its own drawing structures for them. Maya
 // core has no gate of its own - the registration is the opt-in - so the
 // MAYAHYDRA_RENDER_ITEM_OVERRIDE env setting (on by default; 0 runs the stock
-// render-item path) is checked here. Registered with requiresRendererOverride,
+// render-item path) is checked here. Registered with requiresRenderOverride,
 // so Maya only claims shapes while the viewport is in render override mode
 // (today: Global Hydra, optionVar mayaUseHydra). Each registration
 // costs Maya a full scene reset.
@@ -217,12 +217,12 @@ void registerRenderItemOverride()
     }
     const auto& classifications = MayaHydraRenderItemOverrideCreator::drawClassifications();
     for (size_t i = 0; i < classifications.size(); ++i) {
-        // requiresRendererOverride: what we carry is drawn only by our render
+        // requiresRenderOverride: what we carry is drawn only by our render
         // override (the Hydra viewport), so Maya must keep drawing it with
         // Viewport 2.0 otherwise.
         const MStatus status = MHWRender::MRenderItemOverrideRegistry::registerOverrideCreator(
             classifications[i], kRenderItemOverrideRegistrantId,
-            MayaHydraRenderItemOverrideCreator::create, /*requiresRendererOverride*/ true,
+            MayaHydraRenderItemOverrideCreator::create, /*requiresRenderOverride*/ true,
             MayaHydraRenderItemOverrideCreator::shutterSamples());
         if (status != MS::kSuccess) {
             // Leave the stock path running: undo what was registered so far.

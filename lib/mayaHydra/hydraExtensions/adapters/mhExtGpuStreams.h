@@ -98,7 +98,7 @@ public:
     static bool IsEnabled();
 
     /// Whether the renderer that is drawing can BIND a device stream - has an
-    /// extGpuBuffer bridge (Storm). One that cannot (Flash) only reads device
+    /// extGpuBuffer bridge (Storm). One that cannot only reads device
     /// streams back, so producers should hand it CPU data instead: the readback
     /// costs the same either way, and everything that needs CPU points - motion
     /// blur samples above all - then works. Set by the render override whenever
@@ -130,8 +130,9 @@ public:
     /// Publish \p source as primvar \p key, for a stream that has NO CPU copy to fall back on.
     /// Same as the MVertexBuffer overload, except that when the renderer cannot take the buffer
     /// the stream is still kept for the lazy CPU readback rather than withdrawn: it then has no
-    /// schema, and GetLazyValue is the only way to its values. Returns false only when
-    /// \p source cannot be described at all.
+    /// schema, and GetLazyValue is the only way to its values. Returns false when \p source
+    /// cannot be described, its element type is not Hydra's for \p key, or a bridge that
+    /// exists fails to create or refresh the buffer.
     MAYAHYDRALIB_API
     bool ShareDeviceOnly(
         const MhExtGpuSource& source,
@@ -177,15 +178,16 @@ private:
     {
         /// The HdExtGpuBufferSchema container published to the scene index as
         /// the primvar's `extGpuBuffer` child (see
-        /// MayaHydraPrimvarsDataSource). Null means this stream has no shared
-        /// buffer and the CPU value is authoritative.
+        /// MayaHydraPrimvarsDataSource). Null means no renderer can bind this
+        /// stream: the CPU value is authoritative, unless `readbackOnly`, in
+        /// which case the lazy readback is.
         HdContainerDataSourceHandle schema;
 
         /// The producer's STRONG reference to the shared buffer, and the only
         /// thing keeping it alive on our side: what travels through the scene
         /// index is weak, so that a scene-index cache outliving the geometry
-        /// cannot pin GPU memory. Dropping this is how the adapter withdraws a
-        /// buffer -- the arena then releases it once the GPU has retired the
+        /// cannot pin GPU memory. Dropping this is how a stream is withdrawn
+        /// (Withdraw, _ShareFailed) -- the arena then releases it once the GPU has retired the
         /// work that named it, not before.
         ///
         /// Held through a forward-declared type on purpose: hd declares
@@ -195,9 +197,10 @@ private:
         std::shared_ptr<HgiExternalBuffer> buffer;
 
         /// Identity of the VP2 buffer `schema` describes, for change
-        /// detection: which native buffer, how many elements, and whether we
-        /// published permission to bind it directly. A byte-only deform leaves
-        /// all three untouched, which is what makes it free.
+        /// detection: which native buffer, its layout, and whether we published
+        /// permission to bind it directly (the native buffer counts only on a
+        /// zero-copy bridge). A byte-only deform leaves all of them untouched,
+        /// which is what makes it free.
         uint64_t    rawHandle = 0;
         size_t      numElements = 0;
         size_t      byteOffset = 0;
@@ -215,8 +218,8 @@ private:
     /// Publish one primvar stream as a shared GPU buffer, registering it with
     /// the renderer's arena and rebuilding the cached schema only when it must.
     /// Returns NoGpu, leaving \p stream untouched, when the stream cannot be
-    /// shared -- no GPU handle, an element type other than Hydra's for \p key, or a renderer
-    /// that cannot consume VP2's buffers.
+    /// shared -- an element type other than Hydra's for \p key, no bridge to the renderer's
+    /// Hgi, or a bridge that fails to create or refresh the buffer.
     /// With \p deviceOnly, a renderer that cannot take the buffer yields ReadbackOnly rather
     /// than NoGpu.
     _PublishResult _Publish(
