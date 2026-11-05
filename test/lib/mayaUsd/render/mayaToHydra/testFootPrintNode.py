@@ -526,16 +526,35 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     def test_shadedSelectionNotifications(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             self._setupNotificationsScene('smoothShaded')
-            cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionSendsOneColorDirtyPerChange")
+            if self.selectionHighlightMode() == mtohUtils.SELECTION_HIGHLIGHT_MODE_LEGACY:
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.legacyShadedSelectionSendsOneColorDirtyPerChange")
+            else:
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionWithoutLegacyHighlightSendsNoColorDirty")
 
-    def test_wireframeSelectionNotifications(self):
+    def test_shadedSelectionNotificationsHighlightDisabled(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self._setupNotificationsScene('smoothShaded')
+            wasDisabled = cmds.getAttr(mtohUtils.FORCE_DISABLE_SELECTION_HIGHLIGHT_ATTR)
+            try:
+                self.setForceDisableSelectionHighlight(True)
+                cmds.mayaHydraCppTest(f="FootPrintNotifications.shadedSelectionWithoutLegacyHighlightSendsNoColorDirty")
+            finally:
+                self.setForceDisableSelectionHighlight(wasDisabled)
+
+    def _testPerPrimWireframeColorNotifications(self, displayAppearance):
         with PluginLoaded('mayaHydraFootPrintNode'):
             # The display appearance survives a new scene, so restore it for the next tests.
             try:
-                self._setupNotificationsScene('wireframe')
+                self._setupNotificationsScene(displayAppearance)
                 cmds.mayaHydraCppTest(f="FootPrintNotifications.wireframeNonLeadDeselectDirtiesWireframeColor")
             finally:
                 cmds.modelEditor(self.activeEditor, edit=True, displayAppearance='smoothShaded')
+
+    def test_wireframeSelectionNotifications(self):
+        self._testPerPrimWireframeColorNotifications('wireframe')
+
+    def test_boundingBoxSelectionNotifications(self):
+        self._testPerPrimWireframeColorNotifications('boundingBox')
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

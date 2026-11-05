@@ -61,8 +61,8 @@ special way, e.g. object contour, modified object color, or object overlay.
 The former approach is handled by having a plugin provide a selection
 highlighting filtering scene index to the Flow Viewport Toolkit, and is the
 topic of this document.  The latter is handled by tasks rather than scene
-indices, and is implemented for the Hydra Storm render delegate using the
-Hydra Viewport Toolbox outline tasks; see
+indices, and is implemented for the Hydra Storm and Flash render delegates
+using the Hydra Viewport Toolbox outline tasks; see
 [Outline Selection Highlighting Architecture](outlineSelectionHighlightingArchitecture.md).
 The two are mostly mutually exclusive per viewport: whichever mechanism is in
 charge, the other is suppressed for the common case, though not absolutely —
@@ -275,11 +275,12 @@ SelectionSceneIndex o-- Selection : Read / Write
 ## Limitations
 
 - Pixel-based selection highlighting is no longer unexplored: it is implemented
-  for Hydra Storm through the Hydra Viewport Toolbox outline tasks, with the
-  selection pushed to the tasks from the render override rather than through a
-  selection tracker object.  See
+  for Hydra Storm and Flash through the Hydra Viewport Toolbox outline tasks,
+  with the selection pushed to the tasks from the render override rather than
+  through a selection tracker object.  See
   [Outline Selection Highlighting Architecture](outlineSelectionHighlightingArchitecture.md).
-  It remains Storm-only, since the outline tasks need a rasterizer for prim IDs.
+  Other render delegates keep the added geometry highlighting, since the
+  outline tasks need a rasterizer for prim IDs.
 
 - No selection highlighting across scene indices: selection state propagates
   down app scene hierarchy, so that when an ancestor is selected, a

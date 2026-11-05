@@ -94,6 +94,15 @@ if (USD_HAS_HGI_VULKAN)
         PRIVATE USD_HAS_HGI_VULKAN=1)
 endif()
 
+# The render item override creator (adapters/renderItemOverrideCreator) needs
+# Maya's private render-item override API.
+# Without it the creator compiles to nothing, the plugin registers nothing, and
+# MayaHydra behaves as stock whatever MAYAHYDRA_RENDER_ITEM_OVERRIDE says.
+if (MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE=1)
+endif()
+
 # PUBLIC: consumers include gpuRenderItemAdapter.h and mhExtGpuBufferBridge.h under it.
 if (USD_HAS_GPU_BUFFER_SHARING)
     target_compile_definitions(${TARGET_NAME}

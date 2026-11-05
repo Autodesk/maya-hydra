@@ -41,6 +41,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
     testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
+    testUsdAreaLightGizmos.py
     testUVandUDIM.py
 	testPurposeRenderTag.py
 
@@ -63,10 +64,9 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
-    testUsdTextureToggle.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
-    testUsdStageDefaultLighting.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
+    testUsdTextureToggle.py
+    testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
-    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
 	testSceneModified.py
@@ -80,7 +80,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#Disabled tests on OSX
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | HYDRA-2681 : Snapshot mismatch after instance scale
+    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -103,7 +103,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPathMapperRegistry.py
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
-    cpp/testFlowViewportAPIViewportInformation.py|skipOnRenderer:HdFlash # HYDRA-2676 : Renderer name mismatch, then crash in SceneIndexAdded
+    cpp/testFlowViewportAPIViewportInformation.py
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
     cpp/testFlowViewportAPIFilterPrims.py
@@ -120,8 +120,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneIndexDirtying.py
     cpp/testFvpDirtyNotifier.py
     cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
-    cpp/testLightPrimvars.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2673 : Spot light prim not found in scene index
-    cpp/testDataSourceNames.py|skipOnRenderer:HdFlash # HYDRA-2674 : Directional light prim not found in any scene index
+    cpp/testLightPrimvars.py|depOnPlugins:mtoa
+    cpp/testDataSourceNames.py
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
     cpp/testRenderItemPrimvars.py|skipOnRenderer:HdFlash # HYDRA-2675 : Maya crash (access violation) in UntexturedToTexturedAcquiresUVs
@@ -182,7 +182,7 @@ endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
 if (NOT CODE_COVERAGE)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py|skipOnRenderer:HdFlash) # HYDRA-2679 : Prim origin path mismatch, then stack overflow
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
 endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
@@ -206,10 +206,10 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 	testViewportFilters.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2668 : Some objects are not filtered properly
-    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX | HYDRA-2680 : Snapshot mismatches (3 tests)
+    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX
     testBoundingBox.py
 	#Disabled tests on OSX
-	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+	testDataProducerSelHighlight.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-1033 : Flash wireframe-on-shaded baselines pending
 )
 
 # Interactive unit test scripts for Hydra Generative Procedurals.
@@ -217,25 +217,36 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
     cpp/testHydraGenerativeProcedural.py
 )
 
+# Interactive unit test scripts that run with the render item override off
+# (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0), on the stock render item path.
+set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
+    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
+)
+
 # Every interactive test runs in both selection highlighting modes: the primary
 # run uses outline (the plugin default) and a _legacy counterpart uses the
 # wireframe highlight. Per-mode reference images live in a "<mode>" subfolder and
 # are only needed where the output differs (see MayaHydraBaseTestCase).
 #
-# Outline is unavailable on USD <= 24.11 (HgiGL corrupts the prim ids the outline
-# shader samples), on macOS, and with the HdFlash test renderer (OutlineMaskTask only
-# runs for Storm); there every primary run is legacy and there are no _legacy
-# counterparts. Keep in sync with MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
-# (renderGlobals.cpp) and outlineSelectionHighlightSupported() (mtohUtils.py).
-if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
-    set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
+# MAYAHYDRA_OUTLINE_SUPPORTED: the plugin offers the Outline mode with the test
+# renderer. Outline is unavailable on USD <= 24.11 (HgiGL corrupts the prim ids the
+# outline shader samples), on macOS, and with renderers other than Storm and Flash
+# (MtohRenderOverride::_RendererSupportsOutline()); there every run is legacy and
+# there are no _legacy counterparts. Keep in sync with
+# MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT (renderGlobals.cpp) and
+# outlineSelectionHighlightSupported() (mtohUtils.py).
+set(MAYAHYDRA_OUTLINE_TEST_RENDERERS HdStorm HdFlash)
+if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX
+   AND MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_OUTLINE_TEST_RENDERERS)
+    set(MAYAHYDRA_OUTLINE_SUPPORTED TRUE)
 else()
-    set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)
+    set(MAYAHYDRA_OUTLINE_SUPPORTED FALSE)
 endif()
 
-# Hover needs Qt6: without it the plugin has no hover event filter, and the test
+# Hover highlighting is Storm only (MtohRenderOverride::_OutlineHoverHighlightingEnabled()).
+# It also needs Qt6: without it the plugin has no hover event filter, and the test
 # imports PySide6 at module scope, so it cannot skip itself.
-if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+if(Qt6_FOUND AND MAYAHYDRA_OUTLINE_SUPPORTED AND MAYAHYDRA_TEST_RENDERER STREQUAL "HdStorm")
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
         testOutlineHoverPickModes.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
@@ -245,7 +256,8 @@ endif()
 # Also runs with MAYA_HYDRA_USE_MESH_ADAPTER=1, an opt-in path (the viewport default is render items).
 # It is the only path where a Maya native mesh reaches Hydra with a refine level > 0 (Smooth Mesh
 # Preview), so the outline must follow the refined surface there too.
-if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+# Run with both test renderers; Flash reference images are in each test's "flash" subfolder.
+if(MAYAHYDRA_OUTLINE_SUPPORTED)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         testOutlineRefinement.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
         testOutlinePointInstances.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
@@ -287,7 +299,7 @@ set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
 
 # The ENV entry pinning a primary run's mode, empty when it can use the default.
 function(mayaHydra_primary_mode_env out_var test_filename)
-    if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE AND
+    if(MAYAHYDRA_OUTLINE_SUPPORTED AND
        NOT ${test_filename} IN_LIST OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES)
         set(${out_var} "" PARENT_SCOPE)
     else()
@@ -370,13 +382,33 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
 
 endforeach()
 
+# Same as above, with the render item override off.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+            "MAYAHYDRA_RENDER_ITEM_OVERRIDE=0"
+            ${mode_env}
+    )
+
+    # Add a ctest label to these tests for easy filtering.
+    apply_labels_to_test("${all_labels}" ${target})
+
+endforeach()
+
 # Registers the legacy counterpart of an interactive test, unless its primary
 # run is already legacy.
 #   name_suffix - appended before "_legacy", to keep the target unique for
 #                 scripts registered by more than one configuration.
 #   ARGN        - the ENV entries of the configuration being mirrored.
 function(mayaHydra_add_legacy_mode_test script name_suffix)
-    if(NOT MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+    if(NOT MAYAHYDRA_OUTLINE_SUPPORTED)
         return()
     endif()
     get_testfile_and_labels(all_labels test_filename ${script})
@@ -418,6 +450,13 @@ endforeach()
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
     mayaHydra_add_legacy_mode_test(${script} ""
         "HDGP_INCLUDE_DEFAULT_RESOLVER=1")
+endforeach()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE})
+    mayaHydra_add_legacy_mode_test(${script} ""
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+        "MAYAHYDRA_RENDER_ITEM_OVERRIDE=0")
 endforeach()
 
 # Standalone Python unit tests for pure test utilities. These exercise logic

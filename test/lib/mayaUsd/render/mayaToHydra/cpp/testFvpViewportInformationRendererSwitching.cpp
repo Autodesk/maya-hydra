@@ -25,14 +25,14 @@ namespace {
     //Is a global instance
     std::shared_ptr<InfoClientTest> _infoClientTest;
 
-    //Storm renderer name
-    const std::string _stormRendererName ("GL");
+    //Expected test renderer name
+    const std::string _expectedRendererName (PXR_NS::GetExpectedTestRendererName());
 }
 
 //The test is done through 3 Steps in the python script testFlowViewportAPIViewportInformation.py, function test_RendererSwitching
 
-//Step 1) The python script sets Storm as the renderer for the viewport then call viewportInformationWithHydra
-//This is with Hydra, Storm should be the current renderer
+//Step 1) The python script sets Hydra as the renderer for the viewport then call viewportInformationWithHydra
+//This is with Hydra, the test renderer should be the current renderer
 TEST(FlowViewportAPI, viewportInformationWithHydra)
 {    
     //Get Information interface
@@ -50,7 +50,7 @@ TEST(FlowViewportAPI, viewportInformationWithHydra)
     //Check renderer name
     auto it = allViewportInformation.cbegin();
     ASSERT_NE(it, allViewportInformation.cend());
-    ASSERT_EQ(it->_rendererName, _stormRendererName);
+    ASSERT_EQ(it->_rendererName, _expectedRendererName);
 
     //Check initial count for _infoClientTest callbacks
     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 0);
@@ -60,7 +60,7 @@ TEST(FlowViewportAPI, viewportInformationWithHydra)
 }
 
 //Step 2 : the python script sets VP2 as the renderer for the viewport then call viewportInformationWithoutHydra
-//and _infoClientTest is registered in Fvp::InformationInterface so InfoClientTest::SceneIndexRemoved should be called when switching from Storm to VP2
+//and _infoClientTest is registered in Fvp::InformationInterface so InfoClientTest::SceneIndexRemoved should be called when switching from Hydra to VP2
 //This is without Hydra, VP2 should be the current renderer
 TEST(FlowViewportAPI, viewportInformationWithoutHydra)
 {
@@ -77,9 +77,9 @@ TEST(FlowViewportAPI, viewportInformationWithoutHydra)
     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 1);
 }
 
-//Step 3 : the python script sets Storm again as the renderer for the viewport then call viewportInformationWithHydraAgain
-//and _infoClientTest is still registered in Fvp::InformationInterface so InfoClientTest::SceneIndexAdded should be called when switching from VP2 to Storm
-//This is with Hydra again, Storm should be the current renderer
+//Step 3 : the python script sets Hydra again as the renderer for the viewport then call viewportInformationWithHydraAgain
+//and _infoClientTest is still registered in Fvp::InformationInterface so InfoClientTest::SceneIndexAdded should be called when switching from VP2 to Hydra
+//This is with Hydra again, the test renderer should be the current renderer
 TEST(FlowViewportAPI, viewportInformationWithHydraAgain)
 {
     //Get Information interface
@@ -93,7 +93,7 @@ TEST(FlowViewportAPI, viewportInformationWithHydraAgain)
     //Check renderer name
     auto it = allViewportInformation.cbegin();
     ASSERT_NE(it, allViewportInformation.cend());
-    ASSERT_EQ(it->_rendererName, _stormRendererName);
+    ASSERT_EQ(it->_rendererName, _expectedRendererName);
 
     //Both should have been called once only
     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 1);

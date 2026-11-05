@@ -24,6 +24,7 @@
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
+#include <mayaHydraLib/adapters/mhExtGpuStreams.h>   // SetRendererBindsDeviceStreams
 #endif
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
@@ -152,6 +153,7 @@
 #include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MTimerMessage.h>
+
 #include <maya/MUiMessage.h>
 #include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
@@ -854,6 +856,7 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
     , _colorPreferencesObserver(std::make_shared<ColorPreferencesObserver>(*this))
     , _isUsingHdSt(desc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin)
+    , _isUsingHdFlash(desc.rendererName == MayaHydraRendererTokens->HdFlashRendererPlugin)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg(
@@ -1038,13 +1041,14 @@ void MtohRenderOverride::UpdateRenderGlobals(
     else {
         // mayaHydraSelectionHighlightMode and mayaHydraForceDisableSelectionHighlight are consumed
         // at resource-init time, so changing either flags a clear and reinitialize on the next
-        // render. The mode only matters for Storm; force-disable affects every renderer.
+        // render. The mode only matters for the renderers that support the outline; force-disable
+        // affects every renderer.
         if (attrName.GetString().find("SelectionHighlight") != std::string::npos) {
-            const bool stormOnly
+            const bool outlineRenderersOnly
                 = attrName.GetString().find("SelectionHighlightMode") != std::string::npos;
             std::lock_guard<std::mutex> lock(_allInstancesMutex);
             for (auto* instance : _allInstances) {
-                if (!stormOnly || instance->_isUsingHdSt) {
+                if (!outlineRenderersOnly || instance->_RendererSupportsOutline()) {
                     instance->_needsClear = true;
                 }
             }
@@ -1132,20 +1136,65 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
         {"point", 0},
     };
 
+    // Pick the instance that is actually DRAWING, not merely the first one that
+    // initialised.
+    //
+    // There is one MtohRenderOverride per renderer, and switching renderer does
+    // not tear the old one down immediately. The previous version took the first
+    // instance with a render index and stopped, so after a renderer switch it
+    // reported the previous renderer's (by then empty) scene and returned all
+    // zeros. That is indistinguishable from "the scene is empty", which made the
+    // command useless for exactly the renderer-comparison it was reached for.
+    //
+    // _renderPanelCallbacks is non-empty precisely while a panel is drawing
+    // through that instance, so it is the honest test for "active".
     MtohRenderOverride* instance = nullptr;
+    size_t              candidates = 0;
     {
         std::lock_guard<std::mutex> lock(_allInstancesMutex);
         for (auto* inst : _allInstances) {
-            if (inst->_initializationSucceeded && inst->renderIndex()) {
-                instance = inst;
+            if (!inst->_initializationSucceeded || !inst->renderIndex()) {
+                continue;
+            }
+            ++candidates;
+            if (!inst->_renderPanelCallbacks.empty()) {
+                instance = inst;   // drawing right now - prefer it
                 break;
+            }
+            if (!instance) {
+                instance = inst;   // fallback, keeps the old behaviour
             }
         }
     }
 
     if (!instance || !instance->renderIndex()) {
+        // Say so, rather than returning a zero-filled map that reads as "the
+        // scene is empty". A diagnostic that cannot distinguish "no data" from
+        // "no geometry" sends the reader chasing the wrong bug.
+        stats["error.noActiveRenderer"] = 1;
+        stats["error.candidateInstances"] = static_cast<int>(candidates);
         return stats;
     }
+
+    // Which renderer answered, so a renderer comparison cannot silently
+    // compare one renderer against itself.
+    stats["renderer." + std::string(instance->_rendererDesc.rendererName.GetText())] = 1;
+
+    // THIS COMMAND ONLY SEES RenderIndex-BASED RENDERERS.
+    //
+    // Everything below walks HdRenderIndex::GetRprimIds(). A renderer that does
+    // not go through the render index populates nothing
+    // there, so every count comes back 0 and reads exactly like an empty scene.
+    // That cost real debugging time: a viewport with visible geometry
+    // reported "primitives 0", which was taken as evidence the prims were
+    // missing.
+    //
+    // It cannot be detected reliably from here (an empty render index is an
+    // empty render index), so the result says so instead. If you see
+    // warning.zeroPrimsWhileDrawing, do not conclude the scene is empty - use
+    // the Hydra Scene Browser, which inspects the SCENE INDEX and is therefore
+    // renderer-agnostic.
+    const bool drawing = !instance->_renderPanelCallbacks.empty();
 
     // Get stats for all passes, avoiding double-counting when passes share the same render index
     const int numFramePasses = instance->_GetNumFramePasses();
@@ -1235,6 +1284,12 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
             }
         }
     }
+    if (drawing && stats["primitives"] == 0) {
+        // Either the scene really is empty, or this renderer does not use the
+        // render index. Say both rather than implying the first.
+        stats["warning.zeroPrimsWhileDrawing"] = 1;
+    }
+
     return stats;
 }
 
@@ -1966,6 +2021,16 @@ MStatus MtohRenderOverride::Render(
     // bounding box mode. Otherwise only the legacy *WhSi highlight prims do.
     const bool pullsWireframeColorPerPrim = wantedRepr.needsReprChanged || usingBBoxMode;
 
+    // Read by the lead-change notification until the next Render(), so it can be false while
+    // another panel needs selection colors. That panel still re-pulls them: the repr and bbox
+    // scene indices are shared, and this value is only false for the Default repr without bbox, so
+    // a panel pulling per-prim colors always re-pushes its repr or re-enables bbox, which dirties
+    // every prim. _SuppressLegacySelectionHighlight() is global, so it does not vary per panel.
+    if (_dirtySelectionColorsSceneIndex) {
+        _dirtySelectionColorsSceneIndex->setColorDirtiesEnabled(
+            pullsWireframeColorPerPrim || !_SuppressLegacySelectionHighlight());
+    }
+
     // A prim's wireframe color is only re-pulled when the prim is dirtied, so selection and color
     // preference changes must dirty the affected prims. Done here rather than in the notification
     // handlers because the Fvp selection is up to date by now, scene index mutation belongs on the
@@ -1996,8 +2061,8 @@ MStatus MtohRenderOverride::Render(
     }
 
     // Dirty only the prims that were selected or deselected, and only when every prim pulls a
-    // wireframe color, for the same reasons as the dormant color above. Lead changes are handled by
-    // dirtyLeadObjectRelatedSelections().
+    // wireframe color, for the same reasons as the dormant color above. Lead changes are dirtied by
+    // MhLeadObjectPathTracker, subject to setColorDirtiesEnabled() above.
     if (_selection && _dirtySelectionColorsSceneIndex && _selectionColorsDirty.exchange(false)) {
         const SdfPathVector& currentlySelected = getFullySelectedPaths();
 
@@ -2242,7 +2307,9 @@ MStatus MtohRenderOverride::Render(
         if (_mayaHydraSceneIndex) {
             _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
         }
+    }
 
+    if (_RendererSupportsOutline()) {
         // Tested before each exchange() so that dirty flags are kept, not consumed, while there is
         // no outline to push them to.
         const bool outlineLive = _outlineManager && _selection;
@@ -2346,7 +2413,9 @@ MStatus MtohRenderOverride::Render(
             _outlineManager->SetInputs(std::move(inputs));
             _pushedOutlineHover = wantedHover;
         }
+    }
 
+    if (_isUsingHdSt) {
 #ifndef MAYAHYDRALIB_OIT_ENABLED
         // This is required for HdStorm to display transparency.
         // We should fix this upstream, so HdStorm can setup
@@ -2376,9 +2445,14 @@ MtohRenderOverride* MtohRenderOverride::GetByName(TfToken rendererName)
     return nullptr;
 }
 
+bool MtohRenderOverride::_RendererSupportsOutline() const
+{
+    return _isUsingHdSt || _isUsingHdFlash;
+}
+
 bool MtohRenderOverride::_UseOutlineSelectionHighlighting() const
 {
-    return _isUsingHdSt && _globals.outlineSelectionHighlight
+    return _RendererSupportsOutline() && _globals.outlineSelectionHighlight
         && !_globals.forceDisableSelectionHighlight;
 }
 
@@ -2407,14 +2481,17 @@ bool MtohRenderOverride::_AnyPanelDrawsWireframes(
 bool MtohRenderOverride::_HitTestEnabled() const
 {
     // Hover needs the pick. mayaHydraForceEnableInteractiveHitTest (script-only, off by default)
-    // runs the pick without drawing hover, for profiling.
+    // runs the pick without drawing hover, for profiling. Storm only until hover supports Flash.
     return _OutlineHoverHighlightingEnabled()
-        || (_globals.forceEnableInteractiveHitTest && _UseOutlineSelectionHighlighting());
+        || (_isUsingHdSt && _globals.forceEnableInteractiveHitTest
+            && _UseOutlineSelectionHighlighting());
 }
 
 bool MtohRenderOverride::_OutlineHoverHighlightingEnabled() const
 {
-    return _globals.outlineHoverHighlighting && _UseOutlineSelectionHighlighting();
+    // Storm only until hover supports Flash.
+    return _isUsingHdSt && _globals.outlineHoverHighlighting
+        && _UseOutlineSelectionHighlighting();
 }
 
 MtohRenderOverride::HoverState* MtohRenderOverride::_GetHoverState(const std::string& panelName)
@@ -2427,7 +2504,7 @@ void MtohRenderOverride::_InstallHoverEventFilter(const MString& panelName)
 {
 #ifdef MAYAHYDRA_HAS_QT
     // Installed regardless of the highlight mode (see setup()), but only for Storm, the only
-    // renderer that can use the outline.
+    // renderer with hover highlighting (see _OutlineHoverHighlightingEnabled()).
     if (!_isUsingHdSt) {
         return;
     }
@@ -2629,6 +2706,32 @@ HVT_NS::Outline::OutlineStyle MtohRenderOverride::_BuildOutlineStyle() const
     // Set explicitly rather than relying on the toolbox default.
     style.enableDefaultOutlines = _globals.enableDefaultOutlines;
 
+    // Debug only: MAYAHYDRA_OUTLINE_VISUALIZATION=primIds | depth | mask3x3 | mask5x5 shows an
+    // outline buffer (primIds, depth: the Base layer's) instead of the outline, or the outline
+    // with thin (mask3x3, the default) or thick (mask5x5) edges. Read once per session; an unknown
+    // value warns once and keeps the default.
+    static const HVT_NS::Outline::VisualizationMode visualizationMode = [] {
+        using HVT_NS::Outline::VisualizationMode;
+        const std::string visualization = TfGetenv("MAYAHYDRA_OUTLINE_VISUALIZATION");
+        if (visualization == "primIds") {
+            return VisualizationMode::VISUALIZE_PRIM_IDS;
+        }
+        if (visualization == "depth") {
+            return VisualizationMode::VISUALIZE_DEPTH;
+        }
+        if (visualization == "mask5x5") {
+            return VisualizationMode::VISUALIZE_MASK_5x5;
+        }
+        if (!visualization.empty() && visualization != "mask3x3") {
+            TF_WARN(
+                "Unknown MAYAHYDRA_OUTLINE_VISUALIZATION value '%s': expected primIds, depth, "
+                "mask3x3 or mask5x5. Using mask3x3.",
+                visualization.c_str());
+        }
+        return VisualizationMode::VISUALIZE_MASK_3x3;
+    }();
+    style.maskVisualizationMode = visualizationMode;
+
     // The colors above are fallbacks. Colors with a Maya preference equivalent are replaced in
     // full, alpha included.
     Fvp::ColorPreferences& colorPrefs = Fvp::ColorPreferences::getInstance();
@@ -2728,25 +2831,25 @@ void MtohRenderOverride::_InitHydraResources(
             getLayerSettings,
             firstRenderTaskPath,
             hvt::TaskManager::InsertionOrder::insertBefore);
+    }
 
-        // Install the outline on the main Storm pass (pass 0), whose render index contains all
-        // scene geometry. The secondary graphics pass (pass 1) cannot render prim IDs for USD
-        // prims.
-        {
-            constexpr int outlinePassIndex = 0;
-            const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
-            if (outlinePass && _UseOutlineSelectionHighlighting()) {
-                // Insert before colorCorrectionTask so the outline is drawn before PresentTask.
-                const SdfPath ccPath =
-                    outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
-                _outlineManager = std::make_unique<HVT_NS::Outline::OutlineManager>();
-                _outlineManager->Install(*outlinePass,
-                    ccPath,
-                    hvt::TaskManager::InsertionOrder::insertBefore);
-                _outlineManager->SetStyle(_BuildOutlineStyle());
-                // Push the current selection on the next Render.
-                _outlineInputsDirty = true;
-            }
+    // Install the outline on the main pass (pass 0, Storm or Flash), whose render index contains
+    // all scene geometry. The secondary graphics pass (pass 1, when there are two passes) holds no
+    // USD prims, so it cannot render their prim IDs.
+    if (_UseOutlineSelectionHighlighting()) {
+        constexpr int outlinePassIndex = 0;
+        const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
+        if (outlinePass) {
+            // Insert before colorCorrectionTask so the outline is drawn before PresentTask.
+            const SdfPath ccPath =
+                outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
+            _outlineManager = std::make_unique<HVT_NS::Outline::OutlineManager>();
+            _outlineManager->Install(*outlinePass,
+                ccPath,
+                hvt::TaskManager::InsertionOrder::insertBefore);
+            _outlineManager->SetStyle(_BuildOutlineStyle());
+            // Push the current selection on the next Render.
+            _outlineInputsDirty = true;
         }
     }
 
@@ -2952,6 +3055,20 @@ void MtohRenderOverride::_InitHydraResources(
     }
     
     _initializationSucceeded = true;
+
+    // This instance starts drawing now: producers should hand it what it can use.
+    _PublishDeviceStreamSupport();
+}
+
+void MtohRenderOverride::_PublishDeviceStreamSupport()
+{
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    // The same test MhExtGpuStreams applies per stream: a bridge for this
+    // renderer's Hgi means it can bind the buffers; none means CPU readback.
+    const bool binds = _mayaHydraSceneIndex
+        && static_cast<bool>(MhExtGpuBufferBridge::ForHgi(_mayaHydraSceneIndex->GetHgi()));
+    MhExtGpuStreams::SetRendererBindsDeviceStreams(binds);
+#endif
 }
 
 //When fullReset is true, we remove the data producer scene indices that apply to all viewports.
@@ -3217,6 +3334,7 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
         constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
     }
+
 }
 
 void MtohRenderOverride::SelectionChanged(
@@ -3355,7 +3473,15 @@ MStatus MtohRenderOverride::setup(const MString& destination)
             newCallbacks.append(id);
         }
 
+        const bool firstPanel = _renderPanelCallbacks.empty();
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
+
+        // Back to an instance that already has its Hydra resources (switching
+        // renderers): restore its device-stream answer. A new instance sets it
+        // from _InitHydraResources instead, which runs later, from Render().
+        if (firstPanel && _initializationSucceeded) {
+            _PublishDeviceStreamSupport();
+        }
     }
 
     // Track the mouse for hover highlighting. Idempotent. Installed regardless of the highlight

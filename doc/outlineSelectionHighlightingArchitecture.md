@@ -4,10 +4,10 @@
 **added geometry** selection highlighting style — a wireframe drawn on top of selected objects —
 and notes that the other style, **pixel-based modified object appearance**, "is handled by having
 a plugin provide a selection highlighting task to the Flow Viewport Toolkit". This document
-describes that second style, as implemented for the Hydra Storm render delegate using the Hydra
-Viewport Toolbox (HVT) outline tasks.
+describes that second style, as implemented for the Hydra Storm and Flash render delegates using
+the Hydra Viewport Toolbox (HVT) outline tasks.
 
-This document describes the state of outline selection highlighting as of 13-Aug-2026.
+This document describes the state of outline selection highlighting as of 26-Oct-2026.
 
 ## Behavior
 
@@ -37,13 +37,17 @@ option box.
 and it is **not** the same thing as the render global:
 
 ```cpp
-return _isUsingHdSt && _globals.outlineSelectionHighlight
-        && !_globals.forceDisableSelectionHighlight;
+return _RendererSupportsOutline() && _globals.outlineSelectionHighlight
+    && !_globals.forceDisableSelectionHighlight;
 ```
 
-- **Storm only.** HVT's outline tasks need a rasterizer to render prim IDs, Storm-specific render
-  buffers and a GL compute shader for the mask, and gate themselves on Storm internally. A
-  non-Storm delegate therefore keeps the legacy wireframe highlighting, whatever the global says.
+- **Storm or Flash only.** `_RendererSupportsOutline()` is true for those two delegates. HVT's
+  outline tasks need a rasterizer to render prim IDs and disable themselves on any other delegate,
+  so another delegate keeps the legacy wireframe highlighting, whatever the global says. On Flash,
+  HVT does not resolve prim IDs from paths: it hands the selection to Flash as outline tags, and
+  Flash writes the IDs (see [Render delegates](../lib/hydra-viewport-toolbox/docs/outline.md#render-delegates)
+  in HVT's outline documentation). For this repository the two delegates differ only in what Flash
+  does not support yet (see Limitations).
 - **Not offered on USD 24.11**, where HgiGL corrupts the non-zero integer prim IDs the outline mask
   shader samples, **nor on macOS**, where outline selection highlighting is unsupported. In those
   configurations the enum lists *Legacy Selection* only, and it is the default.
@@ -96,8 +100,8 @@ The manager is installed on **frame pass 0** in `_InitHydraResources()`, and onl
 _outlineManager->Install(*outlinePass, ccPath, hvt::TaskManager::InsertionOrder::insertBefore);
 ```
 
-Pass 0 is the main Storm pass, and is the only candidate: its render index holds all scene geometry,
-which the prim-ID tasks must be able to see. Pass 1, the secondary graphics pass, holds secondary
+Pass 0 is the main pass, Storm or Flash, and is the only candidate: its render index holds all scene
+geometry, which the prim-ID tasks must be able to see. Pass 1, the secondary graphics pass, holds secondary
 graphics prims (wireframe highlights, bounding boxes, light and camera gizmos, NURBS curves,
 viewport decorations) and cannot render prim IDs for USD prims.
 
@@ -286,7 +290,7 @@ prims only.
 Hover outlines the object under the cursor. It is a separate render global,
 `mayaHydraOutlineHoverHighlighting`, **off by default**: every mouse move forces a full frame, which
 is not something to impose on a heavy scene. It is only ever active when the outline owns the
-highlight, since the outline is what draws it.
+highlight, since the outline is what draws it, and only on Storm (see Limitations).
 
 The chain is:
 
@@ -386,13 +390,39 @@ selection. Dirtying a path walks its entire subtree, and a prim that stayed sele
 changed colour — so adding one object to a large selection would otherwise re-walk all of it. The
 invalidation is done from `Render()` rather than from `SelectionChanged()` for two reasons: the Fvp
 selection is guaranteed to have been updated by then, and scene index mutation belongs on the render
-thread.
+thread. It is skipped altogether when no prim pulls a wireframe colour (shaded and textured styles
+outside bounding box mode, where only the legacy `*WhSi` prims would), and when a repr change is
+about to dirty every prim anyway.
+
+## Debug visualization
+
+The environment variable `MAYAHYDRA_OUTLINE_VISUALIZATION` makes the mask pass show one of HVT's
+debug outputs (`OutlineStyle::maskVisualizationMode`) instead of the normal outline. It is a
+development aid, not a user setting:
+
+| Value | Shows |
+|---|---|
+| `primIds` | the prim-ID buffers, one hashed colour per prim ID |
+| `depth` | the relative depth of the `Base` layer, the selected prims |
+| `mask3x3` | the normal outline, thin edges (the default, same as unset) |
+| `mask5x5` | the normal outline, thick edges |
+
+`_BuildOutlineStyle()` reads the variable once per Maya session, so set it before starting Maya. An
+unknown value keeps `mask3x3` and issues one `TF_WARN`, which appears in the Script Editor, not in
+Maya's `-log` file. Unset it before running the outline snapshot tests: `primIds` or `depth` makes
+every one of them fail.
 
 ## Limitations
 
-- **Storm only.** Other render delegates keep the legacy wireframe highlighting. Supporting a
-  non-rasterizing delegate would mean a separate Storm pass rasterizing selected geometry alongside
-  the beauty render and compositing the two — an HVT project, not a flag.
+- **Storm and Flash only.** Other render delegates keep the legacy wireframe highlighting.
+  Supporting a non-rasterizing delegate would mean a separate Storm pass rasterizing selected
+  geometry alongside the beauty render and compositing the two — an HVT project, not a flag.
+- **No hover highlighting on Flash.** `_OutlineHoverHighlightingEnabled()` and `_HitTestEnabled()`
+  are Storm-only: the hover pick runs a full pick on every mouse move, which on Flash redraws the
+  scene each time. Hover on Flash is planned on a cached full-viewport ID buffer instead.
+- **No default outlines on Flash.** HVT ignores `enableDefaultOutlines` on Flash, with one warning:
+  a whole-scene prim-ID pass would be a second main pass over the scene, which Flash does not
+  support.
 - **Not available on USD 24.11**, where HgiGL corrupts the prim IDs the mask compute shader samples,
   **or on macOS**, where outline selection highlighting is unsupported.
 - **Wireframe-on-shaded shows both cues.** Deliberate: the alternative was recolouring VP2's wire,

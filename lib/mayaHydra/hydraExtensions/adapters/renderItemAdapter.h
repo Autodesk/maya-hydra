@@ -24,6 +24,9 @@
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/tf/token.h>
+#include <vector>
+
+#include <pxr/imaging/hd/basisCurvesTopology.h>
 #include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hdx/renderTask.h>
@@ -108,6 +111,14 @@ public:
     MAYAHYDRALIB_API
     VtValue Get(const TfToken& key) override;
 
+    /// Motion samples of a primvar across the shutter, the shape adapters'
+    /// SamplePrimvar contract: fills up to \p maxSampleCount (time, value)
+    /// pairs and returns how many. 0 means no samples - the live value stands.
+    /// An ordinary render item has no way to re-evaluate its geometry at another
+    /// time; a render item override carrier can (MayaHydraRenderItemOverrideAdapter).
+    MAYAHYDRALIB_API
+    virtual size_t SamplePrimvar(const TfToken&, size_t, float*, VtValue*) { return 0; }
+
     MAYAHYDRALIB_API
     VtValue GetMaterialResource();
 
@@ -129,13 +140,57 @@ public:
     MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override { return _transform[0]; }
 
-    /// Shutter transform keys captured in UpdateTransform. Both equal GetTransform()
-    /// when motion samples are off, which the matrix data source reads as no motion.
+    /// Shutter transform keys; equal to GetTransform() - which the matrix data
+    /// source reads as no motion - with motion samples off. How they are made
+    /// depends on MAYAHYDRA_MOTION_SAMPLING_MODE (UseVelocityMotionSamples):
+    ///   evaluate (default): UpdateTransform queues a capture, and the source DAG
+    ///       is evaluated at shutter open and close in one batch for all queued
+    ///       items (see CaptureShutterSample). Exact, but two DG evaluations per
+    ///       frame while motion samples are on.
+    ///   velocity: derived when read, from the matrix's per-frame velocity (this
+    ///       frame's minus the previous frame's). No DG evaluation; a straight
+    ///       line between two frames, and no motion on the first frame, after a
+    ///       scrub or jump, or on a frame that brought no new matrix.
     MAYAHYDRALIB_API
-    GfMatrix4d GetOpenTransform() const { return _transform[2]; }
+    GfMatrix4d GetOpenTransform() const
+    {
+        return UseVelocityMotionSamples() ? _ShutterTransform(true) : _transform[2];
+    }
 
     MAYAHYDRALIB_API
-    GfMatrix4d GetCloseTransform() const { return _transform[1]; }
+    GfMatrix4d GetCloseTransform() const
+    {
+        return UseVelocityMotionSamples() ? _ShutterTransform(false) : _transform[1];
+    }
+
+    /// MAYAHYDRA_MOTION_SAMPLING_MODE=velocity; anything else, or unset, is
+    /// evaluate. Read once.
+    MAYAHYDRALIB_API
+    static bool UseVelocityMotionSamples();
+
+    /// BATCHED SHUTTER CAPTURE (evaluate mode). A transform update does not
+    /// evaluate the DG at the shutter times itself: it queues a capture, and
+    /// MayaHydraSceneIndex::UpdateRenderItems enters ONE MDGContextGuard per
+    /// shutter time and calls CaptureShutterSample on every queued item. The
+    /// upstream rig is then evaluated once per shutter time, not once per item.
+    /// Until captured, the shutter keys equal the centre key (no motion).
+    bool ShutterCapturePending() const { return _shutterCapturePending; }
+
+    /// Under the guard for one shutter time: evaluate the queued DAG path's
+    /// world matrix and store the open (\p open) or close key.
+    MAYAHYDRALIB_API
+    void CaptureShutterSample(bool open);
+
+    /// After both samples: the capture is done.
+    void FinishShutterCapture() { _shutterCapturePending = false; }
+
+    /// True when the motion keys last published were derived from a velocity
+    /// for `frame` - i.e. they show motion only as long as the frame stays
+    /// `frame`. The scene index tracks these and calls DirtyStaleVelocity() on
+    /// the first frame that refreshes nothing, so Storm drops the streak of an
+    /// object that stopped moving. Base: the transform, velocity mode only.
+    virtual bool PublishedVelocityAt(double frame) const;
+    virtual void DirtyStaleVelocity();
 
     MAYAHYDRALIB_API
     void InvalidateTransform() { }
@@ -223,6 +278,19 @@ public:
     MAYAHYDRALIB_API
     bool GetIsReplaceableHighlightWire() const { return _isReplaceableHighlightWire; }
 
+    /// Whether the item name is one of the VP2 selection-highlight wireframe names, the first test
+    /// for GetIsReplaceableHighlightWire. A render item keeps its name for its whole life, so
+    /// this is set once, when the adapter is created, instead of copying the name with
+    /// MRenderItem::name() on every delta.
+    MAYAHYDRALIB_API
+    void SetIsSelectionHighlightWireCandidate(bool val)
+    {
+        _isSelectionHighlightWireCandidate = val;
+    }
+
+    MAYAHYDRALIB_API
+    bool GetIsSelectionHighlightWireCandidate() const { return _isSelectionHighlightWireCandidate; }
+
 protected:
     /// Dirty state of each vertex stream, collected over one UpdateFromDelta call.
     struct _StreamDirty
@@ -251,6 +319,10 @@ protected:
 
     /// Called once per UpdateFromDelta, before any vertex stream is read.
     virtual void _BeginGeometryUpdate(bool /*geomChanged*/, bool /*topoChanged*/) { }
+
+    /// Object-space bounds of the shape at \p dagPath, taken from the DAG node, for an item whose
+    /// vertex data never reaches the CPU. Empty when the node has no usable bounding box.
+    static GfRange3d _ObjectSpaceBoundsFromDagNode(const MDagPath& dagPath);
 
     /// Object-space bounds to publish, given the render item's own bounding box.
     virtual GfRange3d _ResolveBounds(const GfRange3d& renderItemBounds) const
@@ -295,6 +367,35 @@ private:
     MAYAHYDRALIB_API
     void _InsertRprim(MayaHydraAdapter* adapter);
 
+protected:
+    // Remove and re-add this adapter's rprim under the same path, so the renderer
+    // drops every buffer range it allocated for it and rebuilds from a full sync.
+    // For a storage-kind change Storm cannot migrate in place (external <->
+    // ordinary vertex data); see MayaHydraRenderItemOverrideAdapter.
+    MAYAHYDRALIB_API
+    void _ReinsertRprim();
+
+    // Velocity mode: store this frame's matrix (all three keys) and, with
+    // motion samples on, keep the previous frame's for _ShutterTransform.
+    MAYAHYDRALIB_API
+    void _SetTransform(const GfMatrix4d& matrix);
+
+    MAYAHYDRALIB_API
+    GfMatrix4d _ShutterTransform(bool open) const;
+
+    // Evaluate mode: set the centre key and queue a shutter capture of \p dag,
+    // whose world matrix at the current time is \p centreDag. Keys are stored as
+    // world deltas applied to the centre key: key = centre * centreDag^-1 * keyDag
+    // (row-vector, as Gf and Maya). With motion samples off, just the centre.
+    MAYAHYDRALIB_API
+    void _QueueShutterCapture(const GfMatrix4d& centre, const MDagPath& dag, const GfMatrix4d& centreDag);
+
+    // Data is protected (as are the shutter helpers above; _RemoveRprim and
+    // _InsertRprim stay private): MayaHydraRenderItemOverrideAdapter
+    // (the carrier adapter) populates these from a producer-supplied payload instead of
+    // from MGeometry, and then every accessor on this class - Get(),
+    // GetMeshTopology(), GetBasisCurvesTopology(), GetPrimvarDescriptors(),
+    // GetDisplayColor(), GetVisible(), GetTransform() - serves it unchanged.
     SdfPath                     _material;
     MDagPath                    _dagPath;
     std::unique_ptr<HdTopology> _topology = nullptr;
@@ -304,6 +405,17 @@ private:
     // Identity-initialised: UpdateTransform only writes the keys when getMatrix()
     // succeeds, and comparing uninitialised keys would publish a bogus motion span.
     GfMatrix4d _transform[3] = { GfMatrix4d(1.0), GfMatrix4d(1.0), GfMatrix4d(1.0) };
+    // Velocity mode (_SetTransform): the previous frame's matrix and the frames
+    // of both, kept only while motion samples are on.
+    GfMatrix4d _prevTransform { 1.0 };
+    double     _xformFrame       = 0.0;
+    double     _prevXformFrame   = 0.0;
+    bool       _xformValid       = false;
+    bool       _hasPrevTransform = false;
+    // Evaluate mode: the queued shutter capture (see CaptureShutterSample).
+    MDagPath   _shutterDag;
+    GfMatrix4d _shutterCentreDagInv { 1.0 };
+    bool       _shutterCapturePending = false;
     int                         _fastId = 0;
     bool                        _visible = false;
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
@@ -311,6 +423,7 @@ private:
     bool                        _isInPlayback = false;
     bool                        _wireframeSelectionHighlightEnabled = true;
     bool                        _isReplaceableHighlightWire = false;
+    bool                        _isSelectionHighlightWireCandidate = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;
