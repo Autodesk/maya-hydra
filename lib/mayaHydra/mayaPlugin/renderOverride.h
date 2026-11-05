@@ -484,6 +484,11 @@ private:
     // This ensures they stay synchronized and eliminates index-based access issues
     Fvp::FramePassDataPtrVector                                _framePassesData;
     
+    /// Return the Hydra camera prim the panel renders through, or an empty path when there is
+    /// none (orthographic, unmapped runtime, unexpected mapping). An empty path means the passes
+    /// use the free camera, so failure needs no other handling.
+    SdfPath _ResolveCameraPrimPath();
+
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;
     const hvt::FramePassPtr& _GetFramePass(int passIndex)const;

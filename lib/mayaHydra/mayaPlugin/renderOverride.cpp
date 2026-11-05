@@ -1515,6 +1515,44 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
     }
 }
 
+SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
+{
+    MStatus       status;
+    const MString ufePathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+    if (!status || ufePathString.length() == 0) {
+        return {};
+    }
+    // Maya builds this string, so it is a valid UFE path.
+    const Ufe::Path ufePath = Ufe::PathString::path(ufePathString.asChar());
+
+    if (ufePath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
+        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+        if (!status || !_mayaHydraSceneIndex) {
+            return {};
+        }
+        MFnCamera camera(camPath, &status);
+        // TODO: Support orthographic cameras.
+        if (!status || camera.isOrtho()) {
+            return {};
+        }
+        return _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+    }
+
+    // Only runtimes that registered a path mapper (MayaUSD) publish camera prims. Checking first
+    // keeps the registry's no-mapping warning out of every draw. Orthographic USD cameras are
+    // rejected later, when the camera prim projection is computed.
+    if (!Fvp::PathMapperRegistry::Instance().HasMapper(ufePath)) {
+        return {};
+    }
+    const Fvp::PrimSelections selections = Fvp::ufePathToPrimSelections(ufePath);
+    // A camera is not instanced, so it maps to exactly one prim, as in
+    // mhExternalCameraResolvingSceneIndex.
+    if (selections.size() != 1) {
+        return {};
+    }
+    return selections.front().primPath;
+}
+
 MStatus MtohRenderOverride::Render(
     const MHWRender::MDrawContext&                         drawContext,
     const MHWRender::MDataServerOperation::MViewportScene& scene)
@@ -2176,38 +2214,7 @@ MStatus MtohRenderOverride::Render(
     // Every delegate renders through the camera prim translated from the Maya or USD camera, so
     // that it gets the render parameters the free camera lacks. Orthographic cameras still use
     // the free camera.
-    SdfPath cameraPath;
-    {
-        MStatus       status;
-        const MString ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
-        if (status == MStatus::kSuccess && ufeCameraPathString.length() > 0) {
-            const Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-            if (ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-                const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-                if (status == MStatus::kSuccess) {
-                    MFnCamera camera(camPath, &status);
-                    // TODO: Support orthographic cameras.
-                    if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
-                        cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
-                    }
-                }
-            } else {
-                // USD camera. Orthographic USD cameras are rejected per pass below.
-                try {
-                    cameraPath = Fvp::sceneIndexPath(ufeCameraPath);
-                }
-                // An exception must not escape the draw callback. On failure, cameraPath stays
-                // empty, so the passes below use the free camera.
-                catch (const std::out_of_range& e) {
-                    TF_WARN(
-                        "Cannot resolve the camera prim of %s (%s). The viewport uses the free "
-                        "camera instead.",
-                        ufeCameraPathString.asChar(),
-                        e.what());
-                }
-            }
-        }
-    }
+    const SdfPath cameraPath = _ResolveCameraPrimPath();
 
     // The camera prim holds the raw camera attributes, shared by every panel looking through that
     // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
