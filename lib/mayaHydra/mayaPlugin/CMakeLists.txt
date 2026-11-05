@@ -71,6 +71,15 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     )
 endif()
 
+# plugin.cpp registers the render item override creator through Maya's private
+# render-item override API.
+if (MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE=1
+    )
+endif()
+
 # -----------------------------------------------------------------------------
 # include directories
 # -----------------------------------------------------------------------------

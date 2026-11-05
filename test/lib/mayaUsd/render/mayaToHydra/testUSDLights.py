@@ -18,8 +18,14 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+import mayaUsd.lib
 import platform
 import unittest
+
+STAGE_SHAPE_PATH = '|testUSDLights:stage1|testUSDLights:stageShape1'
+DISK_LIGHT_PRIM_PATH = '/DiskLight1'
+DISK_LIGHT_PATH = STAGE_SHAPE_PATH + ',' + DISK_LIGHT_PRIM_PATH
+DISTANT_LIGHT_PATH = STAGE_SHAPE_PATH + ',/DistantLight1'
 
 class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -29,16 +35,12 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
     IMAGE_DIFF_FAIL_PERCENT = 0.5
 
     def verifyLightingModes(self, shadowOn):
-        # allLights / domeLight / flatLight changed in USD 25.11 and again in USD 26.05+.
-        # defaultLight / diskLight / distantLight / noLight only changed in USD 26.05+.
-        imageVersion = None
-        if self._usdVersion >= (0, 26, 5):
-            imageVersion = "usd26.05+"
-        elif self._usdVersion >= (0, 25, 11):
-            imageVersion = "usd25.11"
+        # allLights / domeLight / flatLight changed in USD 25.11.
+        imageVersion = "usd25.11+" if self._usdVersion >= (0, 25, 11) else None
 
-        # For images that only changed in USD 26.05+ (no separate usd25.11 baseline).
-        imageVersionNewOnly = "usd26.05+" if self._usdVersion >= (0, 26, 5) else None
+        # The USD sphere picks up slightly different dome lighting in USD 26.05+.
+        domeImageVersion = ("usd26.05+" if self._usdVersion >= (0, 26, 5)
+                            else imageVersion)
 
         imageSuffix = "_shadowOn" if shadowOn else ""
         panel = mayaUtils.activeModelPanel()
@@ -54,7 +56,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #Default Light mode
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
+        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Selected Light mode
         cmds.modelEditor(panel, edit=True, displayLights="selected")
@@ -62,15 +64,15 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
 
         cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DistantLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("distantLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
+        self.assertSnapshotClose("distantLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DiskLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("diskLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
+        self.assertSnapshotClose("diskLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DomeLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("domeLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        self.assertSnapshotClose("domeLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, domeImageVersion)
 
         #Flat Light mode
         cmds.modelEditor(panel, edit=True, displayLights="flat")
@@ -80,7 +82,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #No Light mode
         cmds.modelEditor(panel, edit=True, displayLights="none")
         cmds.refresh()
-        self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
+        self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test usd lights (e.g., disk,distant,dome,etc.) with a maya native sphere and usd sphere.
     def test_USDLights(self):
@@ -98,6 +100,45 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #TODO: Enable code below when shadows are supported by usd lights
         #Shadow ON
         #self.verifyLightingModes(True)
+
+    def _openSceneInSelectedLightsMode(self):
+        mayaUtils.openTestScene("testUSDLights", "testUSDLights.ma")
+        self.setTestRenderer()
+        panel = mayaUtils.activeModelPanel()
+        cmds.modelEditor(panel, edit=True, shadows=False)
+        cmds.modelEditor(panel, edit=True, displayLights="selected")
+        cmds.refresh()
+
+    # Selects the distant and disk lights, the disk light last so that it is the lead object, then
+    # deselects the distant light. That changes no lead, so only the selection change of the
+    # distant light can turn it off.
+    def _verifyDeselectNonLeadLight(self):
+        cmds.select(DISTANT_LIGHT_PATH, r=True)
+        cmds.select(DISK_LIGHT_PATH, add=True)
+        cmds.refresh()
+
+        cmds.select(DISTANT_LIGHT_PATH, deselect=True)
+        cmds.refresh()
+        imageVersion = "usd26.05+" if self._usdVersion >= (0, 26, 5) else None
+        self.assertSnapshotClose("diskLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+
+    def test_USDLightsDeselectNonLeadLight(self):
+        self._openSceneInSelectedLightsMode()
+        self._verifyDeselectNonLeadLight()
+
+    # Lights removed and added once Hydra is running must still follow their selection.
+    def test_USDLightsReAddedLightFollowsSelection(self):
+        self._openSceneInSelectedLightsMode()
+
+        stage = mayaUsd.lib.GetPrim(STAGE_SHAPE_PATH).GetStage()
+        diskLight = stage.GetPrimAtPath(DISK_LIGHT_PRIM_PATH)
+        self.assertTrue(diskLight.IsValid())
+        diskLight.SetActive(False)
+        cmds.refresh()
+        diskLight.SetActive(True)
+        cmds.refresh()
+
+        self._verifyDeselectNonLeadLight()
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

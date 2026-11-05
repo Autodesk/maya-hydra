@@ -171,6 +171,19 @@ bool _IsPrimOrAncestorSelected(const SdfPath& primPath,  const HdSceneIndexPrim&
     return false;
 }
 
+// The paths at or under prefix. Not SdfPathFindPrefixedRange(): its std::lower_bound is linear on
+// set iterators, std::set::lower_bound is logarithmic.
+std::pair<std::set<SdfPath>::const_iterator, std::set<SdfPath>::const_iterator>
+_FindPrefixedRange(const std::set<SdfPath>& paths, const SdfPath& prefix)
+{
+    const auto first = paths.lower_bound(prefix);
+    auto       last = first;
+    while (last != paths.end() && last->HasPrefix(prefix)) {
+        ++last;
+    }
+    return { first, last };
+}
+
 } // end of anonymous namespace
 
 /// This is a filtering scene index that manages lights primitives
@@ -182,6 +195,11 @@ LightsManagementSceneIndex::LightsManagementSceneIndex(const HdSceneIndexBaseRef
     InputSceneIndexUtils(inputSceneIndex)
     ,_defaultLightPath(defaultLightPath)
 {
+    for (const SdfPath& path : HdSceneIndexPrimView(inputSceneIndex)) {
+        if (HdPrimTypeIsLight(inputSceneIndex->GetPrim(path).primType)) {
+            _lightPaths.insert(path);
+        }
+    }
 }
 
 void LightsManagementSceneIndex::SetLightingMode(LightingMode lightingMode) 
@@ -207,11 +225,9 @@ void LightsManagementSceneIndex::SetShadowsEnabled(bool shadowsEnabled)
 void LightsManagementSceneIndex::_DirtyAllLightsPrims()
 {
     HdSceneIndexObserver::DirtiedPrimEntries entries;
-    for (const SdfPath& path : HdSceneIndexPrimView(GetInputSceneIndex())) {
-        auto primType = GetInputSceneIndex()->GetPrim(path).primType;
-        if (HdPrimTypeIsLight(primType)) {
-            entries.push_back({ path, HdLightSchema::GetDefaultLocator() });
-        }
+    entries.reserve(_lightPaths.size());
+    for (const SdfPath& path : _lightPaths) {
+        entries.push_back({ path, HdLightSchema::GetDefaultLocator() });
     }
     _SendPrimsDirtied(entries);
 }
@@ -265,6 +281,73 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
     }
 
     return prim;
+}
+
+void LightsManagementSceneIndex::_PrimsAdded(
+    const HdSceneIndexBase&                       sender,
+    const HdSceneIndexObserver::AddedPrimEntries& entries)
+{
+    // A prim can be re-added with a different type.
+    for (const auto& entry : entries) {
+        if (HdPrimTypeIsLight(entry.primType)) {
+            _lightPaths.insert(entry.primPath);
+        } else {
+            _lightPaths.erase(entry.primPath);
+        }
+    }
+
+    if (!_IsObserved()) {
+        return;
+    }
+    _SendPrimsAdded(entries);
+}
+
+void LightsManagementSceneIndex::_PrimsRemoved(
+    const HdSceneIndexBase&                         sender,
+    const HdSceneIndexObserver::RemovedPrimEntries& entries)
+{
+    // A removed entry removes its whole subtree.
+    for (const auto& entry : entries) {
+        const auto [first, last] = _FindPrefixedRange(_lightPaths, entry.primPath);
+        _lightPaths.erase(first, last);
+    }
+
+    if (!_IsObserved()) {
+        return;
+    }
+    _SendPrimsRemoved(entries);
+}
+
+void LightsManagementSceneIndex::_PrimsDirtied(
+    const HdSceneIndexBase&                         sender,
+    const HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    if (!_IsObserved()) {
+        return;
+    }
+
+    _SendPrimsDirtied(entries);
+
+    if (_lightingMode != LightingMode::kSelectedLightsOnly) {
+        return;
+    }
+
+    // A selections dirty maps to no dirty bits on a light, so the lights whose enabled state
+    // depends on that selection (the prim or its descendants) must be dirtied explicitly.
+    static const HdDataSourceLocator selectionsLocator = HdSelectionsSchema::GetDefaultLocator();
+    HdSceneIndexObserver::DirtiedPrimEntries lightEntries;
+    for (const auto& entry : entries) {
+        if (!entry.dirtyLocators.Intersects(selectionsLocator)) {
+            continue;
+        }
+        const auto [first, last] = _FindPrefixedRange(_lightPaths, entry.primPath);
+        for (auto it = first; it != last; ++it) {
+            lightEntries.push_back({ *it, HdLightSchema::GetDefaultLocator() });
+        }
+    }
+    if (!lightEntries.empty()) {
+        _SendPrimsDirtied(lightEntries);
+    }
 }
 
 void LightsManagementSceneIndex::SetDisabledLightsPrims(

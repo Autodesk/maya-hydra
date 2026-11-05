@@ -22,7 +22,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
-#include <mayaHydraLib/adapters/gpuRenderItemAdapter.h>
+#include <mayaHydraLib/adapters/mhExtGpuStreams.h>
 
 #include <pxr/imaging/hd/extGpuBufferSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
@@ -49,18 +49,18 @@ public:
     HD_DECLARE_DATASOURCE(_ExtGpuBufferLazyValueDataSource);
 
     _ExtGpuBufferLazyValueDataSource(
-        const TfToken&                  primvarName,
-        MayaHydraGpuRenderItemAdapter*  adapter)
+        const TfToken&         primvarName,
+        const MhExtGpuStreams* streams)
         : _primvarName(primvarName)
-        , _adapter(adapter)
+        , _streams(streams)
     {
     }
 
     VtValue GetValue(Time shutterOffset) override
     {
         TF_UNUSED(shutterOffset);
-        return _adapter
-            ? _adapter->GetExtGpuBufferLazyValue(_primvarName)
+        return _streams
+            ? _streams->GetLazyValue(_primvarName)
             : VtValue();
     }
 
@@ -76,8 +76,9 @@ public:
     }
 
 private:
-    TfToken                         _primvarName;
-    MayaHydraGpuRenderItemAdapter*  _adapter;
+    TfToken                _primvarName;
+    // Owned by the adapter, which outlives the data sources built from it.
+    const MhExtGpuStreams* _streams;
 };
 
 } // namespace
@@ -118,10 +119,12 @@ HdDataSourceBaseHandle MayaHydraPrimvarsDataSource::Get(const TfToken& name)
         MayaHydraPrimvarValueDataSource::New(name, _adapter);
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
     HdContainerDataSourceHandle extGpuBuffer;
-    if (auto* ri = dynamic_cast<MayaHydraGpuRenderItemAdapter*>(_adapter)) {
-        extGpuBuffer = ri->GetExtGpuBufferSchema(name);
-        if (extGpuBuffer) {
-            value = _ExtGpuBufferLazyValueDataSource::New(name, ri);
+    if (const MhExtGpuStreams* streams = _adapter ? _adapter->GetExtGpuStreams() : nullptr) {
+        // A shared stream has no CPU copy, so its value is always the lazy readback. It usually
+        // has a schema too; one kept for readback only (no bridge to the renderer) does not.
+        extGpuBuffer = streams->GetSchema(name);
+        if (streams->IsShared(name)) {
+            value = _ExtGpuBufferLazyValueDataSource::New(name, streams);
         }
     }
 #endif
@@ -174,15 +177,17 @@ void MayaHydraPrimvarValueDataSource::_EnsureSamples()
         return;
     }
 
-    // Only shape adapters can multi-sample primvars, e.g. deforming mesh points.
-    MayaHydraShapeAdapter* shapeAdapter = dynamic_cast<MayaHydraShapeAdapter*>(_adapter);
-    if (!shapeAdapter) {
-        return;
-    }
-
+    // Shape adapters multi-sample primvars, e.g. deforming mesh points; so does a
+    // render item override carrier, through the render-item hook (0 for ordinary items).
     float   times[kMotionKeys] {};
     VtValue values[kMotionKeys];
-    const size_t count = shapeAdapter->SamplePrimvar(_primvarName, kMotionKeys, times, values);
+    size_t  count = 0;
+    if (MayaHydraShapeAdapter* shapeAdapter = dynamic_cast<MayaHydraShapeAdapter*>(_adapter)) {
+        count = shapeAdapter->SamplePrimvar(_primvarName, kMotionKeys, times, values);
+    } else if (
+        MayaHydraRenderItemAdapter* riAdapter = dynamic_cast<MayaHydraRenderItemAdapter*>(_adapter)) {
+        count = riAdapter->SamplePrimvar(_primvarName, kMotionKeys, times, values);
+    }
     if (count == 0) {
         return;
     }

@@ -39,6 +39,9 @@
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/subdivisionTagsSchema.h>
+#if HD_API_VERSION >= 109
+#include <pxr/imaging/hd/surfaceSchema.h>
+#endif
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 
@@ -223,7 +226,12 @@ DirtyNotifier& DirtyNotifier::dirtyExtent()
 
 DirtyNotifier& DirtyNotifier::dirtyDoubleSided()
 {
-    return _append(HdMeshSchema::GetDoubleSidedLocator());
+    // The translator always emits both for DirtyDoubleSided on a mesh.
+    _append(HdMeshSchema::GetDoubleSidedLocator());
+#if HD_API_VERSION >= 109
+    _append(HdSurfaceSchema::GetDoubleSidedLocator());
+#endif
+    return *this;
 }
 
 DirtyNotifier& DirtyNotifier::dirtyCullStyle()

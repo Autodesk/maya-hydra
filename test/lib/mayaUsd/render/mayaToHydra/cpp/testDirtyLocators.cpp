@@ -320,10 +320,22 @@ void RunInstancedNonMasterVisibilityToggleTest()
 
 void RunRenderItemConnectivityChangeSameVertexCountTest()
 {
-    const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
+    // polyFlipEdge only flips an edge shared by two triangles, so the quad test cube cannot be used.
+    // A triangulated hard-edged cube does not work either: the mesh reaches the adapter in VP2's
+    // dedup ("render vertex") layout, where each cube side owns its 4 vertices, numbered in face
+    // order, and a flipped diagonal just renumbers them - the index array comes out identical.
+    // On a soft-edged triangulated sphere the render vertices are shared across faces, so flipping
+    // a diagonal (edges 88-119 after polyTriangulate) changes the indices but not the vertex count.
+    const std::string sphereShapeFull = "|connectivitySphere|connectivitySphereShape";
+    ASSERT_EQ(MGlobal::executeCommand("polySphere -sx 8 -sy 6 -n connectivitySphere"),
+              MStatus::kSuccess);
+    ASSERT_EQ(MGlobal::executeCommand("polyTriangulate connectivitySphere"), MStatus::kSuccess);
+    ASSERT_EQ(MGlobal::executeCommand("polySoftEdge -a 180 connectivitySphere"), MStatus::kSuccess);
+    MGlobal::executeCommand("refresh");
+
     SdfPath meshPrimPath;
     HdSceneIndexBaseRefPtr mayaSceneIndex;
-    ASSERT_TRUE(TryFindMeshPrim(meshShapeFull, &meshPrimPath, &mayaSceneIndex))
+    ASSERT_TRUE(TryFindMeshPrim(sphereShapeFull, &meshPrimPath, &mayaSceneIndex))
         << "Mesh prim not found";
 
     SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
@@ -331,11 +343,10 @@ void RunRenderItemConnectivityChangeSameVertexCountTest()
     MGlobal::executeCommand("refresh");
     size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
 
-    // Flip a cube edge: retriangulates a quad face without changing the position buffer size.
+    // Flip a diagonal: retriangulates a quad without changing the position buffer size.
     // Maya may set topoChanged and geomChanged together; topology locators must still emit when
     // index connectivity changes while vertex count is unchanged.
-    ASSERT_EQ(MGlobal::executeCommand(
-                  ("select -r " + meshShapeFull + ".e[4]").c_str()),
+    ASSERT_EQ(MGlobal::executeCommand(("select -r " + sphereShapeFull + ".e[88]").c_str()),
               MStatus::kSuccess);
     ASSERT_EQ(MGlobal::executeCommand("polyFlipEdge"), MStatus::kSuccess);
     MGlobal::executeCommand("refresh");
@@ -351,6 +362,8 @@ void RunRenderItemConnectivityChangeSameVertexCountTest()
     EXPECT_FALSE(signals.broadPrimvars)
         << "Render item connectivity change must not emit the broad primvars locator\n"
         << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
+
+    MGlobal::executeCommand("delete connectivitySphere");
 }
 
 void RunSkinnedMeshDeformationEmitsPointsTest()
@@ -660,7 +673,8 @@ TEST(RenderItemDirtyLocators, IntermediateObjectToggleEmitsVisibilityAndUpdatesS
 }
 
 // What: connectivity change with unchanged position-buffer vertex count must dirty mesh topology.
-// How: polyFlipEdge on a cube edge (render items mode); Maya may flag topo+geom together.
+// How: polyFlipEdge on a diagonal of a soft-edged triangulated sphere (render items mode); Maya may
+//      flag topo+geom together.
 // Expect: meshTopology=true; no broadPrimvars. Complements DeformationVertexMove (same count,
 //         unchanged connectivity → no meshTopology) and TopologyExtrude (count changes).
 TEST(RenderItemDirtyLocators, ConnectivityChangeSameVertexCountEmitsTopology)

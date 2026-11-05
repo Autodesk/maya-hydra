@@ -17,6 +17,7 @@
 # MAYA_HAS_RENDER_ITEM_CULL_MODE_API Presence of MRenderItem has CullMode API
 # MAYA_HAS_VIEW_SELECTED_OBJECT_API Presence of M3dView::viewSelectedObject
 # MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API Presence of MDataServerOperation::MViewportScene::MVS_changedWireframeColor
+# MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE Presence of the private render-item override API (MPxRenderItemOverridePrivate.h)
 # MAYA_LINUX_BUILT_WITH_CXX11_ABI Maya Linux was built with new cxx11 ABI.
 # MAYA_MACOSX_BUILT_WITH_UB2 Maya OSX was built with Universal Binary 2.
 # MAYA_MACOSX_BUILT_WITH_ARM64 Maya OSX was built with arm64 only.
@@ -354,6 +355,16 @@ if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MViewport2Renderer.h")
         set(MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API TRUE CACHE INTERNAL "hasMVSChangedWireframeColor")
         message(STATUS "MDataServerOperation::MViewportScene has MVS_changedWireframeColor API")
     endif()
+endif()
+
+# Maya's PRIVATE, unsupported render-item override API, which the render
+# item override creator (adapters/renderItemOverrideCreator) is built on. Absent
+# from every Maya release before it, and free to change within a major release: the creator
+# follows changes with MAYA_API_VERSION checks.
+set(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE FALSE CACHE INTERNAL "hasRenderItemOverridePrivate")
+if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MPxRenderItemOverridePrivate.h")
+    set(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE TRUE CACHE INTERNAL "hasRenderItemOverridePrivate")
+    message(STATUS "Maya has the private render-item override API (carriers)")
 endif()
 
 set(MAYA_LINUX_BUILT_WITH_CXX11_ABI FALSE CACHE INTERNAL "MayaLinuxBuiltWithCxx11ABI")
