@@ -63,7 +63,9 @@ namespace MAYAHYDRA_NS_DEF {
 void RegisterOptionalSceneIndexPlugins(const TfTokenVector& authoredReprs)
 {
     // The registry never forgets a registration and registering twice stacks two instances,
-    // so remember what was done in this process.
+    // so remember what was done in this process. This state is lost when the mayaHydra plugin
+    // is unloaded, so a reload registers again: the optional plugins must tolerate that by
+    // not adding their scene index when it is already in the chain.
     static std::set<std::string> registered;
 
     // Kill switch, also used to measure the cost of having the optional plugins registered.
