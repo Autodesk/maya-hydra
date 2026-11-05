@@ -48,7 +48,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
-    testMayaLights.py|disabled:HYDRA-1940 # Does not pass on Maya 2026
+    testMayaLights.py|disabledOn:maya2026:HYDRA-1940|disabledOn:mayaGt2027:HYDRA-1940|disabledOn:maya2027,osx:HYDRA-1940
     testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
     testUsdAreaLightGizmos.py
     testUVandUDIM.py|disabled:HYDRA-2709,AGP-734 # This test fails everywhere as of 2026-11-05, but when AGP-734 is fixed convert to disabledOn:mayaLe2027:HYDRA-2709.
