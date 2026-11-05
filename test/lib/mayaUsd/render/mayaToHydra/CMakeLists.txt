@@ -43,7 +43,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
     testTransforms.py
-    testRefinement.py|skipOnRenderer:HdFlash|disabledOn:maya2027,lin:AGP-1034,AGP-1035 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
+    testRefinement.py|skipOnRenderer:HdFlash|disabledOn:maya2027,lin:HYDRA-1893 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
@@ -51,14 +51,14 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaLights.py|disabled:HYDRA-1940 # Does not pass on Maya 2026
     testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
     testUsdAreaLightGizmos.py
-    testUVandUDIM.py|disabled:HYDRA-2709,AGP-734
+    testUVandUDIM.py|disabled:HYDRA-2709,AGP-734 # This test fails everywhere as of 2026-11-05, but when AGP-734 is fixed convert to disabledOn:mayaLe2027:HYDRA-2709.
 	testPurposeRenderTag.py
 
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa|disabledOn:maya2027,osx:HYDRA-1727
-    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2677 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : Maya crash in IsStormRenderDelegate / FramePass::Initialize
+    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2719,HYDRA-2209 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : with HdFlash, Maya crash in IsStormRenderDelegate / FramePass::Initialize
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
