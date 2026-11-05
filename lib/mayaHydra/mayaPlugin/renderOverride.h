@@ -224,6 +224,10 @@ private:
     typedef std::pair<MString, MCallbackIdArray> PanelCallbacks;
     typedef std::vector<PanelCallbacks>          PanelCallbacksList;
 
+    // Tell producers whether this instance's renderer binds device streams
+    // (MhExtGpuStreams::SetRendererBindsDeviceStreams). Needs the scene index.
+    void _PublishDeviceStreamSupport();
+
     void _InitHydraResources(
         const MHWRender::MDrawContext& drawContext,
         const MayaHydraParams&         delegateParams);

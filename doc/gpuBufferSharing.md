@@ -110,7 +110,7 @@ and visibility handling in `UpdateFromDelta` is shared:
 
 | Hook | CPU adapter | GPU adapter |
 | --- | --- | --- |
-| `_BeginGeometryUpdate` | no-op | Decides direct-bind for this update (hybrid promotion) |
+| `_BeginGeometryUpdate` | no-op | Calls `MhExtGpuStreams::BeginUpdate`, which decides direct-bind for this update (hybrid promotion) |
 | `_ReadVertexStream` | `map()` into a `VtArray` | Tries to share; falls back to the base class on failure |
 | `_EndGeometryUpdate` | Dirty every stream on geometry change | Withdraws vanished streams; dirties only what must be re-pulled |
 | `_HasStoredPositions` / `_StoredPositionCount` | CPU array | CPU array or published external stream |
@@ -228,18 +228,21 @@ Details that the implementation depends on:
 ## Publishing a stream
 
 `_ReadVertexStream` handles positions, normals (only when Maya supplies
-normals), UVs and tangents (meshes only). For each, `_ShareStream` calls
-`_PublishExtStream`, which returns one of:
+normals), UVs and tangents (meshes only). The stream state and the publishing
+logic live in `MhExtGpuStreams` (`adapters/mhExtGpuStreams.cpp`), which the
+adapter owns and exposes through `MayaHydraAdapter::GetExtGpuStreams()`. For
+each stream, `MhExtGpuStreams::Share` calls `_Publish`, which returns one of:
 
 | Result | Meaning | Effect on the stream |
 | --- | --- | --- |
 | `Republished` | First publish, or the buffer, layout or direct-bind permission changed | New schema; primvar dirtied |
 | `Unchanged` | Same layout and permission; for the OpenGL route also the same GL buffer | Cached schema kept; Vulkan route refreshes the copy |
 | `NoGpu` | Cannot be shared this time | External stream cleared; base class CPU read runs |
+| `ReadbackOnly` | `ShareDeviceOnly` only: the renderer has no bridge, and the stream has no CPU copy to fall back on | Kept with no schema; its values come from the lazy CPU readback (see [render item override carriers](#render-item-override-carriers)) |
 
 ```mermaid
 flowchart TD
-    START["_PublishExtStream(mvb)"] --> H{"resourceHandle<br/>and GL name valid?"}
+    START["_Publish(mvb)"] --> H{"resourceHandle<br/>and GL name valid?"}
     H -- no --> CPU["NoGpu<br/>(CPU read)"]
     H -- yes --> L{"Element type maps<br/>to an HdTupleType?"}
     L -- no --> CPU
@@ -301,15 +304,16 @@ size:
 
 ### Ownership and lifetime
 
-- The adapter's `_ExtStream::buffer` holds the only strong reference on the
-  producer side.
+- The adapter's `MhExtGpuStreams::_Stream::buffer` holds the only strong
+  reference on the producer side.
 - The schema placed in the scene index holds a **weak** reference
   (`HgiExternalBufferWeakPtr`). A scene index that caches or flattens the
   container therefore cannot pin GPU memory.
 - The consumer takes its own strong reference while it may bind the buffer,
   and the arena releases its reference only from `GarbageCollect()`, after the
-  GPU work that used it has retired. Replacing or clearing `_ExtStream::buffer`
-  is therefore safe while the renderer is still drawing with the old buffer.
+  GPU work that used it has retired. Replacing or clearing
+  `MhExtGpuStreams::_Stream::buffer` is therefore safe while the renderer is
+  still drawing with the old buffer.
 
 ### Withdrawing streams
 
@@ -332,10 +336,10 @@ prim can take part in indirect-draw batching.
 | `batch` | always false | Batched | One Storm-side blit per dirty primvar per frame |
 | `hybrid` (default) | false until the mesh deforms, then true | Batched | Promoted to direct after the first deform |
 
-In hybrid mode, `_BeginGeometryUpdate` promotes a mesh the first time it
+In hybrid mode, `MhExtGpuStreams::BeginUpdate` promotes a mesh the first time it
 reports a geometry or topology change after its positions were already
 published (so the initial population frame does not count). The promotion is
-sticky. No dirty is emitted at promotion time: the next `_PublishExtStream`
+sticky. No dirty is emitted at promotion time: the next `_Publish`
 sees that the cached `allowDirectBind` is stale and republishes, which dirties
 the stream.
 
@@ -362,13 +366,16 @@ streams that VP2 did not supply stay clean.
 
 ## Scene index integration
 
-`MayaHydraPrimvarsDataSource::Get` builds each primvar as usual, then, for a
-`MayaHydraGpuRenderItemAdapter` that has a schema for that primvar:
+`MayaHydraPrimvarsDataSource::Get` builds each primvar as usual, then, for an
+adapter whose `GetExtGpuStreams()` shares that primvar (`IsShared`):
 
-1. Replaces `primvarValue` with `_ExtGpuBufferLazyValueDataSource`.
-2. Overlays the `HdExtGpuBufferSchema` container as the primvar's
-   `extGpuBuffer` child, where the consumer finds it with
-   `HdExtGpuBufferSchema::GetFromParent`.
+1. Replaces `primvarValue` with `_ExtGpuBufferLazyValueDataSource`. This
+   happens for every shared stream, including one kept for readback only
+   (`ReadbackOnly`), because a shared stream has no CPU copy.
+2. When the stream has a schema, overlays the `HdExtGpuBufferSchema`
+   container as the primvar's `extGpuBuffer` child, where the consumer finds
+   it with `HdExtGpuBufferSchema::GetFromParent`. A readback-only stream has
+   none.
 
 ```text
 primvars/
@@ -384,7 +391,7 @@ primvars/
 ### Lazy CPU fallback
 
 Building the lazy data source does not touch the GPU. Only `GetValue()` reads
-the buffer, through `GetExtGpuBufferLazyValue`. This serves consumers that
+the buffer, through `MhExtGpuStreams::GetLazyValue`. This serves consumers that
 ignore `extGpuBuffer`, such as other render delegates, scene browsers, or
 scene index filters that read point positions.
 
@@ -427,6 +434,38 @@ The first lazy read of a primvar sets a bit in
 `_lazyCpuBufferTriggeredMask`. From then on that primvar is dirtied on every
 change, because the adapter is shared by all viewports and some consumer now
 depends on the CPU value being current.
+
+## Render item override carriers
+
+With the render item override path (on unless `MAYAHYDRA_RENDER_ITEM_OVERRIDE=0`), Maya carries mesh geometry to MayaHydra
+through `MPxRenderItemOverride` payloads (Maya's private render-item override
+API, `maya/MPxRenderItemOverridePrivate.h`) rather than VP2 render items, and
+`MayaHydraRenderItemOverrideAdapter` serves them. A static or CPU-deformed carrier
+has no VP2 vertex buffers, so it stays on CPU arrays. A GPU-deformed one does
+have buffers: the ones the deformer writes.
+
+`MayaHydraRenderItemOverride::supportsGPUVertexBuffer()` returns true when
+sharing is enabled, VP2 is on OpenGL, and the active renderer binds device
+streams (`MhExtGpuStreams::RendererBindsDeviceStreams()`, set by the render
+override for the renderer in use). Maya then skips its readback for
+GPU-deformed carriers and describes the deformer's position and normal buffers,
+plus a device copy of the UVs, instead (`MRenderItemOverrideGeometry::gpuVertexBuffer`).
+The override copies each
+description into an `MhExtGpuSource` in the payload, because the handle is
+borrowed for the duration of `updateRenderItem`. The adapter publishes the
+sources through its own `MhExtGpuStreams` with `ShareDeviceOnly`.
+
+`ShareDeviceOnly` differs from `Share` in one respect. A device-only stream has
+no CPU copy to fall back on, so when the renderer has no bridge the stream is
+kept **for readback only**: it is published with no schema, and the lazy CPU
+readback is the only way to its values. The primvar data source therefore uses
+the lazy value for any stream `IsShared` reports, whether or not it has a
+schema.
+
+The first sync of each object always reads back, because the override instance
+that answers `supportsGPUVertexBuffer()` does not exist yet. Bounds for device
+data are the GPU deformer's own, as Maya reports them; the DAG node's bounding
+box is used only when Maya reports none.
 
 ## Frame synchronization (Vulkan route)
 

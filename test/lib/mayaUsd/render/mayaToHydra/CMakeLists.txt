@@ -67,7 +67,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUsdTextureToggle.py
     testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
-    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
 	testSceneModified.py
@@ -214,6 +213,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 # Interactive unit test scripts for Hydra Generative Procedurals.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
     cpp/testHydraGenerativeProcedural.py
+)
+
+# Interactive unit test scripts that run with the render item override off
+# (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0), on the stock render item path.
+set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
+    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
 )
 
 # Every interactive test runs in both selection highlighting modes: the primary
@@ -375,6 +380,26 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
 
 endforeach()
 
+# Same as above, with the render item override off.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+            "MAYAHYDRA_RENDER_ITEM_OVERRIDE=0"
+            ${mode_env}
+    )
+
+    # Add a ctest label to these tests for easy filtering.
+    apply_labels_to_test("${all_labels}" ${target})
+
+endforeach()
+
 # Registers the legacy counterpart of an interactive test, unless its primary
 # run is already legacy.
 #   name_suffix - appended before "_legacy", to keep the target unique for
@@ -423,6 +448,13 @@ endforeach()
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
     mayaHydra_add_legacy_mode_test(${script} ""
         "HDGP_INCLUDE_DEFAULT_RESOLVER=1")
+endforeach()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE})
+    mayaHydra_add_legacy_mode_test(${script} ""
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+        "MAYAHYDRA_RENDER_ITEM_OVERRIDE=0")
 endforeach()
 
 # Standalone Python unit tests for pure test utilities. These exercise logic

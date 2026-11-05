@@ -90,7 +90,8 @@ class TestRenderItemDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
 
     # What: edge flip retriangulates without changing position-buffer size; topology locators must
     #       emit when index connectivity changes (same vertex count, topo+geom flags from Maya).
-    # How: render items mode, polyFlipEdge on a cube edge via C++, inspect dirty locators.
+    # How: render items mode, polyFlipEdge on a soft-edged triangulated sphere via C++, inspect
+    #      dirty locators.
     # Expect: meshTopology=true; no broadPrimvars.
     def test_connectivityChangeSameVertexCountEmitsTopology(self):
         self.setupScene()

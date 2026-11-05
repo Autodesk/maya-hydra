@@ -24,6 +24,7 @@
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
+#include <mayaHydraLib/adapters/mhExtGpuStreams.h>   // SetRendererBindsDeviceStreams
 #endif
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
@@ -151,6 +152,7 @@
 #include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MTimerMessage.h>
+
 #include <maya/MUiMessage.h>
 #include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
@@ -1132,20 +1134,65 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
         {"point", 0},
     };
 
+    // Pick the instance that is actually DRAWING, not merely the first one that
+    // initialised.
+    //
+    // There is one MtohRenderOverride per renderer, and switching renderer does
+    // not tear the old one down immediately. The previous version took the first
+    // instance with a render index and stopped, so after a renderer switch it
+    // reported the previous renderer's (by then empty) scene and returned all
+    // zeros. That is indistinguishable from "the scene is empty", which made the
+    // command useless for exactly the renderer-comparison it was reached for.
+    //
+    // _renderPanelCallbacks is non-empty precisely while a panel is drawing
+    // through that instance, so it is the honest test for "active".
     MtohRenderOverride* instance = nullptr;
+    size_t              candidates = 0;
     {
         std::lock_guard<std::mutex> lock(_allInstancesMutex);
         for (auto* inst : _allInstances) {
-            if (inst->_initializationSucceeded && inst->renderIndex()) {
-                instance = inst;
+            if (!inst->_initializationSucceeded || !inst->renderIndex()) {
+                continue;
+            }
+            ++candidates;
+            if (!inst->_renderPanelCallbacks.empty()) {
+                instance = inst;   // drawing right now - prefer it
                 break;
+            }
+            if (!instance) {
+                instance = inst;   // fallback, keeps the old behaviour
             }
         }
     }
 
     if (!instance || !instance->renderIndex()) {
+        // Say so, rather than returning a zero-filled map that reads as "the
+        // scene is empty". A diagnostic that cannot distinguish "no data" from
+        // "no geometry" sends the reader chasing the wrong bug.
+        stats["error.noActiveRenderer"] = 1;
+        stats["error.candidateInstances"] = static_cast<int>(candidates);
         return stats;
     }
+
+    // Which renderer answered, so a renderer comparison cannot silently
+    // compare one renderer against itself.
+    stats["renderer." + std::string(instance->_rendererDesc.rendererName.GetText())] = 1;
+
+    // THIS COMMAND ONLY SEES RenderIndex-BASED RENDERERS.
+    //
+    // Everything below walks HdRenderIndex::GetRprimIds(). A renderer that does
+    // not go through the render index populates nothing
+    // there, so every count comes back 0 and reads exactly like an empty scene.
+    // That cost real debugging time: a viewport with visible geometry
+    // reported "primitives 0", which was taken as evidence the prims were
+    // missing.
+    //
+    // It cannot be detected reliably from here (an empty render index is an
+    // empty render index), so the result says so instead. If you see
+    // warning.zeroPrimsWhileDrawing, do not conclude the scene is empty - use
+    // the Hydra Scene Browser, which inspects the SCENE INDEX and is therefore
+    // renderer-agnostic.
+    const bool drawing = !instance->_renderPanelCallbacks.empty();
 
     // Get stats for all passes, avoiding double-counting when passes share the same render index
     const int numFramePasses = instance->_GetNumFramePasses();
@@ -1235,6 +1282,12 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
             }
         }
     }
+    if (drawing && stats["primitives"] == 0) {
+        // Either the scene really is empty, or this renderer does not use the
+        // render index. Say both rather than implying the first.
+        stats["warning.zeroPrimsWhileDrawing"] = 1;
+    }
+
     return stats;
 }
 
@@ -2954,6 +3007,20 @@ void MtohRenderOverride::_InitHydraResources(
     }
     
     _initializationSucceeded = true;
+
+    // This instance starts drawing now: producers should hand it what it can use.
+    _PublishDeviceStreamSupport();
+}
+
+void MtohRenderOverride::_PublishDeviceStreamSupport()
+{
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    // The same test MhExtGpuStreams applies per stream: a bridge for this
+    // renderer's Hgi means it can bind the buffers; none means CPU readback.
+    const bool binds = _mayaHydraSceneIndex
+        && static_cast<bool>(MhExtGpuBufferBridge::ForHgi(_mayaHydraSceneIndex->GetHgi()));
+    MhExtGpuStreams::SetRendererBindsDeviceStreams(binds);
+#endif
 }
 
 //When fullReset is true, we remove the data producer scene indices that apply to all viewports.
@@ -3219,6 +3286,7 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
         constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
     }
+
 }
 
 void MtohRenderOverride::SelectionChanged(
@@ -3357,7 +3425,15 @@ MStatus MtohRenderOverride::setup(const MString& destination)
             newCallbacks.append(id);
         }
 
+        const bool firstPanel = _renderPanelCallbacks.empty();
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
+
+        // Back to an instance that already has its Hydra resources (switching
+        // renderers): restore its device-stream answer. A new instance sets it
+        // from _InitHydraResources instead, which runs later, from Render().
+        if (firstPanel && _initializationSucceeded) {
+            _PublishDeviceStreamSupport();
+        }
     }
 
     // Track the mouse for hover highlighting. Idempotent. Installed regardless of the highlight

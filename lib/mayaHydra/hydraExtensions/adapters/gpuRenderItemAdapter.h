@@ -17,17 +17,12 @@
 #ifndef MAYAHYDRALIB_GPU_RENDER_ITEM_ADAPTER_H
 #define MAYAHYDRALIB_GPU_RENDER_ITEM_ADAPTER_H
 
+#include <mayaHydraLib/adapters/mhExtGpuStreams.h>
 #include <mayaHydraLib/adapters/renderItemAdapter.h>
 
-#include <pxr/imaging/hd/extGpuBufferSchema.h>
-#include <pxr/imaging/hd/types.h>
 #include <pxr/pxr.h>
 
 #include <maya/MHWGeometry.h>
-
-#include <atomic>
-#include <cstdint>
-#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -58,18 +53,8 @@ public:
     MAYAHYDRALIB_API
     static bool IsEligible(const MRenderItem& ri, Hgi* hgi);
 
-    /// Returns the primvar's externally-owned GPU buffer as an
-    /// HdExtGpuBufferSchema container, or a null handle when the primvar has
-    /// no external buffer.  Consumed by MayaHydraPrimvarsDataSource, which
-    /// overlays it as the primvar's `extGpuBuffer` child.
-    MAYAHYDRALIB_API
-    HdContainerDataSourceHandle GetExtGpuBufferSchema(const TfToken& key) const;
-
-    /// Materialize the CPU value corresponding to a published external GPU
-    /// buffer. Called only by the lazy primvar value data source when a Hydra
-    /// consumer actually pulls that value.
-    MAYAHYDRALIB_API
-    VtValue GetExtGpuBufferLazyValue(const TfToken& key) const;
+    /// The streams this adapter shares with the renderer.
+    const MhExtGpuStreams* GetExtGpuStreams() const override { return &_extStreams; }
 
 protected:
     size_t    _StoredStreamCount(const TfToken& primvar) const override;
@@ -90,97 +75,7 @@ protected:
     bool _TopologyNeedsRebuild(bool emitTopologyLocators, bool hasCachedTopology) const override;
 
 private:
-    enum class _ExtPublishResult
-    {
-        Republished, // schema (re)built: first publish, buffer change, or mode flip
-        Unchanged,   // same buffer, count and mode: cached schema kept as-is
-        NoGpu,       // not shareable with this renderer: caller uses the CPU path
-    };
-
-    /// One primvar stream shared out of a VP2 vertex buffer.
-    struct _ExtStream
-    {
-        /// The HdExtGpuBufferSchema container published to the scene index as
-        /// the primvar's `extGpuBuffer` child (see
-        /// MayaHydraPrimvarsDataSource). Null means this stream has no shared
-        /// buffer and the CPU value is authoritative.
-        HdContainerDataSourceHandle schema;
-
-        /// The producer's STRONG reference to the shared buffer, and the only
-        /// thing keeping it alive on our side: what travels through the scene
-        /// index is weak, so that a scene-index cache outliving the geometry
-        /// cannot pin GPU memory. Dropping this is how the adapter withdraws a
-        /// buffer -- the arena then releases it once the GPU has retired the
-        /// work that named it, not before.
-        ///
-        /// Held through a forward-declared type on purpose: hd declares
-        /// HgiExternalBuffer without including hgi for the same reason, and
-        /// shared_ptr needs no more than that to be declared, copied and
-        /// destroyed.
-        std::shared_ptr<HgiExternalBuffer> buffer;
-
-        /// Identity of the VP2 buffer `schema` describes, for change
-        /// detection: which native buffer, how many elements, and whether we
-        /// published permission to bind it directly. A byte-only deform leaves
-        /// all three untouched, which is what makes it free.
-        uint64_t    rawHandle = 0;
-        size_t      numElements = 0;
-        size_t      byteOffset = 0;
-        size_t      byteStride = 0;
-        HdTupleType tupleType = { HdTypeInvalid, 1 };
-        bool        allowDirectBind = false;
-
-        explicit operator bool() const { return static_cast<bool>(schema); }
-    };
-
-    /// Publish one primvar stream as a shared GPU buffer, registering it with
-    /// the renderer's arena and rebuilding the cached schema only when it must.
-    /// Returns NoGpu, leaving \p stream untouched, when the stream cannot be
-    /// shared -- no GPU handle, an element type other than Hydra's for \p key, or a renderer
-    /// that cannot consume VP2's buffers.
-    _ExtPublishResult _PublishExtStream(
-        MVertexBuffer* mvb,
-        _ExtStream&    stream,
-        const TfToken& key,
-        bool           allowDirectBind);
-
-    /// Publish \p mvb into \p stream and set \p dirty when the renderer has to re-pull it.
-    /// Returns false, withdrawing \p stream, when the caller must read the stream on the CPU.
-    bool _ShareStream(
-        MVertexBuffer* mvb,
-        _ExtStream&    stream,
-        const TfToken& key,
-        bool           alwaysDirty,
-        bool&          dirty);
-
-    /// The published stream for the points, normals, st or tangents primvar, or null.
-    const _ExtStream* _ExtStreamFor(const TfToken& key) const;
-
-    bool _LazyCpuBufferTriggered(const TfToken& key) const;
-    void _SetLazyCpuBufferTriggered(const TfToken& key) const;
-
-    _ExtStream _extPositions;
-    _ExtStream _extNormals;
-    _ExtStream _extUvs;
-    _ExtStream _extTangents;
-
-    mutable std::atomic<uint8_t> _lazyCpuBufferTriggeredMask { 0 };
-
-    // Hybrid-mode classifier. Starts false so the mesh runs in batch mode
-    // (allowDirectBind=false, GPU-to-GPU blit). Flips to true (sticky) on the
-    // second geometry-only change (MVS_changedGeometry without MVS_changedTopo)
-    // since the mesh was last (re)populated - i.e. a deform. VP2 sends one such
-    // change after populating a rigid mesh (e.g. after a display-mode toggle), so
-    // one is not enough. Once true, the mesh runs in direct mode (zero-copy).
-    // Only consulted when MAYAHYDRA_GPU_BUFFER_SHARING_MODE=hybrid.
-    bool _classifiedAsAnimating = false;
-    // Geometry-only changes since the last topology change, while unclassified in
-    // hybrid mode; saturates at the promotion threshold.
-    int _geomOnlyUpdatesSinceTopo = 0;
-
-    // Whether the streams published on the current update allow direct binding. Decided once
-    // per update in _BeginGeometryUpdate.
-    bool _useDirectBind = false;
+    MhExtGpuStreams _extStreams;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
