@@ -2168,9 +2168,8 @@ MStatus MtohRenderOverride::Render(
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
-    // delegate. The Storm-specific task setup below only disables the shadow task;
-    // other delegates rely on the lights management scene index turning off shadow
-    // casting on the light prims themselves.
+    // delegate. All delegates, Storm included, rely on the lights management scene index
+    // turning off shadow casting on the light prims themselves.
     // MLightParameterInformation::getParameter(kGlobalShadowOn) only actually
     // returns data when the shadows are enabled. If there is no light or shadows
     // are off, the call will not be successful. Therefore, assume shadows are off
@@ -2204,7 +2203,13 @@ MStatus MtohRenderOverride::Render(
                 continue;
             }
 
-            currentPass->SetEnableShadows(enableShadows);
+            // Keep the Storm shadow pipeline always enabled: turning
+            // HdxSimpleLightTaskParams::enableShadows off and then on again leaves the shadow
+            // task drawing into an incomplete framebuffer on the frame it is re-enabled
+            // (GL_INVALID_FRAMEBUFFER_OPERATION), so nothing is drawn in that frame.
+            // The viewport toggle is already applied per light by the lights management
+            // scene index, so no need to turn the task off. 
+            currentPass->SetEnableShadows(true);
             currentPass->SetShadowParams(shadowParams);
         }
         if (_mayaHydraSceneIndex) {
