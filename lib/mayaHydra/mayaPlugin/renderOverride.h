@@ -573,9 +573,10 @@ private:
 
     GfVec4d _viewport;
 
-    /// Camera prim last warned about for a projection that the solved framing cannot reproduce.
-    /// Cleared once that camera's projection becomes solvable again, so a later failure warns again.
-    SdfPath _unsolvableFramingWarnedCamera;
+    /// Camera prims already warned about for a projection that the solved framing cannot
+    /// reproduce. A camera is removed once its projection becomes solvable again, so a later
+    /// failure warns again.
+    TfHashSet<SdfPath, SdfPath::Hash> _unsolvableFramingWarnedCameras;
 
     int _currentOperation = -1;    
 

@@ -2148,22 +2148,27 @@ MStatus MtohRenderOverride::Render(
     // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
     // disabling window conforming and solving the display window so that the framed prim
     // projection equals Maya's projection matrix.
-    const GfVec2i panelSize(width, height);
-    bool          framingUnsolvable = false;
-    bool          framingSolved = false;
+    // Every pass uses the same Maya projection matrix.
+    // The display window is solved once, from the main pass.
+    const GfVec2i             panelSize(width, height);
+    std::optional<GfMatrix4d> cameraPrimProjection;
+    std::optional<GfRange2f>  solvedWindow;
+    if (!cameraPath.IsEmpty() && numFramePasses > 0 && _GetFramePass(0)) {
+        // Compute the base projection matrix of the camera prim.
+        cameraPrimProjection = Fvp::computeCameraPrimProjection(
+            _GetFramePass(0)->GetRenderIndex()->GetTerminalSceneIndex(), cameraPath);
+        if (cameraPrimProjection) {
+            solvedWindow
+                = Fvp::solveDisplayWindow(projectionMatrix, *cameraPrimProjection, panelSize);
+        }
+    }
+
     for (int i = 0; i < numFramePasses; ++i) {
         const hvt::FramePassPtr& currentPass = _GetFramePass(i);
         if (!currentPass) {
             continue;
         }
         auto& params = currentPass->params();
-
-        std::optional<GfMatrix4d> cameraPrimProjection;
-        if (!cameraPath.IsEmpty()) {
-            // Compute the base projection matrix of the camera prim.
-            cameraPrimProjection = Fvp::computeCameraPrimProjection(
-                currentPass->GetRenderIndex()->GetTerminalSceneIndex(), cameraPath);
-        }
 
         if (!cameraPrimProjection) {
             params.viewInfo.framing = CameraUtilFraming(displayWindow, renderRegion);
@@ -2173,14 +2178,6 @@ MStatus MtohRenderOverride::Render(
             continue;
         }
 
-        const std::optional<GfRange2f> solvedWindow
-            = Fvp::solveDisplayWindow(projectionMatrix, *cameraPrimProjection, panelSize);
-        if (solvedWindow) {
-            framingSolved = true;
-        } else {
-            framingUnsolvable = true;
-        }
-
         params.viewInfo.framing
             = CameraUtilFraming(solvedWindow.value_or(displayWindow), renderRegion);
         params.renderParams.camera = cameraPath;
@@ -2188,16 +2185,17 @@ MStatus MtohRenderOverride::Render(
             = std::optional<CameraUtilConformWindowPolicy>(CameraUtilDontConform);
     }
 
-    if (framingUnsolvable) {
-        if (_unsolvableFramingWarnedCamera != cameraPath) {
+    if (cameraPrimProjection && !solvedWindow) {
+        // Warn once per camera. Panels looking through different cameras render in turn.
+        if (_unsolvableFramingWarnedCameras.insert(cameraPath).second) {
             TF_WARN(
                 "The projection of camera %s cannot be reproduced through its camera prim (for "
                 "example because of film roll). The viewport may not match Maya's framing.",
                 cameraPath.GetText());
-            _unsolvableFramingWarnedCamera = cameraPath;
         }
-    } else if (framingSolved && _unsolvableFramingWarnedCamera == cameraPath) {
-        _unsolvableFramingWarnedCamera = SdfPath();
+    } else if (solvedWindow) {
+        // The display window solves again (i.e., the film roll was removed).
+        _unsolvableFramingWarnedCameras.erase(cameraPath);
     }
 
     // Update all registered plugin before render.
