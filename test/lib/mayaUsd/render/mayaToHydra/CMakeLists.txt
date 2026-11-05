@@ -64,8 +64,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
-    testUsdTextureToggle.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
-    testUsdStageDefaultLighting.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
+    testUsdTextureToggle.py
+    testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
     testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX
     testCustomShadersNode.py
