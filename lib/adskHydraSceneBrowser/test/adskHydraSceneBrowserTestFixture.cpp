@@ -476,26 +476,24 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const PXR_NS::VtValue
             valueStream << path << "\n";
         }
     } else if (value.IsHolding<PXR_NS::HdPrimOriginSchema::OriginPath>()) {
-        // Mirror HduiDataSourceValueTreeView: when OriginPath is a registered
-        // Vt type, operator<< outputs "HdPrimOriginSchema::OriginPath(<path>)"
-        // and the widget displays that same string. When OriginPath is not yet
-        // a registered Vt type, the widget calls .GetPath() directly. Detect
-        // at runtime so this works across USD builds regardless of what
-        // PXR_VERSION says.
-        //
-        // We cannot use MatchesFallbackTextOutput here: its regex excludes ':'
-        // so the unregistered fallback "<'HdPrimOriginSchema::OriginPath' @
-        // 0x...>" would not be detected. Instead check the prefix directly.
+#if PXR_VERSION >= 2603
+        // USD 26.03+ hdui unwraps OriginPath and displays the bare SdfPath.
+        valueStream << value.UncheckedGet<PXR_NS::HdPrimOriginSchema::OriginPath>().GetPath();
+#else
+        // Mirror HduiDataSourceValueTreeView (USD < 26.03): when OriginPath is a
+        // registered Vt type, operator<< outputs
+        // "HdPrimOriginSchema::OriginPath(<path>)" and the widget displays that
+        // same string. When OriginPath is not yet a registered Vt type, the widget
+        // calls .GetPath() directly.
         std::ostringstream probeStream;
         probeStream << value;
         const std::string probeOutput = probeStream.str();
         if (probeOutput.rfind("HdPrimOriginSchema::OriginPath(", 0) == 0) {
-            // OriginPath is registered: widget uses VtValue streaming.
             valueStream << probeOutput;
         } else {
-            // OriginPath is not registered: widget calls .GetPath().
             valueStream << value.UncheckedGet<PXR_NS::HdPrimOriginSchema::OriginPath>().GetPath();
         }
+#endif
     } else {
         valueStream << value;
     }

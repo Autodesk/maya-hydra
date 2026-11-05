@@ -180,7 +180,7 @@ endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
 if (NOT CODE_COVERAGE)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py|skipOnRenderer:HdFlash) # HYDRA-2679 : Prim origin path mismatch, then stack overflow
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
 endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
