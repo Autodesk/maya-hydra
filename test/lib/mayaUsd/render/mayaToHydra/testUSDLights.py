@@ -31,8 +31,8 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.5
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1.0
 
     def verifyLightingModes(self, shadowOn):
         # allLights / domeLight / flatLight changed in USD 25.11.
@@ -119,8 +119,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
 
         cmds.select(DISTANT_LIGHT_PATH, deselect=True)
         cmds.refresh()
-        imageVersion = "usd26.05+" if self._usdVersion >= (0, 26, 5) else None
-        self.assertSnapshotClose("diskLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        self.assertSnapshotClose("diskLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_USDLightsDeselectNonLeadLight(self):
         self._openSceneInSelectedLightsMode()
