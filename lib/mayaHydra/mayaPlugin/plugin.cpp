@@ -16,6 +16,7 @@
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 #include "mayaColorPreferencesTranslator.h"
+#include "optionalSceneIndexPlugins.h"
 #include "pluginUtils.h"
 #include "renderGlobals.h"
 #include "envSettings.h"
@@ -36,6 +37,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <flowViewport/global.h>
+#include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <filesystem>
 
 #include <pxr/base/plug/plugin.h>
@@ -376,6 +378,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
             MGlobal::executeCommand("loadPlugin -quiet mayaUsdPlugin");
         }
     }
+
+    // Renderers that cannot draw the reprs we author natively (for example wireframe on
+    // shaded) offer an optional scene index for them. Register it now that every renderer
+    // plugin is discovered (mayaUsdPlugin registered the versioned ones) and before any
+    // render index is created.
+    MayaHydra::RegisterOptionalSceneIndexPlugins(Fvp::ReprSelectorSceneIndex::GetAuthoredReprs());
   
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
