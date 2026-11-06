@@ -2173,7 +2173,8 @@ MStatus MtohRenderOverride::Render(
     // MLightParameterInformation::getParameter(kGlobalShadowOn) only actually
     // returns data when the shadows are enabled. If there is no light or shadows
     // are off, the call will not be successful. Therefore, assume shadows are off
-    // by default, and only enable them if they are.
+    // by default, and only enable them if they are. Note : despite being a Maya
+    // API, MLightParameterInformation does indeed work for USD lights.
     bool  enableShadows = false;
     auto* lightParam = drawContext.getLightParameterInformation(
         0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
@@ -2207,7 +2208,7 @@ MStatus MtohRenderOverride::Render(
             // HdxSimpleLightTaskParams::enableShadows off and then on again leaves the shadow
             // task drawing into an incomplete framebuffer on the frame it is re-enabled
             // (GL_INVALID_FRAMEBUFFER_OPERATION), so nothing is drawn in that frame.
-            // The viewport toggle is already applied per light by the lights management
+            // Shadows are already enabled/disabled for every light by the lights management
             // scene index, so no need to turn the task off. 
             currentPass->SetEnableShadows(true);
             currentPass->SetShadowParams(shadowParams);
