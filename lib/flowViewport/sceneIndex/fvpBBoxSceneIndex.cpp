@@ -26,6 +26,7 @@
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -38,7 +39,10 @@
 #include <pxr/imaging/hd/basisCurvesTopologySchema.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/primOriginSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+
+#include <algorithm>
 
 // This class is a filtering scene index that converts the geometries into a bounding box using the extent attribute. 
 // If the extent attribute is not present, we draw nothing, so an extent attribute must exist on all primitives for this mode to be supported correctly.
@@ -49,6 +53,28 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace
 {
+    TF_DEFINE_PRIVATE_TOKENS(
+        _primvarsTokens,
+        (overrideWireframeColor)
+    );
+
+    const TfToken extentsHintBoundsToken("extentsHintBounds");
+
+    HdContainerDataSourceHandle _OverlayExtent(
+        const HdContainerDataSourceHandle& primSource,
+        const GfRange3d& extent)
+    {
+        const HdContainerDataSourceHandle extentOverlay
+            = HdRetainedContainerDataSource::New(
+                HdExtentSchemaTokens->extent,
+                HdExtentSchema::Builder()
+                    .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(
+                        extent.GetMin()))
+                    .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(
+                        extent.GetMax()))
+                    .Build());
+        return HdOverlayContainerDataSource::New(extentOverlay, primSource);
+    }
 
     //Prims on which we need to change the geometry into a bounding box
     const std::set<TfToken> kSupportedPrimTypes = {
@@ -82,7 +108,7 @@ namespace
     public:
 
         TfTokenVector GetNames() override {
-            return {HdTokens->displayColor};
+            return {HdTokens->displayColor, _primvarsTokens->overrideWireframeColor};
         }
 
         HdDataSourceBaseHandle Get(const TfToken &name) override {
@@ -94,6 +120,13 @@ namespace
                                                 HdPrimvarSchemaTokens->constant,
                                                 HdPrimvarSchemaTokens->color);
                 return src;
+            }
+            if (name == _primvarsTokens->overrideWireframeColor) {
+                return Fvp::PrimvarDataSource::New(
+                    HdRetainedTypedSampledDataSource<VtVec4fArray>::New(
+                        VtVec4fArray{_wireframeColor}),
+                    HdPrimvarSchemaTokens->constant,
+                    HdPrimvarSchemaTokens->color);
             }
             return nullptr;
         }
@@ -136,6 +169,7 @@ namespace
 
         HdDataSourceBaseHandle Get(const TfToken &name) override {
             if (name == HdXformSchemaTokens->xform ||
+                name == HdPurposeSchemaTokens->purpose ||
                 name == HdVisibilitySchemaTokens->visibility ||
                 name == HdInstancedBySchemaTokens->instancedBy ||
                 name == HdPrimOriginSchemaTokens->primOrigin) {
@@ -145,20 +179,15 @@ namespace
                 return nullptr;
             }
             
-            // Force the purpose render tag to be in the secondary graphics for bounding box display mode
-            if (name == HdPurposeSchemaTokens->purpose) {
-                return HdPurposeSchema::Builder()
-                            .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
-                                Fvp::secondaryGraphicsRenderTagToken))
-                            .Build();
-            }
-
             if (name == HdLegacyDisplayStyleSchemaTokens->displayStyle) {
                 static const HdDataSourceBaseHandle src =
                     HdLegacyDisplayStyleSchema::Builder()
                         .SetCullStyle(
                             HdRetainedTypedSampledDataSource<TfToken>::New(
                                 HdCullStyleTokens->nothing))//No culling
+                        .SetReprSelector(
+                            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
+                                {HdReprTokens->wire, TfToken(), TfToken()}))
                         .Build();
                 return src;
             }
@@ -181,7 +210,6 @@ namespace
     ///
     class _BoundsPointsPrimvarValueDataSource final : public HdVec3fArrayDataSource
     {
-        inline static const GfVec3f _floatMaxVec3f {FLT_MAX};
     public:
         HD_DECLARE_DATASOURCE(_BoundsPointsPrimvarValueDataSource);
 
@@ -194,20 +222,20 @@ namespace
             HdExtentSchema extentSchema =
                 HdExtentSchema::GetFromParent(_primSource);
 
-            // Note: If the scene description doesn't provide the extents, Storm uses
-            // the default constructed GfRange3d which is [FLT_MAX, -FLT_MAX],
-            GfVec3f exts[2] = { GfVec3f(0.5f), GfVec3f(-0.5f) };
+            GfVec3f exts[2] = { GfVec3f(0.0f), GfVec3f(0.0f) };
+            bool extentMinFound = false;
             if (HdVec3dDataSourceHandle src = extentSchema.GetMin()) {
-                auto minExt = GfVec3f(src->GetTypedValue(shutterOffset));
-                if (minExt != _floatMaxVec3f) {
-                    exts[0] = minExt;
-                }
+                exts[0] = GfVec3f(src->GetTypedValue(shutterOffset));
+                extentMinFound = true;
             }
+            bool extentMaxFound = false;
             if (HdVec3dDataSourceHandle src = extentSchema.GetMax()) {
-                auto maxExt = GfVec3f(src->GetTypedValue(shutterOffset));
-                if (maxExt != -_floatMaxVec3f) {
-                    exts[1] = maxExt;
-                }
+                exts[1] = GfVec3f(src->GetTypedValue(shutterOffset));
+                extentMaxFound = true;
+            }
+
+            if (!extentMinFound || !extentMaxFound) {
+                return VtVec3fArray();
             }
 
             /// Compute 8 points on box.
@@ -285,36 +313,22 @@ namespace
         }
     };
 
-    HdContainerDataSourceHandle
-    _ComputeBoundsTopology()
+    HdContainerDataSourceHandle _ComputeBoundsTopology()
     {
-        //Is for a bounding box
-        // Segments: CCW bottom face starting at (-x, -y, -z)
-        //           CCW top face starting at (-x, -y, z)
-        //           CCW vertical edges, starting at (-x, -y)
-        const VtIntArray curveIndices{
-                /* bottom face */ 0, 4, 4, 6, 6, 2, 2, 0,
-                /* top face */    1, 5, 5, 7, 7, 3, 3, 1,
-                /* edge pairs */  0, 1, 4, 5, 6, 7, 2, 3 };
-        const VtIntArray curveVertexCounts{
-                static_cast<int>(curveIndices.size()) };
-    
-        return HdBasisCurvesTopologySchema::Builder()
-            .SetCurveVertexCounts(
-                    HdRetainedTypedSampledDataSource<VtIntArray>::New(
-                        curveVertexCounts))
-            .SetCurveIndices(
-                HdRetainedTypedSampledDataSource<VtIntArray>::New(
-                    curveIndices))
-            .SetBasis(
-                HdRetainedTypedSampledDataSource<TfToken>::New(
-                    HdTokens->bezier))
-            .SetType(
-                HdRetainedTypedSampledDataSource<TfToken>::New(
-                    HdTokens->linear))
-            .SetWrap(
-                HdRetainedTypedSampledDataSource<TfToken>::New(
-                    HdTokens->segmented))
+        const VtIntArray faceVertexCounts{4, 4, 4, 4, 4, 4};
+        const VtIntArray faceVertexIndices{
+            0, 4, 6, 2,
+            1, 3, 7, 5,
+            0, 1, 5, 4,
+            2, 6, 7, 3,
+            0, 2, 3, 1,
+            4, 5, 7, 6};
+
+        return HdMeshTopologySchema::Builder()
+            .SetFaceVertexCounts(
+                HdRetainedTypedSampledDataSource<VtIntArray>::New(faceVertexCounts))
+            .SetFaceVertexIndices(
+                HdRetainedTypedSampledDataSource<VtIntArray>::New(faceVertexIndices))
             .Build();
     }
 
@@ -331,22 +345,27 @@ namespace
         HD_DECLARE_DATASOURCE(_BoundsPrimDataSource)
 
         TfTokenVector GetNames() override {
-            static const TfTokenVector result = _Concat(
+            TfTokenVector result = _Concat(
                 _PrimDataSource::GetNames(),
-                { HdBasisCurvesSchemaTokens->basisCurves,
+                { HdMeshSchemaTokens->mesh,
                   HdPrimvarsSchemaTokens->primvars,
                   HdExtentSchemaTokens->extent
                 });
+            if (_isExtentsHintBounds) {
+                result.push_back(extentsHintBoundsToken);
+            }
             return result;
         }
 
         HdDataSourceBaseHandle Get(const TfToken &name) override {
-            if (name == HdBasisCurvesSchemaTokens->basisCurves) {
-                static const HdDataSourceBaseHandle basisCurvesSrc =
-                    HdBasisCurvesSchema::Builder()
+            if (name == HdMeshSchemaTokens->mesh) {
+                static const HdDataSourceBaseHandle meshSrc =
+                    HdMeshSchema::Builder()
                     .SetTopology(_ComputeBoundsTopology())
+                    .SetDoubleSided(
+                        HdRetainedTypedSampledDataSource<bool>::New(true))
                     .Build();
-                return basisCurvesSrc;
+                return meshSrc;
             }
             if (name == HdPrimvarsSchemaTokens->primvars) {
                 return _BoundsPrimvarsDataSource::New(_primSource, _wireframeColor);
@@ -357,33 +376,56 @@ namespace
                 }
                 return nullptr;
             }
+            if (name == extentsHintBoundsToken) {
+                return _isExtentsHintBounds
+                    ? HdRetainedTypedSampledDataSource<bool>::New(true)
+                    : nullptr;
+            }
 
             return _PrimDataSource::Get(name);
         }
 
     private:
         _BoundsPrimDataSource(
-            const HdContainerDataSourceHandle &primSource, const GfVec4f& wireframeColor)
+            const HdContainerDataSourceHandle &primSource,
+            const GfVec4f& wireframeColor,
+            bool isExtentsHintBounds)
           : _PrimDataSource(primSource),
-            _wireframeColor(wireframeColor)
+            _wireframeColor(wireframeColor),
+            _isExtentsHintBounds(isExtentsHintBounds)
         {
         }
 
         GfVec4f _wireframeColor;
+        bool _isExtentsHintBounds;
     };
 }
 
-BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface) : 
-    ParentClass(inputSceneIndex), 
-    InputSceneIndexUtils(inputSceneIndex),
-    _wireframeColorInterface(wireframeColorInterface)
+BboxSceneIndex::BboxSceneIndex(
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
+    Mode mode,
+    PrimPredicate primPredicate,
+    WireframeColorProvider wireframeColorProvider,
+    ExtentProvider extentProvider,
+    ChildPrimPathsProvider childPrimPathsProvider,
+    PrimDataSourceProvider primDataSourceProvider)
+    : ParentClass(inputSceneIndex)
+    , InputSceneIndexUtils(inputSceneIndex)
+    , _wireframeColorInterface(wireframeColorInterface)
+    , _mode(mode)
+    , _primPredicate(std::move(primPredicate))
+    , _wireframeColorProvider(std::move(wireframeColorProvider))
+    , _extentProvider(std::move(extentProvider))
+    , _childPrimPathsProvider(std::move(childPrimPathsProvider))
+    , _primDataSourceProvider(std::move(primDataSourceProvider))
 {
-    TF_AXIOM(_wireframeColorInterface);
+    TF_AXIOM(_wireframeColorInterface || _wireframeColorProvider);
 }
 
-void BboxSceneIndex::Enable(bool enable) 
-{ 
-    if (enable != _enabled) {
+void BboxSceneIndex::Enable(bool enable)
+{
+    if (_mode == Mode::Geometries && enable != _enabled) {
         _enabled = enable;
         _DirtyAllPrims();
     }
@@ -395,23 +437,12 @@ void BboxSceneIndex::_DirtyAllPrims()
         return;
     }
 
-    // Instead of just dirtying, let's re-add all prims
-    // This forces a complete resync of the prims with the new topology
-    HdSceneIndexObserver::AddedPrimEntries   addedEntries;
-
+    HdSceneIndexObserver::AddedPrimEntries addedEntries;
     for (const SdfPath& path : HdSceneIndexPrimView(GetInputSceneIndex())) {
-        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(path);
-
-        // Check if this prim is supported for conversion (regardless of enabled state)
+        const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(path);
         if (prim.dataSource && !_isExcluded(path) && _IsSupportedPrimType(prim.primType)) {
-            // Re-add it with the appropriate type based on current enabled state
-            if (_enabled) {
-                // Convert to bounding box
-                addedEntries.emplace_back(path, HdPrimTypeTokens->basisCurves);
-            } else {
-                // Convert back to original type
-                addedEntries.emplace_back(path, prim.primType);
-            }
+            addedEntries.emplace_back(
+                path, _enabled ? HdPrimTypeTokens->mesh : prim.primType);
         }
     }
 
@@ -420,142 +451,213 @@ void BboxSceneIndex::_DirtyAllPrims()
     }
 }
 
-void BboxSceneIndex::_PrimsDirtied(
-    const PXR_NS::HdSceneIndexBase&                         sender,
-   const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries)
+bool BboxSceneIndex::_ShouldConvert(
+    const SdfPath& primPath, const HdSceneIndexPrim& prim) const
 {
-    if (!_IsObserved()) {
-        return;
+    if (!prim.dataSource || _isExcluded(primPath)) {
+        return false;
     }
 
-    // When bbox mode is off (the common case), nothing needs translating.
-    if (!_enabled) {
-        _SendPrimsDirtied(entries);
-        return;
+    if (_mode == Mode::Geometries) {
+        return _enabled && _IsSupportedPrimType(prim.primType);
     }
 
-    HdSceneIndexObserver::DirtiedPrimEntries transformedEntries;
-    transformedEntries.reserve(entries.size());
-
-    for (const auto& entry : entries) {
-        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-
-        // Only transform entries for prims that we're actually converting
-        if (prim.dataSource && _IsSupportedPrimType(prim.primType)
-            && !_isExcluded(entry.primPath)) {
-
-            // Transform the dirty locators to basisCurves equivalents
-            HdDataSourceLocatorSet transformedLocators;
-
-            for (const auto& locator : entry.dirtyLocators) {
-                // Transform mesh-specific locators to basisCurves equivalents
-                if (locator.HasPrefix(HdMeshSchema::GetDefaultLocator())) {
-                    // Convert mesh topology locators to basisCurves topology locators
-                    transformedLocators.insert(HdBasisCurvesSchema::GetDefaultLocator());
-                }else {
-                    // For any other locators, just keep them as-is
-                    transformedLocators.insert(locator);
-                }
-            }
-
-            transformedEntries.emplace_back(entry.primPath, transformedLocators);
-        } else {
-            // For prims we're not converting, just pass through the original entry
-            transformedEntries.emplace_back(entry);
-        }
+    if (prim.dataSource->Get(extentsHintBoundsToken)) {
+        return true;
     }
 
-    _SendPrimsDirtied(transformedEntries);
+    if (!prim.primType.IsEmpty() || !_primPredicate || !_primPredicate(primPath)) {
+        return false;
+    }
+
+    HdExtentSchema extent = HdExtentSchema::GetFromParent(prim.dataSource);
+    if (extent.GetMin() && extent.GetMax()) {
+        return true;
+    }
+    return _extentProvider && _extentProvider(primPath).has_value();
 }
 
-// Modify the helper functions to take the prim as a parameter
-bool BboxSceneIndex::_ShouldConvertToBoundingBox(
-    const SdfPath&          primPath,
-    const HdSceneIndexPrim& prim) const
-{
-    // Check if bounding box mode is enabled
-    if (!_enabled) {
-        return false;
-    }
-
-    // Check if the prim path is excluded
-    if (_isExcluded(primPath)) {
-        return false;
-    }
-
-    // Check if the prim has a data source
-    if (!prim.dataSource) {
-        return false;
-    }
-
-    // Check if the prim type is supported for conversion
-    if (!_IsSupportedPrimType(prim.primType)) {
-        return false;
-    }
-
-    return true;
-}
-
-// Helper function to create the bounding box data source
 HdContainerDataSourceHandle BboxSceneIndex::_CreateBoundingBoxDataSource(
-    const SdfPath&          primPath,
-    const HdSceneIndexPrim& prim) const
+    const SdfPath& primPath, const HdSceneIndexPrim& prim) const
 {
     if (!prim.dataSource) {
         return nullptr;
     }
 
-    // Get the wireframe color for this prim
-    const GfVec4f wireframeColor = _wireframeColorInterface->getWireframeColor(primPath);
-
-    // Create the bounding box data source using the existing _BoundsPrimDataSource
-    return _BoundsPrimDataSource::New(prim.dataSource, wireframeColor);
+    const GfVec4f wireframeColor = _wireframeColorProvider
+        ? _wireframeColorProvider(primPath)
+        : _wireframeColorInterface->getWireframeColor(primPath);
+    return _BoundsPrimDataSource::New(
+        prim.dataSource,
+        wireframeColor,
+        _mode == Mode::EmptyModelsWithExtents);
 }
 
-// Update the calling functions
 HdSceneIndexPrim BboxSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-
-    // Use the helper function to check if we should convert this prim
-    if (_ShouldConvertToBoundingBox(primPath, prim)) {
-        prim.primType = HdPrimTypeTokens->basisCurves;
+    if (!prim.dataSource && _primDataSourceProvider) {
+        prim.dataSource = _primDataSourceProvider(primPath);
+    }
+    if (_ShouldConvert(primPath, prim)) {
+        if (_extentProvider) {
+            HdExtentSchema extent = HdExtentSchema::GetFromParent(prim.dataSource);
+            if (!extent.GetMin() || !extent.GetMax()) {
+                if (const auto suppliedExtent = _extentProvider(primPath)) {
+                    prim.dataSource = _OverlayExtent(prim.dataSource, *suppliedExtent);
+                }
+            }
+        }
+        prim.primType = HdPrimTypeTokens->mesh;
         prim.dataSource = _CreateBoundingBoxDataSource(primPath, prim);
     }
-
     return prim;
 }
 
+SdfPathVector BboxSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
+{
+    SdfPathVector result = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    if (_childPrimPathsProvider) {
+        const SdfPathVector supplied = _childPrimPathsProvider(primPath);
+        for (const SdfPath& path : supplied) {
+            if (std::find(result.begin(), result.end(), path) == result.end()) {
+                result.push_back(path);
+            }
+        }
+    }
+    return result;
+}
+
+namespace {
+std::set<SdfPath> _ComputeSyntheticPrimPaths(
+    const BboxSceneIndex::ChildPrimPathsProvider& childPrimPathsProvider,
+    const BboxSceneIndex::PrimDataSourceProvider& primDataSourceProvider,
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const std::function<bool(const SdfPath&, const HdSceneIndexPrim&)>& shouldConvert)
+{
+    std::set<SdfPath> newPaths;
+    if (childPrimPathsProvider) {
+        for (const SdfPath& path
+             : childPrimPathsProvider(SdfPath::AbsoluteRootPath())) {
+            HdSceneIndexPrim prim = inputSceneIndex->GetPrim(path);
+            if (!prim.dataSource && primDataSourceProvider) {
+                prim.dataSource = primDataSourceProvider(path);
+            }
+            if (shouldConvert(path, prim)) {
+                newPaths.insert(path);
+            }
+        }
+    }
+    return newPaths;
+}
+} // namespace
+
+void BboxSceneIndex::RemoveStaleSyntheticPrims(bool sendNotifications)
+{
+    const std::set<SdfPath> newPaths = _ComputeSyntheticPrimPaths(
+        _childPrimPathsProvider,
+        _primDataSourceProvider,
+        GetInputSceneIndex(),
+        [this](const SdfPath& path, const HdSceneIndexPrim& prim) {
+            return _ShouldConvert(path, prim);
+        });
+
+    if (sendNotifications && _IsObserved()) {
+        HdSceneIndexObserver::RemovedPrimEntries removed;
+        for (const SdfPath& path : _syntheticPrimPaths) {
+            if (newPaths.count(path) == 0) {
+                removed.emplace_back(path);
+            }
+        }
+        if (!removed.empty()) {
+            _SendPrimsRemoved(removed);
+        }
+    }
+
+    for (auto it = _syntheticPrimPaths.begin(); it != _syntheticPrimPaths.end();) {
+        if (newPaths.count(*it) == 0) {
+            it = _syntheticPrimPaths.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void BboxSceneIndex::AddNewSyntheticPrims(bool sendNotifications)
+{
+    const std::set<SdfPath> newPaths = _ComputeSyntheticPrimPaths(
+        _childPrimPathsProvider,
+        _primDataSourceProvider,
+        GetInputSceneIndex(),
+        [this](const SdfPath& path, const HdSceneIndexPrim& prim) {
+            return _ShouldConvert(path, prim);
+        });
+
+    if (sendNotifications && _IsObserved()) {
+        HdSceneIndexObserver::AddedPrimEntries added;
+        for (const SdfPath& path : newPaths) {
+            if (_syntheticPrimPaths.count(path) == 0) {
+                added.emplace_back(path, GetPrim(path).primType);
+            }
+        }
+        if (!added.empty()) {
+            _SendPrimsAdded(added);
+        }
+    }
+
+    _syntheticPrimPaths.insert(newPaths.begin(), newPaths.end());
+}
+
+void BboxSceneIndex::RefreshSyntheticPrims(bool sendNotifications)
+{
+    RemoveStaleSyntheticPrims(sendNotifications);
+    AddNewSyntheticPrims(sendNotifications);
+}
+
 void BboxSceneIndex::_PrimsAdded(
-    const HdSceneIndexBase&                       sender,
+    const HdSceneIndexBase& sender,
     const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
-    if (!_IsObserved())
-        return;
-
-    if (!_enabled) {
-        _SendPrimsAdded(entries);
+    if (!_IsObserved()) {
         return;
     }
 
     HdSceneIndexObserver::AddedPrimEntries transformedEntries;
-
+    transformedEntries.reserve(entries.size());
     for (const auto& entry : entries) {
-        const SdfPath& primPath = entry.primPath;
-        const TfToken& originalPrimType = entry.primType;
+        const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+        transformedEntries.emplace_back(
+            entry.primPath,
+            _ShouldConvert(entry.primPath, prim) ? HdPrimTypeTokens->mesh : entry.primType);
+    }
+    _SendPrimsAdded(transformedEntries);
+}
 
-        // Get the prim once
-        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-
-        // Check if this prim should be converted to a bounding box
-        if (_ShouldConvertToBoundingBox(primPath, prim)) {
-            transformedEntries.emplace_back(primPath, HdPrimTypeTokens->basisCurves);
-        } else {
-            transformedEntries.emplace_back(primPath, originalPrimType);
-        }
+void BboxSceneIndex::_PrimsDirtied(
+    const HdSceneIndexBase& sender,
+    const HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    if (!_IsObserved()) {
+        return;
     }
 
-    _SendPrimsAdded(transformedEntries);
+    HdSceneIndexObserver::DirtiedPrimEntries transformedEntries;
+    transformedEntries.reserve(entries.size());
+    for (const auto& entry : entries) {
+        HdDataSourceLocatorSet dirtyLocators = entry.dirtyLocators;
+        if (dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
+            const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+            if (_ShouldConvert(entry.primPath, prim)) {
+                dirtyLocators.insert(
+                    HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor));
+                dirtyLocators.insert(
+                    HdPrimvarsSchema::GetDefaultLocator().Append(
+                        _primvarsTokens->overrideWireframeColor));
+            }
+        }
+        transformedEntries.emplace_back(entry.primPath, std::move(dirtyLocators));
+    }
+    _SendPrimsDirtied(transformedEntries);
 }
 
 }//end of namespace FVP_NS_DEF

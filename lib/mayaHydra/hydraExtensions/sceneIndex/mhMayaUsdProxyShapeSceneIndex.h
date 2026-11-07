@@ -46,7 +46,9 @@ public:
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-        const Ufe::Path&                       sceneIndexAppPath);
+        const Ufe::Path&                       sceneIndexAppPath,
+        const std::shared_ptr<UsdStageRefPtr>& sharedStage = {},
+        const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex = {});
 
     ~MayaUsdProxyShapeSceneIndex() override;
 
@@ -57,7 +59,9 @@ private:
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-        const Ufe::Path&                       sceneIndexAppPath);
+        const Ufe::Path&                       sceneIndexAppPath,
+        const std::shared_ptr<UsdStageRefPtr>& sharedStage,
+        const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex);
 
     void _Destroy() override;
     void _DestroyDerived();
