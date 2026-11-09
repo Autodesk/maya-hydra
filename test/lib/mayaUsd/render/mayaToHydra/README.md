@@ -266,6 +266,10 @@ Both `disabled` groups mark work owed, so both require a tracking issue: every
 disabled test in the suite names the ticket that will bring it back. The
 `skipOn` groups describe a permanent limitation instead, with no work to track.
 
+In the maya-hydra project disabled tests have a label that starts with `HYDRA-`
+or `AGP-`.  To list all tests disabled because of issues, use
+`ctest -N -L "AGP-|HYDRA-"`.
+
 # Utilities
 
 Utility files are located under [/test/testUtils](../../../../testUtils/). Many utils files and their contents were inherited from the USD plugin; not all are used by maya-hydra tests.
