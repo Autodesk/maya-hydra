@@ -17,8 +17,8 @@
 # Unit test for the disable tag semantics in cmake/testConditions.cmake: the
 # disabledOn: conditions, covering exact and ranged Maya version predicates,
 # platform and renderer facts, the conjunction of several conditions, and
-# rejection of conditions that could never hold; and the tracking issues a
-# disabled: group must name.
+# rejection of conditions that could never hold; the tracking issues a
+# disabled: group must name; and the shape of both groups.
 
 # Script mode starts with all policies OLD, which leaves the IN_LIST operator
 # the module relies on unsupported. Match the project instead.
@@ -116,6 +116,23 @@ function(expect_disabled_on_group_rejected conditions issues)
         "mayaHydra_parse_disabled_on_group(_m _i \"${conditions};${issues}\")"
         "disabledOn:"
         "disabledOn:${conditions}:${issues}")
+endfunction()
+
+# A whole disabled: group, with its values spelled as the tag parser hands
+# them over: already split on the colon, issues still comma separated.
+function(expect_disabled_group issues)
+    mayaHydra_parse_disabled_group(_issues "${issues}")
+    string(REPLACE "," ";" _expected_issues "${issues}")
+    if(NOT "${_issues}" STREQUAL "${_expected_issues}")
+        message(FATAL_ERROR "disabled:${issues} returned issues ${_issues}")
+    endif()
+endfunction()
+
+function(expect_disabled_group_rejected group_values description)
+    expect_rejected(
+        "mayaHydra_parse_disabled_group(_i \"${group_values}\")"
+        "disabled:"
+        "${description}")
 endfunction()
 
 set(MAYA_APP_VERSION 2027)
@@ -222,3 +239,13 @@ expect_rejected(
     "mayaHydra_parse_disabled_on_group(_m _i \"maya2027,win;HYDRA-1940;extra\")"
     "disabledOn:"
     "disabledOn:maya2027,win:HYDRA-1940:extra")
+
+# A disabled: group has a single value. Several issues are comma separated; a
+# colon in their place must not silently drop the issues after it.
+expect_disabled_group(HYDRA-1940)
+expect_disabled_group(AGP-1034,AGP-1035)
+
+expect_disabled_group_rejected("HYDRA-1;HYDRA-2" "disabled:HYDRA-1:HYDRA-2")
+expect_disabled_group_rejected("HYDRA-1;" "disabled:HYDRA-1: with a trailing colon")
+expect_disabled_group_rejected(oops "disabled:oops")
+expect_disabled_group_rejected("" "disabled: with no issues")

@@ -24,7 +24,7 @@
 # themselves. The issues do, but only where the group actually disables.
 #
 # A disabled: group disables the test everywhere and names the same kind of
-# issues.
+# issues. It has a single value, the comma separated issues.
 #
 # Keeping this logic separate also allows testing it in CMake script mode.
 
@@ -143,6 +143,23 @@ function(mayaHydra_parse_disabled_on_group matches_out issues_out group_values)
     mayaHydra_disabled_on_group_matches(matches "${conditions}")
 
     set(${matches_out} ${matches} PARENT_SCOPE)
+    set(${issues_out} ${issues} PARENT_SCOPE)
+endfunction()
+
+# Evaluates a disabled: group, whose single value is "<issues>" and reaches
+# here already split on the colon, so a stray colon shows up as a second value.
+# Rejecting it matters: otherwise the issues after the colon are silently lost.
+function(mayaHydra_parse_disabled_group issues_out group_values)
+    list(LENGTH group_values value_count)
+    if(NOT value_count EQUAL 1)
+        message(FATAL_ERROR
+            "A disabled: tag group must be spelled disabled:<issues>, "
+            "with several issues separated by commas, as in disabled:HYDRA-1,HYDRA-2")
+    endif()
+
+    string(REPLACE "," ";" issues "${group_values}")
+    mayaHydra_validate_tracking_issues("${issues}" "disabled:")
+
     set(${issues_out} ${issues} PARENT_SCOPE)
 endfunction()
 
