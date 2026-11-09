@@ -31,19 +31,19 @@ if(NOT MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_TEST_RENDERER_CHOICES)
 endif()
 
 set(INTERACTIVE_TEST_SCRIPT_FILES
-    testSceneStat.py|skipOnRenderer:HdFlash # HYDRA-2670 : Scene statistics report 1 primitive instead of 3
+    testSceneStat.py|disabledOn:HdFlash:HYDRA-2670 # HYDRA-2670 : Scene statistics report 1 primitive instead of 3
     testImageDiffing.py
     testMtohCommand.py
     testBasicRender.py
     testDagChanges.py
-    testMeshes.py|skipOnRenderer:HdFlash # HYDRA-2665 : Inconsistent number of prims reported
-    testNamespaces.py|skipOnRenderer:HdFlash # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
+    testMeshes.py|disabledOn:HdFlash:HYDRA-2665 # HYDRA-2665 : Inconsistent number of prims reported
+    testNamespaces.py|disabledOn:HdFlash:HYDRA-2669 # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
     testTransforms.py
-    testRefinement.py|skipOnRenderer:HdFlash|disabledOn:maya2027,lin:HYDRA-1893 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
+    testRefinement.py|disabledOn:HdFlash:AGP-1034,AGP-1035|disabledOn:maya2027,lin:HYDRA-1893 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
     testMayaShadingModes.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
@@ -58,7 +58,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa|disabledOn:maya2027,osx:HYDRA-1727
-    testLightingRenderDelegates.py|depOnPlugins:prman|disabledOn:osx:HYDRA-2209|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2719,HYDRA-2209 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : with HdFlash, Maya crash in IsStormRenderDelegate / FramePass::Initialize
+    testLightingRenderDelegates.py|depOnPlugins:prman|disabledOn:osx:HYDRA-2209|disabledOn:HdFlash:HYDRA-2677|disabledOn:maya2026:HYDRA-2719,HYDRA-2209 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : with HdFlash, Maya crash in IsStormRenderDelegate / FramePass::Initialize
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
@@ -98,7 +98,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCameraPrimFraming.py
     testConvergence.py
     testFramePasses.py
-    testImagePlanes.py|skipOnRenderer:HdFlash # AGP-1037 : Image plane updates is inconsistent
+    testImagePlanes.py|disabledOn:HdFlash:AGP-1037 # AGP-1037 : Image plane updates is inconsistent
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -117,13 +117,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testFlowViewportAPIFilterPrims.py
     cpp/testSceneCorrectness.py
     cpp/testPrimInstancing.py
-    cpp/testPicking.py|skipOnRenderer:HdFlash # HYDRA-2671 : Picking finds 0 prims
+    cpp/testPicking.py|disabledOn:HdFlash:HYDRA-2671 # HYDRA-2671 : Picking finds 0 prims
     cpp/testUsdPointInstancePicking.py
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdNestedNativeInstancePicking.py
     cpp/testUsdPickKind.py
     cpp/testNurbsSurfaces.py
-    cpp/testGeomSubsetsPicking.py|skipOnRenderer:HdFlash # HYDRA-2672 : Geom subset picking doesn't update UFE selection
+    cpp/testGeomSubsetsPicking.py|disabledOn:HdFlash:HYDRA-2672 # HYDRA-2672 : Geom subset picking doesn't update UFE selection
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testFvpDirtyNotifier.py
@@ -132,7 +132,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testDataSourceNames.py
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
-    cpp/testRenderItemPrimvars.py|skipOnRenderer:HdFlash # HYDRA-2675 : Maya crash (access violation) in UntexturedToTexturedAcquiresUVs
+    cpp/testRenderItemPrimvars.py|disabledOn:HdFlash:HYDRA-2675 # HYDRA-2675 : Maya crash (access violation) in UntexturedToTexturedAcquiresUVs
     cpp/testRenderItemPrimvarsMaterialX.py|depOnPlugins:lookdevx
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
@@ -169,7 +169,7 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         # fixed.  The isolate-select behaviour itself passes (all visibility
         # assertions and snapshot comparisons succeed before the crash).
         testIsolateSelectPerShape.py|disabled:HYDRA-2416
-        testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2678 # HYDRA-2678 : cmds.select rejects USD instance paths
+        testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost|disabledOn:HdFlash:HYDRA-2678|disabledOn:maya2026:HYDRA-2678 # HYDRA-2678 : cmds.select rejects USD instance paths
     )
 endif()
 
@@ -199,12 +199,12 @@ endif()
 # INTERACTIVE_TEST_SCRIPT_FILES, it cannot write to an output directory, because running
 # both versions of the test in parallel will conflict.
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
-    testMeshes.py|skipOnRenderer:HdFlash # HYDRA-2665 : Inconsistent number of prims reported
+    testMeshes.py|disabledOn:HdFlash:HYDRA-2665 # HYDRA-2665 : Inconsistent number of prims reported
     testTransformMeshAdapter.py
     testMeshAdapterVisibility.py
-    cpp/testMeshAdapterTransform.py|skipOnRenderer:HdFlash # HYDRA-2666 : Dirtying is not received properly
+    cpp/testMeshAdapterTransform.py|disabledOn:HdFlash:HYDRA-2666 # HYDRA-2666 : Dirtying is not received properly
     cpp/testMeshPrimvars.py
-    cpp/testMeshDirtyLocators.py|skipOnRenderer:HdFlash # HYDRA-2667 : visibility update not received properly
+    cpp/testMeshDirtyLocators.py|disabledOn:HdFlash:HYDRA-2667 # HYDRA-2667 : visibility update not received properly
     cpp/testMeshGeomSubsets.py
     cpp/testMeshSubdivTags.py
 )
@@ -213,11 +213,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
 # enabled.  We must fix this, to ensure that mayaHydra does not rely
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
-	testViewportFilters.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2668 : Some objects are not filtered properly
+	testViewportFilters.py|depOnPlugins:mtoa|disabledOn:HdFlash:HYDRA-2668 # HYDRA-2668 : Some objects are not filtered properly
     testFlowPluginsHierarchicalProperties.py|disabledOn:osx:HYDRA-2209 # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX
     testBoundingBox.py
 	#Disabled tests on OSX
-	testDataProducerSelHighlight.py|disabledOn:osx:HYDRA-1127|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-1033 : Flash wireframe-on-shaded baselines pending
+	testDataProducerSelHighlight.py|disabledOn:osx:HYDRA-1127|disabledOn:HdFlash:AGP-1033 # HYDRA-1127 : refinedWire not working on OSX | AGP-1033 : Flash wireframe-on-shaded baselines pending
 )
 
 # Interactive unit test scripts for Hydra Generative Procedurals.
