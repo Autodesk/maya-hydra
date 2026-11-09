@@ -49,8 +49,11 @@ def setRendererOverride(editor, overrideName):
     set before the switch, because under Global Hydra modelEditor refuses
     non-Hydra overrides. Maya applies a preference change from an idle-time
     scriptJob (applyUseHydraToModelPanels.mel moves the other panels and does
-    an `ogs -reset`), so the idle queue is flushed once the editor is on its
-    final renderer, rather than letting that reset land mid-test.
+    the `ogs -reset` VP2 needs to rebuild the render items the render item
+    override handed to mayaHydra). The tests run inside Maya's startup command,
+    where queued idle work does not run, not even through flushIdleQueue, so
+    the apply is called directly once the editor is on its final renderer. The
+    queued scriptJob then finds the state already applied and does nothing.
     '''
     useHydraChanged = False
     if cmds.optionVar(exists="mayaUseHydra"):
@@ -59,8 +62,9 @@ def setRendererOverride(editor, overrideName):
             cmds.optionVar(intValue=("mayaUseHydra", value))
             useHydraChanged = True
     cmds.modelEditor(editor, e=1, rendererOverrideName=overrideName)
-    if useHydraChanged:
-        cmds.flushIdleQueue()
+    # A Maya without the proc can still carry a stale mayaUseHydra from old prefs.
+    if useHydraChanged and maya.mel.eval("exists applyUseHydraToModelPanels"):
+        maya.mel.eval("applyUseHydraToModelPanels")
 
 RENDER_GLOBALS_NODE = "defaultRenderGlobals"
 
