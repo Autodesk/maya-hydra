@@ -41,9 +41,6 @@ class TestSnapshot(BasicRenderBaseTestCase):
         # whether hdmaya works with this test - just whether we can make a snapshot
 
         mtohUtils.setRendererOverride(activeEditor, "")
-        cmds.modelEditor(
-            activeEditor, e=1,
-            rendererName='vp2Renderer')
 
         cube = cmds.polyCube()[0]
         shader = cmds.shadingNode("surfaceShader", asShader=1)
