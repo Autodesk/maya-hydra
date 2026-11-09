@@ -42,12 +42,25 @@ import math
 
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
-def setMayaUseHydra(enable=True):
-    if not cmds.optionVar(exists="mayaUseHydra"):
-        return
-    value = 1 if enable else 0
-    if cmds.optionVar(query="mayaUseHydra") != value:
-        cmds.optionVar(intValue=("mayaUseHydra", value))
+def setRendererOverride(editor, overrideName):
+    '''Switch a model editor to a Hydra render override, or back to VP2 with "".
+
+    Keeps the Global Hydra preference (optionVar mayaUseHydra) in sync. It is
+    set before the switch, because under Global Hydra modelEditor refuses
+    non-Hydra overrides. Maya applies a preference change from an idle-time
+    scriptJob (applyUseHydraToModelPanels.mel moves the other panels and does
+    an `ogs -reset`), so the idle queue is flushed once the editor is on its
+    final renderer, rather than letting that reset land mid-test.
+    '''
+    useHydraChanged = False
+    if cmds.optionVar(exists="mayaUseHydra"):
+        value = 0 if overrideName == "" else 1
+        if cmds.optionVar(query="mayaUseHydra") != value:
+            cmds.optionVar(intValue=("mayaUseHydra", value))
+            useHydraChanged = True
+    cmds.modelEditor(editor, e=1, rendererOverrideName=overrideName)
+    if useHydraChanged:
+        cmds.flushIdleQueue()
 
 RENDER_GLOBALS_NODE = "defaultRenderGlobals"
 
@@ -548,11 +561,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                           file=sys.stderr)
 
     def setRenderer(self, renderer):
-        self.setMayaUseHydra(True)
         self.activeEditor = cmds.playblast(activeEditor=1)
-        cmds.modelEditor(
-            self.activeEditor, e=1,
-            rendererOverrideName=rendererUtils.getRendererOverrideName(renderer))
+        setRendererOverride(
+            self.activeEditor, rendererUtils.getRendererOverrideName(renderer))
         # During automated tests, tracing demonstrates that the following call
         # to refresh marks the scene as modified, with the modified node being
         # defaultRenderGlobals.  This behavior cannot be reproduced in a
@@ -571,24 +582,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.setRenderer(rendererUtils.TEST_RENDERER_STORM)
         
     def setViewport2Renderer(self):
-        self.setMayaUseHydra(False)
         self.activeEditor = cmds.playblast(activeEditor=1)
-        # Check whether the viewport is currently using a MayaHydra renderer.
-        leavingHydra = (cmds.modelEditor(
-            self.activeEditor, query=True, rendererOverrideName=True) or "").startswith("mayaHydra")
-        # Empty string for rendererOverrideName unsets any currently active override, thus returning to VP2
-        cmds.modelEditor(self.activeEditor, e=1, rendererOverrideName="")
-        if leavingHydra:
-            # While Hydra was on, the render item override handed native shapes to
-            # mayaHydra, so VP2 built no render items for them. Reset VP2 so it
-            # rebuilds them, as applyUseHydraToModelPanels.mel does when leaving Hydra.
-            # Without the reset, VP2 renders none of those shapes, only the background.
-            cmds.ogs(reset=True)
+        # Empty string for rendererOverrideName unsets any currently active override,
+        # thus returning to VP2. Turning Global Hydra off also runs the `ogs -reset`
+        # VP2 needs to rebuild the render items for shapes the render item override
+        # had handed to mayaHydra.
+        setRendererOverride(self.activeEditor, "")
         cmds.refresh(f=1)
         self.delegateId = ""
-
-    def setMayaUseHydra(self, enable=True):
-        setMayaUseHydra(enable)
 
     def setBasicCam(self, dist=DEFAULT_CAM_DIST):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
