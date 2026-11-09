@@ -45,7 +45,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testRefinement.py|skipOnRenderer:HdFlash|disabledOn:maya2027,lin:HYDRA-1893 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
-    testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testMayaShadingModes.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py|disabledOn:maya2026:HYDRA-1940|disabledOn:mayaGt2027:HYDRA-1940|disabledOn:maya2027,osx:HYDRA-1940
@@ -58,7 +58,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa|disabledOn:maya2027,osx:HYDRA-1727
-    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2719,HYDRA-2209 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : with HdFlash, Maya crash in IsStormRenderDelegate / FramePass::Initialize
+    testLightingRenderDelegates.py|depOnPlugins:prman|disabledOn:osx:HYDRA-2209|skipOnRenderer:HdFlash|disabledOn:maya2026:HYDRA-2719,HYDRA-2209 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : with HdFlash, Maya crash in IsStormRenderDelegate / FramePass::Initialize
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
@@ -67,9 +67,9 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStagePayloadsReferences.py
-    testNurbsPrimitives.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testNurbsPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testCurveTools.py
-    testPolygonPrimitives.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testPolygonPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
@@ -82,18 +82,18 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testIsolateSelectWithGeomSubset.py
     testMayaReference.py
     testTexturedMode.py
-    testSelectionColorPreferences.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testSelectionColorPreferences.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testUsdDeleteCamera.py
     testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
 	#Disabled tests on OSX
-    testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
-	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-	testMayaDisplayModes.py|skipOnPlatform:osx|disabled:HYDRA-1660 # HYDRA-1127 : refinedWire not working on OSX
+    testPointInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+    testGeomSubsetsWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+    testNativeInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+    testMeshWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+    testStageInstanceablePrimsSelHighlight.py|disabledOn:osx:HYDRA-1315 # HYDRA-1315 : Wire not showing on OSX
+	testStageVariants.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+	testMayaDisplayModes.py|disabledOn:osx:HYDRA-1127|disabled:HYDRA-1660 # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
     testCameraPrimFraming.py
     testConvergence.py
@@ -142,7 +142,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdStageFromFile.py
     cpp/testSceneGlobalsCurrentFrame.py
 	#CPP tests disabled on OSX
-    cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    cpp/testWriteFile.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     cpp/testMaterialBlocking.py
     cpp/testMaterialDirtying.py
     cpp/testPassFiltering.py
@@ -155,7 +155,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 # HYDRA-1245.
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
-        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+        testIsolateSelectWithUsdLighting.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
         cpp/testIsolateSelect.py
         cpp/testIsolateSelectSwitchToVP2.py
         cpp/testIsolateSelectMayaSelectionHighlighting.py
@@ -214,10 +214,10 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 	testViewportFilters.py|depOnPlugins:mtoa|skipOnRenderer:HdFlash # HYDRA-2668 : Some objects are not filtered properly
-    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX
+    testFlowPluginsHierarchicalProperties.py|disabledOn:osx:HYDRA-2209 # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX
     testBoundingBox.py
 	#Disabled tests on OSX
-	testDataProducerSelHighlight.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-1033 : Flash wireframe-on-shaded baselines pending
+	testDataProducerSelHighlight.py|disabledOn:osx:HYDRA-1127|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-1033 : Flash wireframe-on-shaded baselines pending
 )
 
 # Interactive unit test scripts for Hydra Generative Procedurals.
@@ -228,7 +228,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # Interactive unit test scripts that run with the render item override off
 # (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0), on the stock render item path.
 set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
-    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
+    testMayaComponentsPicking.py|disabledOn:osx:HYDRA-1882 # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
 )
 
 # Every interactive test runs in both selection highlighting modes: the primary
