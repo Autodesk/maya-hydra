@@ -42,6 +42,18 @@ import math
 
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
+def mayaHasHydraMode():
+    '''Whether Maya has the Global Hydra mode (Maya 2028+).
+
+    In that mode, VP2 and Hydra viewports can't be mixed: switching one model
+    panel to VP2 or to Hydra switches all of them (see setRendererOverride).
+    It is driven by the mayaUseHydra optionVar and applied to the panels by
+    applyUseHydraToModelPanels.mel. A Maya without the proc can still carry a
+    stale mayaUseHydra from old prefs, so both are checked.
+    '''
+    return bool(cmds.optionVar(exists="mayaUseHydra")
+                and maya.mel.eval("exists applyUseHydraToModelPanels"))
+
 def setRendererOverride(editor, overrideName):
     '''Switch a model editor to a Hydra render override, or back to VP2 with "".
 
@@ -56,14 +68,13 @@ def setRendererOverride(editor, overrideName):
     queued scriptJob then finds the state already applied and does nothing.
     '''
     useHydraChanged = False
-    if cmds.optionVar(exists="mayaUseHydra"):
+    if mayaHasHydraMode():
         value = 0 if overrideName == "" else 1
         if cmds.optionVar(query="mayaUseHydra") != value:
             cmds.optionVar(intValue=("mayaUseHydra", value))
             useHydraChanged = True
     cmds.modelEditor(editor, e=1, rendererOverrideName=overrideName)
-    # A Maya without the proc can still carry a stale mayaUseHydra from old prefs.
-    if useHydraChanged and maya.mel.eval("exists applyUseHydraToModelPanels"):
+    if useHydraChanged:
         maya.mel.eval("applyUseHydraToModelPanels")
 
 RENDER_GLOBALS_NODE = "defaultRenderGlobals"

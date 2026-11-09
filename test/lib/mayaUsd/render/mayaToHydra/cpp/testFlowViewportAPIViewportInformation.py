@@ -52,6 +52,20 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewportsInit")
             #switch to 4 views
             mel.eval('FourViewLayout')
+
+            if mtohUtils.mayaHasHydraMode():
+                # In Maya's Hydra mode (2028+), VP2 and Hydra viewports can't be mixed: setting
+                # Hydra on one viewport switches all of them, and so does VP2.
+                cmds.setFocus ('modelPanel4') #Is the persp view
+                self.setTestRenderer()
+                cmds.refresh()
+                cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewportsAllViewports")
+
+                self.setViewport2Renderer()
+                cmds.refresh()
+                cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewportsAllViewportsRemoved")
+                return
+
             #Set focus on persp view
             cmds.setFocus ('modelPanel4') #Is the persp view
             #Set Hydra as the renderer

@@ -27,9 +27,13 @@ namespace {
 
     //Expected test renderer name
     const std::string _expectedRendererName (PXR_NS::GetExpectedTestRendererName());
+
+    //Number of viewports of the FourViewLayout
+    constexpr size_t _fourViewLayoutViewportCount = 4;
 }
 
 //The test is done through 4 Steps in the python script testFlowViewportAPIViewportInformation.py function test_MultipleViewports
+//From Maya 2028, VP2 and Hydra viewports can't be mixed, so the script uses steps 1, 2b and 3b instead (see below).
 
 //Step 1) The python script calls viewportInformationMultipleViewportsInit before anything is done.
 TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
@@ -114,6 +118,49 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports0Viewport)
    ///Both should have been called once only
     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);
     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 2);
+
+    //Unregister our callbacks client
+    informationInterface.UnregisterInformationClient(_infoClientTest);
+}
+
+//Step 2b (Maya 2028+) : The python script has created 4 viewports and set Hydra on one of them.
+//VP2 and Hydra viewports can't be mixed, so this switched all 4 viewports to Hydra
+//and InfoClientTest::SceneIndexAdded should have been called once per viewport
+//then it calls viewportInformationMultipleViewportsAllViewports
+TEST(FlowViewportAPI, viewportInformationMultipleViewportsAllViewports)
+{
+    //Get Information interface
+    Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
+
+    //Get all Hydra viewports information
+    Fvp::InformationInterface::RenderViewDescSet allViewportsInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportsInformation);
+    ASSERT_EQ(allViewportsInformation.size(), _fourViewLayoutViewportCount); //All 4 viewports should be Hydra viewports
+
+    //Check renderers name, they all should be the Hydra test renderer
+    for (auto info : allViewportsInformation){
+        ASSERT_EQ(info._rendererName, _expectedRendererName);
+    }
+
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), (int)_fourViewLayoutViewportCount);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
+}
+
+//Step 3b (Maya 2028+) : The python script has set VP2 back, which switched all 4 viewports to VP2
+//and InfoClientTest::SceneIndexRemoved should have been called once per viewport
+//then it calls viewportInformationMultipleViewportsAllViewportsRemoved
+TEST(FlowViewportAPI, viewportInformationMultipleViewportsAllViewportsRemoved)
+{
+    //Get Information interface
+    Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
+
+    //Get all Hydra viewports information
+    Fvp::InformationInterface::RenderViewDescSet allViewportsInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportsInformation);
+    ASSERT_EQ(allViewportsInformation.size(), (size_t)0);//We should not have any hydra viewport
+
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), (int)_fourViewLayoutViewportCount);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), (int)_fourViewLayoutViewportCount);
 
     //Unregister our callbacks client
     informationInterface.UnregisterInformationClient(_infoClientTest);
