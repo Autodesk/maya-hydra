@@ -27,6 +27,7 @@
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/registryManager.h>
+#include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hdx/renderTask.h>
@@ -37,6 +38,7 @@
 #include <maya/MAnimControl.h>
 #include <maya/MDGContextGuard.h>
 #include <maya/MFn.h>
+#include <maya/MFnDagNode.h>
 #include <maya/MNodeMessage.h>
 
 #include <functional>
@@ -177,43 +179,138 @@ void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
 {
     MMatrix matrix;
     if (ri.getMatrix(matrix) == MStatus::kSuccess) {
-        _transform[0] = GetGfMatrixFromMaya(matrix);
-        
-        // _transform[1] and _transform[2] are used only when motion samples are enabled
-        // so no reason to spend cycles on setting them otherwise.
-
-        if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
-            // MRenderItem::getMatrix() is a Viewport 2.0 snapshot of the current frame
-            // and does not re-evaluate under MDGContextGuard, so sample the source DAG
-            // node's world transform instead and apply those deltas to the item's matrix.
-            MDagPath dag = ri.sourceDagPath();
-            if (!dag.isValid()) {
-                dag = _dagPath;
-            }
-            if (dag.isValid()) {
-                const GfMatrix4d centerDag    = GetGfMatrixFromMaya(dag.inclusiveMatrix());
-                const GfMatrix4d centerDagInv = centerDag.GetInverse();
-                const GfInterval shutter
-                    = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
-                const MTime now = MAnimControl::currentTime();
-
-                GfMatrix4d openDag;
-                {
-                    MDGContextGuard guard(now + shutter.GetMin());
-                    openDag = GetGfMatrixFromMaya(dag.inclusiveMatrix());
-                }
-                GfMatrix4d closeDag;
-                {
-                    MDGContextGuard guard(now + shutter.GetMax());
-                    closeDag = GetGfMatrixFromMaya(dag.inclusiveMatrix());
-                }
-                // World-space deltas, row-vector convention matching Gf and Maya:
-                // worldKey = worldCentre * (centreDag^-1 * keyDag).
-                _transform[1] = _transform[0] * centerDagInv * closeDag;
-                _transform[2] = _transform[0] * centerDagInv * openDag;
-            }
+        // Velocity mode: keys derived when read, from the matrix history; no DG
+        // evaluation here. See GetOpenTransform.
+        if (UseVelocityMotionSamples()) {
+            _SetTransform(GetGfMatrixFromMaya(matrix));
+            return;
         }
+
+        const GfMatrix4d centre = GetGfMatrixFromMaya(matrix);
+
+        // Motion samples off - the default: all keys are the centre, and the DAG
+        // is not touched. Checked HERE, before building the DAG path and its
+        // inclusive matrix, which were otherwise computed on every matrix change
+        // only to be discarded by _QueueShutterCapture.
+        if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
+            _QueueShutterCapture(centre, MDagPath(), centre);
+            return;
+        }
+
+        // Evaluate mode. MRenderItem::getMatrix() is a Viewport 2.0 snapshot of the
+        // current frame and does not re-evaluate under MDGContextGuard, so the
+        // source DAG node's world transform is what is sampled, and its deltas
+        // are applied to the item's matrix. Sampled in a batch - see
+        // CaptureShutterSample.
+        MDagPath dag = ri.sourceDagPath();
+        if (!dag.isValid()) {
+            dag = _dagPath;
+        }
+        _QueueShutterCapture(
+            centre, dag, dag.isValid() ? GetGfMatrixFromMaya(dag.inclusiveMatrix()) : centre);
     }
+}
+
+void MayaHydraRenderItemAdapter::_QueueShutterCapture(
+    const GfMatrix4d& centre,
+    const MDagPath&   dag,
+    const GfMatrix4d& centreDag)
+{
+    // All three keys equal until captured: "no motion", never a stale span.
+    _transform[0] = centre;
+    _transform[1] = centre;
+    _transform[2] = centre;
+    _shutterCapturePending = false;
+    if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled() || !dag.isValid()) {
+        return;
+    }
+    _shutterDag            = dag;
+    _shutterCentreDagInv   = centreDag.GetInverse();
+    _shutterCapturePending = true;
+}
+
+void MayaHydraRenderItemAdapter::CaptureShutterSample(bool open)
+{
+    if (!_shutterCapturePending || !_shutterDag.isValid()) {
+        return;
+    }
+    // Called inside the batch's MDGContextGuard for this shutter time.
+    const GfMatrix4d keyDag = GetGfMatrixFromMaya(_shutterDag.inclusiveMatrix());
+    _transform[open ? 2 : 1] = _transform[0] * _shutterCentreDagInv * keyDag;
+}
+
+bool MayaHydraRenderItemAdapter::UseVelocityMotionSamples()
+{
+    static const bool velocity = TfGetenv("MAYAHYDRA_MOTION_SAMPLING_MODE") == "velocity";
+    return velocity;
+}
+
+void MayaHydraRenderItemAdapter::_SetTransform(const GfMatrix4d& matrix)
+{
+    // The outgoing matrix becomes the previous frame's when a new frame brings
+    // a new one. Nothing is kept, and the clock is not even read, with motion
+    // samples off.
+    if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
+        const double now = GetMayaHydraSceneIndex()->GetCurrentFrame();
+        if (now != _xformFrame) {
+            _prevTransform    = _transform[0];
+            _prevXformFrame   = _xformFrame;
+            _hasPrevTransform = _xformValid;
+        }
+        _xformFrame = now;
+    } else {
+        _hasPrevTransform = false;
+    }
+
+    // All three stored keys equal ("no motion"); _ShutterTransform derives the
+    // shutter keys. An open key left at its identity initialiser once blurred
+    // objects along a streak from the world origin.
+    _transform[0] = matrix;
+    _transform[1] = matrix;
+    _transform[2] = matrix;
+    _xformValid   = true;
+}
+
+GfMatrix4d MayaHydraRenderItemAdapter::_ShutterTransform(bool open) const
+{
+    const GfMatrix4d&    centre     = _transform[0];
+    MayaHydraSceneIndex* sceneIndex = GetMayaHydraSceneIndex();
+    if (!_hasPrevTransform || !sceneIndex || !sceneIndex->GetParams().motionSamplesEnabled()) {
+        return centre;
+    }
+    // This frame's matrix, and a small forward step from the previous one: the
+    // first frame, a scrub or a jump would turn the gap into a bogus velocity.
+    // dF scales it to per-frame, so playback stepping several frames still
+    // blurs by the right amount.
+    // The frame from the scene index, not MAnimControl: this runs during Hydra
+    // sync, on Storm's worker threads.
+    const double dF = _xformFrame - _prevXformFrame;
+    if (sceneIndex->GetCurrentFrame() != _xformFrame || !(dF > 1e-4 && dF <= 4.0 + 1e-4)) {
+        return centre;
+    }
+    const GfInterval shutter = sceneIndex->GetCurrentTimeSamplingInterval();
+    const double     offset  = open ? shutter.GetMin() : shutter.GetMax();
+
+    // Linear in the matrix entries: exact for translation, a close
+    // approximation for the small per-frame rotations motion blur spans.
+    GfMatrix4d velocityPerFrame = centre - _prevTransform;
+    velocityPerFrame *= (1.0 / dF);
+    GfMatrix4d key = velocityPerFrame;
+    key *= offset;
+    key += centre;
+    return key;
+}
+
+bool MayaHydraRenderItemAdapter::PublishedVelocityAt(double frame) const
+{
+    // Evaluate mode publishes real shutter keys, not a velocity: nothing to
+    // retract. _hasPrevTransform is only set by a matrix change on a new frame.
+    return UseVelocityMotionSamples() && _hasPrevTransform && _xformFrame == frame;
+}
+
+void MayaHydraRenderItemAdapter::DirtyStaleVelocity()
+{
+    MayaHydra::DirtyNotifier(this).dirtyTransform();
 }
 
 bool MayaHydraRenderItemAdapter::IsSupported() const
@@ -261,6 +358,15 @@ void MayaHydraRenderItemAdapter::_RemoveRprim()
 {
     GetMayaHydraSceneIndex()->RemovePrim(GetID());
     _isPopulated = false;
+}
+
+void MayaHydraRenderItemAdapter::_ReinsertRprim()
+{
+    if (!_isPopulated) {
+        return;
+    }
+    _RemoveRprim();
+    _InsertRprim(this);
 }
 
 // We receive in that function the changes made in the Maya viewport between the last frame rendered
@@ -847,6 +953,32 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
 
     // Let base class handle other keys
     return MayaHydraAdapter::Get(key);
+}
+
+// MRenderItem::boundingBox() is frequently empty while a scene is still loading, and an item
+// whose vertex data is GPU-only has no CPU points to derive bounds from either. VP2 itself takes
+// bounds from the source shape's MFnDagNode::boundingBox(), which Maya maintains in object space
+// regardless of where the vertex data lives; this uses the same source.
+GfRange3d MayaHydraRenderItemAdapter::_ObjectSpaceBoundsFromDagNode(const MDagPath& dagPath)
+{
+    GfRange3d range;
+    MStatus   status;
+    MFnDagNode dagNode(dagPath, &status);
+    if (!status) {
+        return range;
+    }
+    const MBoundingBox bb = dagNode.boundingBox(&status);
+    if (!status) {
+        return range;
+    }
+    const MPoint mn = bb.min();
+    const MPoint mx = bb.max();
+    // Reject an empty/inverted box; a flat shape (zero extent on one axis) is
+    // still valid, so compare per-axis with min <= max.
+    if (mn.x <= mx.x && mn.y <= mx.y && mn.z <= mx.z) {
+        range = GfRange3d(GfVec3d(mn.x, mn.y, mn.z), GfVec3d(mx.x, mx.y, mx.z));
+    }
+    return range;
 }
 
 size_t MayaHydraRenderItemAdapter::_StoredStreamCount(const TfToken& primvar) const

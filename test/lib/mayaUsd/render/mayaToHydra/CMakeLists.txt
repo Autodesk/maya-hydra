@@ -49,7 +49,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py|disabledOn:maya2026:HYDRA-1940|disabledOn:mayaGt2027:HYDRA-1940|disabledOn:maya2027,osx:HYDRA-1940
-    testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
+    testUSDLights.py
     testUsdAreaLightGizmos.py
     testUVandUDIM.py|disabled:HYDRA-2709,AGP-734 # This test fails everywhere as of 2026-11-05, but when AGP-734 is fixed convert to disabledOn:mayaLe2027:HYDRA-2709.
 	testPurposeRenderTag.py
@@ -73,10 +73,9 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
-    testUsdTextureToggle.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
-    testUsdStageDefaultLighting.py|skipOnRenderer:HdFlash # AGP-734 : Geometry sometimes flashing (texture deferral)
+    testUsdTextureToggle.py
+    testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
-    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
 	testSceneModified.py
@@ -96,6 +95,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 	testMayaDisplayModes.py|skipOnPlatform:osx|disabled:HYDRA-1660 # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
+    testCameraPrimFraming.py
     testConvergence.py
     testFramePasses.py
     testImagePlanes.py|skipOnRenderer:HdFlash # AGP-1037 : Image plane updates is inconsistent
@@ -136,6 +136,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testRenderItemPrimvarsMaterialX.py|depOnPlugins:lookdevx
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
+    cpp/testCameraFraming.py
     cpp/testMayaNodesAttributes.py|depOnPlugins:mtoa
     cpp/testUsdAnim.py
     cpp/testUsdStageFromFile.py
@@ -154,7 +155,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 # HYDRA-1245.
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
-        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-723 : Light intensity not matching Storm/Arnold
+        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
         cpp/testIsolateSelect.py
         cpp/testIsolateSelectSwitchToVP2.py
         cpp/testIsolateSelectMayaSelectionHighlighting.py
@@ -189,7 +190,7 @@ endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
 if (NOT CODE_COVERAGE)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py|skipOnRenderer:HdFlash) # HYDRA-2679 : Prim origin path mismatch, then stack overflow
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
 endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
@@ -222,6 +223,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 # Interactive unit test scripts for Hydra Generative Procedurals.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
     cpp/testHydraGenerativeProcedural.py
+)
+
+# Interactive unit test scripts that run with the render item override off
+# (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0), on the stock render item path.
+set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
+    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
 )
 
 # Every interactive test runs in both selection highlighting modes: the primary
@@ -383,6 +390,26 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
 
 endforeach()
 
+# Same as above, with the render item override off.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+            "MAYAHYDRA_RENDER_ITEM_OVERRIDE=0"
+            ${mode_env}
+    )
+
+    # Add a ctest label to these tests for easy filtering.
+    apply_labels_to_test("${all_labels}" ${target})
+
+endforeach()
+
 # Registers the legacy counterpart of an interactive test, unless its primary
 # run is already legacy.
 #   name_suffix - appended before "_legacy", to keep the target unique for
@@ -431,6 +458,13 @@ endforeach()
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
     mayaHydra_add_legacy_mode_test(${script} ""
         "HDGP_INCLUDE_DEFAULT_RESOLVER=1")
+endforeach()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE})
+    mayaHydra_add_legacy_mode_test(${script} ""
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+        "MAYAHYDRA_RENDER_ITEM_OVERRIDE=0")
 endforeach()
 
 # Standalone Python unit tests for pure test utilities. These exercise logic

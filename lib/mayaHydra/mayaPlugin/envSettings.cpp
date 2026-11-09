@@ -25,13 +25,6 @@ TF_DEFINE_ENV_SETTING(
     "Use single frame pass when using the same renderer for all passes.");
 
 TF_DEFINE_ENV_SETTING(
-    MAYA_HYDRA_USE_CAMERA_PRIM,
-    true,
-    "Pass the Maya camera prim to non-Storm render delegates instead of populating the free "
-    "camera parameters. The camera prim exposes render parameters the free camera lacks. Storm "
-    "always uses the free camera, so that its draw matches the picking matrices.");
-
-TF_DEFINE_ENV_SETTING(
     MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS,
     true,
     "Set HdArnold render delegate to use Hydra v2 render settings.");
@@ -42,6 +35,12 @@ TF_DEFINE_ENV_SETTING(
     "Use the active renderer for the secondary graphics pass if it supports rendering them, "
     "instead of always using Storm.");
 
+TF_DEFINE_ENV_SETTING(
+    MAYAHYDRA_RENDER_ITEM_OVERRIDE,
+    true,
+    "Have Maya carry translated geometry straight to MayaHydra (MPxRenderItemOverride "
+    "carriers) instead of the stock render-item path. Set to 0 to run the stock path.");
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -51,13 +50,6 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
-    }
-
-    bool useCameraPrim()
-    {
-        static const bool _useCameraPrim
-            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_USE_CAMERA_PRIM);
-        return _useCameraPrim;
     }
 
     bool hdArnoldUseV2RenderSettings()
@@ -72,6 +64,13 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _secondaryGraphicsUseActiveRenderer = PXR_NS::TfGetEnvSetting(
             PXR_NS::MAYA_HYDRA_SECONDARY_GRAPHICS_USE_ACTIVE_RENDERER);
         return _secondaryGraphicsUseActiveRenderer;
+    }
+
+    bool useRenderItemOverride()
+    {
+        static const bool _useRenderItemOverride
+            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYAHYDRA_RENDER_ITEM_OVERRIDE);
+        return _useRenderItemOverride;
     }
 
 } // namespace MAYAHYDRA_NS_DEF

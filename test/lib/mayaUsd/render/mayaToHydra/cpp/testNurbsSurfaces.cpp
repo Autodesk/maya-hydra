@@ -19,8 +19,10 @@
 #include <mayaHydraLib/mayaUtils.h>
 
 #include <pxr/imaging/hd/basisCurvesSchema.h>
+#include <pxr/imaging/hd/basisCurvesTopologySchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
 
 #include <maya/M3dView.h>
@@ -38,6 +40,44 @@ HdDataSourceLocator meshTopologyLocator = HdMeshSchema::GetTopologyLocator();
 HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
 #ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
+// A linear curve can be described either way: VP2 render items use 2-vertex `segmented` pieces,
+// while render item override carriers (MAYAHYDRA_RENDER_ITEM_OVERRIDE) describe a NURBS curve as one `nonperiodic`
+// polyline (some renderers do not draw `segmented`). Rewrite a nonperiodic topology into the
+// equivalent segmented edge list, so both compare against the same reference files.
+HdDataSourceBaseHandle asSegmentedTopology(const HdDataSourceBaseHandle& dataSource)
+{
+    HdBasisCurvesTopologySchema topology(HdContainerDataSource::Cast(dataSource));
+    if (!topology || !topology.GetWrap() || !topology.GetCurveVertexCounts()
+        || topology.GetWrap()->GetTypedValue(0.0f) != HdTokens->nonperiodic) {
+        return dataSource;
+    }
+    const VtIntArray counts = topology.GetCurveVertexCounts()->GetTypedValue(0.0f);
+    const VtIntArray indices
+        = topology.GetCurveIndices() ? topology.GetCurveIndices()->GetTypedValue(0.0f) : VtIntArray();
+    VtIntArray segmentCounts;
+    VtIntArray segmentIndices;
+    int        offset = 0;
+    for (const int count : counts) {
+        for (int i = 0; i + 1 < count; ++i) {
+            const int a = offset + i;
+            const int b = offset + i + 1;
+            segmentIndices.push_back(indices.empty() ? a : indices[a]);
+            segmentIndices.push_back(indices.empty() ? b : indices[b]);
+            segmentCounts.push_back(2);
+        }
+        offset += count;
+    }
+    return HdRetainedContainerDataSource::New(
+        HdBasisCurvesTopologySchemaTokens->basis, topology.GetBasis(),
+        HdBasisCurvesTopologySchemaTokens->curveIndices,
+        HdRetainedTypedSampledDataSource<VtIntArray>::New(segmentIndices),
+        HdBasisCurvesTopologySchemaTokens->curveVertexCounts,
+        HdRetainedTypedSampledDataSource<VtIntArray>::New(segmentCounts),
+        HdBasisCurvesTopologySchemaTokens->type, topology.GetType(),
+        HdBasisCurvesTopologySchemaTokens->wrap,
+        HdRetainedTypedSampledDataSource<TfToken>::New(HdTokens->segmented));
+}
+
 FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfToken& primType)
 {
     return [nurbsName,
@@ -197,7 +237,7 @@ TEST(NurbsSurfaces, nurbsCircle)
             EXPECT_EQ(circlePrim.primType, HdPrimTypeTokens->basisCurves);
             ASSERT_NE(circlePrim.dataSource, nullptr);
             EXPECT_TRUE(dataSourceMatchesReference(
-                HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+                asSegmentedTopology(HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator)),
                 getPathToSample("circle_topology_fresh.txt")));
             EXPECT_TRUE(dataSourceMatchesReference(
                 HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
@@ -227,7 +267,7 @@ TEST(NurbsSurfaces, nurbsCircle)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+        asSegmentedTopology(HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator)),
         getPathToSample("circle_topology_modified.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
@@ -238,7 +278,7 @@ TEST(NurbsSurfaces, nurbsCircle)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+        asSegmentedTopology(HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator)),
         getPathToSample("circle_topology_tolerance.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
@@ -248,7 +288,7 @@ TEST(NurbsSurfaces, nurbsCircle)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+        asSegmentedTopology(HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator)),
         getPathToSample("circle_topology_unfixedCenter.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
@@ -285,7 +325,7 @@ TEST(NurbsSurfaces, nurbsSquare)
             EXPECT_EQ(linePrim.prim.primType, HdPrimTypeTokens->basisCurves);
             ASSERT_NE(linePrim.prim.dataSource, nullptr);
             EXPECT_TRUE(dataSourceMatchesReference(
-                HdContainerDataSource::Get(linePrim.prim.dataSource, curvesTopologyLocator),
+                asSegmentedTopology(HdContainerDataSource::Get(linePrim.prim.dataSource, curvesTopologyLocator)),
                 getPathToSample(
                     "square_" + linePrim.primPath.GetParentPath().GetElementString() + "_topology_"
                     + testSuffix + ".txt")));

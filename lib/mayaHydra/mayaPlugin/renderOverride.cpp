@@ -24,6 +24,7 @@
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <mayaHydraLib/adapters/mhExtGpuBufferBridge.h>
+#include <mayaHydraLib/adapters/mhExtGpuStreams.h>   // SetRendererBindsDeviceStreams
 #endif
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
@@ -49,6 +50,7 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
+#include <flowViewport/fvpCameraFraming.h>
 #include <flowViewport/fvpDirtyNotifier.h>
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
@@ -151,6 +153,7 @@
 #include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MTimerMessage.h>
+
 #include <maya/MUiMessage.h>
 #include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
@@ -165,6 +168,7 @@
 #include <iterator>
 #include <limits>
 #include <set>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -1132,20 +1136,65 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
         {"point", 0},
     };
 
+    // Pick the instance that is actually DRAWING, not merely the first one that
+    // initialised.
+    //
+    // There is one MtohRenderOverride per renderer, and switching renderer does
+    // not tear the old one down immediately. The previous version took the first
+    // instance with a render index and stopped, so after a renderer switch it
+    // reported the previous renderer's (by then empty) scene and returned all
+    // zeros. That is indistinguishable from "the scene is empty", which made the
+    // command useless for exactly the renderer-comparison it was reached for.
+    //
+    // _renderPanelCallbacks is non-empty precisely while a panel is drawing
+    // through that instance, so it is the honest test for "active".
     MtohRenderOverride* instance = nullptr;
+    size_t              candidates = 0;
     {
         std::lock_guard<std::mutex> lock(_allInstancesMutex);
         for (auto* inst : _allInstances) {
-            if (inst->_initializationSucceeded && inst->renderIndex()) {
-                instance = inst;
+            if (!inst->_initializationSucceeded || !inst->renderIndex()) {
+                continue;
+            }
+            ++candidates;
+            if (!inst->_renderPanelCallbacks.empty()) {
+                instance = inst;   // drawing right now - prefer it
                 break;
+            }
+            if (!instance) {
+                instance = inst;   // fallback, keeps the old behaviour
             }
         }
     }
 
     if (!instance || !instance->renderIndex()) {
+        // Say so, rather than returning a zero-filled map that reads as "the
+        // scene is empty". A diagnostic that cannot distinguish "no data" from
+        // "no geometry" sends the reader chasing the wrong bug.
+        stats["error.noActiveRenderer"] = 1;
+        stats["error.candidateInstances"] = static_cast<int>(candidates);
         return stats;
     }
+
+    // Which renderer answered, so a renderer comparison cannot silently
+    // compare one renderer against itself.
+    stats["renderer." + std::string(instance->_rendererDesc.rendererName.GetText())] = 1;
+
+    // THIS COMMAND ONLY SEES RenderIndex-BASED RENDERERS.
+    //
+    // Everything below walks HdRenderIndex::GetRprimIds(). A renderer that does
+    // not go through the render index populates nothing
+    // there, so every count comes back 0 and reads exactly like an empty scene.
+    // That cost real debugging time: a viewport with visible geometry
+    // reported "primitives 0", which was taken as evidence the prims were
+    // missing.
+    //
+    // It cannot be detected reliably from here (an empty render index is an
+    // empty render index), so the result says so instead. If you see
+    // warning.zeroPrimsWhileDrawing, do not conclude the scene is empty - use
+    // the Hydra Scene Browser, which inspects the SCENE INDEX and is therefore
+    // renderer-agnostic.
+    const bool drawing = !instance->_renderPanelCallbacks.empty();
 
     // Get stats for all passes, avoiding double-counting when passes share the same render index
     const int numFramePasses = instance->_GetNumFramePasses();
@@ -1235,6 +1284,12 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
             }
         }
     }
+    if (drawing && stats["primitives"] == 0) {
+        // Either the scene really is empty, or this renderer does not use the
+        // render index. Say both rather than implying the first.
+        stats["warning.zeroPrimsWhileDrawing"] = 1;
+    }
+
     return stats;
 }
 
@@ -1458,6 +1513,44 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
                 "_hasDefaultLighting=%i\n",
                 _hasDefaultLighting);
     }
+}
+
+SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
+{
+    MStatus       status;
+    const MString ufePathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+    if (!status || ufePathString.length() == 0) {
+        return {};
+    }
+    // Maya builds this string, so it is a valid UFE path.
+    const Ufe::Path ufePath = Ufe::PathString::path(ufePathString.asChar());
+
+    if (ufePath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
+        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+        if (!status || !_mayaHydraSceneIndex) {
+            return {};
+        }
+        MFnCamera camera(camPath, &status);
+        // TODO: Support orthographic cameras.
+        if (!status || camera.isOrtho()) {
+            return {};
+        }
+        return _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+    }
+
+    // Only runtimes that registered a path mapper (MayaUSD) publish camera prims. Checking first
+    // keeps the registry's no-mapping warning out of every draw. Orthographic USD cameras are
+    // rejected later, when the camera prim projection is computed.
+    if (!Fvp::PathMapperRegistry::Instance().HasMapper(ufePath)) {
+        return {};
+    }
+    const Fvp::PrimSelections selections = Fvp::ufePathToPrimSelections(ufePath);
+    // A camera is not instanced, so it maps to exactly one prim, as in
+    // mhExternalCameraResolvingSceneIndex.
+    if (selections.size() != 1) {
+        return {};
+    }
+    return selections.front().primPath;
 }
 
 MStatus MtohRenderOverride::Render(
@@ -2117,34 +2210,28 @@ MStatus MtohRenderOverride::Render(
     const int maxX = std::clamp(renderRegion.GetMaxX(), minX, width - 1);
     const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
     renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
-    for (int i = 0; i < numFramePasses; ++i) {
-        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-        if (!currentPass) {
-            continue;
-        }
-        currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
-    }
 
-    // Storm renders through the free camera, built from Maya's view and projection matrices. The
-    // camera prim does not translate every Maya projection input (overscan, resolution gate,
-    // film transforms, 2D pan/zoom), and Storm is picked with Maya's matrices, so binding the prim
-    // would desync the draw from the pick. Other delegates bind the prim for the render
-    // parameters the free camera lacks.
-    SdfPath cameraPath;
-    if (useCameraPrim() && !_isUsingHdSt) {
-        MStatus        status;
-        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-        if (status == MStatus::kSuccess) {
-            const MString ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
-            const Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-            // TODO: Support USD cameras.
-            if (ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-                MFnCamera camera(camPath, &status);
-                // TODO: Support orthographic cameras.
-                if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
-                    cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
-                }
-            }
+    // Every delegate renders through the camera prim translated from the Maya or USD camera, so
+    // that it gets the render parameters the free camera lacks. Orthographic cameras still use
+    // the free camera.
+    const SdfPath cameraPath = _ResolveCameraPrimPath();
+
+    // The camera prim holds the raw camera attributes, shared by every panel looking through that
+    // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
+    // disabling window conforming and solving the display window so that the framed prim
+    // projection equals Maya's projection matrix.
+    // Every pass uses the same Maya projection matrix.
+    // The display window is solved once, from the main pass.
+    const GfVec2i             panelSize(width, height);
+    std::optional<GfMatrix4d> cameraPrimProjection;
+    std::optional<GfRange2f>  solvedWindow;
+    if (!cameraPath.IsEmpty() && numFramePasses > 0 && _GetFramePass(0)) {
+        // Compute the base projection matrix of the camera prim.
+        cameraPrimProjection = Fvp::computeCameraPrimProjection(
+            _GetFramePass(0)->GetRenderIndex()->GetTerminalSceneIndex(), cameraPath);
+        if (cameraPrimProjection) {
+            solvedWindow
+                = Fvp::solveDisplayWindow(projectionMatrix, *cameraPrimProjection, panelSize);
         }
     }
 
@@ -2153,13 +2240,34 @@ MStatus MtohRenderOverride::Render(
         if (!currentPass) {
             continue;
         }
-        currentPass->params().renderParams.camera = cameraPath;
-        // A bound camera prim carries its own window policy, translated from the Maya film fit,
-        // so disable the override. The free camera needs the default override back, since the
-        // camera path goes empty again when switching to an ortho or USD camera.
-        currentPass->params().renderParams.overrideWindowPolicy = cameraPath.IsEmpty()
-            ? std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit)
-            : std::nullopt;
+        auto& params = currentPass->params();
+
+        if (!cameraPrimProjection) {
+            params.viewInfo.framing = CameraUtilFraming(displayWindow, renderRegion);
+            params.renderParams.camera = SdfPath();
+            params.renderParams.overrideWindowPolicy
+                = std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit);
+            continue;
+        }
+
+        params.viewInfo.framing
+            = CameraUtilFraming(solvedWindow.value_or(displayWindow), renderRegion);
+        params.renderParams.camera = cameraPath;
+        params.renderParams.overrideWindowPolicy
+            = std::optional<CameraUtilConformWindowPolicy>(CameraUtilDontConform);
+    }
+
+    if (cameraPrimProjection && !solvedWindow) {
+        // Warn once per camera. Panels looking through different cameras render in turn.
+        if (_unsolvableFramingWarnedCameras.insert(cameraPath).second) {
+            TF_WARN(
+                "The projection of camera %s cannot be reproduced through its camera prim (for "
+                "example because of film roll). The viewport may not match Maya's framing.",
+                cameraPath.GetText());
+        }
+    } else if (solvedWindow) {
+        // The display window solves again (i.e., the film roll was removed).
+        _unsolvableFramingWarnedCameras.erase(cameraPath);
     }
 
     // Update all registered plugin before render.
@@ -2168,10 +2276,14 @@ MStatus MtohRenderOverride::Render(
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
-    // delegate. The Storm-specific task setup below only disables the shadow task;
-    // other delegates rely on the lights management scene index turning off shadow
-    // casting on the light prims themselves.
-    bool  enableShadows = true;
+    // delegate. All delegates, Storm included, rely on the lights management scene index
+    // turning off shadow casting on the light prims themselves.
+    // MLightParameterInformation::getParameter(kGlobalShadowOn) only actually
+    // returns data when the shadows are enabled. If there is no light or shadows
+    // are off, the call will not be successful. Therefore, assume shadows are off
+    // by default, and only enable them if they are. Note : despite being a Maya
+    // API, MLightParameterInformation does indeed work for USD lights.
+    bool  enableShadows = false;
     auto* lightParam = drawContext.getLightParameterInformation(
         0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
     if (lightParam != nullptr) {
@@ -2200,7 +2312,13 @@ MStatus MtohRenderOverride::Render(
                 continue;
             }
 
-            currentPass->SetEnableShadows(enableShadows);
+            // Keep the Storm shadow pipeline always enabled: turning
+            // HdxSimpleLightTaskParams::enableShadows off and then on again leaves the shadow
+            // task drawing into an incomplete framebuffer on the frame it is re-enabled
+            // (GL_INVALID_FRAMEBUFFER_OPERATION), so nothing is drawn in that frame.
+            // Shadows are already enabled/disabled for every light by the lights management
+            // scene index, so no need to turn the task off. 
+            currentPass->SetEnableShadows(true);
             currentPass->SetShadowParams(shadowParams);
         }
         if (_mayaHydraSceneIndex) {
@@ -2954,6 +3072,20 @@ void MtohRenderOverride::_InitHydraResources(
     }
     
     _initializationSucceeded = true;
+
+    // This instance starts drawing now: producers should hand it what it can use.
+    _PublishDeviceStreamSupport();
+}
+
+void MtohRenderOverride::_PublishDeviceStreamSupport()
+{
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+    // The same test MhExtGpuStreams applies per stream: a bridge for this
+    // renderer's Hgi means it can bind the buffers; none means CPU readback.
+    const bool binds = _mayaHydraSceneIndex
+        && static_cast<bool>(MhExtGpuBufferBridge::ForHgi(_mayaHydraSceneIndex->GetHgi()));
+    MhExtGpuStreams::SetRendererBindsDeviceStreams(binds);
+#endif
 }
 
 //When fullReset is true, we remove the data producer scene indices that apply to all viewports.
@@ -3219,6 +3351,7 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
         constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
     }
+
 }
 
 void MtohRenderOverride::SelectionChanged(
@@ -3357,7 +3490,15 @@ MStatus MtohRenderOverride::setup(const MString& destination)
             newCallbacks.append(id);
         }
 
+        const bool firstPanel = _renderPanelCallbacks.empty();
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
+
+        // Back to an instance that already has its Hydra resources (switching
+        // renderers): restore its device-stream answer. A new instance sets it
+        // from _InitHydraResources instead, which runs later, from Render().
+        if (firstPanel && _initializationSucceeded) {
+            _PublishDeviceStreamSupport();
+        }
     }
 
     // Track the mouse for hover highlighting. Idempotent. Installed regardless of the highlight

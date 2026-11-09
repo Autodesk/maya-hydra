@@ -573,8 +573,17 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     def setViewport2Renderer(self):
         self.setMayaUseHydra(False)
         self.activeEditor = cmds.playblast(activeEditor=1)
+        # Check whether the viewport is currently using a MayaHydra renderer.
+        leavingHydra = (cmds.modelEditor(
+            self.activeEditor, query=True, rendererOverrideName=True) or "").startswith("mayaHydra")
         # Empty string for rendererOverrideName unsets any currently active override, thus returning to VP2
         cmds.modelEditor(self.activeEditor, e=1, rendererOverrideName="")
+        if leavingHydra:
+            # While Hydra was on, the render item override handed native shapes to
+            # mayaHydra, so VP2 built no render items for them. Reset VP2 so it
+            # rebuilds them, as applyUseHydraToModelPanels.mel does when leaving Hydra.
+            # Without the reset, VP2 renders none of those shapes, only the background.
+            cmds.ogs(reset=True)
         cmds.refresh(f=1)
         self.delegateId = ""
 

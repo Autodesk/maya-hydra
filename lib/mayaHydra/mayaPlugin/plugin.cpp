@@ -18,6 +18,7 @@
 #include "mayaColorPreferencesTranslator.h"
 #include "pluginUtils.h"
 #include "renderGlobals.h"
+#include "envSettings.h"
 #include "renderOverride.h"
 #include "viewCommand.h"
 #include "pluginBuildInfoCommand.h"
@@ -31,6 +32,8 @@
 #endif
 
 #include <mayaHydraLib/adapters/adapter.h>
+#include <mayaHydraLib/adapters/renderItemOverrideCreator.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <flowViewport/global.h>
 #include <filesystem>
@@ -186,6 +189,72 @@ void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
         }
     }
 }
+
+namespace {
+
+#if defined(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
+const MString kRenderItemOverrideRegistrantId("mayaHydra");
+bool          gRenderItemOverrideRegistered = false;
+#endif
+
+// Register the render item override creator (adapters/renderItemOverrideCreator)
+// for every draw classification it serves, so Maya carries those shapes' geometry
+// straight to us instead of building its own drawing structures for them. Maya
+// core has no gate of its own - the registration is the opt-in - so the
+// MAYAHYDRA_RENDER_ITEM_OVERRIDE env setting (on by default; 0 runs the stock
+// render-item path) is checked here. Registered with requiresRenderOverride,
+// so Maya only claims shapes while the viewport is in render override mode
+// (today: Global Hydra, optionVar mayaUseHydra). Each registration
+// costs Maya a full scene reset.
+//
+// ALL-OR-NOTHING: if one registration fails the API is unusable, and a partial
+// registration would leave some shape types carried and others not.
+void registerRenderItemOverride()
+{
+#if defined(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
+    if (gRenderItemOverrideRegistered || !MAYAHYDRA_NS::useRenderItemOverride()) {
+        return;
+    }
+    const auto& classifications = MayaHydraRenderItemOverrideCreator::drawClassifications();
+    for (size_t i = 0; i < classifications.size(); ++i) {
+        // requiresRenderOverride: what we carry is drawn only by our render
+        // override (the Hydra viewport), so Maya must keep drawing it with
+        // Viewport 2.0 otherwise.
+        const MStatus status = MHWRender::MRenderItemOverrideRegistry::registerOverrideCreator(
+            classifications[i], kRenderItemOverrideRegistrantId,
+            MayaHydraRenderItemOverrideCreator::create, /*requiresRenderOverride*/ true,
+            MayaHydraRenderItemOverrideCreator::shutterSamples());
+        if (status != MS::kSuccess) {
+            // Leave the stock path running: undo what was registered so far.
+            for (size_t j = 0; j < i; ++j) {
+                MHWRender::MRenderItemOverrideRegistry::deregisterOverrideCreator(
+                    classifications[j], kRenderItemOverrideRegistrantId);
+            }
+            return;
+        }
+    }
+    gRenderItemOverrideRegistered = true;
+    PXR_NS::MayaHydraSceneIndex::SetRenderItemOverrideEnabled(true);
+#endif
+}
+
+void deregisterRenderItemOverride()
+{
+#if defined(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
+    if (!gRenderItemOverrideRegistered) {
+        return;
+    }
+    PXR_NS::MayaHydraSceneIndex::SetRenderItemOverrideEnabled(false);
+    for (const MString& classification :
+         MayaHydraRenderItemOverrideCreator::drawClassifications()) {
+        MHWRender::MRenderItemOverrideRegistry::deregisterOverrideCreator(
+            classification, kRenderItemOverrideRegistrantId);
+    }
+    gRenderItemOverrideRegistered = false;
+#endif
+}
+
+} // namespace
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
@@ -382,11 +451,27 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    // Register the render item override data creators for the whole session. LAST, after
+    // every step that can fail: Maya does not call uninitializePlugin after a
+    // failed initializePlugin, so a registration made before a failure would be
+    // left pointing into the unloaded module.
+    //
+    // Skipped when the render item override path is turned off (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0; on by default).
+    // Even registered, nothing is claimed while Global Hydra is off: Maya
+    // also gates claiming on the optionVar mayaUseHydra, and rebuilds the scene
+    // with `ogs -reset` whenever that preference changes
+    // (applyUseHydraToModelPanels.mel).
+    registerRenderItemOverride();
+
     return ret;
 }
 
 PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
+    // Withdraw the render item override creator before anything else: Maya must
+    // not call into an unloading module.
+    deregisterRenderItemOverride();
+
     finalize();
 
     for (const auto& callbackId : _pluginLoadingCallbackIds) {

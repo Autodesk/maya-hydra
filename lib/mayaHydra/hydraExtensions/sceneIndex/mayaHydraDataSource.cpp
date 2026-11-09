@@ -355,7 +355,12 @@ MayaHydraDataSource::Get(const TfToken& name)
     else if (name == HdCameraSchemaTokens->camera) {
         return MayaHydraCameraDataSource::New(_id, _type, _adapter);
     }
-    else if (name == HdLightSchemaTokens->light) {
+    // Lights only, as GetNames() says. Answering for every prim made
+    // HdLightSchema::IsDefined() true on meshes, and consumers that spare lights
+    // - the isolate select scene index keeps them visible when excluded - then
+    // spared every mesh. VP2 hid the render items anyway; render item override carriers rely
+    // on the isolate select scene index alone.
+    else if (name == HdLightSchemaTokens->light && HdPrimTypeIsLight(_type)) {
         return MayaHydraLightDataSource::New(_id, _type, _adapter);
     }
     else if (name == HdExtentSchemaTokens->extent) {//Extent attribute to support the bounding box display style
