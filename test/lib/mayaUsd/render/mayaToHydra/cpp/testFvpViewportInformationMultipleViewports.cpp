@@ -33,7 +33,7 @@ namespace {
 }
 
 //The test is done through 4 Steps in the python script testFlowViewportAPIViewportInformation.py function test_MultipleViewports
-//From Maya 2028, VP2 and Hydra viewports can't be mixed, so the script uses steps 1, 2b and 3b instead (see below).
+//In Maya's Hydra mode, VP2 and Hydra viewports can't be mixed, so the script uses steps 1, 2b and 3b instead (see below).
 
 //Step 1) The python script calls viewportInformationMultipleViewportsInit before anything is done.
 TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
@@ -123,7 +123,7 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports0Viewport)
     informationInterface.UnregisterInformationClient(_infoClientTest);
 }
 
-//Step 2b (Maya 2028+) : The python script has created 4 viewports and set Hydra on one of them.
+//Step 2b (Maya's Hydra mode) : The python script has created 4 viewports and set Hydra on one of them.
 //VP2 and Hydra viewports can't be mixed, so this switched all 4 viewports to Hydra
 //and InfoClientTest::SceneIndexAdded should have been called once per viewport
 //then it calls viewportInformationMultipleViewportsAllViewports
@@ -146,7 +146,7 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewportsAllViewports)
     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
 }
 
-//Step 3b (Maya 2028+) : The python script has set VP2 back, which switched all 4 viewports to VP2
+//Step 3b (Maya's Hydra mode) : The python script has set VP2 back, which switched all 4 viewports to VP2
 //and InfoClientTest::SceneIndexRemoved should have been called once per viewport
 //then it calls viewportInformationMultipleViewportsAllViewportsRemoved
 TEST(FlowViewportAPI, viewportInformationMultipleViewportsAllViewportsRemoved)

@@ -43,7 +43,7 @@ import math
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
 def mayaHasHydraMode():
-    '''Whether Maya has the Global Hydra mode (Maya 2028+).
+    '''Whether Maya has the Global Hydra mode.
 
     In that mode, VP2 and Hydra viewports can't be mixed: switching one model
     panel to VP2 or to Hydra switches all of them (see setRenderer).

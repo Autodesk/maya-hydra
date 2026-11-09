@@ -343,7 +343,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
     #Test multiple viewports
     def test_MultipleViewports(self):
-        # In Maya's Hydra mode (2028+), VP2 and Hydra viewports can't be mixed: setting VP2 or
+        # In Maya's Hydra mode, VP2 and Hydra viewports can't be mixed: setting VP2 or
         # Hydra on one viewport switches all of them, so the renderer is only
         # set on modelPanel4 and modelPanel2 follows.
         canMixRenderers = not mtohUtils.mayaHasHydraMode()

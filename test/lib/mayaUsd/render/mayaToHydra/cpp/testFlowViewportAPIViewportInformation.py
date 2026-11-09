@@ -54,7 +54,7 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
             mel.eval('FourViewLayout')
 
             if mtohUtils.mayaHasHydraMode():
-                # In Maya's Hydra mode (2028+), VP2 and Hydra viewports can't be mixed: setting
+                # In Maya's Hydra mode, VP2 and Hydra viewports can't be mixed: setting
                 # Hydra on one viewport switches all of them, and so does VP2.
                 cmds.setFocus ('modelPanel4') #Is the persp view
                 self.setTestRenderer()
