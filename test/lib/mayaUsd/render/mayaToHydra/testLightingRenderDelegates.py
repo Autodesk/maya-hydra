@@ -150,7 +150,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         if delegate.get("plugin") == renderManUtils.HD_PRMAN:
             renderManUtils.logDiagnostics("before renderer switch")
         panel = mayaUtils.activeModelPanel()
-        mtohUtils.setRendererOverride(panel, delegate["override"])
+        mtohUtils.setRenderer(panel, delegate["override"])
         cmds.refresh(force=True)
 
         activeRenderers = cmds.mayaHydra(listActiveRenderers=True)

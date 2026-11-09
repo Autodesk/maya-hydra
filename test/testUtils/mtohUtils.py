@@ -46,7 +46,7 @@ def mayaHasHydraMode():
     '''Whether Maya has the Global Hydra mode (Maya 2028+).
 
     In that mode, VP2 and Hydra viewports can't be mixed: switching one model
-    panel to VP2 or to Hydra switches all of them (see setRendererOverride).
+    panel to VP2 or to Hydra switches all of them (see setRenderer).
     It is driven by the mayaUseHydra optionVar and applied to the panels by
     applyUseHydraToModelPanels.mel. A Maya without the proc can still carry a
     stale mayaUseHydra from old prefs, so both are checked.
@@ -54,7 +54,7 @@ def mayaHasHydraMode():
     return bool(cmds.optionVar(exists="mayaUseHydra")
                 and maya.mel.eval("exists applyUseHydraToModelPanels"))
 
-def setRendererOverride(editor, overrideName):
+def setRenderer(editor, overrideName):
     '''Switch a model editor to a Hydra render override, or back to VP2 with "".
 
     Keeps the Global Hydra preference (optionVar mayaUseHydra) in sync. It is
@@ -418,7 +418,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
         # We've just opened a new scene, so we should not be modified.  Setting
         # a Hydra renderer should conceptually not change that status, but
-        # unfortunately in automated tests it does (see setRenderer()
+        # unfortunately in automated tests it does (see setTestRenderer()
         # method documentation).  Restore modified status to false.
         cmds.file(modified=False)
 
@@ -575,9 +575,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                           "complete after %d attempts" % maxAttempts,
                           file=sys.stderr)
 
-    def setRenderer(self, renderer):
+    def setTestRenderer(self):
+        """Activate the renderer selected for this CTest invocation."""
+        renderer = rendererUtils.getTestRenderer()
         self.activeEditor = cmds.playblast(activeEditor=1)
-        setRendererOverride(
+        setRenderer(
             self.activeEditor, rendererUtils.getRendererOverrideName(renderer))
         # During automated tests, tracing demonstrates that the following call
         # to refresh marks the scene as modified, with the modified node being
@@ -588,13 +590,17 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             renderer=rendererUtils.getRendererPluginName(renderer),
             sceneDelegateId="MayaHydraSceneDelegate")
 
-    def setTestRenderer(self):
-        """Activate the renderer selected for this CTest invocation."""
-        self.setRenderer(rendererUtils.getTestRenderer())
-
     def setHdStormRenderer(self):
         """Activate Storm for a test that explicitly requires it."""
-        self.setRenderer(rendererUtils.TEST_RENDERER_STORM)
+        renderer = rendererUtils.TEST_RENDERER_STORM
+        self.activeEditor = cmds.playblast(activeEditor=1)
+        setRenderer(
+            self.activeEditor, rendererUtils.getRendererOverrideName(renderer))
+        # See setTestRenderer() for why this refresh marks the scene as modified.
+        cmds.refresh(f=1)
+        self.delegateId = cmds.mayaHydra(
+            renderer=rendererUtils.getRendererPluginName(renderer),
+            sceneDelegateId="MayaHydraSceneDelegate")
         
     def setViewport2Renderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)
@@ -602,7 +608,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # thus returning to VP2. Turning Global Hydra off also runs the `ogs -reset`
         # VP2 needs to rebuild the render items for shapes the render item override
         # had handed to mayaHydra.
-        setRendererOverride(self.activeEditor, "")
+        setRenderer(self.activeEditor, "")
         cmds.refresh(f=1)
         self.delegateId = ""
 
