@@ -343,6 +343,19 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
     #Test multiple viewports
     def test_MultipleViewports(self):
+        # In Maya's Hydra mode, VP2 and Hydra viewports can't be mixed: setting VP2 or
+        # Hydra on one viewport switches all of them, so the renderer is only
+        # set on modelPanel4 and modelPanel2 follows.
+        canMixRenderers = not mtohUtils.mayaHasHydraMode()
+
+        # With all 4 viewports on Hydra, the data producer and filtering scene
+        # indices are added once per viewport to the shared render index, which
+        # breaks the rendering of the locator cubes, so the images are only
+        # compared when the viewports can mix renderers.
+        def assertViewportSnapshotClose(*args):
+            if canMixRenderers:
+                self.assertSnapshotClose(*args)
+
         with PluginLoaded('mayaHydraFlowViewportAPILocator'):
             #switch to 4 views
             mel.eval('FourViewLayout')
@@ -350,12 +363,13 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.setFocus ('modelPanel4') #Is the persp view
             #Set Hydra as the renderer
             self.setTestRenderer()
-            
-            #Set focus on model Panel 2 (it's an orthographic view : right) 
+
+            #Set focus on model Panel 2 (it's an orthographic view : right)
             cmds.setFocus ('modelPanel2')
             #Set Hydra as the renderer
-            self.setTestRenderer()
-            
+            if canMixRenderers:
+                self.setTestRenderer()
+
             #Create a maya sphere
             sphereNode, sphereShape = cmds.polySphere()
             cmds.move(15, 0, 0, sphereNode)
@@ -377,42 +391,44 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             cmds.refresh()
             
             cmds.setFocus ('modelPanel4')
-            self.assertSnapshotClose("multipleViewports_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            assertViewportSnapshotClose("multipleViewports_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
-            self.assertSnapshotClose("multipleViewports_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            assertViewportSnapshotClose("multipleViewports_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
             #Change sphere attributes to add more vertices/polygons, our filtering removes a prim when its number of vertices is greater than 10 000.
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 200)
             cmds.setAttr(sphereShape + '.subdivisionsHeight', 200)
             cmds.refresh()
             cmds.setFocus ('modelPanel4')
-            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            assertViewportSnapshotClose("multipleViewports_sphereFiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
-            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            assertViewportSnapshotClose("multipleViewports_sphereFiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             
             #Remove filtering by decreasing the number of vertices
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30)
             cmds.refresh()
             cmds.setFocus ('modelPanel4')
-            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            assertViewportSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
-            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            assertViewportSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             
             #Switch to VP2
             cmds.setFocus ('modelPanel4')
             self.setViewport2Renderer()
-            self.assertSnapshotClose("multipleViewports_VP2_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            assertViewportSnapshotClose("multipleViewports_VP2_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             cmds.setFocus ('modelPanel2')
-            self.setViewport2Renderer()
-            self.assertSnapshotClose("multipleViewports_VP2_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-            
+            if canMixRenderers:
+                self.setViewport2Renderer()
+            assertViewportSnapshotClose("multipleViewports_VP2_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
             #Switch back to Hydra
             cmds.setFocus ('modelPanel4')
             self.setTestRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            assertViewportSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
             cmds.setFocus ('modelPanel2')
-            self.setTestRenderer()
-            self.assertSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
+            if canMixRenderers:
+                self.setTestRenderer()
+            assertViewportSnapshotClose("multipleViewports_VP2AndThenBackToHydra_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.macOSFlashImageVersion())
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
