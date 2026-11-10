@@ -380,9 +380,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     }
 
     // Renderers that cannot draw the reprs we author natively (for example wireframe on
-    // shaded) offer an optional scene index for them. Register it now that every renderer
-    // plugin is discovered (mayaUsdPlugin registered the versioned ones) and before any
-    // render index is created.
+    // shaded) can offer an optional scene index for them. Register it now that every
+    // renderer plugin is discovered (mayaUsdPlugin registered the versioned ones) and
+    // before any render index is created.
     MayaHydra::RegisterOptionalSceneIndexPlugins(Fvp::ReprSelectorSceneIndex::GetAuthoredReprs());
   
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
