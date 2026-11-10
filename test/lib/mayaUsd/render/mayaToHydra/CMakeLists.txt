@@ -17,18 +17,8 @@
 # Tests are run with the VP2 render delegate disabled, to ensure 
 # that mayaHydra does not rely on computations made by VP2 for its use.
 
-# Renderer the MayaHydra tests run against. Baked into every test's environment
-# below, so `ctest` run directly uses it. Set by build.py via -DMAYAHYDRA_TEST_RENDERER.
-# Changing it requires reconfiguring the build.
-# MAYAHYDRA_TEST_RENDERER_CHOICES comes from cmake/testConditions.cmake, which
-# also accepts those names as disabledOn: conditions.
-set(MAYAHYDRA_TEST_RENDERER HdStorm CACHE STRING
-    "Hydra renderer used by the MayaHydra tests")
-set_property(CACHE MAYAHYDRA_TEST_RENDERER PROPERTY STRINGS ${MAYAHYDRA_TEST_RENDERER_CHOICES})
-if(NOT MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_TEST_RENDERER_CHOICES)
-    message(FATAL_ERROR "MAYAHYDRA_TEST_RENDERER must be one of "
-        "${MAYAHYDRA_TEST_RENDERER_CHOICES}, got '${MAYAHYDRA_TEST_RENDERER}'.")
-endif()
+# MAYAHYDRA_TEST_RENDERER, the renderer these tests run against, is defined in
+# cmake/test.cmake.
 
 set(INTERACTIVE_TEST_SCRIPT_FILES
     testSceneStat.py|disabledOn:HdFlash:HYDRA-2670 # HYDRA-2670 : Scene statistics report 1 primitive instead of 3

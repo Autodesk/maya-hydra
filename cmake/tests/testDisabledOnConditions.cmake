@@ -209,6 +209,13 @@ expect_disabled_on_rejected(maya2027,osxx)
 # An empty group would vacuously hold and disable the test everywhere.
 expect_disabled_on_rejected("")
 
+# Evaluating renderer facts before the renderer is defined must not silently
+# make every renderer condition false.
+expect_rejected(
+    "unset(MAYAHYDRA_TEST_RENDERER)\nmayaHydra_disabled_on_group_matches(_m \"win\")"
+    "MAYAHYDRA_TEST_RENDERER is not set"
+    "disabledOn: evaluated with no test renderer")
+
 # A disabled: group must name the work of re-enabling the test.
 expect_tracking_issues_accepted(HYDRA-1940)
 expect_tracking_issues_accepted(AGP-1034)

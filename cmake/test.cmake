@@ -2,6 +2,18 @@ set(MAYA_HYDRA_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 include("${CMAKE_CURRENT_LIST_DIR}/testConditions.cmake")
 
+# Renderer the MayaHydra tests run against. Baked into every test's environment,
+# so `ctest` run directly uses it. Set by build.py via -DMAYAHYDRA_TEST_RENDERER.
+# Changing it requires reconfiguring the build. Defined here, before any test
+# directory, so that disabledOn: renderer conditions see it wherever they are used.
+set(MAYAHYDRA_TEST_RENDERER HdStorm CACHE STRING
+    "Hydra renderer used by the MayaHydra tests")
+set_property(CACHE MAYAHYDRA_TEST_RENDERER PROPERTY STRINGS ${MAYAHYDRA_TEST_RENDERER_CHOICES})
+if(NOT MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_TEST_RENDERER_CHOICES)
+    message(FATAL_ERROR "MAYAHYDRA_TEST_RENDERER must be one of "
+        "${MAYAHYDRA_TEST_RENDERER_CHOICES}, got '${MAYAHYDRA_TEST_RENDERER}'.")
+endif()
+
 # Paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold plugin).
 # Sources (first wins): -DADDITIONAL_PXR_PLUGINPATH_NAME=... or $ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}
 # On Windows use forward slashes or escaped backslashes.

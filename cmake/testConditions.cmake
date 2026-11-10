@@ -40,6 +40,11 @@ set(MAYAHYDRA_TEST_PLATFORM_CHOICES osx win lin)
 # are deliberately absent: they are predicates rather than facts, see
 # mayaHydra_test_condition_holds.
 function(mayaHydra_current_test_facts out)
+    if(NOT MAYAHYDRA_TEST_RENDERER)
+        message(FATAL_ERROR
+            "MAYAHYDRA_TEST_RENDERER is not set: disabledOn: renderer "
+            "conditions cannot be evaluated before cmake/test.cmake defines it.")
+    endif()
     if(IS_MACOSX)
         set(platform osx)
     elseif(IS_WINDOWS)
