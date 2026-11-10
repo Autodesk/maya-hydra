@@ -38,6 +38,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
+    # Enabled on Maya 2027 Windows and Linux, disabled elsewhere.
     testMayaLights.py|disabledOn:maya2026:HYDRA-1940|disabledOn:mayaGt2027:HYDRA-1940|disabledOn:maya2027,osx:HYDRA-1940
     testUSDLights.py
     testUsdAreaLightGizmos.py
