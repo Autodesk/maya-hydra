@@ -19,6 +19,8 @@
 
 #include <mayaHydraLib/api.h>
 
+#include <pxr/base/tf/diagnostic.h>
+
 #include <maya/MGlobal.h>
 #include <maya/MStatus.h>
 
@@ -41,15 +43,13 @@ class SceneModifiedGuard
 {
 public:
     SceneModifiedGuard()
-        : _wasModified(_SceneModified())
+        : _wasModified(_IsSceneModified())
     {
     }
 
     ~SceneModifiedGuard()
     {
-        // Never throw from a destructor: if the query fails, leave the flag alone.
-        bool modified = true;
-        if (_QuerySceneModified(modified) && modified && !_wasModified) {
+        if (!_wasModified && _IsSceneModified()) {
             MGlobal::executeCommand("file -modified 0");
         }
     }
@@ -58,24 +58,19 @@ public:
     SceneModifiedGuard& operator=(const SceneModifiedGuard&) = delete;
 
 private:
-    // Returns false if the query failed.
-    static bool _QuerySceneModified(bool& modified)
+    // Querying the modified state is not expected to fail. If it does, report it rather than hide
+    // it, and count the scene as modified so that the guard never clears a flag on a guess.
+    static bool _IsSceneModified()
     {
+        // TF_VERIFY expands to unqualified pxr names, which this namespace does not see.
+        PXR_NAMESPACE_USING_DIRECTIVE
+
         int           result = 0;
         const MStatus status = MGlobal::executeCommand("file -query -modified", result);
-        if (status != MStatus::kSuccess) {
-            return false;
+        if (!TF_VERIFY(status == MStatus::kSuccess, "Querying the scene modified state failed.")) {
+            return true;
         }
-        modified = (result != 0);
-        return true;
-    }
-
-    // A failed query counts as modified, so the guard never clears a flag it could not read.
-    static bool _SceneModified()
-    {
-        bool modified = true;
-        _QuerySceneModified(modified);
-        return modified;
+        return result != 0;
     }
 
     bool _wasModified { true };
