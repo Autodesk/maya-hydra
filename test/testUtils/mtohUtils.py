@@ -90,6 +90,12 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     _pluginsToUnload = []
     _initializeStandalone = False
     _setTestRenderer = True
+    # When True (the default), setUp() ends by applying the selection highlighting
+    # mode and resetting the scene's modified flag, which hides any modification
+    # made by setting up Hydra. A test of the scene's modified state sets this to
+    # False, together with _setTestRenderer, so it starts from a pristine new scene
+    # and observes the modified flag itself.
+    _clearModifiedAfterSetUp = True
 
     #The OpenUSD version
     _usdVersion = None
@@ -384,6 +390,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
         if self._setTestRenderer:
             self.setTestRenderer()
+
+        if not self._clearModifiedAfterSetUp:
+            return
 
         # Before cmds.file(modified=False): setting the mode modifies the scene.
         self.applySelectionHighlightMode()
