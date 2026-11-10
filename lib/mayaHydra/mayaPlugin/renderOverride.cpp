@@ -50,6 +50,7 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
+#include <flowViewport/fvpCameraFraming.h>
 #include <flowViewport/fvpDirtyNotifier.h>
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
@@ -167,6 +168,7 @@
 #include <iterator>
 #include <limits>
 #include <set>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -1513,6 +1515,44 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
     }
 }
 
+SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
+{
+    MStatus       status;
+    const MString ufePathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+    if (!status || ufePathString.length() == 0) {
+        return {};
+    }
+    // Maya builds this string, so it is a valid UFE path.
+    const Ufe::Path ufePath = Ufe::PathString::path(ufePathString.asChar());
+
+    if (ufePath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
+        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+        if (!status || !_mayaHydraSceneIndex) {
+            return {};
+        }
+        MFnCamera camera(camPath, &status);
+        // TODO: Support orthographic cameras.
+        if (!status || camera.isOrtho()) {
+            return {};
+        }
+        return _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+    }
+
+    // Only runtimes that registered a path mapper (MayaUSD) publish camera prims. Checking first
+    // keeps the registry's no-mapping warning out of every draw. Orthographic USD cameras are
+    // rejected later, when the camera prim projection is computed.
+    if (!Fvp::PathMapperRegistry::Instance().HasMapper(ufePath)) {
+        return {};
+    }
+    const Fvp::PrimSelections selections = Fvp::ufePathToPrimSelections(ufePath);
+    // A camera is not instanced, so it maps to exactly one prim, as in
+    // mhExternalCameraResolvingSceneIndex.
+    if (selections.size() != 1) {
+        return {};
+    }
+    return selections.front().primPath;
+}
+
 MStatus MtohRenderOverride::Render(
     const MHWRender::MDrawContext&                         drawContext,
     const MHWRender::MDataServerOperation::MViewportScene& scene)
@@ -2170,34 +2210,28 @@ MStatus MtohRenderOverride::Render(
     const int maxX = std::clamp(renderRegion.GetMaxX(), minX, width - 1);
     const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
     renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
-    for (int i = 0; i < numFramePasses; ++i) {
-        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-        if (!currentPass) {
-            continue;
-        }
-        currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
-    }
 
-    // Storm renders through the free camera, built from Maya's view and projection matrices. The
-    // camera prim does not translate every Maya projection input (overscan, resolution gate,
-    // film transforms, 2D pan/zoom), and Storm is picked with Maya's matrices, so binding the prim
-    // would desync the draw from the pick. Other delegates bind the prim for the render
-    // parameters the free camera lacks.
-    SdfPath cameraPath;
-    if (useCameraPrim() && !_isUsingHdSt) {
-        MStatus        status;
-        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-        if (status == MStatus::kSuccess) {
-            const MString ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
-            const Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-            // TODO: Support USD cameras.
-            if (ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-                MFnCamera camera(camPath, &status);
-                // TODO: Support orthographic cameras.
-                if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
-                    cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
-                }
-            }
+    // Every delegate renders through the camera prim translated from the Maya or USD camera, so
+    // that it gets the render parameters the free camera lacks. Orthographic cameras still use
+    // the free camera.
+    const SdfPath cameraPath = _ResolveCameraPrimPath();
+
+    // The camera prim holds the raw camera attributes, shared by every panel looking through that
+    // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
+    // disabling window conforming and solving the display window so that the framed prim
+    // projection equals Maya's projection matrix.
+    // Every pass uses the same Maya projection matrix.
+    // The display window is solved once, from the main pass.
+    const GfVec2i             panelSize(width, height);
+    std::optional<GfMatrix4d> cameraPrimProjection;
+    std::optional<GfRange2f>  solvedWindow;
+    if (!cameraPath.IsEmpty() && numFramePasses > 0 && _GetFramePass(0)) {
+        // Compute the base projection matrix of the camera prim.
+        cameraPrimProjection = Fvp::computeCameraPrimProjection(
+            _GetFramePass(0)->GetRenderIndex()->GetTerminalSceneIndex(), cameraPath);
+        if (cameraPrimProjection) {
+            solvedWindow
+                = Fvp::solveDisplayWindow(projectionMatrix, *cameraPrimProjection, panelSize);
         }
     }
 
@@ -2206,13 +2240,34 @@ MStatus MtohRenderOverride::Render(
         if (!currentPass) {
             continue;
         }
-        currentPass->params().renderParams.camera = cameraPath;
-        // A bound camera prim carries its own window policy, translated from the Maya film fit,
-        // so disable the override. The free camera needs the default override back, since the
-        // camera path goes empty again when switching to an ortho or USD camera.
-        currentPass->params().renderParams.overrideWindowPolicy = cameraPath.IsEmpty()
-            ? std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit)
-            : std::nullopt;
+        auto& params = currentPass->params();
+
+        if (!cameraPrimProjection) {
+            params.viewInfo.framing = CameraUtilFraming(displayWindow, renderRegion);
+            params.renderParams.camera = SdfPath();
+            params.renderParams.overrideWindowPolicy
+                = std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit);
+            continue;
+        }
+
+        params.viewInfo.framing
+            = CameraUtilFraming(solvedWindow.value_or(displayWindow), renderRegion);
+        params.renderParams.camera = cameraPath;
+        params.renderParams.overrideWindowPolicy
+            = std::optional<CameraUtilConformWindowPolicy>(CameraUtilDontConform);
+    }
+
+    if (cameraPrimProjection && !solvedWindow) {
+        // Warn once per camera. Panels looking through different cameras render in turn.
+        if (_unsolvableFramingWarnedCameras.insert(cameraPath).second) {
+            TF_WARN(
+                "The projection of camera %s cannot be reproduced through its camera prim (for "
+                "example because of film roll). The viewport may not match Maya's framing.",
+                cameraPath.GetText());
+        }
+    } else if (solvedWindow) {
+        // The display window solves again (i.e., the film roll was removed).
+        _unsolvableFramingWarnedCameras.erase(cameraPath);
     }
 
     // Update all registered plugin before render.
@@ -2221,10 +2276,14 @@ MStatus MtohRenderOverride::Render(
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
-    // delegate. The Storm-specific task setup below only disables the shadow task;
-    // other delegates rely on the lights management scene index turning off shadow
-    // casting on the light prims themselves.
-    bool  enableShadows = true;
+    // delegate. All delegates, Storm included, rely on the lights management scene index
+    // turning off shadow casting on the light prims themselves.
+    // MLightParameterInformation::getParameter(kGlobalShadowOn) only actually
+    // returns data when the shadows are enabled. If there is no light or shadows
+    // are off, the call will not be successful. Therefore, assume shadows are off
+    // by default, and only enable them if they are. Note : despite being a Maya
+    // API, MLightParameterInformation does indeed work for USD lights.
+    bool  enableShadows = false;
     auto* lightParam = drawContext.getLightParameterInformation(
         0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
     if (lightParam != nullptr) {
@@ -2253,7 +2312,13 @@ MStatus MtohRenderOverride::Render(
                 continue;
             }
 
-            currentPass->SetEnableShadows(enableShadows);
+            // Keep the Storm shadow pipeline always enabled: turning
+            // HdxSimpleLightTaskParams::enableShadows off and then on again leaves the shadow
+            // task drawing into an incomplete framebuffer on the frame it is re-enabled
+            // (GL_INVALID_FRAMEBUFFER_OPERATION), so nothing is drawn in that frame.
+            // Shadows are already enabled/disabled for every light by the lights management
+            // scene index, so no need to turn the task off. 
+            currentPass->SetEnableShadows(true);
             currentPass->SetShadowParams(shadowParams);
         }
         if (_mayaHydraSceneIndex) {

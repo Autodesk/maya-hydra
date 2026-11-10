@@ -40,7 +40,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaIsolateSelect.py
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
-    testUSDLights.py|skipOnRenderer:HdFlash # AGP-723 : Light intensity not matching Storm/Arnold
+    testUSDLights.py
     testUsdAreaLightGizmos.py
     testUVandUDIM.py
 	testPurposeRenderTag.py
@@ -87,6 +87,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#HYDRA-1660 re-enable testMayaDisplayModes
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
+    testCameraPrimFraming.py
     testConvergence.py
     testFramePasses.py
     testImagePlanes.py|skipOnRenderer:HdFlash # AGP-1037 : Image plane updates is inconsistent
@@ -127,6 +128,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testRenderItemPrimvarsMaterialX.py|depOnPlugins:lookdevx
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
+    cpp/testCameraFraming.py
     cpp/testMayaNodesAttributes.py|depOnPlugins:mtoa
     cpp/testUsdAnim.py
     cpp/testUsdStageFromFile.py
@@ -145,7 +147,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 # HYDRA-1245.
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
-        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx|skipOnRenderer:HdFlash # HYDRA-1127 : refinedWire not working on OSX | AGP-723 : Light intensity not matching Storm/Arnold
+        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
         cpp/testIsolateSelect.py
         cpp/testIsolateSelectSwitchToVP2.py
         cpp/testIsolateSelectMayaSelectionHighlighting.py
@@ -180,7 +182,7 @@ endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
 if (NOT CODE_COVERAGE)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py|skipOnRenderer:HdFlash) # HYDRA-2679 : Prim origin path mismatch, then stack overflow
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
 endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)

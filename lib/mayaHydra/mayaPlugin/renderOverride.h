@@ -484,6 +484,11 @@ private:
     // This ensures they stay synchronized and eliminates index-based access issues
     Fvp::FramePassDataPtrVector                                _framePassesData;
     
+    /// Return the Hydra camera prim the panel renders through, or an empty path when there is
+    /// none (orthographic, unmapped runtime, unexpected mapping). An empty path means the passes
+    /// use the free camera, so failure needs no other handling.
+    SdfPath _ResolveCameraPrimPath();
+
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;
     const hvt::FramePassPtr& _GetFramePass(int passIndex)const;
@@ -579,6 +584,11 @@ private:
     SdfPath _ID; // Root path to runtime data (like task controller)
 
     GfVec4d _viewport;
+
+    /// Camera prims already warned about for a projection that the solved framing cannot
+    /// reproduce. A camera is removed once its projection becomes solvable again, so a later
+    /// failure warns again.
+    TfHashSet<SdfPath, SdfPath::Hash> _unsolvableFramingWarnedCameras;
 
     int _currentOperation = -1;    
 

@@ -25,13 +25,6 @@ TF_DEFINE_ENV_SETTING(
     "Use single frame pass when using the same renderer for all passes.");
 
 TF_DEFINE_ENV_SETTING(
-    MAYA_HYDRA_USE_CAMERA_PRIM,
-    true,
-    "Pass the Maya camera prim to non-Storm render delegates instead of populating the free "
-    "camera parameters. The camera prim exposes render parameters the free camera lacks. Storm "
-    "always uses the free camera, so that its draw matches the picking matrices.");
-
-TF_DEFINE_ENV_SETTING(
     MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS,
     true,
     "Set HdArnold render delegate to use Hydra v2 render settings.");
@@ -57,13 +50,6 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
-    }
-
-    bool useCameraPrim()
-    {
-        static const bool _useCameraPrim
-            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_USE_CAMERA_PRIM);
-        return _useCameraPrim;
     }
 
     bool hdArnoldUseV2RenderSettings()
