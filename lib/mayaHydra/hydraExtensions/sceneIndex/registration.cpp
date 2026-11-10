@@ -15,6 +15,7 @@
 //
 
 #include "mayaHydraLib/mayaUtils.h"
+#include "mayaHydraLib/mhSceneModifiedGuard.h"
 #include "mayaHydraLib/mixedUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhExternalCameraOverrideSceneIndex.h"
@@ -365,6 +366,11 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
     if (!GetDependNodeFromNodeName(rdNodeName(), nodeObj)) {
         return;
     }
+
+    // The first getUsdStage() call makes MayaUSD populate the node and write its
+    // activeRenderDescriptionPath plug. That is not a user edit and must not mark
+    // the scene as modified.
+    MayaHydra::SceneModifiedGuard sceneModifiedGuard;
 
     MAYAUSDAPI_NS::ProxyStage proxyStage(nodeObj);
     auto stage = proxyStage.getUsdStage();
