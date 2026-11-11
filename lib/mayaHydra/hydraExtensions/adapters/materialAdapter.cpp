@@ -29,6 +29,7 @@
 #include <flowViewport/API/fvpMaterialCreationInterface.h>
 
 #include <pxr/base/tf/stl.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/material.h>
@@ -561,10 +562,17 @@ private:
         MayaHydra::DgAccessLock dgLock;
 
         if (_IsGLSLShader()) {
-            VtValue customMaterial
-                = Fvp::MaterialCreationInterface::Get().CreateMaterial(GetID());
-            if (!customMaterial.IsEmpty()) {
-                return customMaterial;
+            static const MString shaderStr("shader");
+            MFnDependencyNode    surfaceNode(_surfaceShader);
+            MPlug                shaderPlug = surfaceNode.findPlug(shaderStr, true);
+            if (!shaderPlug.isNull()) {
+                const std::string shaderName
+                    = TfStringGetBeforeSuffix(TfGetBaseName(shaderPlug.asString().asChar()));
+                VtValue customMaterial
+                    = Fvp::MaterialCreationInterface::Get().CreateMaterial(shaderName, GetID());
+                if (!customMaterial.IsEmpty()) {
+                    return customMaterial;
+                }
             }
         }
 

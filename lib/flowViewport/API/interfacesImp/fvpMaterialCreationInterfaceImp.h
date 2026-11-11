@@ -22,6 +22,8 @@
 #include <flowViewport/API/fvpMaterialCreationInterface.h>
 
 #include <mutex>
+#include <string>
+#include <unordered_map>
 
 namespace FVP_NS_DEF {
 
@@ -35,17 +37,17 @@ public:
     static FVP_API MaterialCreationInterfaceImp& Get();
 
     //From MaterialCreationInterface
-    void RegisterMaterialCreationCallback(const MaterialCreationCallback& callback) override;
-    void UnregisterMaterialCreationCallback() override;
-    PXR_NS::VtValue CreateMaterial(const PXR_NS::SdfPath& materialId) const override;
+    void RegisterMaterialCreationCallback(const std::string& name, const MaterialCreationCallback& callback) override;
+    void UnregisterMaterialCreationCallback(const std::string& name) override;
+    PXR_NS::VtValue CreateMaterial(const std::string& name, const PXR_NS::SdfPath& materialId) const override;
 
-    FVP_API bool HasMaterialCreationCallback() const;
+    FVP_API bool HasMaterialCreationCallback(const std::string& name) const;
 
 private:
     MaterialCreationInterfaceImp() = default;
 
-    mutable std::mutex       _callbackMutex;
-    MaterialCreationCallback _callback;
+    mutable std::mutex                                        _callbackMutex;
+    std::unordered_map<std::string, MaterialCreationCallback> _callbacks;
 };
 
 } //End of namespace FVP_NS_DEF

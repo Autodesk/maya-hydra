@@ -32,32 +32,38 @@ MaterialCreationInterfaceImp& MaterialCreationInterfaceImp::Get()
     return theInterface;
 }
 
-void MaterialCreationInterfaceImp::RegisterMaterialCreationCallback(const MaterialCreationCallback& callback)
+void MaterialCreationInterfaceImp::RegisterMaterialCreationCallback(
+    const std::string&              name,
+    const MaterialCreationCallback& callback)
 {
     std::lock_guard<std::mutex> lock(_callbackMutex);
-    _callback = callback;
+    _callbacks[name] = callback;
 }
 
-void MaterialCreationInterfaceImp::UnregisterMaterialCreationCallback()
+void MaterialCreationInterfaceImp::UnregisterMaterialCreationCallback(const std::string& name)
 {
     std::lock_guard<std::mutex> lock(_callbackMutex);
-    _callback = nullptr;
+    _callbacks.erase(name);
 }
 
-VtValue MaterialCreationInterfaceImp::CreateMaterial(const SdfPath& materialId) const
+VtValue MaterialCreationInterfaceImp::CreateMaterial(const std::string& name, const SdfPath& materialId) const
 {
     MaterialCreationCallback callback;
     {
         std::lock_guard<std::mutex> lock(_callbackMutex);
-        callback = _callback;
+        auto it = _callbacks.find(name);
+        if (it != _callbacks.end()) {
+            callback = it->second;
+        }
     }
     return callback ? callback(materialId) : VtValue();
 }
 
-bool MaterialCreationInterfaceImp::HasMaterialCreationCallback() const
+bool MaterialCreationInterfaceImp::HasMaterialCreationCallback(const std::string& name) const
 {
     std::lock_guard<std::mutex> lock(_callbackMutex);
-    return static_cast<bool>(_callback);
+    auto it = _callbacks.find(name);
+    return it != _callbacks.end() && static_cast<bool>(it->second);
 }
 
 } //End of namespace FVP_NS_DEF

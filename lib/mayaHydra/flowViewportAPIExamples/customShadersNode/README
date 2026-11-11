@@ -6,10 +6,11 @@ The Flow viewport toolkit has been developed to :
 This project is a Maya node that creates a Hydra primitive and applies to it the custom GLSL shader for Hydra Storm that is created and registered in OpenUSD/hydra by the project 
 https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport/usdPlugins/shadersDiscoveryPlugin
 
-It also shows how to use the Flow viewport MaterialCreationInterface to replace the Maya GLSLShader materials
-(surface shaders whose type or name contains "GLSLShader") by that custom GLSL shader. Run in Python :
+It also shows how to use the Flow viewport MaterialCreationInterface to replace Maya GLSLShader materials
+by that custom GLSL shader. MayaHydra calls the callback registered under the shader file name, without directory
+and extension, of the "shader" attribute of each GLSLShader surface shader node. Run in Python :
 
 import maya.cmds as cmds
 cmds.loadPlugin("mayaHydraCustomShadersNode")
-cmds.mhRegisterCustomMaterialCallback()               # GLSLShader materials use FVP_CustomBasicLightingShader
+cmds.mhRegisterCustomMaterialCallback()               # matching GLSLShader materials use FVP_CustomBasicLightingShader
 cmds.mhRegisterCustomMaterialCallback(unregister=True) # back to the default material conversion

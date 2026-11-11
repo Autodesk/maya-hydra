@@ -25,12 +25,15 @@
 #include <pxr/usd/sdf/path.h>
 
 #include <functional>
+#include <string>
 
 namespace FVP_NS_DEF
 {
     /*!\class MaterialCreationInterface
-    \brief : interface for a customer to register a callback that creates the Hydra material of a DCC material.
-    * In MayaHydra, the callback is called for Maya surface shaders whose type or name contains "GLSLShader".
+    \brief : interface for a customer to register named callbacks that create the Hydra material of a DCC material.
+    * In MayaHydra, for Maya surface shaders of type GLSLShader, the callback registered under the shader file name
+    * without directory and extension (from the "shader" attribute, e.g. "C:/shaders/myShader.ogsfx" gives "myShader")
+    * is called.
     * To get an instance of the MaterialCreationInterface class, please use :
     * Fvp::MaterialCreationInterface& materialCreationInterface = Fvp::MaterialCreationInterface::Get();
     */
@@ -52,26 +55,32 @@ namespace FVP_NS_DEF
         static FVP_API MaterialCreationInterface& Get();
 
         /**
-        *  @brief      Register a material creation callback, it replaces any previously registered callback.
+        *  @brief      Register a material creation callback under a name, it replaces any callback previously
+        *              registered under the same name.
         *
+        *  @param[in]  name is the name the callback is registered under.
         *  @param[in]  callback is the material creation callback.
         */
-        virtual void RegisterMaterialCreationCallback(const MaterialCreationCallback& callback) = 0;
+        virtual void RegisterMaterialCreationCallback(const std::string& name, const MaterialCreationCallback& callback) = 0;
 
         /**
-        *  @brief      Unregister the material creation callback, the DCC default material conversion is used again.
-        */
-        virtual void UnregisterMaterialCreationCallback() = 0;
-
-        /**
-        *  @brief      Call the registered material creation callback.
+        *  @brief      Unregister the material creation callback registered under a name, the DCC default material
+        *              conversion is used again for that name. Callbacks registered under other names are kept.
         *
+        *  @param[in]  name is the name the callback was registered under.
+        */
+        virtual void UnregisterMaterialCreationCallback(const std::string& name) = 0;
+
+        /**
+        *  @brief      Call the material creation callback registered under a name.
+        *
+        *  @param[in]  name is the name the callback was registered under.
         *  @param[in]  materialId is the Hydra path of the material prim.
         *
         *  @return     The Hydra material resource created by the callback, or an empty VtValue if no callback
-        *              is registered.
+        *              is registered under that name.
         */
-        virtual PXR_NS::VtValue CreateMaterial(const PXR_NS::SdfPath& materialId) const = 0;
+        virtual PXR_NS::VtValue CreateMaterial(const std::string& name, const PXR_NS::SdfPath& materialId) const = 0;
     };
 
 }//end of namespace
