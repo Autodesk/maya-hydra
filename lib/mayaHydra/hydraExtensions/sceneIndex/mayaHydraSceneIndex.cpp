@@ -451,7 +451,8 @@ bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
 
 bool UpdateRenderItemWireframeColor(
     const MRenderItem&                   ri,
-    const MayaHydraRenderItemAdapterPtr& ria)
+    const MayaHydraRenderItemAdapterPtr& ria,
+    const MayaHydraRenderItemPayload*    customData)
 {
     MColor wireframeColor;
     // Prefer the LIVE sourceDagPath, exactly as before, and fall back to the
@@ -464,7 +465,11 @@ bool UpdateRenderItemWireframeColor(
     if (!dagPath.isValid()) {
         dagPath = ria->GetDagPath();
     }
-    if (dagPath.isValid()) {
+    // A carrier wire whose colour Maya resolved itself: the smooth-preview palette
+    // of "cage + smooth" mode, which the DAG path's colour does not know about.
+    if (customData && customData->hasWireColorOverride) {
+        wireframeColor = customData->wireColorOverride;
+    } else if (dagPath.isValid()) {
         // This is a color managed VP2 color, it will need to be unmanaged at some point
         wireframeColor = MGeometryUtilities::wireframeColor(dagPath);
     }
@@ -940,7 +945,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         }
 
         if (wireframeColorDirty) {
-            wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria);
+            wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria, customData);
         }
 
         // Call UpdateTransform before UpdateFromDelta, as UpdateTransform

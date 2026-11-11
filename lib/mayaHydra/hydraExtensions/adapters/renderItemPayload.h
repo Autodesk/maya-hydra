@@ -21,6 +21,7 @@
 #include <mayaHydraLib/adapters/mhExtGpuStreams.h>
 #endif
 
+#include <maya/MColor.h>
 #include <maya/MDagPath.h>
 #include <maya/MUserData.h>
 
@@ -85,13 +86,20 @@ public:
         // bounding-box level of detail): eight corners and twelve edges, the
         // carrier counterpart of VP2's BoundingBoxItem. Drawn like a wireframe;
         // while it is drawn the producer hides the object's other carriers.
-        kBoundingBox = 3
+        kBoundingBox = 3,
+
+        // Smooth mesh preview's cage: the base mesh's edges at the base
+        // positions, the carrier counterpart of VP2's CageDormantWire. Drawn
+        // like a wireframe, but in shaded panels too and whether or not the
+        // object is selected - so, unlike kWireframe, never a selection-highlight
+        // wire that the outline replaces.
+        kCage = 4
     };
 
     //! The kinds whose geometry is a line list rather than a surface.
     bool isLineList() const
     {
-        return kind == kWireframe || kind == kCurve || kind == kBoundingBox;
+        return kind == kWireframe || kind == kCurve || kind == kBoundingBox || kind == kCage;
     }
 
     Kind kind = kShadedMesh;
@@ -102,6 +110,14 @@ public:
     // render item has no MRenderItem::sourceDagPath(), so this is the only
     // source. Kept up to date by updateRenderItem across renames/reparents.
     MDagPath dagPath;
+
+    // kWireframe only: the colour Maya draws this wire in when the DAG path's
+    // wireframe colour is not it (MRenderItemOverrideGeometry::
+    // wireframeColorOverride) - smooth mesh preview's "cage + smooth" mode
+    // draws the smooth wire in the smooth-preview palette. Refreshed on every
+    // update; when unset, the colour is MGeometryUtilities::wireframeColor.
+    bool   hasWireColorOverride = false;
+    MColor wireColorOverride;
 
     // Geometry, in VP2's "render vertex" layout: points and normals are
     // both VERTEX interpolated over the same array and the index arrays index
@@ -134,7 +150,7 @@ public:
     float        shutterOpenOffset  = 0.0f;
     float        shutterCloseOffset = 0.0f;
 
-    // Line-list kinds only (isLineList: kWireframe, kCurve, kBoundingBox): vertex
+    // Line-list kinds only (isLineList: kWireframe, kCurve, kBoundingBox, kCage): vertex
     // pairs indexing the same dedup points, produced by
     // VP2's own edge list so hard/soft and shared-edge behaviour
     // matches what VP2 draws.

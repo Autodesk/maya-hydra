@@ -29,6 +29,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMeshes.py|skipOnRenderer:HdFlash # HYDRA-2665 : Inconsistent number of prims reported
     testNamespaces.py|skipOnRenderer:HdFlash # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
+    testSmoothCage.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
