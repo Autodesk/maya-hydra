@@ -179,7 +179,10 @@ TEST(CameraPrimvars, ParamAttributesMatchGetLogic)
         "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
         "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
         "verticalShake", "filmFit", "depthOfField", "aiEnableDOF", "aiFocusDistance",
-        "orthographic", "exposure",
+        "orthographic",
+#if PXR_VERSION >= 2505
+        "exposure",
+#endif
     };
 
     const auto& paramAttrs = MayaHydraCameraAdapter::GetCameraParamAttributeNamesForTest();
@@ -294,6 +297,9 @@ TEST(CameraPrimvars, DepthOfFieldSchemaFieldsRoundTrip)
     EXPECT_FALSE(depthOfFieldDisabled);
 }
 
+// Requires OpenUSD 25.05+ for HdCameraSchema::linearExposureScale. The Python wrappers skip these tests when
+// the Maya camera has no exposure attribute.
+#if PXR_VERSION >= 2505
 namespace {
 
 const char* kSecondCameraShapeOptionVar = "mhSecondCameraShape";
@@ -459,3 +465,4 @@ TEST(CameraPrimvars, ExposureMatchesUsdCamera)
     EXPECT_FLOAT_EQ(ReadLinearExposureScale(usdSceneIndex, usdCameraPrimPath), 2.0f);
     EXPECT_FLOAT_EQ(ReadLinearExposureScale(mayaSceneIndex, mayaCameraPrimPath), 2.0f);
 }
+#endif // PXR_VERSION >= 2505

@@ -74,6 +74,8 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
     # How: build the scene, then run the C++ test that reads linearExposureScale.
     # Expect: linearExposureScale is 1.0.
     def test_exposureDefaultIsNoScale(self):
+        if not mtohUtils.cameraExposureSupported():
+            self.skipTest(mtohUtils.CAMERA_EXPOSURE_SKIP_REASON)
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureDefaultIsNoScale")
@@ -82,6 +84,8 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
     # How: build the scene, then run the C++ test that sets exposure.
     # Expect: linearExposureScale is 2^exposure, and its locator is dirtied.
     def test_exposureSetAttrUpdatesLinearExposureScale(self):
+        if not mtohUtils.cameraExposureSupported():
+            self.skipTest(mtohUtils.CAMERA_EXPOSURE_SKIP_REASON)
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureSetAttrUpdatesLinearExposureScale")
@@ -90,6 +94,8 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
     # How: build the scene, then run the C++ test that keys exposure and changes frames.
     # Expect: linearExposureScale matches the keyed value at each frame.
     def test_exposureKeyedFollowsCurrentFrame(self):
+        if not mtohUtils.cameraExposureSupported():
+            self.skipTest(mtohUtils.CAMERA_EXPOSURE_SKIP_REASON)
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureKeyedFollowsCurrentFrame")
@@ -98,6 +104,8 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
     # How: add a second camera, then run the C++ test that sets exposure on the first.
     # Expect: only the first camera's linearExposureScale changes.
     def test_exposureIsPerCamera(self):
+        if not mtohUtils.cameraExposureSupported():
+            self.skipTest(mtohUtils.CAMERA_EXPOSURE_SKIP_REASON)
         self.setupScene()
         _, secondCameraShape = cmds.camera()
         secondCameraShape = cmds.ls(secondCameraShape, long=True)[0]
@@ -112,6 +120,8 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
     # on the Maya camera.
     # Expect: both camera prims report 2.0.
     def test_exposureMatchesUsdCamera(self):
+        if not mtohUtils.cameraExposureSupported():
+            self.skipTest(mtohUtils.CAMERA_EXPOSURE_SKIP_REASON)
         import mayaUsd.ufe
         import mayaUsd_createStageWithNewLayer
         from pxr import UsdGeom

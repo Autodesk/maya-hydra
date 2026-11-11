@@ -88,7 +88,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
     testCameraPrimFraming.py
-    testCameraExposure.py|skipOnRenderer:HdStorm
     testConvergence.py
     testFramePasses.py
     testImagePlanes.py|skipOnRenderer:HdFlash # AGP-1037 : Image plane updates is inconsistent
@@ -173,6 +172,14 @@ if(MAYA_APP_VERSION VERSION_GREATER 2026)
         # V2 locator-notification path while HdArnold is active (SIGSEGV / pure virtual).
         #cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
         cpp/testArnoldCustomAttributesMayaNodes.py|depOnPlugins:mtoa
+    )
+endif()
+
+# Camera exposure needs the cameraShape.exposure attribute (Maya versions > 2027) and
+# HdCameraSchema::linearExposureScale (OpenUSD 25.05+).
+if(MAYA_APP_VERSION VERSION_GREATER 2027 AND USD_VERSION VERSION_GREATER_EQUAL "0.25.05")
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        testCameraExposure.py|skipOnRenderer:HdStorm
     )
 endif()
 
