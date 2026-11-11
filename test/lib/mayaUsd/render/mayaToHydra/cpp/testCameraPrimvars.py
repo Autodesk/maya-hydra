@@ -70,6 +70,63 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.DepthOfFieldSchemaFieldsRoundTrip")
 
+    # What: the default exposure must not scale the image.
+    # How: build the scene, then run the C++ test that reads linearExposureScale.
+    # Expect: linearExposureScale is 1.0.
+    def test_exposureDefaultIsNoScale(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureDefaultIsNoScale")
+
+    # What: setting exposure must reach the camera prim and notify Hydra.
+    # How: build the scene, then run the C++ test that sets exposure.
+    # Expect: linearExposureScale is 2^exposure, and its locator is dirtied.
+    def test_exposureSetAttrUpdatesLinearExposureScale(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureSetAttrUpdatesLinearExposureScale")
+
+    # What: keyed exposure must follow the current frame.
+    # How: build the scene, then run the C++ test that keys exposure and changes frames.
+    # Expect: linearExposureScale matches the keyed value at each frame.
+    def test_exposureKeyedFollowsCurrentFrame(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureKeyedFollowsCurrentFrame")
+
+    # What: exposure on one camera must not affect another camera.
+    # How: add a second camera, then run the C++ test that sets exposure on the first.
+    # Expect: only the first camera's linearExposureScale changes.
+    def test_exposureIsPerCamera(self):
+        self.setupScene()
+        _, secondCameraShape = cmds.camera()
+        secondCameraShape = cmds.ls(secondCameraShape, long=True)[0]
+        cmds.optionVar(stringValue=("mhSecondCameraShape", secondCameraShape))
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureIsPerCamera")
+
+    # What: a Maya camera must publish the same linearExposureScale as a USD camera
+    # with the same exposure.
+    # How: add a USD camera with exposure 1, then run the C++ test that sets exposure 1
+    # on the Maya camera.
+    # Expect: both camera prims report 2.0.
+    def test_exposureMatchesUsdCamera(self):
+        import mayaUsd.ufe
+        import mayaUsd_createStageWithNewLayer
+        from pxr import UsdGeom
+
+        self.setupScene()
+        usdCameraName = "usdExposureCam"
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        stage = mayaUsd.ufe.getStage(stagePath)
+        usdCamera = UsdGeom.Camera.Define(stage, "/" + usdCameraName)
+        usdCamera.CreateExposureAttr(1.0)
+        cmds.optionVar(stringValue=("mhUsdCameraPrimName", usdCameraName))
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CameraPrimvars.ExposureMatchesUsdCamera")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

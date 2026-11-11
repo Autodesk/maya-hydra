@@ -178,6 +178,7 @@ TEST(DataSourceNames, CameraContainerAdvertisesAndServesParams)
              HdCameraSchemaTokens->focalLength,
              HdCameraSchemaTokens->focusDistance,
              HdCameraSchemaTokens->fStop,
+             HdCameraSchemaTokens->linearExposureScale,
          }) {
         EXPECT_TRUE(Contains(names, param))
             << "camera param '" << param.GetText() << "' should be advertised by GetNames()";

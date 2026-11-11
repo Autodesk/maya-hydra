@@ -25,6 +25,7 @@
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/imaging/hd/camera.h>
+#include <pxr/imaging/hd/cameraSchema.h>
 #include <pxr/imaging/hd/changeTracker.h>
 
 #include <maya/MDagMessage.h>
@@ -35,6 +36,8 @@
 #include <maya/MMatrix.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
+
+#include <cmath>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -70,6 +73,28 @@ static float _ReadArnoldFocusDistanceIfSet(MFnCamera& camera)
     return static_cast<float>(v);
 }
 
+// Maya's cameraShape.exposure is in EV stops. Hydra's linearExposureScale is the linear
+// multiplier applied to scene radiance.
+// Returns 1.0 when the camera has no exposure attribute for backward compatibility.
+// Note that for now we only support the exposure attribute. Later on when we support attributes
+// like exposure:fStop/time/iso/responsivity, we will use the full formula from
+// UsdGeomCamera::ComputeLinearExposureScale. For now, with all default values in that method,
+// the formula is equivalent to 2^ev.
+static float _ComputeLinearExposureScale(const MDagPath& cameraShape)
+{
+    MStatus           status;
+    MFnDependencyNode dep(cameraShape.node(), &status);
+    if (status.error())
+        return 1.0f;
+    MPlug exposurePlug = dep.findPlug("exposure", false, &status);
+    if (status.error() || exposurePlug.isNull())
+        return 1.0f;
+    const double ev = exposurePlug.asDouble(&status);
+    if (status.error())
+        return 1.0f;
+    return static_cast<float>(std::exp2(ev));
+}
+
 // Attributes that affect HdCamera params (from GetCameraParamValue). When these change,
 // we mark DirtyParams | DirtyPrimvar in one call to avoid duplicates.
 // The callbacks match the top-level plug, so the compound parents (cameraAperture, filmOffset,
@@ -79,7 +104,7 @@ static const char* const kCameraParamAttributeNames[] = {
     "fStop", "cameraAperture", "horizontalFilmAperture", "verticalFilmAperture",
     "lensSqueezeRatio", "shakeEnabled", "filmOffset", "horizontalFilmOffset",
     "verticalFilmOffset", "shake", "horizontalShake", "verticalShake", "filmFit",
-    "depthOfField", "aiEnableDOF", "aiFocusDistance", "orthographic",
+    "depthOfField", "aiEnableDOF", "aiFocusDistance", "orthographic", "exposure",
 };
 
 static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
@@ -291,6 +316,10 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             status.errorString().asChar());
         return false;
     };
+
+    if (paramName == HdCameraSchemaTokens->linearExposureScale) {
+        return VtValue(_ComputeLinearExposureScale(GetDagPath()));
+    }
 
     MFnCamera camera(GetDagPath(), &status);
     if (hadError(status))
