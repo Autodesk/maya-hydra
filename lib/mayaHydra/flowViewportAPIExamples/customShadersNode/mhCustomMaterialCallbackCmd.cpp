@@ -37,7 +37,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 TF_DEFINE_PRIVATE_TOKENS(_tokens,
-    (FVP_CustomBasicLightingShader) //Name of the shader loaded by Hydra
+    (FVP_CustomBufferShader) //Name of the shader loaded by Hydra
     (FVP_CustomColor) //Parameter of our custom color GLSLFX shader
     (displayColorPrimVarReaderNode)//Name of the prim var reader node
     (varname)
@@ -53,15 +53,15 @@ const char* const kGLSLShaderName = "vertexBufferGenerator";
 
 //Material creation callback registered in the flow viewport MaterialCreationInterface under kGLSLShaderName.
 //MayaHydra calls it for the Maya GLSLShader materials whose shader file name matches kGLSLShaderName,
-//which are replaced by the FVP_CustomBasicLightingShader glslfx shader, their parameters are not translated.
+//which are replaced by the FVP_CustomBufferShader glslfx shader, their parameters are not translated.
 VtValue _CreateGLSLShaderReplacementMaterial(const SdfPath& materialId)
 {
     HdMaterialNetworkMap networkMap;
     HdMaterialNetwork&   network = networkMap.map[HdMaterialTerminalTokens->surface];
 
     HdMaterialNode terminal;
-    terminal.identifier = _tokens->FVP_CustomBasicLightingShader;
-    terminal.path = materialId.AppendChild(_tokens->FVP_CustomBasicLightingShader);
+    terminal.identifier = _tokens->FVP_CustomBufferShader;
+    terminal.path = materialId.AppendChild(_tokens->FVP_CustomBufferShader);
     terminal.parameters[_tokens->FVP_CustomColor] = VtValue(GfVec3f(1.0f, 0.0f, 0.0f));
 
     // Primvar reader so that HdGet_displayColor() is available in the shader
@@ -88,7 +88,7 @@ VtValue _CreateGLSLShaderReplacementMaterial(const SdfPath& materialId)
 
 /// Command to register / unregister in the flow viewport MaterialCreationInterface a callback
 /// which replaces the Maya GLSLShader materials whose shader file name matches kGLSLShaderName by the
-/// FVP_CustomBasicLightingShader glslfx shader.
+/// FVP_CustomBufferShader glslfx shader.
 /// Python usage :
 ///   cmds.mhRegisterCustomMaterialCallback()
 ///   cmds.mhRegisterCustomMaterialCallback(unregister=True)

@@ -15,3 +15,19 @@ def Shader "FVP_CustomBasicLightingShader"
     float3 inputs:FVP_CustomColor = (1.0, 0.0, 0.0) (
     )
 }
+
+#FVP_CustomBufferShader is the identifier to use in a material node from a material network to use this shader
+def Shader "FVP_CustomBufferShader"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:glslfx:sourceAsset = @./customBufferShader.glslfx@
+
+    # Outputs
+	token outputs:displacement
+    token outputs:surface
+
+	#This is a custom parameter which is used in the glslfx shader with HdGet_FVP_CustomColor()
+	#It should also be defined as a terminal node parameter in the material network when you use that shader
+    float3 inputs:FVP_CustomColor = (1.0, 0.0, 0.0) (
+    )
+}

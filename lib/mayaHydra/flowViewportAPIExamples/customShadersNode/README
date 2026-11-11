@@ -7,10 +7,10 @@ This project is a Maya node that creates a Hydra primitive and applies to it the
 https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport/usdPlugins/shadersDiscoveryPlugin
 
 It also shows how to use the Flow viewport MaterialCreationInterface to replace Maya GLSLShader materials
-by that custom GLSL shader. MayaHydra calls the callback registered under the shader file name, without directory
+by the FVP_CustomBufferShader custom GLSL shader from the same project. MayaHydra calls the callback registered under the shader file name, without directory
 and extension, of the "shader" attribute of each GLSLShader surface shader node. Run in Python :
 
 import maya.cmds as cmds
 cmds.loadPlugin("mayaHydraCustomShadersNode")
-cmds.mhRegisterCustomMaterialCallback()               # matching GLSLShader materials use FVP_CustomBasicLightingShader
+cmds.mhRegisterCustomMaterialCallback()               # matching GLSLShader materials use FVP_CustomBufferShader
 cmds.mhRegisterCustomMaterialCallback(unregister=True) # back to the default material conversion
