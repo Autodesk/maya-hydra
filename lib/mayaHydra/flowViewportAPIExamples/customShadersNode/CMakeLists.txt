@@ -8,6 +8,7 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         mhCustomShadersNode.cpp
+        mhCustomMaterialCallbackCmd.cpp
 )
 
 set(HEADERS

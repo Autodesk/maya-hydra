@@ -26,6 +26,8 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/API/fvpMaterialCreationInterface.h>
+
 #include <pxr/base/tf/stl.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/base/tf/type.h>
@@ -67,6 +69,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (mtlx)
     ((mtlxSurface, "mtlx:surface"))
     (surface)
+    (GLSLShader)
 );
 
 const VtValue       _emptyValue;
@@ -359,6 +362,15 @@ private:
         }
     }
 
+    bool _IsGLSLShader() const
+    {
+        if (_surfaceShader.isNull()) {
+            return false;
+        }
+
+        return _surfaceShaderType == _tokens->GLSLShader;
+    }
+
     bool PopulateMaterialXNetworkMap(HdMaterialNetworkMap& networkMap)
     {
 #ifdef WANT_MATERIALX_BUILD
@@ -547,6 +559,14 @@ private:
             .Msg("MayaHydraShadingEngineAdapter::GetMaterialResource(): %s\n", GetID().GetText());
         
         MayaHydra::DgAccessLock dgLock;
+
+        if (_IsGLSLShader()) {
+            VtValue customMaterial
+                = Fvp::MaterialCreationInterface::Get().CreateMaterial(GetID());
+            if (!customMaterial.IsEmpty()) {
+                return customMaterial;
+            }
+        }
 
         HdMaterialNetworkMap materialXNetworkMap;
         if (PopulateMaterialXNetworkMap(materialXNetworkMap)) {
