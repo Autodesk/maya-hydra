@@ -94,6 +94,13 @@ ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inp
     TF_AXIOM(_wireframeColorInterface);
 }
 
+const TfTokenVector& ReprSelectorSceneIndex::GetAuthoredReprs()
+{
+    static const TfTokenVector reprs { HdReprTokens->refined, HdReprTokens->refinedWire,
+        HdReprTokens->wireOnSurf, HdReprTokens->refinedWireOnSurf };
+    return reprs;
+}
+
 void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged, int refineLevel)
 {
     _convertToSecondaryGraphicsPurposeRenderTag = false;
