@@ -39,6 +39,7 @@
 #endif
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
+#include <mayaHydraLib/mhSceneModifiedGuard.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
@@ -2793,6 +2794,11 @@ void MtohRenderOverride::_InitHydraResources(
         .Msg("MtohRenderOverride::_InitHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
     _initializationAttempted = true;
+
+    // Initializing Hydra adds attributes to defaultRenderGlobals and has MayaUSD populate
+    // UsdDefaultRenderDescription. Neither is a user edit, so keep them from marking the scene as
+    // modified.
+    const MayaHydra::SceneModifiedGuard sceneModifiedGuard;
 
     // Absorb the opened scene's defaultRenderGlobals first: the selection-highlight mode decides
     // below whether the outline manager or the legacy highlight scene indices get installed, and
