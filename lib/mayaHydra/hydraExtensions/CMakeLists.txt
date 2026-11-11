@@ -33,6 +33,7 @@ set(HEADERS
     mixedUtils.h
     mhWireframeColorInterfaceImp.h
     mhLeadObjectPathTracker.h
+    mhSceneModifiedGuard.h
     mhSharedGLContext.h
     profilingUtils.h
     tokens.h
