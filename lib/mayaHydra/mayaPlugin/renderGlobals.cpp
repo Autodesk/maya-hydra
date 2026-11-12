@@ -129,15 +129,25 @@ global proc mtohRenderOverride_EndGroup(int $fromAE) {
     }
 }
 
+// Settings shared by every render delegate (refine level, display purpose). Shown once in the Attribute Editor rather than under
+// each renderer, so the same attribute is not added to the editorTemplate several times. The
+// renderer "mayaHydra" addresses all renderers (see MtohViewCmd).
+global proc mtohRenderOverride_GlobalOptions(int $fromAE) {
+    mtohRenderOverride_BeginGroup("All renderers", 0, $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Subdivision refine level (mayaHydraRefinementLevel)", "mayaHydraRefinementLevel", "Refine level", $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Draw prims with the proxy purpose (mayaHydraProxyPurpose)", "mayaHydraProxyPurpose", "Proxy purpose", $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Draw prims with the render purpose (mayaHydraRenderPurpose)", "mayaHydraRenderPurpose", "Render purpose", $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Draw prims with the guide purpose (mayaHydraGuidePurpose)", "mayaHydraGuidePurpose", "Guide purpose", $fromAE);
+    mtohRenderOverride_EndGroup($fromAE);
+}
+
 global proc mtohRenderOverride_AEAttributesCallback(string $nodeName) {
     if (`nodeType $nodeName` != "renderGlobals") {
         return;
     }
 
     editorTemplate -beginLayout "Hydra Settings" -collapse 1;
-        if (`exists mtohRenderOverride_AddMTOHAttributes`) {
-            mtohRenderOverride_AddMTOHAttributes(1);
-        }
+        mtohRenderOverride_GlobalOptions(1);
         for ($renderer in `mayaHydra -lr`) {
             string $displayName = `mayaHydra -getRendererDisplayName -r $renderer`;
             editorTemplate -beginLayout $displayName -collapse 1;
@@ -164,6 +174,7 @@ global proc {{override}}OptionBox() {
 
     window -title "Maya to Hydra Settings" -widthHeight 480 640 "{{override}}OptionsWindow";
     scrollLayout -childResizable true;
+    columnLayout -adjustableColumn true;
 
     frameLayout -label "{{hydraDisplayName}}" -collapsable true;
     columnLayout -adjustableColumn true;
@@ -171,6 +182,9 @@ global proc {{override}}OptionBox() {
     setParent ..;
     setParent ..;
 
+    mtohRenderOverride_GlobalOptions(0);
+
+    setParent ..;
     setParent ..;
 
     showWindow $windowName;
@@ -733,7 +747,6 @@ enum _SettingCategory : size_t
     kVolumes,
     kColor,
     kDisplay,
-    kDisplayPurpose,
     kPerformance,
     kOverrides,
     kDiagnostics,
@@ -757,7 +770,6 @@ constexpr std::array<_SettingCategoryInfo, kSettingCategoryCount> _kSettingCateg
     { "Volumes", true },
     { "Color", false },
     { "Display", false },
-    { "Display purpose", false },
     { "Performance", true },
     { "Overrides", true },
     { "Diagnostics", true },
@@ -1075,15 +1087,8 @@ void MtohRenderGlobals::BuildOptionsMenu(
             _MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting));
 #endif
     }
-    add(kDisplay,
-        "Refine level",
-        "Refine level",
-        _MangleName(MtohTokens->mayaHydraRefinementLevel));
-
-    // Temp solution to store global settings for USD Purpose tags
-    add(kDisplayPurpose, "Proxy", "Display Purpose", _MangleName(_tokens->mayaHydraProxyPurpose));
-    add(kDisplayPurpose, "Render", "Display Purpose", _MangleName(_tokens->mayaHydraRenderPurpose));
-    add(kDisplayPurpose, "Guide", "Display Purpose", _MangleName(_tokens->mayaHydraGuidePurpose));
+    // Refine level and the display purpose attributes are shared by all renderers: see
+    // mtohRenderOverride_GlobalOptions in the preamble.
 
     const auto renderer = _QuoteMel(rendererDesc.rendererName.GetString());
 
