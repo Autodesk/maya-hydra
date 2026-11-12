@@ -169,6 +169,12 @@ VtValue MayaHydraImagePlaneMaterialAdapter::GetMaterialResource()
     std::string imagePath;
     {
         MayaHydra::DgAccessLock dgLock;
+        // frameExtension is driven by the time node. This runs from the timeChanged
+        // event, before the evaluation manager has evaluated the graph, so a plain
+        // read returns the previous frame's value. Resolve in an explicit time
+        // context so the DG evaluates for the current frame.
+        const MDGContext timeContext(MAnimControl::currentTime());
+        MDGContextGuard  ctxGuard(timeContext);
         imagePath = GetImagePlaneTexturePath(GetNode());
     }
     if (imagePath.empty()) {
