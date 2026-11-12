@@ -975,6 +975,9 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             // to emit the notification for it.
             MH_PROFILE_SCOPE("UpdateRenderItems: UpdateFromRenderItemOverride");
             carrier->UpdateFromRenderItemOverride(*customData, effFlags, wireframeColorDirty);
+            // Face culling rides any update (the producer sends no flag for it),
+            // so it is compared here, not in the flag-gated update above.
+            carrier->UpdateRenderItemOverrideCullMode(ri);
 
             // PER-MATERIAL SUBSETS. One carrier prim per shape, where VP2 made
             // one render item per shading group - so without these every face

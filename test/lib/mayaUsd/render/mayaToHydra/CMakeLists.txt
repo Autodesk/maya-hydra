@@ -31,6 +31,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testVisibility.py
     testSmoothCage.py
     testMapBorder.py
+    testCulling.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
@@ -281,6 +282,8 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     # testMapBorder's border.
     testSmoothCage.py
     testMapBorder.py
+    # Mode-independent: nothing is selected, so there is no highlight to differ.
+    testCulling.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to

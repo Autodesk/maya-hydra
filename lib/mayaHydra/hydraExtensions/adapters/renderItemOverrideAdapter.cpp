@@ -56,6 +56,28 @@ MayaHydraRenderItemOverrideAdapter::MayaHydraRenderItemOverrideAdapter(
 {
 }
 
+void MayaHydraRenderItemOverrideAdapter::UpdateRenderItemOverrideCullMode(const MRenderItem& ri)
+{
+#ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
+    // The base's UpdateFromDelta block, which a carrier does not run: the shell
+    // reports VP2's face culling for the shape (.doubleSided, .opposite,
+    // .backfaceCulling) exactly as VP2's own shaded item does.
+    const MRenderItem::CullMode cullMode = ri.cullMode();
+    if (cullMode == _cullMode) {
+        return;
+    }
+    MayaHydra::DirtyNotifier notifier(this);
+    //  MRenderItem uses CullNone to denote doubleSided
+    if (IsDoubleSided(_cullMode) || IsDoubleSided(cullMode)) {
+        notifier.dirtyDoubleSided();
+    }
+    notifier.dirtyCullStyle();
+    _cullMode = cullMode;
+#else
+    (void)ri;
+#endif
+}
+
 void MayaHydraRenderItemOverrideAdapter::UpdateRenderItemOverrideTransform()
 {
     // A carried render item has no MRenderItem matrix, so the base
