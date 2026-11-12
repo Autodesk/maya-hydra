@@ -2255,8 +2255,10 @@ void MayaHydraSceneIndex::_UpdateRenderItemOverrideGeomSubsets(
     }
     carrier.SetGeomSubsetCount(0);
 
-    // No mapping (smooth mesh preview), or no shape: the prim's single
-    // material binding stays in charge, exactly as before subsets existed.
+    // No mapping (the producer could not map the faces back to the base
+    // polygons), or no shape: the prim's single material binding stays in
+    // charge, exactly as before subsets existed. Under smooth mesh preview the
+    // mapping addresses the subdivided faces from the base polygons.
     if (customData.polygonFaceOffsets.empty() || !customData.dagPath.isValid()) {
         return;
     }
