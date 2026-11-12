@@ -180,6 +180,9 @@ TEST(CameraPrimvars, ParamAttributesMatchGetLogic)
         "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
         "verticalShake", "filmFit", "depthOfField", "aiEnableDOF", "aiFocusDistance",
         "orthographic",
+#if PXR_VERSION >= 2505
+        "exposure",
+#endif
     };
 
     const auto& paramAttrs = MayaHydraCameraAdapter::GetCameraParamAttributeNamesForTest();
@@ -293,3 +296,173 @@ TEST(CameraPrimvars, DepthOfFieldSchemaFieldsRoundTrip)
     EXPECT_FLOAT_EQ(fStopDisabled, 0.0f);
     EXPECT_FALSE(depthOfFieldDisabled);
 }
+
+// Requires OpenUSD 25.05+ for HdCameraSchema::linearExposureScale. The Python wrappers skip these tests when
+// the Maya camera has no exposure attribute.
+#if PXR_VERSION >= 2505
+namespace {
+
+const char* kSecondCameraShapeOptionVar = "mhSecondCameraShape";
+const char* kUsdCameraPrimNameOptionVar = "mhUsdCameraPrimName";
+
+float ReadLinearExposureScale(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& cameraPrimPath)
+{
+    return ReadCameraSampledValue<float>(
+        sceneIndex, cameraPrimPath, HdCameraSchemaTokens->linearExposureScale);
+}
+
+// Report whether the camera prim's linearExposureScale was dirtied since a starting index.
+bool LinearExposureScaleDirtiedSince(
+    SceneIndexNotificationsAccumulator& accumulator,
+    size_t                              startIndex,
+    const SdfPath&                      cameraPrimPath)
+{
+    const auto& entries = accumulator.GetDirtiedPrimEntries();
+    const auto  locator = HdCameraSchema::GetLinearExposureScaleLocator();
+    for (size_t i = startIndex; i < entries.size(); ++i) {
+        if (entries[i].primPath == cameraPrimPath && entries[i].dirtyLocators.Intersects(locator)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void SetExposure(const std::string& cameraShapeFull, double ev)
+{
+    MGlobal::executeCommand(
+        ("setAttr \"" + cameraShapeFull + ".exposure\" " + std::to_string(ev)).c_str());
+    MGlobal::executeCommand("refresh");
+}
+
+} // namespace
+
+// What: a camera with the default exposure must not change the image.
+// How: read linearExposureScale on a new camera.
+// Expect: 1.0, since exposure 0 EV is a scale of 2^0.
+TEST(CameraPrimvars, ExposureDefaultIsNoScale)
+{
+    const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(cameraShapeFull);
+
+    SdfPath cameraPrimPath;
+    HdSceneIndexBaseRefPtr sceneIndex = FindSceneIndexWithCamera(shapeNamePart, &cameraPrimPath);
+    ASSERT_TRUE(sceneIndex) << "Camera prim not found in scene index";
+
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(sceneIndex, cameraPrimPath), 1.0f);
+}
+
+// What: setting exposure must update linearExposureScale and notify Hydra.
+// How: setAttr exposure 2 and inspect the value and the notices since the change.
+// Expect: 2^2 = 4.0, and the linearExposureScale locator is dirtied.
+TEST(CameraPrimvars, ExposureSetAttrUpdatesLinearExposureScale)
+{
+    const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(cameraShapeFull);
+
+    SdfPath cameraPrimPath;
+    HdSceneIndexBaseRefPtr sceneIndex = FindSceneIndexWithCamera(shapeNamePart, &cameraPrimPath);
+    ASSERT_TRUE(sceneIndex) << "Camera prim not found in scene index";
+    auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndex);
+    ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
+
+    SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
+    const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
+
+    SetExposure(cameraShapeFull, 2.0);
+
+    EXPECT_TRUE(LinearExposureScaleDirtiedSince(notifsAccumulator, startIndex, cameraPrimPath))
+        << "Changing exposure should dirty camera.linearExposureScale";
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(sceneIndex, cameraPrimPath), 4.0f);
+
+    SetExposure(cameraShapeFull, -1.0);
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(sceneIndex, cameraPrimPath), 0.5f);
+}
+
+// What: animated exposure must follow the current frame.
+// How: key exposure (frame 1 = -1, frame 10 = 1), then change frames.
+// Expect: 0.5 at frame 1 and 2.0 at frame 10, with a dirty notice on the frame change.
+TEST(CameraPrimvars, ExposureKeyedFollowsCurrentFrame)
+{
+    const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(cameraShapeFull);
+
+    SdfPath cameraPrimPath;
+    HdSceneIndexBaseRefPtr sceneIndex = FindSceneIndexWithCamera(shapeNamePart, &cameraPrimPath);
+    ASSERT_TRUE(sceneIndex) << "Camera prim not found in scene index";
+    auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndex);
+    ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
+
+    MGlobal::executeCommand(
+        ("setKeyframe -attribute exposure -time 1 -value -1 \"" + cameraShapeFull + "\"").c_str());
+    MGlobal::executeCommand(
+        ("setKeyframe -attribute exposure -time 10 -value 1 \"" + cameraShapeFull + "\"").c_str());
+    MGlobal::executeCommand("currentTime 1");
+    MGlobal::executeCommand("refresh");
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(sceneIndex, cameraPrimPath), 0.5f);
+
+    SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
+    const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
+
+    MGlobal::executeCommand("currentTime 10");
+    MGlobal::executeCommand("refresh");
+
+    EXPECT_TRUE(LinearExposureScaleDirtiedSince(notifsAccumulator, startIndex, cameraPrimPath))
+        << "A frame change on keyed exposure should dirty camera.linearExposureScale";
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(sceneIndex, cameraPrimPath), 2.0f);
+}
+
+// What: exposure belongs to one camera, so it must only affect that camera's prim.
+// How: set exposure 2 on the first camera, then read both camera prims.
+// Expect: 4.0 on the first camera and 1.0 on the second.
+TEST(CameraPrimvars, ExposureIsPerCamera)
+{
+    const std::string cameraShapeA = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
+    const std::string cameraShapeB = GetOptionVarOrDefault(kSecondCameraShapeOptionVar, "cameraShape2");
+
+    SdfPath                cameraPrimPathA;
+    HdSceneIndexBaseRefPtr sceneIndexA
+        = FindSceneIndexWithCamera(GetShapeNameFromFullPath(cameraShapeA), &cameraPrimPathA);
+    ASSERT_TRUE(sceneIndexA) << "First camera prim not found in scene index";
+    SdfPath                cameraPrimPathB;
+    HdSceneIndexBaseRefPtr sceneIndexB
+        = FindSceneIndexWithCamera(GetShapeNameFromFullPath(cameraShapeB), &cameraPrimPathB);
+    ASSERT_TRUE(sceneIndexB) << "Second camera prim not found in scene index";
+    ASSERT_NE(cameraPrimPathA, cameraPrimPathB);
+
+    SetExposure(cameraShapeA, 2.0);
+
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(sceneIndexA, cameraPrimPathA), 4.0f);
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(sceneIndexB, cameraPrimPathB), 1.0f);
+}
+
+// What: a Maya camera must publish the same linearExposureScale as a USD camera with the
+// same exposure, so the two look the same in the viewport.
+// How: set exposure 1 on the Maya camera; the Python side authors exposure 1 on a USD camera.
+// Expect: both prims report 2^1 = 2.0.
+TEST(CameraPrimvars, ExposureMatchesUsdCamera)
+{
+    const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
+    const std::string usdCameraName = GetOptionVarOrDefault(kUsdCameraPrimNameOptionVar, "usdExposureCam");
+
+    SdfPath                mayaCameraPrimPath;
+    HdSceneIndexBaseRefPtr mayaSceneIndex
+        = FindSceneIndexWithCamera(GetShapeNameFromFullPath(cameraShapeFull), &mayaCameraPrimPath);
+    ASSERT_TRUE(mayaSceneIndex) << "Maya camera prim not found in scene index";
+
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    const auto usdCameraPredicate = CreatePrimPredicate(usdCameraName, HdPrimTypeTokens->camera);
+    HdSceneIndexBaseRefPtr usdSceneIndex
+        = FindTerminalSceneIndexWithPrim(sceneIndices, usdCameraPredicate);
+    ASSERT_TRUE(usdSceneIndex) << "USD camera prim not found in any scene index";
+    SceneIndexInspector inspector(usdSceneIndex);
+    PrimEntriesVector   foundPrims = inspector.FindPrims(usdCameraPredicate, 1);
+    ASSERT_EQ(foundPrims.size(), 1u);
+    const SdfPath usdCameraPrimPath = foundPrims.front().primPath;
+
+    SetExposure(cameraShapeFull, 1.0);
+
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(usdSceneIndex, usdCameraPrimPath), 2.0f);
+    EXPECT_FLOAT_EQ(ReadLinearExposureScale(mayaSceneIndex, mayaCameraPrimPath), 2.0f);
+}
+#endif // PXR_VERSION >= 2505

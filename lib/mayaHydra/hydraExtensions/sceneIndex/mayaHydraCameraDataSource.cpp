@@ -154,6 +154,9 @@ TfTokenVector MayaHydraCameraDataSource::GetNames()
         HdCameraSchemaTokens->fStop,
         HdCameraSchemaTokens->shutterOpen,
         HdCameraSchemaTokens->shutterClose,
+#if PXR_VERSION >= 2505
+        HdCameraSchemaTokens->linearExposureScale,
+#endif
         HdCameraTokens->windowPolicy,
         // Maya-specific, not part of HdCameraSchema, but discoverable on the prim.
         TfToken("depthOfField"),

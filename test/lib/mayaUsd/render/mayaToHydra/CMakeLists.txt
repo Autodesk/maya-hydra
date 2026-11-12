@@ -175,6 +175,14 @@ if(MAYA_APP_VERSION VERSION_GREATER 2026)
     )
 endif()
 
+# Camera exposure needs the cameraShape.exposure attribute (Maya versions > 2027) and
+# HdCameraSchema::linearExposureScale (OpenUSD 25.05+).
+if(MAYA_APP_VERSION VERSION_GREATER 2027 AND USD_VERSION VERSION_GREATER_EQUAL "0.25.05")
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        testCameraExposure.py|skipOnRenderer:HdStorm
+    )
+endif()
+
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
