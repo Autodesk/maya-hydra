@@ -1,0 +1,53 @@
+{
+  "renderer": "HdStormRendererPlugin",
+  "categories": [
+    {
+      "label": "Lighting and shadows",
+      "collapsed": false,
+      "settings": [
+        {"key": "maxLights", "label": "Max lights"},
+        {"key": "domeLightCubemapTargetMemory", "label": "Dome light cubemap memory (MB)"},
+        {"key": "mtohMaximumShadowMapResolution", "label": "Max shadow map size"}
+      ]
+    },
+    {
+      "label": "Environment",
+      "collapsed": false,
+      "settings": [
+        {"key": "domeLightCameraVisibility", "label": "Dome light visible to camera"}
+      ]
+    },
+    {
+      "label": "Volumes",
+      "collapsed": true,
+      "settings": [
+        {"key": "volumeRaymarchingStepSize", "label": "Raymarching step size"},
+        {"key": "volumeRaymarchingStepSizeLighting", "label": "Lighting raymarching step size"},
+        {"key": "volumeMaxTextureMemoryPerField", "label": "Max texture memory per field (MB)"}
+      ]
+    },
+    {
+      "label": "Color",
+      "collapsed": false,
+      "settings": [
+        {"key": "enableExposureCompensation", "label": "Exposure compensation"}
+      ]
+    },
+    {
+      "label": "Display",
+      "collapsed": false,
+      "settings": [
+        {"key": "mayaHydraSelectionHighlightMode", "label": "Selection highlight"},
+        {"key": "mayaHydraOutlineHoverHighlighting", "label": "Hover highlight (experimental)"}
+      ]
+    },
+    {
+      "label": "Performance",
+      "collapsed": true,
+      "settings": [
+        {"key": "enableTinyPrimCulling", "label": "Tiny prim culling"}
+      ]
+    }
+  ],
+  "other": {"label": "Other", "collapsed": true}
+}

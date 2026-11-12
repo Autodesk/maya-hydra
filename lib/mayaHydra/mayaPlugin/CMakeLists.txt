@@ -16,6 +16,7 @@ target_sources(${TARGET_NAME}
         pluginUtils.cpp
         renderSettingsUtils.cpp
         renderGlobals.cpp
+        renderSettingsUiConfig.cpp
         renderOverride.cpp
         tokens.cpp
         viewCommand.cpp
@@ -205,6 +206,13 @@ if(IS_WINDOWS)
                 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/maya OPTIONAL)
     endif()
 endif()
+
+# Render settings UI layouts, read at runtime (see renderSettingsUiConfig.h). The plugin finds
+# them relative to its own folder, lib/maya.
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/renderSettingsUi/
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/mayaHydra/renderSettingsUi
+    FILES_MATCHING PATTERN "*.json"
+)
 
 # install top level plugInfo.json that includes the configured plugInfo.json
 install(CODE

@@ -17,6 +17,7 @@
 #include "renderGlobals.h"
 
 #include "renderOverride.h"
+#include "renderSettingsUiConfig.h"
 
 #include <mayaHydraLib/tokens.h>
 
@@ -176,13 +177,14 @@ global proc {{override}}OptionBox() {
     scrollLayout -childResizable true;
     columnLayout -adjustableColumn true;
 
+    // Settings shared by all renderers come first, as in the Attribute Editor.
+    mtohRenderOverride_GlobalOptions(0);
+
     frameLayout -label "{{hydraDisplayName}}" -collapsable true;
     columnLayout -adjustableColumn true;
     {{override}}Options(0);
     setParent ..;
     setParent ..;
-
-    mtohRenderOverride_GlobalOptions(0);
 
     setParent ..;
     setParent ..;
@@ -734,179 +736,6 @@ TfToken _MangleName(const TfToken& settingKey, const TfToken& rendererName = {})
     return _MangleString(settingKey, rendererName);
 }
 
-// Categories the render settings UI groups settings into, in display order. A setting the table
-// below does not list goes to kOther, so settings of other render delegates still show up.
-enum _SettingCategory : size_t
-{
-    kQuality,
-    kLighting,
-    kAmbientOcclusion,
-    kReflections,
-    kMotionBlur,
-    kEnvironment,
-    kVolumes,
-    kColor,
-    kDisplay,
-    kPerformance,
-    kOverrides,
-    kDiagnostics,
-    kOther,
-    kSettingCategoryCount
-};
-
-struct _SettingCategoryInfo
-{
-    const char* label;
-    bool        collapsed;
-};
-
-constexpr std::array<_SettingCategoryInfo, kSettingCategoryCount> _kSettingCategories = { {
-    { "Quality and sampling", false },
-    { "Lighting and shadows", false },
-    { "Ambient occlusion", false },
-    { "Reflections and refraction", false },
-    { "Motion blur and depth of field", true },
-    { "Environment", false },
-    { "Volumes", true },
-    { "Color", false },
-    { "Display", false },
-    { "Performance", true },
-    { "Overrides", true },
-    { "Diagnostics", true },
-    { "Other", true },
-} };
-
-struct _SettingUi
-{
-    _SettingCategory category;
-    const char*      label; // nullptr: use the render delegate's display name
-};
-
-// MayaHydra's placement and label for known render settings, keyed by render setting id. Labels
-// are short because the category already gives the context; the delegate's full display name and
-// the setting id stay available in the tooltip.
-const std::unordered_map<TfToken, _SettingUi, TfToken::HashFunctor>& _RenderSettingUi()
-{
-    static const std::unordered_map<TfToken, _SettingUi, TfToken::HashFunctor> ui = {
-        // Storm
-        { TfToken("maxLights"), { kLighting, "Max lights" } },
-        { TfToken("domeLightCubemapTargetMemory"), { kLighting, "Dome light cubemap memory (MB)" } },
-        { TfToken("domeLightCameraVisibility"), { kEnvironment, "Dome light visible to camera" } },
-        { TfToken("enableExposureCompensation"), { kColor, "Exposure compensation" } },
-        { TfToken("volumeRaymarchingStepSize"), { kVolumes, "Raymarching step size" } },
-        { TfToken("volumeRaymarchingStepSizeLighting"), { kVolumes, "Lighting raymarching step size" } },
-        { TfToken("volumeMaxTextureMemoryPerField"), { kVolumes, "Max texture memory per field (MB)" } },
-        { TfToken("enableTinyPrimCulling"), { kPerformance, "Tiny prim culling" } },
-
-        // Flash
-        { TfToken("hdFlash:lightingTier"), { kQuality, "Lighting tier" } },
-        { TfToken("hdFlash:enableAdaptiveTessellation"), { kQuality, "Adaptive subdivision tessellation" } },
-        { TfToken("hdFlash:shadowAtlasSize"), { kLighting, "Shadow atlas size" } },
-        { TfToken("hdFlash:shadow16BitDepth"), { kLighting, "16-bit shadow depth" } },
-        { TfToken("hdFlash:shadowMaxTilesPerFrame"), { kLighting, "Shadow tiles per frame" } },
-        { TfToken("hdFlash:useAreaLightGuides"), { kLighting, "Area light guides" } },
-        { TfToken("hdFlash:iblLightExtraction"), { kLighting, "IBL light extraction" } },
-        { TfToken("hdFlash:iblLightExtractionMaxLights"), { kLighting, "IBL extraction max lights" } },
-        { TfToken("hdFlash:iblLightExtractionDomeCompensation"), { kLighting, "IBL extraction dome compensation" } },
-        { TfToken("hdFlash:iblExtractedLightsCastShadows"), { kLighting, "IBL extracted lights cast shadows" } },
-        { TfToken("hdFlash:gtao"), { kAmbientOcclusion, "Ground-truth AO" } },
-        { TfToken("hdFlash:gtaoRadiusAuto"), { kAmbientOcclusion, "Fit radius to scene" } },
-        { TfToken("hdFlash:gtaoRadius"), { kAmbientOcclusion, "Radius (world units)" } },
-        { TfToken("hdFlash:gtaoIntensity"), { kAmbientOcclusion, "Intensity" } },
-        { TfToken("hdFlash:gtaoSteps"), { kAmbientOcclusion, "Steps (4-16)" } },
-        { TfToken("hdFlash:gtaoSlices"), { kAmbientOcclusion, "Slices (1-8)" } },
-        { TfToken("hdFlash:gtaoMicroShadow"), { kAmbientOcclusion, "Micro-shadowing (0-1)" } },
-        { TfToken("hdFlash:screenSpaceReflections"), { kReflections, "Screen-space reflections" } },
-        { TfToken("hdFlash:ssrMaxSteps"), { kReflections, "SSR max steps" } },
-        { TfToken("hdFlash:ssrRayStepSize"), { kReflections, "SSR ray step size (px)" } },
-        { TfToken("hdFlash:ssrThickness"), { kReflections, "SSR thickness" } },
-        { TfToken("hdFlash:ssrIntensity"), { kReflections, "SSR intensity" } },
-        { TfToken("hdFlash:screenSpaceRefraction"), { kReflections, "Screen-space refraction" } },
-        { TfToken("hdFlash:refractionThickness"), { kReflections, "Refraction thickness" } },
-        { TfToken("hdFlash:refractionDensity"), { kReflections, "Refraction density" } },
-        { TfToken("hdFlash:motionBlurEnabled"), { kMotionBlur, "Motion blur" } },
-        { TfToken("hdFlash:motionBlurSamples"), { kMotionBlur, "Motion blur samples" } },
-        { TfToken("hdFlash:motionBlurIntensity"), { kMotionBlur, "Motion blur intensity" } },
-        { TfToken("hdFlash:motionBlurMaxRadius"), { kMotionBlur, "Motion blur max radius" } },
-        { TfToken("hdFlash:motionBlurMaxDilateTiles"), { kMotionBlur, "Motion blur max dilate tiles" } },
-        { TfToken("hdFlash:motionBlurCenterBias"), { kMotionBlur, "Motion blur center bias" } },
-        { TfToken("hdFlash:motionBlurDepthGateStill"), { kMotionBlur, "Depth gate, still (px)" } },
-        { TfToken("hdFlash:motionBlurDepthGateMove"), { kMotionBlur, "Depth gate, moving (px)" } },
-        { TfToken("hdFlash:dofSamples"), { kMotionBlur, "DOF samples" } },
-        { TfToken("hdFlash:dofMaxCoCRadius"), { kMotionBlur, "DOF max CoC radius" } },
-        { TfToken("hdFlash:showSkyBackground"), { kEnvironment, "Sky background" } },
-        { TfToken("enableFog"), { kEnvironment, "Fog" } },
-        { TfToken("fogDistance"), { kEnvironment, "Fog distance" } },
-        { TfToken("fogHeight"), { kEnvironment, "Fog height" } },
-        { TfToken("fogColor"), { kEnvironment, "Fog color" } },
-        { TfToken("fogGroundPoint"), { kEnvironment, "Fog ground point" } },
-        { TfToken("fogGroundNormal"), { kEnvironment, "Fog ground normal" } },
-        { TfToken("hdFlash:workingColorSpace"), { kColor, "Working color space" } },
-        { TfToken("hdFlash:useAsyncTextureLoading"), { kPerformance, "Async texture loading" } },
-        { TfToken("hdFlash:useGpuBatchCompaction"), { kPerformance, "GPU batch compaction" } },
-        { TfToken("hdFlash:useGpuFrustumCulling"), { kPerformance, "GPU frustum culling" } },
-        { TfToken("hdFlash:useGpuDetailCulling"), { kPerformance, "GPU detail culling" } },
-        { TfToken("hdFlash:useGpuOcclusionCulling"), { kPerformance, "GPU occlusion culling" } },
-        { TfToken("hdFlash:useGpuBvhVisibility"), { kPerformance, "GPU BVH visibility" } },
-        { TfToken("hdFlash:forceDynamicSlabs"), { kPerformance, "Force dynamic slabs" } },
-        { TfToken("hdFlash:useResidencyDrivenLoading"), { kPerformance, "Residency-driven loading" } },
-        { TfToken("hdFlash:cpuMemoryBudget"), { kPerformance, "CPU memory budget (MB)" } },
-        { TfToken("hdFlash:gpuMemoryBudget"), { kPerformance, "GPU memory budget (MB)" } },
-        { TfToken("hdFlash:residencyActivationPressure"), { kPerformance, "Residency activation pressure" } },
-        { TfToken("hdFlash:residencyHysteresisFrames"), { kPerformance, "Residency hysteresis frames" } },
-        { TfToken("hdFlash:reportRenderStats"), { kDiagnostics, "Report render statistics" } },
-        { TfToken("hdFlash:residencyLogging"), { kDiagnostics, "Residency logging" } },
-        { TfToken("hdFlash:stageGraph"), { kOther, "Stage graph" } },
-        { TfToken("hdFlash:stageParams"), { kOther, "Stage parameters" } },
-
-        // Arnold: category only, the delegate's display names are short enough.
-        { TfToken("enable_progressive_render"), { kQuality, nullptr } },
-        { TfToken("progressive_min_AA_samples"), { kQuality, nullptr } },
-        { TfToken("enable_adaptive_sampling"), { kQuality, nullptr } },
-        { TfToken("AA_samples"), { kQuality, nullptr } },
-        { TfToken("AA_samples_max"), { kQuality, nullptr } },
-        { TfToken("GI_diffuse_samples"), { kQuality, nullptr } },
-        { TfToken("GI_specular_samples"), { kQuality, nullptr } },
-        { TfToken("GI_transmission_samples"), { kQuality, nullptr } },
-        { TfToken("GI_sss_samples"), { kQuality, nullptr } },
-        { TfToken("GI_volume_samples"), { kQuality, nullptr } },
-        { TfToken("auto_transparency_depth"), { kQuality, nullptr } },
-        { TfToken("GI_diffuse_depth"), { kQuality, nullptr } },
-        { TfToken("GI_specular_depth"), { kQuality, nullptr } },
-        { TfToken("GI_transmission_depth"), { kQuality, nullptr } },
-        { TfToken("GI_volume_depth"), { kQuality, nullptr } },
-        { TfToken("GI_total_depth"), { kQuality, nullptr } },
-        { TfToken("background"), { kEnvironment, nullptr } },
-        { TfToken("atmosphere"), { kEnvironment, nullptr } },
-        { TfToken("interactive_target_fps"), { kPerformance, nullptr } },
-        { TfToken("interactive_target_fps_min"), { kPerformance, nullptr } },
-        { TfToken("interactive_fps_min"), { kPerformance, nullptr } },
-        { TfToken("threads"), { kPerformance, nullptr } },
-        { TfToken("texture_auto_generate_tx"), { kPerformance, nullptr } },
-        { TfToken("ignore_textures"), { kOverrides, nullptr } },
-        { TfToken("ignore_shaders"), { kOverrides, nullptr } },
-        { TfToken("ignore_atmosphere"), { kOverrides, nullptr } },
-        { TfToken("ignore_lights"), { kOverrides, nullptr } },
-        { TfToken("ignore_shadows"), { kOverrides, nullptr } },
-        { TfToken("ignore_subdivision"), { kOverrides, nullptr } },
-        { TfToken("ignore_displacement"), { kOverrides, nullptr } },
-        { TfToken("ignore_bump"), { kOverrides, nullptr } },
-        { TfToken("ignore_motion"), { kOverrides, nullptr } },
-        { TfToken("ignore_motion_blur"), { kOverrides, nullptr } },
-        { TfToken("ignore_dof"), { kOverrides, nullptr } },
-        { TfToken("ignore_smoothing"), { kOverrides, nullptr } },
-        { TfToken("ignore_sss"), { kOverrides, nullptr } },
-        { TfToken("ignore_operators"), { kOverrides, nullptr } },
-        { TfToken("abort_on_error"), { kDiagnostics, nullptr } },
-        { TfToken("log:verbosity"), { kDiagnostics, nullptr } },
-        { TfToken("log:file"), { kDiagnostics, nullptr } },
-        { TfToken("report:file"), { kDiagnostics, nullptr } },
-        { TfToken("profile:file"), { kDiagnostics, nullptr } },
-        { TfToken("stats:file"), { kDiagnostics, nullptr } },
-    };
-    return ui;
-}
-
 // Escape a string for use inside a double-quoted MEL string literal. Double quotes become single
 // quotes rather than \": attrControlGrp fails to create enum controls whose label holds a '"'.
 std::string _EscapeMel(const std::string& str)
@@ -1026,65 +855,57 @@ void MtohRenderGlobals::BuildOptionsMenu(
             status.errorString().asChar());
     }
 
-    // Sort the settings into categories; within a category keep the delegate's order.
+    // Every setting this renderer can show, in the delegate's order, then MayaHydra's own
+    // per-renderer attributes. The layout file (see renderSettingsUiConfig.h) only places and
+    // labels them: whether a setting exists is decided here.
     struct UiEntry
     {
-        std::string label;
-        std::string annotation;
+        TfToken     key;
+        std::string defaultLabel;
+        std::string delegateName; // The delegate's display name, empty for MayaHydra attributes.
+        std::string annotation;   // Fixed tooltip, used when delegateName is empty.
         std::string attrName;
     };
-    std::array<std::vector<UiEntry>, kSettingCategoryCount> categories;
-    const auto add = [&](_SettingCategory category,
-                         std::string      label,
-                         std::string      annotation,
-                         const TfToken&   attrName) {
-        categories[category].push_back(
-            { std::move(label), std::move(annotation), attrName.GetString() });
-    };
-
-    const auto& settingUi = _RenderSettingUi();
+    std::vector<UiEntry> entries;
     for (const auto& desc : rendererSettingDescriptors) {
         if (!_IsSupportedAttribute(desc.defaultValue)) {
             continue;
         }
-
-        const auto* ui = TfMapLookupPtr(settingUi, desc.key);
-        const auto  category = ui ? ui->category : kOther;
-        std::string label = (ui && ui->label) ? ui->label : _DefaultSettingLabel(desc);
-        // Tooltip: the delegate's full display name, then the setting id it maps to.
-        std::string annotation = desc.name.empty() || desc.name == label
-            ? desc.key.GetString()
-            : desc.name + " (" + desc.key.GetString() + ")";
-        add(category,
-            std::move(label),
-            std::move(annotation),
-            _MangleName(desc.key, rendererDesc.rendererName));
+        entries.push_back({ desc.key,
+                            _DefaultSettingLabel(desc),
+                            desc.name,
+                            {},
+                            _MangleName(desc.key, rendererDesc.rendererName).GetString() });
     }
+    const auto addMayaHydraAttr
+        = [&](const TfToken& attr, const char* label, const char* annotation) {
+              entries.push_back({ attr, label, {}, annotation, _MangleName(attr).GetString() });
+          };
 
     if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
-        add(kLighting,
+        addMayaHydraAttr(
+            MtohTokens->mtohMaximumShadowMapResolution,
             "Max shadow map size",
-            "Maximum shadow map size",
-            _MangleName(MtohTokens->mtohMaximumShadowMapResolution));
+            "Maximum shadow map size");
     }
     // The renderers that support the outline (see MtohRenderOverride::_RendererSupportsOutline()).
     if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin
         || rendererDesc.rendererName == MayaHydraRendererTokens->HdFlashRendererPlugin) {
         // Dropdown: Outline Selection / Legacy Selection.
-        add(kDisplay,
+        addMayaHydraAttr(
+            MtohTokens->mayaHydraSelectionHighlightMode,
             "Selection highlight",
-            "Selection highlight mode (Outline or Legacy)",
-            _MangleName(MtohTokens->mayaHydraSelectionHighlightMode));
+            "Selection highlight mode (Outline or Legacy)");
     }
     if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
         // Checkbox, shown only where hover can work: it needs Qt for the cursor position
         // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
         // everywhere, so scenes saved on a capable build load on any build.
 #if defined(MAYAHYDRA_HAS_QT) && !defined(MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT)
-        add(kDisplay,
+        addMayaHydraAttr(
+            MtohTokens->mayaHydraOutlineHoverHighlighting,
             "Hover highlight (experimental)",
-            "Outline the object under the cursor. Requires the Outline selection highlight mode.",
-            _MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting));
+            "Outline the object under the cursor. Requires the Outline selection highlight mode.");
 #endif
     }
     // Refine level and the display purpose attributes are shared by all renderers: see
@@ -1093,19 +914,76 @@ void MtohRenderGlobals::BuildOptionsMenu(
     const auto renderer = _QuoteMel(rendererDesc.rendererName.GetString());
 
     std::stringstream ss;
-    ss << "global proc " << rendererDesc.overrideName << "Options(int $fromAE) {\n";
-    for (size_t i = 0; i < categories.size(); ++i) {
-        if (categories[i].empty()) {
-            continue;
+    const auto emitEntry = [&](const UiEntry& entry, const std::string& labelOverride) {
+        const std::string& label = labelOverride.empty() ? entry.defaultLabel : labelOverride;
+        // Tooltip: the delegate's full display name, then the setting id it maps to.
+        std::string annotation = !entry.annotation.empty() ? entry.annotation
+            : entry.delegateName.empty() || entry.delegateName == label
+            ? entry.key.GetString()
+            : entry.delegateName + " (" + entry.key.GetString() + ")";
+        ss << "\t\tmtohRenderOverride_AddAttribute(" << renderer << ',' << _QuoteMel(annotation)
+           << ',' << _QuoteMel(entry.attrName) << ',' << _QuoteMel(label) << ", $fromAE);\n";
+    };
+    const auto emitGroup = [&](const RenderSettingsUiCategory&                   category,
+                               const std::vector<std::pair<const UiEntry*, std::string>>& items) {
+        if (items.empty()) {
+            return;
         }
-        ss << "\tmtohRenderOverride_BeginGroup(" << _QuoteMel(_kSettingCategories[i].label) << ", "
-           << (_kSettingCategories[i].collapsed ? 1 : 0) << ", $fromAE);\n";
-        for (const auto& entry : categories[i]) {
-            ss << "\t\tmtohRenderOverride_AddAttribute(" << renderer << ','
-               << _QuoteMel(entry.annotation) << ',' << _QuoteMel(entry.attrName) << ','
-               << _QuoteMel(entry.label) << ", $fromAE);\n";
+        ss << "\tmtohRenderOverride_BeginGroup(" << _QuoteMel(category.label) << ", "
+           << (category.collapsed ? 1 : 0) << ", $fromAE);\n";
+        for (const auto& item : items) {
+            emitEntry(*item.first, item.second);
         }
         ss << "\tmtohRenderOverride_EndGroup($fromAE);\n";
+    };
+
+    ss << "global proc " << rendererDesc.overrideName << "Options(int $fromAE) {\n";
+    if (const auto* layout = MtohGetRenderSettingsUiLayout(rendererDesc.rendererName)) {
+        std::unordered_map<TfToken, const UiEntry*, TfToken::HashFunctor> byKey;
+        for (const auto& entry : entries) {
+            byKey.emplace(entry.key, &entry);
+        }
+        // A key is shown once: the first category that lists it wins, hidden keys never show.
+        TfToken::Set placed = layout->hidden;
+
+        std::vector<std::vector<std::pair<const UiEntry*, std::string>>> groups(
+            layout->categories.size());
+        for (size_t i = 0; i < layout->categories.size(); ++i) {
+            for (const auto& setting : layout->categories[i].settings) {
+                // Keys this renderer does not report are skipped: one file can serve several
+                // delegate versions.
+                const auto it = byKey.find(setting.key);
+                if (it != byKey.end() && placed.insert(setting.key).second) {
+                    groups[i].emplace_back(it->second, setting.label);
+                }
+            }
+        }
+        // Settings no category lists go to the "other" group, in the delegate's order. If a
+        // category has the same label, they are appended to it rather than shown twice.
+        std::vector<std::pair<const UiEntry*, std::string>>* leftovers = nullptr;
+        for (size_t i = 0; i < layout->categories.size() && !leftovers; ++i) {
+            if (layout->categories[i].label == layout->other.label) {
+                leftovers = &groups[i];
+            }
+        }
+        std::vector<std::pair<const UiEntry*, std::string>> otherGroup;
+        if (!leftovers) {
+            leftovers = &otherGroup;
+        }
+        for (const auto& entry : entries) {
+            if (placed.insert(entry.key).second) {
+                leftovers->emplace_back(&entry, std::string());
+            }
+        }
+        for (size_t i = 0; i < layout->categories.size(); ++i) {
+            emitGroup(layout->categories[i], groups[i]);
+        }
+        emitGroup(layout->other, otherGroup);
+    } else {
+        // No layout file for this renderer: a flat list in the delegate's order.
+        for (const auto& entry : entries) {
+            emitEntry(entry, std::string());
+        }
     }
     ss << "}\n";
 

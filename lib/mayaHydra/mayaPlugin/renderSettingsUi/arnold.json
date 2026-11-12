@@ -1,0 +1,79 @@
+{
+  "renderer": "HdArnoldRendererPlugin",
+  "categories": [
+    {
+      "label": "Quality and sampling",
+      "collapsed": false,
+      "settings": [
+        "enable_progressive_render",
+        "progressive_min_AA_samples",
+        "enable_adaptive_sampling",
+        "AA_samples",
+        "AA_samples_max",
+        "GI_diffuse_samples",
+        "GI_specular_samples",
+        "GI_transmission_samples",
+        "GI_sss_samples",
+        "GI_volume_samples",
+        "auto_transparency_depth",
+        "GI_diffuse_depth",
+        "GI_specular_depth",
+        "GI_transmission_depth",
+        "GI_volume_depth",
+        "GI_total_depth"
+      ]
+    },
+    {
+      "label": "Environment",
+      "collapsed": false,
+      "settings": [
+        "background",
+        "atmosphere"
+      ]
+    },
+    {
+      "label": "Performance",
+      "collapsed": true,
+      "settings": [
+        "interactive_target_fps",
+        "interactive_target_fps_min",
+        "interactive_fps_min",
+        "threads",
+        "texture_auto_generate_tx"
+      ]
+    },
+    {
+      "label": "Overrides",
+      "collapsed": true,
+      "settings": [
+        "ignore_textures",
+        "ignore_shaders",
+        "ignore_atmosphere",
+        "ignore_lights",
+        "ignore_shadows",
+        "ignore_subdivision",
+        "ignore_displacement",
+        "ignore_bump",
+        "ignore_motion",
+        "ignore_motion_blur",
+        "ignore_dof",
+        "ignore_smoothing",
+        "ignore_sss",
+        "ignore_operators"
+      ]
+    },
+    {
+      "label": "Diagnostics",
+      "collapsed": true,
+      "settings": [
+        "abort_on_error",
+        "log:verbosity",
+        "log:file",
+        "report:file",
+        "profile:file",
+        "stats:file"
+      ]
+    }
+  ],
+  "other": {"label": "Other", "collapsed": true}
+}
