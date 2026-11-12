@@ -10,15 +10,16 @@ plugin reload or a Maya restart, not a rebuild.
 
 1. Each folder in the `MAYAHYDRA_RENDER_SETTINGS_UI_PATH` environment variable, in order. Separate
    folders with `:` on macOS and Linux and `;` on Windows.
-2. The default folder `<install>/lib/mayaHydra/renderSettingsUi`, which holds `storm.json`,
-   `flash.json` and `arnold.json`. Their sources are in `lib/mayaHydra/mayaPlugin/renderSettingsUi`.
+2. The default folder `<install>/lib/mayaHydra/renderSettingsUi`, which holds `flash.json` and
+   `arnold.json`. Their sources are in `lib/mayaHydra/mayaPlugin/renderSettingsUi`. Storm has no
+   default layout on purpose, so it shows what a renderer without a layout file looks like.
 
 Every `*.json` file in a folder is read. The `renderer` key says which renderer a file is for;
 the filename doesn't matter. The first file found for a renderer is used, and it replaces that
 renderer's default layout as a whole. Layouts are not merged.
 
-A renderer with no layout file shows its settings as one flat list, in the order the render
-delegate reports them.
+A renderer with no layout file, like Storm, shows its settings as one flat list, in the order
+the render delegate reports them.
 
 ## Format
 

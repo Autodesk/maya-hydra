@@ -37,6 +37,7 @@
 #include <maya/MSelectionList.h>
 #include <maya/MStatus.h>
 
+#include <algorithm>
 #include <array>
 #include <functional>
 #include <sstream>
@@ -91,15 +92,22 @@ global proc mtohRenderOverride_ApplySetting(string $renderer, string $attr, stri
     mayaHydra -r $renderer -updateRenderGlobals $attr;
     refresh -f;
 }
+// Label column width of the option box being built. Each renderer's OptionBox proc sets it from
+// its longest label (see MtohRenderGlobals::BuildOptionsMenu) before building its controls.
+global int $gMtohRenderOverrideLabelWidth = 220;
 // Widen the label column of a control created by attrControlGrp so long labels are not clipped.
 // attrControlGrp returns a rowGroupLayout whose short name starts with the command that made it
 // (checkBoxGrp, attrFieldSliderGrp, attrEnumOptionMenuGrp, textFieldGrp, attrColorSliderGrp...).
 global proc mtohRenderOverride_FitLabel(string $ctrl) {
+    global int $gMtohRenderOverrideLabelWidth;
     string $parts[];
     tokenize $ctrl "|" $parts;
+    if (size($parts) == 0) {
+        return;
+    }
     string $cmd = `match "^[A-Za-z]+" $parts[size($parts) - 1]`;
     if ($cmd != "") {
-        catchQuiet(eval($cmd + " -e -columnWidth 1 220 \"" + $ctrl + "\""));
+        catchQuiet(eval($cmd + " -e -columnWidth 1 " + $gMtohRenderOverrideLabelWidth + " \"" + $ctrl + "\""));
     }
 }
 global proc mtohRenderOverride_AddAttribute(string $renderer, string $description, string $attr, string $label, int $fromAE) {
@@ -173,7 +181,10 @@ global proc {{override}}OptionBox() {
     //
     mayaHydra -createRenderGlobals -r "{{hydraplugin}}" -userDefaults;
 
-    window -title "Maya to Hydra Settings" -widthHeight 480 640 "{{override}}OptionsWindow";
+    // Sized to this renderer's longest label, computed when the plugin built this proc.
+    global int $gMtohRenderOverrideLabelWidth;
+    $gMtohRenderOverrideLabelWidth = {{labelWidth}};
+    window -title "Maya to Hydra settings" -widthHeight {{windowWidth}} 640 "{{override}}OptionsWindow";
     scrollLayout -childResizable true;
     columnLayout -adjustableColumn true;
 
@@ -190,6 +201,10 @@ global proc {{override}}OptionBox() {
     setParent ..;
 
     showWindow $windowName;
+    // Maya restores a saved window size; widen it if the labels need more room than that.
+    if (`window -q -width $windowName` < {{windowWidth}}) {
+        window -e -width {{windowWidth}} $windowName;
+    }
 }
 )mel";
 
@@ -836,25 +851,6 @@ void MtohRenderGlobals::BuildOptionsMenu(
     const MtohRendererDescription&       rendererDesc,
     const HdRenderSettingDescriptorList& rendererSettingDescriptors)
 {
-    auto optionBoxCommand = TfStringReplace(
-        _renderOverrideOptionBoxTemplate, "{{override}}", rendererDesc.overrideName.GetText());
-    optionBoxCommand
-        = TfStringReplace(optionBoxCommand, "{{hydraplugin}}", rendererDesc.rendererName);
-    optionBoxCommand
-        = TfStringReplace(optionBoxCommand, "{{hydraDisplayName}}", rendererDesc.displayName);
-    optionBoxCommand = TfStringReplace(
-        optionBoxCommand,
-        "{{hydraRenderDelegateName}}",
-        rendererDesc.rendererName); // Is the name of the render delegate since we are displaying
-                                    // its settings
-
-    auto status = MGlobal::executeCommand(optionBoxCommand.c_str());
-    if (!status) {
-        TF_WARN(
-            "[mayaHydra] Error in render override option box command function: \n%s",
-            status.errorString().asChar());
-    }
-
     // Every setting this renderer can show, in the delegate's order, then MayaHydra's own
     // per-renderer attributes. The layout file (see renderSettingsUiConfig.h) only places and
     // labels them: whether a setting exists is decided here.
@@ -914,8 +910,11 @@ void MtohRenderGlobals::BuildOptionsMenu(
     const auto renderer = _QuoteMel(rendererDesc.rendererName.GetString());
 
     std::stringstream ss;
+    // The "All renderers" group shares the option box, so its labels count too.
+    size_t     longestLabel = std::string("Render purpose").size();
     const auto emitEntry = [&](const UiEntry& entry, const std::string& labelOverride) {
         const std::string& label = labelOverride.empty() ? entry.defaultLabel : labelOverride;
+        longestLabel = std::max(longestLabel, label.size());
         // Tooltip: the delegate's full display name, then the setting id it maps to.
         std::string annotation = !entry.annotation.empty() ? entry.annotation
             : entry.delegateName.empty() || entry.delegateName == label
@@ -988,10 +987,46 @@ void MtohRenderGlobals::BuildOptionsMenu(
     ss << "}\n";
 
     const auto optionsCommand = ss.str();
-    status = MGlobal::executeCommand(optionsCommand.c_str());
+    auto status = MGlobal::executeCommand(optionsCommand.c_str());
     if (!status) {
         TF_WARN(
             "[mayaHydra] Error in render delegate options function: \n%s",
+            status.errorString().asChar());
+    }
+
+    // Size the option box's label column to the longest label: an estimate of the label font's
+    // average character width, kept within limits so one very long label does not make the window
+    // huge (the full text stays in the tooltip). The controls keep the width they had before.
+    constexpr int kPixelsPerChar = 7;
+    constexpr int kLabelPadding = 16;
+    constexpr int kMinLabelWidth = 150;
+    constexpr int kMaxLabelWidth = 400;
+    constexpr int kControlsWidth = 260;
+    const int     labelWidth = std::clamp(
+        static_cast<int>(longestLabel) * kPixelsPerChar + kLabelPadding,
+        kMinLabelWidth,
+        kMaxLabelWidth);
+
+    auto optionBoxCommand = TfStringReplace(
+        _renderOverrideOptionBoxTemplate, "{{override}}", rendererDesc.overrideName.GetText());
+    optionBoxCommand
+        = TfStringReplace(optionBoxCommand, "{{hydraplugin}}", rendererDesc.rendererName);
+    optionBoxCommand
+        = TfStringReplace(optionBoxCommand, "{{hydraDisplayName}}", rendererDesc.displayName);
+    optionBoxCommand = TfStringReplace(
+        optionBoxCommand,
+        "{{hydraRenderDelegateName}}",
+        rendererDesc.rendererName); // Is the name of the render delegate since we are displaying
+                                    // its settings
+    optionBoxCommand
+        = TfStringReplace(optionBoxCommand, "{{labelWidth}}", std::to_string(labelWidth));
+    optionBoxCommand = TfStringReplace(
+        optionBoxCommand, "{{windowWidth}}", std::to_string(labelWidth + kControlsWidth));
+
+    status = MGlobal::executeCommand(optionBoxCommand.c_str());
+    if (!status) {
+        TF_WARN(
+            "[mayaHydra] Error in render override option box command function: \n%s",
             status.errorString().asChar());
     }
 }
