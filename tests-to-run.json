@@ -1,15 +1,7 @@
 {
   "files_to_include": [],
   "_comment_files_to_exclude": "Patterns are CTest -E regexes matched against test names.",
-  "files_to_exclude": [
-    "prmanResolution",
-    "prmanRenderDir",
-    "prmanImageName",
-    "prmanOutputFormat",
-    "mayaSphereMaterialXPRMan",
-    "mayaSphereMayaMaterialPRMan",
-    "usdCamera_PRMan"
-  ],
+  "files_to_exclude": [],
   "plugins_to_include": [],
   "plugins_to_exclude": [],
   "platforms_to_exclude": ["osx"]
