@@ -241,6 +241,30 @@ namespace {
 std::mutex                       _allInstancesMutex;
 std::vector<MtohRenderOverride*> _allInstances;
 
+//! \brief  Replaces the Hydra selection with the UFE selection, minus the Maya nodes outside the
+//!         DAG (materials, sets, render globals).
+//!
+//! Those nodes have no Hydra prim; mapping one reports a failed mapping. The selection is copied
+//! only when it holds such a node.
+void replaceHydraSelection(const Fvp::SelectionSceneIndexRefPtr& selectionSceneIndex,
+                           const Ufe::Selection&                 ufeSelection)
+{
+    const auto isNonDag = [](const Ufe::SceneItem::Ptr& item) {
+        return UfeExtensions::isMayaNonDagNodePath(item->path());
+    };
+    if (std::none_of(ufeSelection.cbegin(), ufeSelection.cend(), isNonDag)) {
+        selectionSceneIndex->ReplaceSelection(ufeSelection);
+        return;
+    }
+    Ufe::Selection drawnItems;
+    for (const auto& item : ufeSelection) {
+        if (!isNonDag(item)) {
+            drawnItems.append(item);
+        }
+    }
+    selectionSceneIndex->ReplaceSelection(drawnItems);
+}
+
 //! \brief  Whether a display style draws a wireframe for objects, so VP2's wireframe items must be
 //!         left alone rather than treated as selection highlighting.
 //!
@@ -1906,7 +1930,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (_needToReplaceSelection){
-        _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+        replaceHydraSelection(_selectionSceneIndex, *Ufe::GlobalSelection::get());
         _needToReplaceSelection = false;
         // No selection notification comes with this replace, so push the outline inputs again.
         _outlineInputsDirty = true;
@@ -3374,7 +3398,7 @@ void MtohRenderOverride::SelectionChanged(
 
     TF_AXIOM(_selectionSceneIndex);
 
-    // Two considerations:
+    // Three considerations:
     // 1) Reading from the Maya active selection list only returns
     //    Maya objects, so must read from the UFE selection.
     // 2) The UFE selection does not have Maya component selections.
@@ -3383,13 +3407,19 @@ void MtohRenderOverride::SelectionChanged(
     //    notification is sent before the Maya selection is ready, so
     //    reading the Maya selection must be done from the Maya selection
     //    changed callback, not the UFE selection changed callback.
+    // 3) Maya nodes outside the DAG (materials, sets, render globals)
+    //    can be selected but have no Hydra prim, so they are skipped.
     using SnOp = Ufe::SelectionCompositeNotification::Op;
     using SnSiPtr = Fvp::SelectionSceneIndexRefPtr;
     static auto appendSn = [](const SnOp& op, const SnSiPtr& si) {
-        si->AddSelection(op.item->path());
+        if (!UfeExtensions::isMayaNonDagNodePath(op.item->path())) {
+            si->AddSelection(op.item->path());
+        }
     };
     static auto removeSn = [](const SnOp& op, const SnSiPtr& si) {
-        si->RemoveSelection(op.item->path());
+        if (!UfeExtensions::isMayaNonDagNodePath(op.item->path())) {
+            si->RemoveSelection(op.item->path());
+        }
     };
     // FLOW_VIEWPORT_TODO  Support selection insert.  PPT, 19-Oct-2023
     static auto insertSn = [](const SnOp&, const SnSiPtr& si) {
@@ -3399,7 +3429,7 @@ void MtohRenderOverride::SelectionChanged(
         si->ClearSelection();
     };
     static auto replaceWithSn = [](const SnOp& op, const SnSiPtr& si) {
-        si->ReplaceSelection(*Ufe::GlobalSelection::get());
+        replaceHydraSelection(si, *Ufe::GlobalSelection::get());
     };
     static std::function<void(const SnOp&, const SnSiPtr&)> changeSn[] = {appendSn, removeSn, insertSn, clearSn, replaceWithSn};
 
