@@ -31,6 +31,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testVisibility.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
+    testSelectNonDagNodes.py
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py|skipOnRenderer:HdFlash # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
