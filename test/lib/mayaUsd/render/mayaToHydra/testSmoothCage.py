@@ -15,56 +15,29 @@
 # Smooth mesh preview's "cage + smooth" mode (displaySmoothMesh 1): the cage is
 # drawn over the smoothed surface and follows the mode at runtime, as VP2 draws
 # it. Covers both paths: the stock render items and the render item override
-# (carriers).
+# (carriers), which draw the same images.
 #
-# Compares snapshots of the same scene within the run rather than against
-# baselines: what differs between two modes is exactly what the mode adds.
-import os
-
+# Reference images per renderer in SmoothCageTest/<renderer>/.
 import maya.cmds as cmds
 import fixturesUtils
-import imageUtils
 import mayaUtils
 import mtohUtils
-
-try:
-    from PySide6.QtGui import QImage
-except ImportError:
-    from PySide2.QtGui import QImage
-
-
-def _loadPixels(path):
-    image = QImage(path).convertToFormat(QImage.Format_RGBA8888)
-    data = bytes(image.constBits())
-    stride = image.bytesPerLine()
-    return image.width(), image.height(), data, stride
-
-
-def _differingPixels(pathA, pathB, tolerance=24):
-    wa, ha, a, sa = _loadPixels(pathA)
-    wb, hb, b, sb = _loadPixels(pathB)
-    if (wa, ha) != (wb, hb):
-        raise AssertionError("snapshot sizes differ: %s vs %s" % ((wa, ha), (wb, hb)))
-    count = 0
-    for y in range(ha):
-        ra = a[y * sa:y * sa + 4 * wa]
-        rb = b[y * sb:y * sb + 4 * wb]
-        if ra == rb:
-            continue
-        for x in range(0, 4 * wa, 4):
-            if (abs(ra[x] - rb[x]) > tolerance or abs(ra[x + 1] - rb[x + 1]) > tolerance
-                    or abs(ra[x + 2] - rb[x + 2]) > tolerance):
-                count += 1
-    return count
 
 
 class TestSmoothCage(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    SIZE = 400
+    # idiff thresholds: a pixel fails when a channel moves by more than 0.1
+    # (about 25/255), and the image fails when more than 0.1% of its pixels do.
+    # The cage covers more than 0.2% of the image, so a missing cage fails.
+    IMAGEDIFF_FAIL_THRESHOLD = 0.1
+    IMAGEDIFF_FAIL_PERCENT = 0.1
 
     def setUp(self):
+        # Only with Maya's Global Hydra mode.
+        if not mtohUtils.mayaHasHydraMode():
+            self.skipTest("needs Maya's Global Hydra mode")
         super(TestSmoothCage, self).setUp()
         self.setTestRenderer()
         cmds.file(new=True, force=True)
@@ -76,41 +49,30 @@ class TestSmoothCage(mtohUtils.MayaHydraBaseTestCase):
         self.panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(self.panel, edit=True, displayAppearance="smoothShaded",
                          wireframeOnShaded=False, displayTextures=False)
-        self.snapDir = os.path.join(os.path.abspath("."), "smoothCageSnapshots")
 
-    def snap(self, name, smoothMode=None):
+    def assertViewport(self, refImage, smoothMode=None):
         if smoothMode is not None:
             cmds.setAttr(self.shape + ".displaySmoothMesh", smoothMode)
         cmds.refresh(force=True)
         cmds.refresh(force=True)
-        path = os.path.join(self.snapDir, name + ".png")
-        imageUtils.snapshot(path, width=self.SIZE, height=self.SIZE)
-        return path
+        self.assertSnapshotClose(refImage, self.IMAGEDIFF_FAIL_THRESHOLD, self.IMAGEDIFF_FAIL_PERCENT)
 
     def test_cageDrawnInShadedPanel(self):
-        smooth = self.snap("smooth", 2)
-        cage   = self.snap("cageAndSmooth", 1)
-        # The cage is the difference: the surface under it is the same smoothed
-        # surface in both modes.
-        self.assertGreater(_differingPixels(smooth, cage), 0.002 * self.SIZE * self.SIZE,
-                           "the cage of 'cage + smooth' mode is not drawn")
+        self.assertViewport("smooth.png", 2)
+        self.assertViewport("cageAndSmooth.png", 1)
 
     def test_cageFollowsTheMode(self):
-        base1 = self.snap("base1", 0)
-        cage1 = self.snap("cage1", 1)
-        base2 = self.snap("base2", 0)
-        cage2 = self.snap("cage2", 1)
-        self.assertEqual(_differingPixels(base1, base2), 0, "turning smooth preview off leaves a cage")
-        self.assertEqual(_differingPixels(cage1, cage2), 0, "turning 'cage + smooth' back on differs")
+        # Turning smooth preview off leaves no cage, and turning "cage + smooth"
+        # back on draws the same cage.
+        self.assertViewport("base.png", 0)
+        self.assertViewport("cageAndSmooth.png", 1)
+        self.assertViewport("base.png", 0)
+        self.assertViewport("cageAndSmooth.png", 1)
 
     def test_hiddenMeshDrawsNoCage(self):
-        empty = self.snap("empty", 1)
+        self.assertViewport("cageAndSmooth.png", 1)
         cmds.setAttr(self.sphere + ".visibility", False)
-        hidden = self.snap("hidden")
-        cmds.delete(self.sphere)
-        nothing = self.snap("nothing")
-        self.assertEqual(_differingPixels(hidden, nothing), 0, "a hidden mesh still draws its cage")
-        self.assertGreater(_differingPixels(empty, nothing), 0)
+        self.assertViewport("nothing.png")
 
 
 if __name__ == '__main__':

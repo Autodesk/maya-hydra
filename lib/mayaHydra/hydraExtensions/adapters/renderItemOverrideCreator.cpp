@@ -510,6 +510,7 @@ private:
             customData.hasWireColorOverride = has;
             customData.wireColorOverride    = has ? color : MColor();
         }
+        customData.lineWidthScale = geometry.lineWidthScale();
     }
 
     // The first call for an item: build its payload and attach it to the item.
@@ -530,7 +531,9 @@ private:
         const bool isLineList = (gk == MRenderItemOverrideGeometry::kWireframe)
                              || (gk == MRenderItemOverrideGeometry::kCurve)
                              || (gk == MRenderItemOverrideGeometry::kBoundingBox)
-                             || (gk == MRenderItemOverrideGeometry::kCage);
+                             || (gk == MRenderItemOverrideGeometry::kCage)
+                             || (gk == MRenderItemOverrideGeometry::kUVBorder)
+                             || (gk == MRenderItemOverrideGeometry::kCageUVBorder);
 
         // A line item is only worth a payload if there are edges to draw. For a
         // wireframe that means "nothing to overlay"; for a curve it means the
@@ -553,6 +556,12 @@ private:
             break;
         case MRenderItemOverrideGeometry::kCage:
             customData->kind = MayaHydraRenderItemPayload::kCage;
+            break;
+        case MRenderItemOverrideGeometry::kUVBorder:
+            customData->kind = MayaHydraRenderItemPayload::kUVBorder;
+            break;
+        case MRenderItemOverrideGeometry::kCageUVBorder:
+            customData->kind = MayaHydraRenderItemPayload::kCageUVBorder;
             break;
         default: customData->kind = MayaHydraRenderItemPayload::kShadedMesh; break;
         }

@@ -93,13 +93,26 @@ public:
         // like a wireframe, but in shaded panels too and whether or not the
         // object is selected - so, unlike kWireframe, never a selection-highlight
         // wire that the outline replaces.
-        kCage = 4
+        kCage = 4,
+
+        // Display Map Border: the mesh's edges on a border of the current UV set,
+        // the carrier counterpart of VP2's PolyUVBorderEdges. The same points as
+        // the mesh's wireframe and its own edge list. Drawn in wireframe panels,
+        // and in shaded ones while the object is selected or templated; never a
+        // selection-highlight wire.
+        kUVBorder = 5,
+
+        // The smooth mesh preview cage's UV border edges (VP2's
+        // CagePolyUVBorderEdges), over the cage's base points. Drawn wherever
+        // kCage is.
+        kCageUVBorder = 6
     };
 
     //! The kinds whose geometry is a line list rather than a surface.
     bool isLineList() const
     {
-        return kind == kWireframe || kind == kCurve || kind == kBoundingBox || kind == kCage;
+        return kind == kWireframe || kind == kCurve || kind == kBoundingBox || kind == kCage
+            || kind == kUVBorder || kind == kCageUVBorder;
     }
 
     Kind kind = kShadedMesh;
@@ -118,6 +131,12 @@ public:
     // update; when unset, the colour is MGeometryUtilities::wireframeColor.
     bool   hasWireColorOverride = false;
     MColor wireColorOverride;
+
+    // Line width relative to the viewport's (MRenderItemOverrideGeometry::
+    // lineWidthScale): VP2 draws a UV border at the mesh's border width. 1 for
+    // every other kind. Carried for a renderer that can draw wide lines; Storm and
+    // Flash draw line lists one pixel wide.
+    float lineWidthScale = 1.0f;
 
     // Geometry, in VP2's "render vertex" layout: points and normals are
     // both VERTEX interpolated over the same array and the index arrays index

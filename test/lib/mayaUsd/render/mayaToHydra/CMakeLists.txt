@@ -30,6 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py|skipOnRenderer:HdFlash # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
     testSmoothCage.py
+    testMapBorder.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
@@ -276,6 +277,10 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineRefinement.py
     testOutlinePointInstances.py
     testOutlineNativeInstances.py
+    # Their reference images are outline-mode images; a highlight wire would draw over
+    # testMapBorder's border.
+    testSmoothCage.py
+    testMapBorder.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to
