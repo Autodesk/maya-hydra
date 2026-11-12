@@ -27,10 +27,8 @@
 #include <flowViewport/API/fvpMaterialCreationInterface.h>
 
 //Hydra headers
-#include <pxr/base/gf/vec3f.h>
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/usdImaging/usdImaging/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -38,11 +36,6 @@ namespace {
 
 TF_DEFINE_PRIVATE_TOKENS(_tokens,
     (FVP_CustomBufferShader) //Name of the shader loaded by Hydra
-    (FVP_CustomColor) //Parameter of our custom color GLSLFX shader
-    (displayColorPrimVarReaderNode)//Name of the prim var reader node
-    (varname)
-    (result)
-    (fallback)
 );
 
 const char* const kUnregisterFlag     = "-u";
@@ -62,23 +55,6 @@ VtValue _CreateGLSLShaderReplacementMaterial(const SdfPath& materialId)
     HdMaterialNode terminal;
     terminal.identifier = _tokens->FVP_CustomBufferShader;
     terminal.path = materialId.AppendChild(_tokens->FVP_CustomBufferShader);
-    terminal.parameters[_tokens->FVP_CustomColor] = VtValue(GfVec3f(1.0f, 0.0f, 0.0f));
-
-    // Primvar reader so that HdGet_displayColor() is available in the shader
-    HdMaterialNode primvarNode;
-    primvarNode.path = materialId.AppendChild(_tokens->displayColorPrimVarReaderNode);
-    primvarNode.identifier = UsdImagingTokens->UsdPrimvarReader_float3;
-    primvarNode.parameters[_tokens->varname] = HdTokens->displayColor;
-    primvarNode.parameters[_tokens->fallback] = VtValue(GfVec3f(0.0f, 0.0f, 1.0f));
-    network.primvars.push_back(HdTokens->displayColor);
-
-    HdMaterialRelationship primvarRel;
-    primvarRel.inputId = primvarNode.path;
-    primvarRel.inputName = _tokens->result;
-    primvarRel.outputId = terminal.path;
-    primvarRel.outputName = HdTokens->displayColor;
-    network.relationships.emplace_back(std::move(primvarRel));
-    network.nodes.emplace_back(std::move(primvarNode));
 
     networkMap.terminals.push_back(terminal.path);
     network.nodes.emplace_back(std::move(terminal));
