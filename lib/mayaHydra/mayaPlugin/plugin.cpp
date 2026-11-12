@@ -379,6 +379,8 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    PXR_NS::MtohRenderGlobals::RegisterAttributeEditorCallback();
+
 #if MAYA_API_VERSION >= 20270000
     // Register Hydra renderers as Maya production renderers.
     for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {

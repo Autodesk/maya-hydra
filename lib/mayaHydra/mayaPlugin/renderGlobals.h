@@ -77,6 +77,9 @@ public:
     // Add common UI code for options-menu boxes
     static void OptionsPreamble();
 
+    // Hook the renderer settings into the defaultRenderGlobals Attribute Editor
+    static void RegisterAttributeEditorCallback();
+
     // Build a UI options menu for the renderer and it's settings list
     static void BuildOptionsMenu(
         const MtohRendererDescription&       rendererDesc,

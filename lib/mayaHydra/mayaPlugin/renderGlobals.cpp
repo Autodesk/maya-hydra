@@ -36,8 +36,11 @@
 #include <maya/MSelectionList.h>
 #include <maya/MStatus.h>
 
+#include <array>
 #include <functional>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
 
 // This file is where we build the UI and expose to MEL the global parameters from this plug-in and
 // the parameters from the chosen render delegate.
@@ -87,13 +90,42 @@ global proc mtohRenderOverride_ApplySetting(string $renderer, string $attr, stri
     mayaHydra -r $renderer -updateRenderGlobals $attr;
     refresh -f;
 }
+// Widen the label column of a control created by attrControlGrp so long labels are not clipped.
+// attrControlGrp returns a rowGroupLayout whose short name starts with the command that made it
+// (checkBoxGrp, attrFieldSliderGrp, attrEnumOptionMenuGrp, textFieldGrp, attrColorSliderGrp...).
+global proc mtohRenderOverride_FitLabel(string $ctrl) {
+    string $parts[];
+    tokenize $ctrl "|" $parts;
+    string $cmd = `match "^[A-Za-z]+" $parts[size($parts) - 1]`;
+    if ($cmd != "") {
+        catchQuiet(eval($cmd + " -e -columnWidth 1 220 \"" + $ctrl + "\""));
+    }
+}
 global proc mtohRenderOverride_AddAttribute(string $renderer, string $description, string $attr, string $label, int $fromAE) {
     string $command = "mtohRenderOverride_ApplySetting " + $renderer + " " + $attr;
     if (!$fromAE) {
         $command = $command + " defaultRenderGlobals";
-        attrControlGrp -label $label -attribute ("defaultRenderGlobals." + $attr) -changeCommand $command -annotation $description;
+        string $ctrl = `attrControlGrp -label $label -attribute ("defaultRenderGlobals." + $attr) -changeCommand $command -annotation $description`;
+        mtohRenderOverride_FitLabel($ctrl);
     } else {
         editorTemplate -label $label -adc $attr $command -annotation $description;
+    }
+}
+// Collapsible category: a frameLayout in the option box, a layout in the Attribute Editor.
+global proc mtohRenderOverride_BeginGroup(string $label, int $collapse, int $fromAE) {
+    if (!$fromAE) {
+        frameLayout -label $label -collapsable true -collapse $collapse -marginWidth 4 -marginHeight 2;
+        columnLayout -adjustableColumn true;
+    } else {
+        editorTemplate -beginLayout $label -collapse $collapse;
+    }
+}
+global proc mtohRenderOverride_EndGroup(int $fromAE) {
+    if (!$fromAE) {
+        setParent ..;
+        setParent ..;
+    } else {
+        editorTemplate -endLayout;
     }
 }
 
@@ -103,19 +135,19 @@ global proc mtohRenderOverride_AEAttributesCallback(string $nodeName) {
     }
 
     editorTemplate -beginLayout "Hydra Settings" -collapse 1;
-        mtohRenderOverride_AddMTOHAttributes(1);
+        if (`exists mtohRenderOverride_AddMTOHAttributes`) {
+            mtohRenderOverride_AddMTOHAttributes(1);
+        }
         for ($renderer in `mayaHydra -lr`) {
             string $displayName = `mayaHydra -getRendererDisplayName -r $renderer`;
             editorTemplate -beginLayout $displayName -collapse 1;
-                string $optionsCmd = "mtohRenderOverride_" + $renderer + "Options(1);";
+                string $optionsCmd = "{{overridePrefix}}" + $renderer + "Options(1);";
                 eval($optionsCmd);
             editorTemplate -endLayout;
         }
     editorTemplate -endLayout;
 }
 
-// Make our attributes look nice and get sent from the AttributeEditor
-callbacks -o mayaHydra -hook AETemplateCustomContent -addCallback mtohRenderOverride_AEAttributesCallback;
 )mel";
 
 constexpr auto _renderOverrideOptionBoxTemplate = R"mel(
@@ -130,11 +162,11 @@ global proc {{override}}OptionBox() {
     //
     mayaHydra -createRenderGlobals -r "{{hydraplugin}}" -userDefaults;
 
-    window -title "Maya to Hydra Settings" "{{override}}OptionsWindow";
-    scrollLayout;
+    window -title "Maya to Hydra Settings" -widthHeight 480 640 "{{override}}OptionsWindow";
+    scrollLayout -childResizable true;
 
     frameLayout -label "{{hydraDisplayName}}" -collapsable true;
-    columnLayout;
+    columnLayout -adjustableColumn true;
     {{override}}Options(0);
     setParent ..;
     setParent ..;
@@ -688,6 +720,210 @@ TfToken _MangleName(const TfToken& settingKey, const TfToken& rendererName = {})
     return _MangleString(settingKey, rendererName);
 }
 
+// Categories the render settings UI groups settings into, in display order. A setting the table
+// below does not list goes to kOther, so settings of other render delegates still show up.
+enum _SettingCategory : size_t
+{
+    kQuality,
+    kLighting,
+    kAmbientOcclusion,
+    kReflections,
+    kMotionBlur,
+    kEnvironment,
+    kVolumes,
+    kColor,
+    kDisplay,
+    kDisplayPurpose,
+    kPerformance,
+    kOverrides,
+    kDiagnostics,
+    kOther,
+    kSettingCategoryCount
+};
+
+struct _SettingCategoryInfo
+{
+    const char* label;
+    bool        collapsed;
+};
+
+constexpr std::array<_SettingCategoryInfo, kSettingCategoryCount> _kSettingCategories = { {
+    { "Quality and sampling", false },
+    { "Lighting and shadows", false },
+    { "Ambient occlusion", false },
+    { "Reflections and refraction", false },
+    { "Motion blur and depth of field", true },
+    { "Environment", false },
+    { "Volumes", true },
+    { "Color", false },
+    { "Display", false },
+    { "Display purpose", false },
+    { "Performance", true },
+    { "Overrides", true },
+    { "Diagnostics", true },
+    { "Other", true },
+} };
+
+struct _SettingUi
+{
+    _SettingCategory category;
+    const char*      label; // nullptr: use the render delegate's display name
+};
+
+// MayaHydra's placement and label for known render settings, keyed by render setting id. Labels
+// are short because the category already gives the context; the delegate's full display name and
+// the setting id stay available in the tooltip.
+const std::unordered_map<TfToken, _SettingUi, TfToken::HashFunctor>& _RenderSettingUi()
+{
+    static const std::unordered_map<TfToken, _SettingUi, TfToken::HashFunctor> ui = {
+        // Storm
+        { TfToken("maxLights"), { kLighting, "Max lights" } },
+        { TfToken("domeLightCubemapTargetMemory"), { kLighting, "Dome light cubemap memory (MB)" } },
+        { TfToken("domeLightCameraVisibility"), { kEnvironment, "Dome light visible to camera" } },
+        { TfToken("enableExposureCompensation"), { kColor, "Exposure compensation" } },
+        { TfToken("volumeRaymarchingStepSize"), { kVolumes, "Raymarching step size" } },
+        { TfToken("volumeRaymarchingStepSizeLighting"), { kVolumes, "Lighting raymarching step size" } },
+        { TfToken("volumeMaxTextureMemoryPerField"), { kVolumes, "Max texture memory per field (MB)" } },
+        { TfToken("enableTinyPrimCulling"), { kPerformance, "Tiny prim culling" } },
+
+        // Flash
+        { TfToken("hdFlash:lightingTier"), { kQuality, "Lighting tier" } },
+        { TfToken("hdFlash:enableAdaptiveTessellation"), { kQuality, "Adaptive subdivision tessellation" } },
+        { TfToken("hdFlash:shadowAtlasSize"), { kLighting, "Shadow atlas size" } },
+        { TfToken("hdFlash:shadow16BitDepth"), { kLighting, "16-bit shadow depth" } },
+        { TfToken("hdFlash:shadowMaxTilesPerFrame"), { kLighting, "Shadow tiles per frame" } },
+        { TfToken("hdFlash:useAreaLightGuides"), { kLighting, "Area light guides" } },
+        { TfToken("hdFlash:iblLightExtraction"), { kLighting, "IBL light extraction" } },
+        { TfToken("hdFlash:iblLightExtractionMaxLights"), { kLighting, "IBL extraction max lights" } },
+        { TfToken("hdFlash:iblLightExtractionDomeCompensation"), { kLighting, "IBL extraction dome compensation" } },
+        { TfToken("hdFlash:iblExtractedLightsCastShadows"), { kLighting, "IBL extracted lights cast shadows" } },
+        { TfToken("hdFlash:gtao"), { kAmbientOcclusion, "Ground-truth AO" } },
+        { TfToken("hdFlash:gtaoRadiusAuto"), { kAmbientOcclusion, "Fit radius to scene" } },
+        { TfToken("hdFlash:gtaoRadius"), { kAmbientOcclusion, "Radius (world units)" } },
+        { TfToken("hdFlash:gtaoIntensity"), { kAmbientOcclusion, "Intensity" } },
+        { TfToken("hdFlash:gtaoSteps"), { kAmbientOcclusion, "Steps (4-16)" } },
+        { TfToken("hdFlash:gtaoSlices"), { kAmbientOcclusion, "Slices (1-8)" } },
+        { TfToken("hdFlash:gtaoMicroShadow"), { kAmbientOcclusion, "Micro-shadowing (0-1)" } },
+        { TfToken("hdFlash:screenSpaceReflections"), { kReflections, "Screen-space reflections" } },
+        { TfToken("hdFlash:ssrMaxSteps"), { kReflections, "SSR max steps" } },
+        { TfToken("hdFlash:ssrRayStepSize"), { kReflections, "SSR ray step size (px)" } },
+        { TfToken("hdFlash:ssrThickness"), { kReflections, "SSR thickness" } },
+        { TfToken("hdFlash:ssrIntensity"), { kReflections, "SSR intensity" } },
+        { TfToken("hdFlash:screenSpaceRefraction"), { kReflections, "Screen-space refraction" } },
+        { TfToken("hdFlash:refractionThickness"), { kReflections, "Refraction thickness" } },
+        { TfToken("hdFlash:refractionDensity"), { kReflections, "Refraction density" } },
+        { TfToken("hdFlash:motionBlurEnabled"), { kMotionBlur, "Motion blur" } },
+        { TfToken("hdFlash:motionBlurSamples"), { kMotionBlur, "Motion blur samples" } },
+        { TfToken("hdFlash:motionBlurIntensity"), { kMotionBlur, "Motion blur intensity" } },
+        { TfToken("hdFlash:motionBlurMaxRadius"), { kMotionBlur, "Motion blur max radius" } },
+        { TfToken("hdFlash:motionBlurMaxDilateTiles"), { kMotionBlur, "Motion blur max dilate tiles" } },
+        { TfToken("hdFlash:motionBlurCenterBias"), { kMotionBlur, "Motion blur center bias" } },
+        { TfToken("hdFlash:motionBlurDepthGateStill"), { kMotionBlur, "Depth gate, still (px)" } },
+        { TfToken("hdFlash:motionBlurDepthGateMove"), { kMotionBlur, "Depth gate, moving (px)" } },
+        { TfToken("hdFlash:dofSamples"), { kMotionBlur, "DOF samples" } },
+        { TfToken("hdFlash:dofMaxCoCRadius"), { kMotionBlur, "DOF max CoC radius" } },
+        { TfToken("hdFlash:showSkyBackground"), { kEnvironment, "Sky background" } },
+        { TfToken("enableFog"), { kEnvironment, "Fog" } },
+        { TfToken("fogDistance"), { kEnvironment, "Fog distance" } },
+        { TfToken("fogHeight"), { kEnvironment, "Fog height" } },
+        { TfToken("fogColor"), { kEnvironment, "Fog color" } },
+        { TfToken("fogGroundPoint"), { kEnvironment, "Fog ground point" } },
+        { TfToken("fogGroundNormal"), { kEnvironment, "Fog ground normal" } },
+        { TfToken("hdFlash:workingColorSpace"), { kColor, "Working color space" } },
+        { TfToken("hdFlash:useAsyncTextureLoading"), { kPerformance, "Async texture loading" } },
+        { TfToken("hdFlash:useGpuBatchCompaction"), { kPerformance, "GPU batch compaction" } },
+        { TfToken("hdFlash:useGpuFrustumCulling"), { kPerformance, "GPU frustum culling" } },
+        { TfToken("hdFlash:useGpuDetailCulling"), { kPerformance, "GPU detail culling" } },
+        { TfToken("hdFlash:useGpuOcclusionCulling"), { kPerformance, "GPU occlusion culling" } },
+        { TfToken("hdFlash:useGpuBvhVisibility"), { kPerformance, "GPU BVH visibility" } },
+        { TfToken("hdFlash:forceDynamicSlabs"), { kPerformance, "Force dynamic slabs" } },
+        { TfToken("hdFlash:useResidencyDrivenLoading"), { kPerformance, "Residency-driven loading" } },
+        { TfToken("hdFlash:cpuMemoryBudget"), { kPerformance, "CPU memory budget (MB)" } },
+        { TfToken("hdFlash:gpuMemoryBudget"), { kPerformance, "GPU memory budget (MB)" } },
+        { TfToken("hdFlash:residencyActivationPressure"), { kPerformance, "Residency activation pressure" } },
+        { TfToken("hdFlash:residencyHysteresisFrames"), { kPerformance, "Residency hysteresis frames" } },
+        { TfToken("hdFlash:reportRenderStats"), { kDiagnostics, "Report render statistics" } },
+        { TfToken("hdFlash:residencyLogging"), { kDiagnostics, "Residency logging" } },
+        { TfToken("hdFlash:stageGraph"), { kOther, "Stage graph" } },
+        { TfToken("hdFlash:stageParams"), { kOther, "Stage parameters" } },
+
+        // Arnold: category only, the delegate's display names are short enough.
+        { TfToken("enable_progressive_render"), { kQuality, nullptr } },
+        { TfToken("progressive_min_AA_samples"), { kQuality, nullptr } },
+        { TfToken("enable_adaptive_sampling"), { kQuality, nullptr } },
+        { TfToken("AA_samples"), { kQuality, nullptr } },
+        { TfToken("AA_samples_max"), { kQuality, nullptr } },
+        { TfToken("GI_diffuse_samples"), { kQuality, nullptr } },
+        { TfToken("GI_specular_samples"), { kQuality, nullptr } },
+        { TfToken("GI_transmission_samples"), { kQuality, nullptr } },
+        { TfToken("GI_sss_samples"), { kQuality, nullptr } },
+        { TfToken("GI_volume_samples"), { kQuality, nullptr } },
+        { TfToken("auto_transparency_depth"), { kQuality, nullptr } },
+        { TfToken("GI_diffuse_depth"), { kQuality, nullptr } },
+        { TfToken("GI_specular_depth"), { kQuality, nullptr } },
+        { TfToken("GI_transmission_depth"), { kQuality, nullptr } },
+        { TfToken("GI_volume_depth"), { kQuality, nullptr } },
+        { TfToken("GI_total_depth"), { kQuality, nullptr } },
+        { TfToken("background"), { kEnvironment, nullptr } },
+        { TfToken("atmosphere"), { kEnvironment, nullptr } },
+        { TfToken("interactive_target_fps"), { kPerformance, nullptr } },
+        { TfToken("interactive_target_fps_min"), { kPerformance, nullptr } },
+        { TfToken("interactive_fps_min"), { kPerformance, nullptr } },
+        { TfToken("threads"), { kPerformance, nullptr } },
+        { TfToken("texture_auto_generate_tx"), { kPerformance, nullptr } },
+        { TfToken("ignore_textures"), { kOverrides, nullptr } },
+        { TfToken("ignore_shaders"), { kOverrides, nullptr } },
+        { TfToken("ignore_atmosphere"), { kOverrides, nullptr } },
+        { TfToken("ignore_lights"), { kOverrides, nullptr } },
+        { TfToken("ignore_shadows"), { kOverrides, nullptr } },
+        { TfToken("ignore_subdivision"), { kOverrides, nullptr } },
+        { TfToken("ignore_displacement"), { kOverrides, nullptr } },
+        { TfToken("ignore_bump"), { kOverrides, nullptr } },
+        { TfToken("ignore_motion"), { kOverrides, nullptr } },
+        { TfToken("ignore_motion_blur"), { kOverrides, nullptr } },
+        { TfToken("ignore_dof"), { kOverrides, nullptr } },
+        { TfToken("ignore_smoothing"), { kOverrides, nullptr } },
+        { TfToken("ignore_sss"), { kOverrides, nullptr } },
+        { TfToken("ignore_operators"), { kOverrides, nullptr } },
+        { TfToken("abort_on_error"), { kDiagnostics, nullptr } },
+        { TfToken("log:verbosity"), { kDiagnostics, nullptr } },
+        { TfToken("log:file"), { kDiagnostics, nullptr } },
+        { TfToken("report:file"), { kDiagnostics, nullptr } },
+        { TfToken("profile:file"), { kDiagnostics, nullptr } },
+        { TfToken("stats:file"), { kDiagnostics, nullptr } },
+    };
+    return ui;
+}
+
+// Escape a string for use inside a double-quoted MEL string literal. Double quotes become single
+// quotes rather than \": attrControlGrp fails to create enum controls whose label holds a '"'.
+std::string _EscapeMel(const std::string& str)
+{
+    std::string out;
+    out.reserve(str.size());
+    for (const char c : str) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '"': out += '\''; break;
+        case '\n': out += "\\n"; break;
+        default: out += c;
+        }
+    }
+    return out;
+}
+
+std::string _QuoteMel(const std::string& str) { return "\"" + _EscapeMel(str) + "\""; }
+
+// The delegate's display name without trailing periods, or the setting id if it has none.
+std::string _DefaultSettingLabel(const HdRenderSettingDescriptor& desc)
+{
+    std::string label = desc.name;
+    while (!label.empty() && (label.back() == '.' || label.back() == ' ')) {
+        label.pop_back();
+    }
+    return label.empty() ? desc.key.GetString() : label;
+}
+
 } // namespace
 
 MtohRenderGlobals::MtohRenderGlobals() { }
@@ -734,11 +970,25 @@ bool MtohRenderGlobals::ApplySettings(
 
 void MtohRenderGlobals::OptionsPreamble()
 {
-    MStatus status = MGlobal::executeCommand(_renderOverride_PreAmble);
+    // The per-renderer Options procs are named after the render override, see BuildOptionsMenu.
+    const auto preamble = TfStringReplace(
+        _renderOverride_PreAmble, "{{overridePrefix}}", MayaHydra::MTOH_RENDER_OVERRIDE_PREFIX);
+    MStatus status = MGlobal::executeCommand(preamble.c_str());
     if (status) {
         return;
     }
-    TF_WARN("[mayaHydra] Error executing preamble:\n%s", _renderOverride_PreAmble);
+    TF_WARN("[mayaHydra] Error executing preamble:\n%s", preamble.c_str());
+}
+
+void MtohRenderGlobals::RegisterAttributeEditorCallback()
+{
+    // Not part of the preamble: the preamble runs once per process, but uninitializePlugin clears
+    // every mayaHydra callback, so the hook must be added again on each plugin load.
+    MGlobal::executeCommand(
+        "catchQuiet(`callbacks -o mayaHydra -hook AETemplateCustomContent -removeCallback "
+        "mtohRenderOverride_AEAttributesCallback`);\n"
+        "callbacks -o mayaHydra -hook AETemplateCustomContent -addCallback "
+        "mtohRenderOverride_AEAttributesCallback;");
 }
 
 void MtohRenderGlobals::BuildOptionsMenu(
@@ -764,103 +1014,94 @@ void MtohRenderGlobals::BuildOptionsMenu(
             status.errorString().asChar());
     }
 
-    auto quote = [&](std::string str, const char* strb = nullptr) -> std::string {
-        if (strb)
-            str += strb;
-        return "\"" + str + "\"";
+    // Sort the settings into categories; within a category keep the delegate's order.
+    struct UiEntry
+    {
+        std::string label;
+        std::string annotation;
+        std::string attrName;
+    };
+    std::array<std::vector<UiEntry>, kSettingCategoryCount> categories;
+    const auto add = [&](_SettingCategory category,
+                         std::string      label,
+                         std::string      annotation,
+                         const TfToken&   attrName) {
+        categories[category].push_back(
+            { std::move(label), std::move(annotation), attrName.GetString() });
     };
 
-    std::stringstream ss;
-    ss << "global proc " << rendererDesc.overrideName << "Options(int $fromAE) {\n";
+    const auto& settingUi = _RenderSettingUi();
     for (const auto& desc : rendererSettingDescriptors) {
         if (!_IsSupportedAttribute(desc.defaultValue)) {
             continue;
         }
 
-        ss << "\tmtohRenderOverride_AddAttribute("
-           << quote(rendererDesc.rendererName.GetString()) // Renderer name
-           << ',' << quote(desc.name) << ','               // Description
-           << quote(_MangleName(desc.key, rendererDesc.rendererName).GetString())
-           << ','                       // Attribute name
-           << quote(desc.key.GetText()) // Label
-           << ", $fromAE);\n";
+        const auto* ui = TfMapLookupPtr(settingUi, desc.key);
+        const auto  category = ui ? ui->category : kOther;
+        std::string label = (ui && ui->label) ? ui->label : _DefaultSettingLabel(desc);
+        // Tooltip: the delegate's full display name, then the setting id it maps to.
+        std::string annotation = desc.name.empty() || desc.name == label
+            ? desc.key.GetString()
+            : desc.name + " (" + desc.key.GetString() + ")";
+        add(category,
+            std::move(label),
+            std::move(annotation),
+            _MangleName(desc.key, rendererDesc.rendererName));
     }
+
     if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Maximum shadow map size") << ',' // Description
-           << quote(_MangleName(MtohTokens->mtohMaximumShadowMapResolution).GetString())
-           << ','                                                         // Attribute name
-           << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
-           << ", $fromAE);\n";
+        add(kLighting,
+            "Max shadow map size",
+            "Maximum shadow map size",
+            _MangleName(MtohTokens->mtohMaximumShadowMapResolution));
     }
     // The renderers that support the outline (see MtohRenderOverride::_RendererSupportsOutline()).
     if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin
         || rendererDesc.rendererName == MayaHydraRendererTokens->HdFlashRendererPlugin) {
         // Dropdown: Outline Selection / Legacy Selection.
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
-           << quote(_MangleName(MtohTokens->mayaHydraSelectionHighlightMode).GetString())
-           << ','                                                          // Attribute name
-           << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
-           << ", $fromAE);\n";
+        add(kDisplay,
+            "Selection highlight",
+            "Selection highlight mode (Outline or Legacy)",
+            _MangleName(MtohTokens->mayaHydraSelectionHighlightMode));
     }
     if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
         // Checkbox, shown only where hover can work: it needs Qt for the cursor position
         // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
         // everywhere, so scenes saved on a capable build load on any build.
 #if defined(MAYAHYDRA_HAS_QT) && !defined(MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT)
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Outline the object under the cursor. Requires the Outline selection "
-                           "highlight mode.")
-           << ','                                                             // Description
-           << quote(_MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting).GetString())
-           << ','                                                             // Attribute name
-           << quote(
-                  MtohTokens->mayaHydraOutlineHoverHighlighting.GetString(),
-                  " (Experimental)") // Label
-           << ", $fromAE);\n";
+        add(kDisplay,
+            "Hover highlight (experimental)",
+            "Outline the object under the cursor. Requires the Outline selection highlight mode.",
+            _MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting));
 #endif
     }
-
-    {
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Refine level") << ',' // Description
-           << quote(_MangleName(MtohTokens->mayaHydraRefinementLevel).GetString())
-           << ','                                                         // Attribute name
-           << quote(MtohTokens->mayaHydraRefinementLevel.GetText()) // Label
-           << ", $fromAE);\n";
-    }
+    add(kDisplay,
+        "Refine level",
+        "Refine level",
+        _MangleName(MtohTokens->mayaHydraRefinementLevel));
 
     // Temp solution to store global settings for USD Purpose tags
-    {
-        ss << "\tframeLayout -label \"Display Purpose\" -collapsable true;";
+    add(kDisplayPurpose, "Proxy", "Display Purpose", _MangleName(_tokens->mayaHydraProxyPurpose));
+    add(kDisplayPurpose, "Render", "Display Purpose", _MangleName(_tokens->mayaHydraRenderPurpose));
+    add(kDisplayPurpose, "Guide", "Display Purpose", _MangleName(_tokens->mayaHydraGuidePurpose));
+
+    const auto renderer = _QuoteMel(rendererDesc.rendererName.GetString());
+
+    std::stringstream ss;
+    ss << "global proc " << rendererDesc.overrideName << "Options(int $fromAE) {\n";
+    for (size_t i = 0; i < categories.size(); ++i) {
+        if (categories[i].empty()) {
+            continue;
+        }
+        ss << "\tmtohRenderOverride_BeginGroup(" << _QuoteMel(_kSettingCategories[i].label) << ", "
+           << (_kSettingCategories[i].collapsed ? 1 : 0) << ", $fromAE);\n";
+        for (const auto& entry : categories[i]) {
+            ss << "\t\tmtohRenderOverride_AddAttribute(" << renderer << ','
+               << _QuoteMel(entry.annotation) << ',' << _QuoteMel(entry.attrName) << ','
+               << _QuoteMel(entry.label) << ", $fromAE);\n";
+        }
+        ss << "\tmtohRenderOverride_EndGroup($fromAE);\n";
     }
-    {        
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Display Purpose") << ',' // Description
-           << quote(_MangleName(_tokens->mayaHydraProxyPurpose).GetString())
-           << ','                                                         // Attribute name
-           << quote("Proxy")                                              // Label
-           << ", $fromAE);\n";
-    }
-    {        
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Display Purpose") << ',' // Description
-           << quote(_MangleName(_tokens->mayaHydraRenderPurpose).GetString())
-           << ','                                                         // Attribute name
-           << quote("Render")                                             // Label
-           << ", $fromAE);\n";
-    }
-    {        
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Display Purpose") << ',' // Description
-           << quote(_MangleName(_tokens->mayaHydraGuidePurpose).GetString())
-           << ','                                                         // Attribute name
-           << quote("Guide")                                              // Label
-           << ", $fromAE);\n";
-    }
-    ss << "setParent ..;";
-    ss << "setParent ..;";
     ss << "}\n";
 
     const auto optionsCommand = ss.str();
