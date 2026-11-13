@@ -27,9 +27,11 @@
 #include <pxr/base/tf/stringUtils.h>
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <set>
 #include <unordered_map>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -42,20 +44,37 @@ using Layouts = std::unordered_map<TfToken, MayaHydra::RenderSettingsUiLayout, T
 
 constexpr const char* kPathEnvVar = "MAYAHYDRA_RENDER_SETTINGS_UI_PATH";
 
+bool isValidId(const std::string& id)
+{
+    return !id.empty() && std::all_of(id.begin(), id.end(), [](unsigned char c) {
+        return std::isalnum(c) || c == '_';
+    });
+}
+
 // Parse errors are reported through 'error' rather than TF_WARN so the caller can name the file.
+// Without 'requireId', a missing id keeps the category's current one.
 bool parseCategoryHeader(
     const JsValue&                      value,
     MayaHydra::RenderSettingsUiCategory& category,
-    std::string&                        error)
+    std::string&                        error,
+    bool                                requireId)
 {
     if (!value.IsObject()) {
         error = "a category must be an object";
         return false;
     }
     const JsObject& obj = value.GetJsObject();
-    const auto      label = obj.find("label");
+    const auto      id = obj.find("id");
+    if (id != obj.end() || requireId) {
+        if (id == obj.end() || !id->second.IsString() || !isValidId(id->second.GetString())) {
+            error = "a category needs an 'id' string of letters, digits and underscores";
+            return false;
+        }
+        category.id = id->second.GetString();
+    }
+    const auto label = obj.find("label");
     if (label == obj.end() || !label->second.IsString() || label->second.GetString().empty()) {
-        error = "a category needs a non-empty string 'label'";
+        error = "category '" + category.id + "' needs a non-empty string 'label'";
         return false;
     }
     category.label = label->second.GetString();
@@ -75,7 +94,7 @@ bool parseCategory(
     MayaHydra::RenderSettingsUiCategory& category,
     std::string&                        error)
 {
-    if (!parseCategoryHeader(value, category, error)) {
+    if (!parseCategoryHeader(value, category, error, true)) {
         return false;
     }
     const JsObject& obj = value.GetJsObject();
@@ -154,6 +173,7 @@ parseLayoutFile(const fs::path& file)
 
     MayaHydra::RenderSettingsUiLayout layout;
     std::string                       error;
+    std::set<std::string>             ids;
 
     const auto categories = obj.find("categories");
     if (categories != obj.end()) {
@@ -167,12 +187,16 @@ parseLayoutFile(const fs::path& file)
                 warn(error);
                 return std::nullopt;
             }
+            if (!ids.insert(category.id).second) {
+                warn("category id '" + category.id + "' is used twice");
+                return std::nullopt;
+            }
             layout.categories.push_back(std::move(category));
         }
     }
 
     const auto other = obj.find("other");
-    if (other != obj.end() && !parseCategoryHeader(other->second, layout.other, error)) {
+    if (other != obj.end() && !parseCategoryHeader(other->second, layout.other, error, false)) {
         warn("'other': " + error);
         return std::nullopt;
     }

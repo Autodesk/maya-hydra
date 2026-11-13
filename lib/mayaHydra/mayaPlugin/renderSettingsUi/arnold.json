@@ -2,6 +2,7 @@
   "renderer": "HdArnoldRendererPlugin",
   "categories": [
     {
+      "id": "qualitySampling",
       "label": "Quality and sampling",
       "collapsed": false,
       "settings": [
@@ -24,6 +25,7 @@
       ]
     },
     {
+      "id": "environment",
       "label": "Environment",
       "collapsed": false,
       "settings": [
@@ -32,6 +34,7 @@
       ]
     },
     {
+      "id": "performance",
       "label": "Performance",
       "collapsed": true,
       "settings": [
@@ -43,6 +46,7 @@
       ]
     },
     {
+      "id": "overrides",
       "label": "Overrides",
       "collapsed": true,
       "settings": [
@@ -63,6 +67,7 @@
       ]
     },
     {
+      "id": "diagnostics",
       "label": "Diagnostics",
       "collapsed": true,
       "settings": [
@@ -75,5 +80,5 @@
       ]
     }
   ],
-  "other": {"label": "Other", "collapsed": true}
+  "other": {"id": "other", "label": "Other", "collapsed": true}
 }

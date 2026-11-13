@@ -36,6 +36,8 @@ struct RenderSettingsUiSetting
 /// A collapsible group of settings in the option box and the Attribute Editor.
 struct RenderSettingsUiCategory
 {
+    /// Stable identifier, unique within a layout file. Meant as the key for a localized label.
+    std::string                          id;
     std::string                          label;
     bool                                 collapsed = false;
     std::vector<RenderSettingsUiSetting> settings;
@@ -47,7 +49,7 @@ struct RenderSettingsUiLayout
 {
     std::vector<RenderSettingsUiCategory> categories;
     /// Receives the settings that no category lists. Its settings list is unused.
-    RenderSettingsUiCategory other { "Other", false, {} };
+    RenderSettingsUiCategory other { "other", "Other", false, {} };
     /// Keys that are never shown.
     PXR_NS::TfToken::Set hidden;
 };

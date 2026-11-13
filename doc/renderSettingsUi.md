@@ -28,6 +28,7 @@ the render delegate reports them.
   "renderer": "HdStormRendererPlugin",
   "categories": [
     {
+      "id": "lightingShadows",
       "label": "Lighting and shadows",
       "collapsed": false,
       "settings": [
@@ -36,7 +37,7 @@ the render delegate reports them.
       ]
     }
   ],
-  "other": {"label": "Other", "collapsed": true},
+  "other": {"id": "other", "label": "Other", "collapsed": true},
   "hidden": ["enableTinyPrimCulling"]
 }
 ```
@@ -45,10 +46,11 @@ the render delegate reports them.
 |---|---|---|
 | `renderer` | yes | The render delegate plugin id, as listed by `mayaHydra -listRenderers`. |
 | `categories` | no | Groups, shown in file order. |
+| `categories[].id` | yes | Stable identifier, unique within the file. Letters, digits and underscores only. Meant as the key for a localized label later; today it isn't shown. |
 | `categories[].label` | yes | Group title. Use sentence case. |
 | `categories[].collapsed` | no | Whether the group starts collapsed. Defaults to `false`. |
 | `categories[].settings` | no | Settings in display order. A bare key uses the render delegate's display name as the label. An object can set its own `label`. |
-| `other` | no | The group for settings that no category lists, in delegate order. Defaults to `{"label": "Other", "collapsed": false}`. If a category has the same label, the leftovers are appended to it. |
+| `other` | no | The group for settings that no category lists, in delegate order. Defaults to `{"id": "other", "label": "Other", "collapsed": false}`. If a category has the same id, the leftovers are appended to it. |
 | `hidden` | no | Keys that are never shown. |
 
 Keys are the render delegate's setting ids, such as `maxLights` or `hdFlash:gtao`. Three

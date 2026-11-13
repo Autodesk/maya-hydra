@@ -958,10 +958,10 @@ void MtohRenderGlobals::BuildOptionsMenu(
             }
         }
         // Settings no category lists go to the "other" group, in the delegate's order. If a
-        // category has the same label, they are appended to it rather than shown twice.
+        // category has the same id, they are appended to it rather than shown twice.
         std::vector<std::pair<const UiEntry*, std::string>>* leftovers = nullptr;
         for (size_t i = 0; i < layout->categories.size() && !leftovers; ++i) {
-            if (layout->categories[i].label == layout->other.label) {
+            if (layout->categories[i].id == layout->other.id) {
                 leftovers = &groups[i];
             }
         }

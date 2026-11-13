@@ -2,6 +2,7 @@
   "renderer": "HdFlashRendererPlugin",
   "categories": [
     {
+      "id": "qualitySampling",
       "label": "Quality and sampling",
       "collapsed": false,
       "settings": [
@@ -10,6 +11,7 @@
       ]
     },
     {
+      "id": "lightingShadows",
       "label": "Lighting and shadows",
       "collapsed": false,
       "settings": [
@@ -24,6 +26,7 @@
       ]
     },
     {
+      "id": "ambientOcclusion",
       "label": "Ambient occlusion",
       "collapsed": false,
       "settings": [
@@ -37,6 +40,7 @@
       ]
     },
     {
+      "id": "reflectionsRefraction",
       "label": "Reflections and refraction",
       "collapsed": false,
       "settings": [
@@ -51,6 +55,7 @@
       ]
     },
     {
+      "id": "motionBlurDepthOfField",
       "label": "Motion blur and depth of field",
       "collapsed": true,
       "settings": [
@@ -67,6 +72,7 @@
       ]
     },
     {
+      "id": "environment",
       "label": "Environment",
       "collapsed": false,
       "settings": [
@@ -80,6 +86,7 @@
       ]
     },
     {
+      "id": "color",
       "label": "Color",
       "collapsed": false,
       "settings": [
@@ -87,6 +94,7 @@
       ]
     },
     {
+      "id": "display",
       "label": "Display",
       "collapsed": false,
       "settings": [
@@ -94,6 +102,7 @@
       ]
     },
     {
+      "id": "performance",
       "label": "Performance",
       "collapsed": true,
       "settings": [
@@ -112,6 +121,7 @@
       ]
     },
     {
+      "id": "diagnostics",
       "label": "Diagnostics",
       "collapsed": true,
       "settings": [
@@ -120,6 +130,7 @@
       ]
     },
     {
+      "id": "other",
       "label": "Other",
       "collapsed": true,
       "settings": [
@@ -128,5 +139,5 @@
       ]
     }
   ],
-  "other": {"label": "Other", "collapsed": true}
+  "other": {"id": "other", "label": "Other", "collapsed": true}
 }
