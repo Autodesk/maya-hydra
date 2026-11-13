@@ -626,9 +626,11 @@ function(_mayaHydra_setup_test_USD_paths)
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "PXR_USD_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}"
         "USD_INSTALL_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}")
+    # For the USD python bindings.
     # Inherit any existing PYTHONPATH, but keep it at the end.
+    get_pxr_usd_python_module_location(pxr_usd_python_location)
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-        "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/python")
+        "${MAYAHYDRA_USD_INSTALL_LOCATION}/${pxr_usd_python_location}")
     if(IS_WINDOWS)
         list(APPEND MAYAHYDRA_VARNAME_PATH
             "${MAYAHYDRA_USD_INSTALL_LOCATION}/bin")

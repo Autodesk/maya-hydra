@@ -84,6 +84,27 @@ function(mayaUsd_find_python_module module)
     endif()
 endfunction()
 
+# In USD v26.08 Pixar moved the location of the python bindings from lib/python to:
+# - Windows: lib/site-packages
+# - Linux/Mac: lib/pythonX.Y/site-packages
+#
+# This helper function returns the correct location of the USD python bindings based on the current USD version.
+function(get_pxr_usd_python_module_location out_var)
+    set(pxr_usd_python_location "lib/python")
+    if (USD_VERSION VERSION_GREATER_EQUAL "0.26.8")
+        if(IS_WINDOWS)
+            set(pxr_usd_python_location "lib/site-packages")
+        else()
+            # Get the python version from the python executable
+            execute_process(COMMAND "${Python_EXECUTABLE}" -c "import sys; print('.'.join(map(str, sys.version_info[:2])))"
+                OUTPUT_VARIABLE PYTHON_VERSION
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            set(pxr_usd_python_location "lib/python${PYTHON_VERSION}/site-packages")
+        endif()
+    endif()
+    set(${out_var} "${pxr_usd_python_location}" PARENT_SCOPE)
+endfunction()
+
 # Initialize a variable to accumulate an rpath.  The origin is the
 # RUNTIME DESTINATION of the target.  If not absolute it's appended
 # to CMAKE_INSTALL_PREFIX.
