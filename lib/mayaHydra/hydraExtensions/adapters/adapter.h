@@ -105,6 +105,10 @@ public:
     virtual void RemovePrim() = 0;
     /// Insert the prim into the scene index.
     virtual void Populate() = 0;
+    /// Re-read the Maya data this adapter caches for its data sources and dirty what changed.
+    /// Requested with MayaHydraSceneIndex::RebuildFlagData; runs on the main thread during the
+    /// scene push, when the DG may be read and no render thread is inside Hydra sync.
+    virtual void RefreshData() { }
 
     MAYAHYDRALIB_API
     /// Perform any one-time adapter initialization.
@@ -207,6 +211,10 @@ public:
     MAYAHYDRALIB_API
     /// Return primvar descriptors for a given interpolation.
     virtual HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation);
+    MAYAHYDRALIB_API
+    /// Return the color space of a primvar's values (a GfColorSpaceNames token), or an
+    /// empty token to leave it unspecified.
+    virtual TfToken GetPrimvarColorSpace(const TfToken& /*name*/) const { return TfToken(); }
     MAYAHYDRALIB_API
     /// Return whether the prim should be treated as double-sided.
     virtual bool GetDoubleSided() const { return true; }

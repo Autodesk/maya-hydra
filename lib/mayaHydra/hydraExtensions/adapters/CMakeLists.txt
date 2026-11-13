@@ -7,6 +7,7 @@ target_sources(${TARGET_NAME}
         adapterDebugCodes.cpp
         mhDirtyNotifier.cpp
         adapterRegistry.cpp
+        aiGaussianSplatAdapter.cpp
         aiSkydomeLightAdapter.cpp
 		aiAreaLightAdapter.cpp
         areaLightAdapter.cpp
@@ -17,6 +18,7 @@ target_sources(${TARGET_NAME}
         renderItemAdapter.cpp
         renderItemTopologyUtil.cpp
         directionalLightAdapter.cpp
+        gaussianSplatPlyReader.cpp
         lightAdapter.cpp
         materialAdapter.cpp
         materialNetworkConverter.cpp
