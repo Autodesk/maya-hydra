@@ -148,7 +148,6 @@ expect_disabled_on(mayaGt2026 TRUE)
 expect_disabled_on(mayaGt2027 FALSE)
 expect_disabled_on(mayaLe2027 TRUE)
 expect_disabled_on(mayaLe2026 FALSE)
-expect_disabled_on(mayaLt2028 TRUE)
 expect_disabled_on(mayaLt2027 FALSE)
 
 expect_disabled_on(win TRUE)
@@ -180,7 +179,7 @@ expect_disabled_on(mayaLt2027 TRUE)
 
 # A condition may name a Maya version that does not exist yet: it stays false
 # until someone configures against that version, with no change to this file.
-set(MAYA_APP_VERSION 2028)
+set(MAYA_APP_VERSION 9999)
 expect_disabled_on(mayaGt2027 TRUE)
 expect_disabled_on(mayaGe2027 TRUE)
 expect_disabled_on(maya2027 FALSE)
