@@ -39,7 +39,6 @@
 
 #include <maya/MDagPath.h>
 #include <maya/MObject.h>
-#include <maya/MObjectHandle.h>
 #include <ufe/ufe.h>
 
 #include <flowViewport/selection/fvpPathMapperFwd.h>
@@ -207,8 +206,6 @@ public:
     void OnDagNodeRemoved(const MObject& obj);
     void AddNewInstance(const MDagPath& dag);
     void UpdateLightVisibility(const MDagPath& dag);
-    // A shape joined or left a shading group (whole object or faces).
-    void OnShadingGroupMembershipChanged(const MObject& shape);
 
     bool    CreateMaterial(const SdfPath& id, const MObject& obj);
     void    MaterialTagChanged(const SdfPath& id);
@@ -384,11 +381,8 @@ private:
     // Re-publish a carrier shaded prim's geomSubsets: remove the ones it had,
     // insert the current set.
     void _UpdateRenderItemOverrideGeomSubsets(
-        const MDagPath&                     dagPath,
-        const VtIntArray&                   polygonFaceOffsets,
-        MayaHydraRenderItemOverrideAdapter& carrier);
-    // Rebind the material of the shaded carriers of _carrierShadingChanges.
-    void _RebindCarrierShadingChanges();
+        const MayaHydraRenderItemPayload& customData,
+        MayaHydraRenderItemOverrideAdapter&    carrier);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(int fastId);
 
@@ -405,17 +399,6 @@ private:
     static bool _renderItemOverrideEnabled;
     // Drop the carrier adapters (and so the prims) of a shape being deleted.
     void _RemoveCarriersOf(const MObject& obj);
-
-    struct _MObjectHandleHash
-    {
-        size_t operator()(const MObjectHandle& handle) const { return handle.hashCode(); }
-    };
-    // Shapes whose shading group membership changed while Maya hands them over as carriers,
-    // rebound by the next FlushPendingUpdates (see OnShadingGroupMembershipChanged).
-    std::unordered_set<MObjectHandle, _MObjectHandleHash> _carrierShadingChanges;
-    // Fast ids of the shaded mesh carriers of each shape, to rebind them without a scan.
-    std::unordered_map<MObjectHandle, std::unordered_set<int>, _MObjectHandleHash>
-        _shadedCarriersByShape;
 
     bool
     _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);

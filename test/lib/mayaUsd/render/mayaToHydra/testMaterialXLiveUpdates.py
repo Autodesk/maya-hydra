@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# LookdevX MaterialX changes made while the viewport is in Hydra, and that
+# LookdevX MaterialX edits made while the viewport is in Hydra, to materials
 # Viewport 2.0 never drew, must show in the Hydra viewport right away.
 #
 import os
-import unittest
 
 import maya.cmds as cmds
 import ufe
@@ -24,13 +23,6 @@ import ufe
 import fixturesUtils
 import imageUtils
 import mtohUtils
-import rendererUtils
-
-# HYDRA-2741: with Flash and the render item override, a mesh going from per-face assignments
-# back to one material disappears.
-_MESH_LOSES_SUBSETS_DISAPPEARS = (
-    rendererUtils.getTestRenderer() == rendererUtils.TEST_RENDERER_FLASH
-    and os.environ.get("MAYAHYDRA_RENDER_ITEM_OVERRIDE", "1") != "0")
 
 
 class TestMaterialXLiveUpdates(mtohUtils.MayaHydraBaseTestCase):
@@ -40,7 +32,6 @@ class TestMaterialXLiveUpdates(mtohUtils.MayaHydraBaseTestCase):
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
     IMAGEDIFF_FAIL_PERCENT = 0.1
 
-    RED = (1.0, 0.0, 0.0)
     BLUE = (0.0, 0.0, 1.0)
 
     def _setBaseColor(self, shaderItem, color):
@@ -135,73 +126,6 @@ class TestMaterialXLiveUpdates(mtohUtils.MayaHydraBaseTestCase):
         self.assertEqual(len(material), 1, "MaterialXSurfaceShader nodes: %s" % material)
         self._setBaseColor(self._surfaceShaderOf(material[0]), self.BLUE)
         self._assertLiveMatchesRebuilt("editInput")
-
-    # What: a new LookdevX material assigned while in Hydra (HYDRA-2739).
-    # How: in Hydra, assign a new OpenPBR Surface to a cube, then set its base_color to red.
-    # Expect: the live image matches the image after a full rebuild (red cube).
-    def test_AssignNewMaterial(self):
-        cmds.polyCube(name="pCube1")
-        cmds.select(clear=True)
-        self.setBasicCam(3)
-        cmds.refresh()
-
-        material = self._assignNewOpenPbrSurface("|pCube1")
-        cmds.select(clear=True)
-        cmds.refresh()
-
-        self._setBaseColor(self._surfaceShaderOf(material), self.RED)
-        self._assertLiveMatchesRebuilt("assignNewMaterial")
-
-    def _shadingGroupOf(self, material):
-        shadingGroups = cmds.listConnections(
-            material + ".outColor", source=False, destination=True, type="shadingEngine")
-        self.assertEqual(len(shadingGroups or []), 1,
-                         "Shading groups of %s: %s" % (material, shadingGroups))
-        return shadingGroups[0]
-
-    def _setUpRedCubeAndBlueShadingGroup(self):
-        '''pCube1 with a red LookdevX material, and a blue LookdevX shading group on a hidden cube.
-
-        Done in Hydra, and compared with a rebuild only at the end of each test: a rebuild
-        has VP2 draw the materials, after which LookdevX would update them without the fix.
-        '''
-        cmds.polyCube(name="pCube1")
-        red = self._assignNewOpenPbrSurface("|pCube1")
-        self._setBaseColor(self._surfaceShaderOf(red), self.RED)
-        cmds.polyCube(name="pCube2")
-        blue = self._assignNewOpenPbrSurface("|pCube2")
-        self._setBaseColor(self._surfaceShaderOf(blue), self.BLUE)
-        cmds.hide("pCube2")
-        cmds.select(clear=True)
-        self.setBasicCam(3)
-        cmds.refresh()
-        return self._shadingGroupOf(red), self._shadingGroupOf(blue)
-
-    # What: faces of a mesh moved between LookdevX shading groups already in use, while in
-    #       Hydra (HYDRA-2739). Rebuilds the per-face geomSubsets of the mesh.
-    # How: pCube1 red, then its front and top faces to the blue shading group with sets.
-    # Expect: the live image matches the image after a full rebuild (blue front and top
-    #         faces, red side face).
-    def test_PerFaceAssignment(self):
-        _, blueGroup = self._setUpRedCubeAndBlueShadingGroup()
-        cmds.sets("pCube1.f[0:1]", edit=True, forceElement=blueGroup)
-        cmds.refresh()
-        self._assertLiveMatchesRebuilt("perFaceAssignment")
-
-    # What: a mesh with per-face LookdevX assignments returned to one whole-object material,
-    #       while in Hydra (HYDRA-2739). Removes the per-face geomSubsets of the mesh.
-    # How: as test_PerFaceAssignment, then the whole of pCube1 back to the red shading group.
-    # Expect: the live image matches the image after a full rebuild (all red: no stale
-    #         blue subset left).
-    @unittest.skipIf(_MESH_LOSES_SUBSETS_DISAPPEARS,
-                     "HYDRA-2741 : with Flash, the mesh disappears instead of turning all red.")
-    def test_PerFaceToWholeObject(self):
-        redGroup, blueGroup = self._setUpRedCubeAndBlueShadingGroup()
-        cmds.sets("pCube1.f[0:1]", edit=True, forceElement=blueGroup)
-        cmds.refresh()
-        cmds.sets("pCube1", edit=True, forceElement=redGroup)
-        cmds.refresh()
-        self._assertLiveMatchesRebuilt("perFaceToWholeObject")
 
 
 if __name__ == '__main__':
