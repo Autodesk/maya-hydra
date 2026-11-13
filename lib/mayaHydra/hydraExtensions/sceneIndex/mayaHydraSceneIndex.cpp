@@ -612,8 +612,6 @@ void MayaHydraSceneIndex::UpdateRenderItems(
     // Coalesce DirtyPrims notifications produced per render item.
     const Fvp::DirtyNotifier::DirtyBatchGuard dirtyBatchGuard(*this);
 
-    _RebindCarrierShadingChanges();
-
     // Evaluate-mode shutter captures queued by this pass's transform updates,
     // sampled in one batch after the loop (see CaptureShutterSample).
     std::vector<MayaHydraRenderItemAdapterPtr> shutterCaptures;
@@ -1245,6 +1243,13 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
 
     _renderCollectionChanged = false;
 
+    // Here rather than in UpdateRenderItems, which only runs on frames with a render item delta:
+    // a LookdevX assignment can come with none.
+    if (!_carrierShadingChanges.empty()) {
+        const Fvp::DirtyNotifier::DirtyBatchGuard dirtyBatchGuard(*this);
+        _RebindCarrierShadingChanges();
+    }
+
     if (!_materialTagsChanged.empty()) {
         if (IsHdSt()) {
             for (const auto& id : _materialTagsChanged) {
@@ -1701,9 +1706,10 @@ bool MayaHydraSceneIndex::_renderItemOverrideEnabled = false;
 // Maya flags a carrier's material change (MVS_changedEffect) when the shape moves to a Maya
 // shading group, but not when it moves to a LookdevX MaterialX one while Maya hands the shape
 // over to us (and MRenderer::setGeometryDrawDirty doesn't get the carrier flagged either), so
-// assigning one left the mesh bound to its previous material. Record the shape; the next UpdateRenderItems rebinds its carriers
-// (_RebindCarrierShadingChanges). Costs one set insertion per shape whose assignment changed,
-// then one material lookup per carrier of it, nothing otherwise.
+// assigning one left the mesh bound to its previous material. Record the shape; the next
+// FlushPendingUpdates rebinds its carriers (_RebindCarrierShadingChanges). Costs one set
+// insertion per shape whose assignment changed, then one material lookup per carrier of it,
+// nothing otherwise.
 void MayaHydraSceneIndex::OnShadingGroupMembershipChanged(const MObject& shape)
 {
     // As MayaHydraAdapter::ShouldSkipHydraUpdates: a file read builds new carriers anyway.

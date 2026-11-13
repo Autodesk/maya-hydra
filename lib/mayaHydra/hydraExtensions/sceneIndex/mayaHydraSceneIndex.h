@@ -411,7 +411,7 @@ private:
         size_t operator()(const MObjectHandle& handle) const { return handle.hashCode(); }
     };
     // Shapes whose shading group membership changed while Maya hands them over as carriers,
-    // rebound by the next UpdateRenderItems (see OnShadingGroupMembershipChanged).
+    // rebound by the next FlushPendingUpdates (see OnShadingGroupMembershipChanged).
     std::unordered_set<MObjectHandle, _MObjectHandleHash> _carrierShadingChanges;
     // Fast ids of the shaded mesh carriers of each shape, to rebind them without a scan.
     std::unordered_map<MObjectHandle, std::unordered_set<int>, _MObjectHandleHash>
