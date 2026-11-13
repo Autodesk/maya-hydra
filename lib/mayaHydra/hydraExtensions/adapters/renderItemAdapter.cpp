@@ -161,6 +161,12 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     , _cullMode(ri.cullMode())
 #endif
 {
+    // Maya builds the image plane as a fixed quad in the XY plane, with a +Z normal.
+    const bool isTriangles = _primitive == MHWRender::MGeometry::Primitive::kTriangles
+        || _primitive == MHWRender::MGeometry::Primitive::kTriangleStrip;
+    if (isTriangles && dagPath.node().hasFn(MFn::kImagePlane)) {
+        _constantNormal = GfVec3f(0.0f, 0.0f, 1.0f);
+    }
 }
 
 MayaHydraRenderItemAdapter::~MayaHydraRenderItemAdapter() { _RemoveRprim(); }
@@ -526,19 +532,39 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     // The semantics this geometry supplies, scanned once for the stream reads and for the end of
     // the update. Only meaningful when the geometry was fetched (geomChanged || topoChanged).
+    // "present" is what VP2 actually supplied and stays const: _EndGeometryUpdate needs it so the
+    // GPU adapter still withdraws a shared normals buffer that VP2 dropped. This one should be
+    // used whenever the question is : "does the **incoming VP2** item have X stream".
     const StreamPresence present = _GetStreamPresence(geom, vertexBuffercount);
+    // "published" is what this item will publish: present plus any synthesized streams. This one
+    // should be used whenever the question is : "does the **outgoing Hydra** item have X stream".
+    StreamPresence published = present;
+
+    const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
+        || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
 
     // VP2 only supplies the streams the current shader requests, and a shader change can arrive
     // as a topology-only update: read the streams then too when one appeared, otherwise it stays
     // unadvertised until the next geometry change. Not on every topology-only update, which face
     // component selection also raises, as nothing else needs re-reading there.
-    const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
-        || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
+    // Synthesized normals were not read from VP2, so for this purpose the real normals have not
+    // been read yet and a real stream replacing them is picked up.
+    const bool normalsStreamWasRead
+        = _StoredStreamCount(UsdGeomTokens->normals) > 0 && !_normalsSynthesized;
     const bool streamAppeared
         = (isMesh && present.uvs && _StoredStreamCount(MayaHydraAdapterTokens->st) == 0)
         || (isMesh && present.tangents
             && _StoredStreamCount(MayaHydraAdapterTokens->tangents) == 0)
-        || (useMayaNormals && present.normals && _StoredStreamCount(UsdGeomTokens->normals) == 0);
+        || (useMayaNormals && present.normals && !normalsStreamWasRead);
+
+    // If VP2 has no normals stream, publish a constant normal when we have one. We set
+    // "published.normals = true;" here so that any _ReadVertexStream afterwards
+    // computes hydraOwnsNormals correctly in gpuRenderItemAdapter.cpp.
+    const bool synthesizeNormals
+        = geom && isMesh && useMayaNormals && present.positions && !present.normals && _ConstantNormal();
+    if (synthesizeNormals) {
+        published.normals = true;
+    }
 
     // Vertices
     if ((geomChanged || (topoChanged && streamAppeared)) && vertexBuffercount) {
@@ -548,13 +574,32 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             if ( ! mvb) {
                 continue;
             }
-            _ReadVertexStream(mvb, topoChanged, useMayaNormals, present, dirty);
+            _ReadVertexStream(mvb, topoChanged, useMayaNormals, published, dirty);
         }
+    }
+
+    // Synthesized normals: one constant value per shared point. The values never change, so only
+    // a change of the point count dirties them. If or when VP2 supplies a real stream, _normals
+    // is overwritten above and the synthesized flag drops.
+    if (synthesizeNormals) {
+        const size_t pointCount = _StoredStreamCount(UsdGeomTokens->points);
+        const size_t normalsCount = _StoredStreamCount(UsdGeomTokens->normals);
+        if (pointCount > 0 && (!_normalsSynthesized || normalsCount != pointCount)) {
+            _normals = VtVec3fArray(pointCount, *_ConstantNormal());
+            _normalsSynthesized = true;
+            dirty.normals = true;
+        }
+    }
+    else if (geom) {
+        // Reset only when the geometry was fetched: otherwise normals presence/absence is unknown
+        // and the flag stands.
+        _normalsSynthesized = false;
     }
 
     // The reverse of streamAppeared above, as the adapter outlives shader reassignments: drop
     // the CPU copy of a stream the geometry no longer supplies, otherwise it stays advertised
-    // with stale values. Same condition as the GPU withdraw in _EndGeometryUpdate.
+    // with stale values. Uses "published" so synthesized normals are kept; the GPU withdraw in
+    // _EndGeometryUpdate uses "present" (what VP2 actually supplied).
     if (geom) {
         const auto clearAbsent = [](bool isPresent, auto& values, bool& streamDirty) {
             if (!isPresent && !values.empty()) {
@@ -562,9 +607,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 streamDirty = true;
             }
         };
-        clearAbsent(present.normals, _normals, dirty.normals);
-        clearAbsent(present.uvs, _uvs, dirty.uvs);
-        clearAbsent(present.tangents, _tangents, dirty.tangents);
+        clearAbsent(published.normals, _normals, dirty.normals);
+        clearAbsent(published.uvs, _uvs, dirty.uvs);
+        clearAbsent(published.tangents, _tangents, dirty.tangents);
     }
 
     _EndGeometryUpdate(present, geomChanged, topoChanged, useMayaNormals, dirty);

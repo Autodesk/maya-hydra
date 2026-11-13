@@ -90,7 +90,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCameraPrimFraming.py
     testConvergence.py
     testFramePasses.py
-    testImagePlanes.py|disabledOn:HdFlash:AGP-1037 # AGP-1037 : Image plane updates is inconsistent
+    testImagePlanes.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
