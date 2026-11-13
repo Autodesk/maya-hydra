@@ -48,6 +48,12 @@ Ufe::Rtid getUsdRunTimeId();
 UFEEXTENSIONS_API
 MDagPath ufeToDagPath(const Ufe::Path& ufePath);
 
+//! Whether the UFE path is a Maya dependency graph node that is not a DAG node, e.g. a material,
+//! a set or the render globals. Such a node is never drawn, so it has no Hydra prim. Reads the
+//! path only, without a Maya lookup.
+UFEEXTENSIONS_API
+bool isMayaNonDagNodePath(const Ufe::Path& ufePath);
+
 UFEEXTENSIONS_API
 Ufe::PathSegment sdfPathToUfePathSegment(const SdfPath& usdPath, Ufe::Rtid rtid, int instanceIndex = ALL_INSTANCES);
 

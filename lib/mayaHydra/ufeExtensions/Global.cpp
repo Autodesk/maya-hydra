@@ -80,6 +80,18 @@ MDagPath ufeToDagPath(const Ufe::Path& ufePath)
     return nameToDagPath(Ufe::PathString::string(ufePath));
 }
 
+bool isMayaNonDagNodePath(const Ufe::Path& ufePath)
+{
+    if (ufePath.runTimeId() != getMayaRunTimeId() || ufePath.nbSegments() != 1) {
+        return false;
+    }
+    // A DAG node's path starts with "world" (see dagPathToUfePathSegment); a node outside the
+    // DAG is a single component.
+    static const Ufe::PathComponent world("world");
+    const Ufe::PathSegment&         segment = ufePath.getSegments().front();
+    return segment.size() == 1 && !(segment.components().front() == world);
+}
+
 //! \brief Converts a SdfPath to Ufe PathSegment
 ///
 /// In order to ensure compatibility with an arbitrary data model, it is possible to provide the

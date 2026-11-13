@@ -10,6 +10,7 @@ target_sources(${TARGET_NAME}
         colorNotFoundException.cpp
         envSettings.cpp
         mayaColorPreferencesTranslator.cpp
+        optionalSceneIndexPlugins.cpp
         plugin.cpp
         pluginDebugCodes.cpp
         pluginUtils.cpp

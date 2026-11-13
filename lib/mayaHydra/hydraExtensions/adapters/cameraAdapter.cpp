@@ -25,6 +25,7 @@
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/imaging/hd/camera.h>
+#include <pxr/imaging/hd/cameraSchema.h>
 #include <pxr/imaging/hd/changeTracker.h>
 
 #include <maya/MDagMessage.h>
@@ -36,13 +37,15 @@
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 
+#include <cmath>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
 // Either Maya's own attribute or the Arnold camera extension counts as enabled: the
 // UI toggles only the latter when Arnold DOF is turned on.
-static bool _IsDofEnabledOnCamera(MFnCamera& camera)
+bool _IsDofEnabledOnCamera(MFnCamera& camera)
 {
     MStatus status;
     if (camera.isDepthOfField(&status) && !status.error())
@@ -57,7 +60,7 @@ static bool _IsDofEnabledOnCamera(MFnCamera& camera)
 }
 
 // Returns 0 for "not set", leaving Maya's own focusDistance to be used instead.
-static float _ReadArnoldFocusDistanceIfSet(MFnCamera& camera)
+float _ReadArnoldFocusDistanceIfSet(MFnCamera& camera)
 {
     MStatus status;
     MFnDependencyNode dep(camera.object());
@@ -70,19 +73,46 @@ static float _ReadArnoldFocusDistanceIfSet(MFnCamera& camera)
     return static_cast<float>(v);
 }
 
+#if PXR_VERSION >= 2505
+// Maya's cameraShape.exposure is in EV stops. Hydra's linearExposureScale is the linear
+// multiplier applied to scene radiance.
+// Returns 1.0 (no scaling) if the exposure plug can't be read.
+// Note that for now we only support the exposure attribute. Later on when we support attributes
+// like exposure:fStop/time/iso/responsivity, we will use the full formula from
+// UsdGeomCamera::ComputeLinearExposureScale. For now, with all default values in that method,
+// the formula is equivalent to 2^ev.
+float _ComputeLinearExposureScale(const MDagPath& cameraShape)
+{
+    MStatus           status;
+    MFnDependencyNode dep(cameraShape.node(), &status);
+    if (status.error())
+        return 1.0f;
+    MPlug exposurePlug = dep.findPlug("exposure", false, &status);
+    if (status.error() || exposurePlug.isNull())
+        return 1.0f;
+    const double ev = exposurePlug.asDouble(&status);
+    if (status.error())
+        return 1.0f;
+    return static_cast<float>(std::exp2(ev));
+}
+#endif
+
 // Attributes that affect HdCamera params (from GetCameraParamValue). When these change,
 // we mark DirtyParams | DirtyPrimvar in one call to avoid duplicates.
 // The callbacks match the top-level plug, so the compound parents (cameraAperture, filmOffset,
 // shake) must be listed for changes to their children to be detected.
-static const char* const kCameraParamAttributeNames[] = {
+const char* const kCameraParamAttributeNames[] = {
     "nearClipPlane", "farClipPlane", "shutterAngle", "focusDistance", "focalLength",
     "fStop", "cameraAperture", "horizontalFilmAperture", "verticalFilmAperture",
     "lensSqueezeRatio", "shakeEnabled", "filmOffset", "horizontalFilmOffset",
     "verticalFilmOffset", "shake", "horizontalShake", "verticalShake", "filmFit",
     "depthOfField", "aiEnableDOF", "aiFocusDistance", "orthographic",
+#if PXR_VERSION >= 2505
+    "exposure",
+#endif
 };
 
-static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
+void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
 {
     TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
@@ -106,7 +136,7 @@ static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
 
 // Fires on attribute value changes and DG structure changes (add/remove/rename). Ensures
 // extension attrs like aiUScale trigger primvar dirty, and undo/redo of addAttr refreshes primvars.
-static void _cameraAttributeChanged(
+void _cameraAttributeChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug&                        plug,
     MPlug&                        otherPlug,
@@ -291,6 +321,12 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             status.errorString().asChar());
         return false;
     };
+
+#if PXR_VERSION >= 2505
+    if (paramName == HdCameraSchemaTokens->linearExposureScale) {
+        return VtValue(_ComputeLinearExposureScale(GetDagPath()));
+    }
+#endif
 
     MFnCamera camera(GetDagPath(), &status);
     if (hadError(status))

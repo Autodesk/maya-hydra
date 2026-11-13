@@ -16,6 +16,7 @@
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 #include "mayaColorPreferencesTranslator.h"
+#include "optionalSceneIndexPlugins.h"
 #include "pluginUtils.h"
 #include "renderGlobals.h"
 #include "envSettings.h"
@@ -33,9 +34,11 @@
 
 #include <mayaHydraLib/adapters/adapter.h>
 #include <mayaHydraLib/adapters/renderItemOverrideCreator.h>
+#include <mayaHydraLib/mhSceneModifiedGuard.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <flowViewport/global.h>
+#include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <filesystem>
 
 #include <pxr/base/plug/plugin.h>
@@ -92,43 +95,6 @@ namespace {
     setenv(name.c_str(), value.c_str(), 1);
     #endif
     }
-
-class SceneModifiedGuard
-{
-public:
-
-    // Read modified state before
-    SceneModifiedGuard() : _wasModified(sceneModified())
-    {}
-
-    ~SceneModifiedGuard()
-    {
-        // If modified flag became true, clear it.
-        if (sceneModified() && !_wasModified) {
-            MGlobal::executeCommand("file -modified 0");
-        }
-    }
-
-private:
-
-    bool _wasModified{false};
-
-    // Scene modified query.
-    static bool sceneModified()
-    {
-        MCommandResult result;
-        auto status = MGlobal::executeCommand("file -query -modified", result);
-        if (status != MStatus::kSuccess) {
-            throw std::runtime_error("File modified query error in mayaHydra plugin load.");
-        }
-        int typedResult{0};
-        status = result.getResult(typedResult);
-        if (status != MStatus::kSuccess) {
-            throw std::runtime_error("Command result access error in mayaHydra plugin load.");
-        }
-        return (typedResult != 0);
-    }
-};
 
 }
 
@@ -376,6 +342,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
             MGlobal::executeCommand("loadPlugin -quiet mayaUsdPlugin");
         }
     }
+
+    // Renderers that cannot draw the reprs we author natively (for example wireframe on
+    // shaded) can offer an optional scene index for them. Register it now that every
+    // renderer plugin is discovered (mayaUsdPlugin registered the versioned ones) and
+    // before any render index is created.
+    MayaHydra::RegisterOptionalSceneIndexPlugins(Fvp::ReprSelectorSceneIndex::GetAuthoredReprs());
   
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
