@@ -1,0 +1,143 @@
+{
+  "renderer": "HdFlashRendererPlugin",
+  "categories": [
+    {
+      "id": "qualitySampling",
+      "label": "Quality and sampling",
+      "collapsed": false,
+      "settings": [
+        {"key": "hdFlash:lightingTier", "label": "Lighting tier"},
+        {"key": "hdFlash:enableAdaptiveTessellation", "label": "Adaptive subdivision tessellation"}
+      ]
+    },
+    {
+      "id": "lightingShadows",
+      "label": "Lighting and shadows",
+      "collapsed": false,
+      "settings": [
+        {"key": "hdFlash:shadowAtlasSize", "label": "Shadow atlas size"},
+        {"key": "hdFlash:shadow16BitDepth", "label": "16-bit shadow depth"},
+        {"key": "hdFlash:shadowMaxTilesPerFrame", "label": "Shadow tiles per frame"},
+        {"key": "hdFlash:useAreaLightGuides", "label": "Area light guides"},
+        {"key": "hdFlash:iblLightExtraction", "label": "IBL light extraction"},
+        {"key": "hdFlash:iblLightExtractionMaxLights", "label": "IBL extraction max lights"},
+        {"key": "hdFlash:iblLightExtractionDomeCompensation", "label": "IBL extraction dome compensation"},
+        {"key": "hdFlash:iblExtractedLightsCastShadows", "label": "IBL extracted lights cast shadows"}
+      ]
+    },
+    {
+      "id": "ambientOcclusion",
+      "label": "Ambient occlusion",
+      "collapsed": false,
+      "settings": [
+        {"key": "hdFlash:gtao", "label": "Ground-truth AO"},
+        {"key": "hdFlash:gtaoRadiusAuto", "label": "Fit radius to scene"},
+        {"key": "hdFlash:gtaoRadius", "label": "Radius (world units)"},
+        {"key": "hdFlash:gtaoIntensity", "label": "Intensity"},
+        {"key": "hdFlash:gtaoSteps", "label": "Steps (4-16)"},
+        {"key": "hdFlash:gtaoSlices", "label": "Slices (1-8)"},
+        {"key": "hdFlash:gtaoMicroShadow", "label": "Micro-shadowing (0-1)"}
+      ]
+    },
+    {
+      "id": "reflectionsRefraction",
+      "label": "Reflections and refraction",
+      "collapsed": false,
+      "settings": [
+        {"key": "hdFlash:screenSpaceReflections", "label": "Screen-space reflections"},
+        {"key": "hdFlash:ssrMaxSteps", "label": "SSR max steps"},
+        {"key": "hdFlash:ssrRayStepSize", "label": "SSR ray step size (px)"},
+        {"key": "hdFlash:ssrThickness", "label": "SSR thickness"},
+        {"key": "hdFlash:ssrIntensity", "label": "SSR intensity"},
+        {"key": "hdFlash:screenSpaceRefraction", "label": "Screen-space refraction"},
+        {"key": "hdFlash:refractionThickness", "label": "Refraction thickness"},
+        {"key": "hdFlash:refractionDensity", "label": "Refraction density"}
+      ]
+    },
+    {
+      "id": "motionBlurDepthOfField",
+      "label": "Motion blur and depth of field",
+      "collapsed": true,
+      "settings": [
+        {"key": "hdFlash:motionBlurEnabled", "label": "Motion blur"},
+        {"key": "hdFlash:motionBlurSamples", "label": "Motion blur samples"},
+        {"key": "hdFlash:motionBlurIntensity", "label": "Motion blur intensity"},
+        {"key": "hdFlash:motionBlurMaxRadius", "label": "Motion blur max radius"},
+        {"key": "hdFlash:motionBlurMaxDilateTiles", "label": "Motion blur max dilate tiles"},
+        {"key": "hdFlash:motionBlurCenterBias", "label": "Motion blur center bias"},
+        {"key": "hdFlash:motionBlurDepthGateStill", "label": "Depth gate, still (px)"},
+        {"key": "hdFlash:motionBlurDepthGateMove", "label": "Depth gate, moving (px)"},
+        {"key": "hdFlash:dofSamples", "label": "DOF samples"},
+        {"key": "hdFlash:dofMaxCoCRadius", "label": "DOF max CoC radius"}
+      ]
+    },
+    {
+      "id": "environment",
+      "label": "Environment",
+      "collapsed": false,
+      "settings": [
+        {"key": "hdFlash:showSkyBackground", "label": "Sky background"},
+        {"key": "enableFog", "label": "Fog"},
+        {"key": "fogDistance", "label": "Fog distance"},
+        {"key": "fogHeight", "label": "Fog height"},
+        {"key": "fogColor", "label": "Fog color"},
+        {"key": "fogGroundPoint", "label": "Fog ground point"},
+        {"key": "fogGroundNormal", "label": "Fog ground normal"}
+      ]
+    },
+    {
+      "id": "color",
+      "label": "Color",
+      "collapsed": false,
+      "settings": [
+        {"key": "hdFlash:workingColorSpace", "label": "Working color space"}
+      ]
+    },
+    {
+      "id": "display",
+      "label": "Display",
+      "collapsed": false,
+      "settings": [
+        {"key": "mayaHydraSelectionHighlightMode", "label": "Selection highlight"}
+      ]
+    },
+    {
+      "id": "performance",
+      "label": "Performance",
+      "collapsed": true,
+      "settings": [
+        {"key": "hdFlash:useAsyncTextureLoading", "label": "Async texture loading"},
+        {"key": "hdFlash:useGpuBatchCompaction", "label": "GPU batch compaction"},
+        {"key": "hdFlash:useGpuFrustumCulling", "label": "GPU frustum culling"},
+        {"key": "hdFlash:useGpuDetailCulling", "label": "GPU detail culling"},
+        {"key": "hdFlash:useGpuOcclusionCulling", "label": "GPU occlusion culling"},
+        {"key": "hdFlash:useGpuBvhVisibility", "label": "GPU BVH visibility"},
+        {"key": "hdFlash:forceDynamicSlabs", "label": "Force dynamic slabs"},
+        {"key": "hdFlash:useResidencyDrivenLoading", "label": "Residency-driven loading"},
+        {"key": "hdFlash:cpuMemoryBudget", "label": "CPU memory budget (MB)"},
+        {"key": "hdFlash:gpuMemoryBudget", "label": "GPU memory budget (MB)"},
+        {"key": "hdFlash:residencyActivationPressure", "label": "Residency activation pressure"},
+        {"key": "hdFlash:residencyHysteresisFrames", "label": "Residency hysteresis frames"}
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "label": "Diagnostics",
+      "collapsed": true,
+      "settings": [
+        {"key": "hdFlash:reportRenderStats", "label": "Report render statistics"},
+        {"key": "hdFlash:residencyLogging", "label": "Residency logging"}
+      ]
+    },
+    {
+      "id": "other",
+      "label": "Other",
+      "collapsed": true,
+      "settings": [
+        {"key": "hdFlash:stageGraph", "label": "Stage graph"},
+        {"key": "hdFlash:stageParams", "label": "Stage parameters"}
+      ]
+    }
+  ],
+  "other": {"id": "other", "label": "Other", "collapsed": true}
+}
