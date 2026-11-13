@@ -92,6 +92,28 @@ global proc mtohRenderOverride_ApplySetting(string $renderer, string $attr, stri
     mayaHydra -r $renderer -updateRenderGlobals $attr;
     refresh -f;
 }
+// Last value the Attribute Editor saw for each attribute, as parallel arrays.
+global string $gMtohRenderOverrideAEAttrs[];
+global string $gMtohRenderOverrideAEValues[];
+// The Attribute Editor also runs a control's command when it builds the control. Applying then
+// would push every setting of every renderer, so only apply when the value really changed.
+global proc mtohRenderOverride_AEApplySetting(string $renderer, string $attr, string $node) {
+    global string $gMtohRenderOverrideAEAttrs[];
+    global string $gMtohRenderOverrideAEValues[];
+    string $value = `getAttr ("defaultRenderGlobals." + $attr)`;
+    int $i = stringArrayFind($attr, 0, $gMtohRenderOverrideAEAttrs);
+    if ($i < 0) {
+        $i = size($gMtohRenderOverrideAEAttrs);
+        $gMtohRenderOverrideAEAttrs[$i] = $attr;
+        $gMtohRenderOverrideAEValues[$i] = $value;
+        return;
+    }
+    if ($gMtohRenderOverrideAEValues[$i] == $value) {
+        return;
+    }
+    $gMtohRenderOverrideAEValues[$i] = $value;
+    mtohRenderOverride_ApplySetting($renderer, $attr, $node);
+}
 // Label column width of the option box being built. Each renderer's OptionBox proc sets it from
 // its longest label (see MtohRenderGlobals::BuildOptionsMenu) before building its controls.
 global int $gMtohRenderOverrideLabelWidth = 220;
@@ -117,6 +139,7 @@ global proc mtohRenderOverride_AddAttribute(string $renderer, string $descriptio
         string $ctrl = `attrControlGrp -label $label -attribute ("defaultRenderGlobals." + $attr) -changeCommand $command -annotation $description`;
         mtohRenderOverride_FitLabel($ctrl);
     } else {
+        $command = "mtohRenderOverride_AEApplySetting " + $renderer + " " + $attr;
         editorTemplate -label $label -adc $attr $command -annotation $description;
     }
 }
