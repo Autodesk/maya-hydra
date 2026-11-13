@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -68,25 +67,29 @@ bool _ParseType(const std::string& name, _Type& type, size_t& size)
     return false;
 }
 
-template <typename T> float _Load(const char* p)
+/// Reads a T from the \p available bytes at \p p; 0 when they are too few.
+template <typename T> float _Load(const char* p, size_t available)
 {
-    T value;
-    std::memcpy(&value, p, sizeof(T));
+    if (available < sizeof(T)) {
+        return 0.0f;
+    }
+    T value {};
+    std::copy_n(p, sizeof(T), reinterpret_cast<char*>(&value));
     return static_cast<float>(value);
 }
 
 // The file is little-endian, as is every platform Maya runs on.
-float _ReadFloat(const char* p, _Type type)
+float _ReadFloat(const char* p, size_t available, _Type type)
 {
     switch (type) {
-    case _Type::Int8: return _Load<int8_t>(p);
-    case _Type::UInt8: return _Load<uint8_t>(p);
-    case _Type::Int16: return _Load<int16_t>(p);
-    case _Type::UInt16: return _Load<uint16_t>(p);
-    case _Type::Int32: return _Load<int32_t>(p);
-    case _Type::UInt32: return _Load<uint32_t>(p);
-    case _Type::Float32: return _Load<float>(p);
-    case _Type::Float64: return _Load<double>(p);
+    case _Type::Int8: return _Load<int8_t>(p, available);
+    case _Type::UInt8: return _Load<uint8_t>(p, available);
+    case _Type::Int16: return _Load<int16_t>(p, available);
+    case _Type::UInt16: return _Load<uint16_t>(p, available);
+    case _Type::Int32: return _Load<int32_t>(p, available);
+    case _Type::UInt32: return _Load<uint32_t>(p, available);
+    case _Type::Float32: return _Load<float>(p, available);
+    case _Type::Float64: return _Load<double>(p, available);
     }
     return 0.0f;
 }
@@ -275,7 +278,9 @@ bool MayaHydraReadGaussianSplatPly(
             const char* v = buffer.data() + i * stride;
             float       f[kRequiredCount];
             for (size_t k = 0; k < kRequiredCount; ++k) {
-                f[k] = _ReadFloat(v + props[k]->offset, props[k]->type);
+                const size_t offset = props[k]->offset;
+                f[k] = _ReadFloat(
+                    v + offset, offset < stride ? stride - offset : 0, props[k]->type);
             }
             const size_t idx = first + i;
             positions[idx] = GfVec3f(f[0], f[1], f[2]);
