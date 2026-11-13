@@ -214,9 +214,11 @@ you can pass ```--redirect-outstream-file``` and set it to false.
 
 Run the script with the ```--help``` parameter to see all the possible flags and short descriptions.
 
-#### 6. How To Run Unit Tests
+#### 8. How To Run Unit Tests
 
 Unit tests can be run by setting ```--stages=test``` or by simply calling `ctest` directly from the build directory.
+
+For more information on how to create tests, run them, and label them, please see [MayaHydra testing](../test/lib/mayaUsd/render/mayaToHydra/README.md).
 
 # Additional Build Instructions
 

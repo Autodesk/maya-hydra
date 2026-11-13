@@ -1,5 +1,19 @@
 set(MAYA_HYDRA_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+include("${CMAKE_CURRENT_LIST_DIR}/testLabels.cmake")
+
+# Renderer the MayaHydra tests run against. Baked into every test's environment,
+# so `ctest` run directly uses it. Set by build.py via -DMAYAHYDRA_TEST_RENDERER.
+# Changing it requires reconfiguring the build. Defined here, before any test
+# directory, so that disabledOn: renderer conditions see it wherever they are used.
+set(MAYAHYDRA_TEST_RENDERER HdStorm CACHE STRING
+    "Hydra renderer used by the MayaHydra tests")
+set_property(CACHE MAYAHYDRA_TEST_RENDERER PROPERTY STRINGS ${MAYAHYDRA_TEST_RENDERER_CHOICES})
+if(NOT MAYAHYDRA_TEST_RENDERER IN_LIST MAYAHYDRA_TEST_RENDERER_CHOICES)
+    message(FATAL_ERROR "MAYAHYDRA_TEST_RENDERER must be one of "
+        "${MAYAHYDRA_TEST_RENDERER_CHOICES}, got '${MAYAHYDRA_TEST_RENDERER}'.")
+endif()
+
 # Paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold plugin).
 # Sources (first wins): -DADDITIONAL_PXR_PLUGINPATH_NAME=... or $ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}
 # On Windows use forward slashes or escaped backslashes.
@@ -63,21 +77,6 @@ if(MayaUsd_FOUND)
         message(STATUS "MAYA_MODULE_PATH is now : ${MAYA_MODULE_PATH}")
     endif()
 endif()
-
-function(find_labels label_set label_list)
-    string(REPLACE ":" ";" split_labels ${label_set})
-    list(LENGTH split_labels len)
-    if(len GREATER 0)
-        list(GET split_labels 1 labels_value)
-        # we expect comma separated labels
-        string(REPLACE "," ";" all_labels ${labels_value})
-        set(local_label_list "")
-        foreach(label ${all_labels})
-            list(APPEND local_label_list ${label})
-        endforeach()
-        set(${label_list} ${local_label_list} PARENT_SCOPE)
-    endif()
-endfunction()
 
 #
 # mayaHydra_add_cmd_line_render_multi_image_test( <scene_file_labeled>
@@ -227,22 +226,11 @@ endfunction()
 function(get_testfile_and_labels all_labels test_filename test_script)
     # fetch labels for each test file
     string(REPLACE "|" ";" tests_with_tags ${test_script})
-    list(GET tests_with_tags 0 filename)
+    list(POP_FRONT tests_with_tags filename)
     # set the test file to input as no labels were passed
     set(${test_filename} ${filename} PARENT_SCOPE)
-    list(LENGTH tests_with_tags length)
-    math(EXPR one_less_length "${length} - 1")
-    if(length GREATER 1)        
-        set(collect_labels "")
-        foreach(i RANGE 1 ${one_less_length})
-            list(GET tests_with_tags ${i} item)
-            find_labels(${item} label_list)
-            list(APPEND collect_labels ${label_list})
-        endforeach()
-        set(${all_labels} ${collect_labels} PARENT_SCOPE)    
-    else()
-        set(${all_labels} "" PARENT_SCOPE)
-    endif()
+    mayaHydra_parse_test_label_groups(parsed_labels "${tests_with_tags}")
+    set(${all_labels} "${parsed_labels}" PARENT_SCOPE)
 endfunction()
 
 function(apply_labels_to_test test_labels test_file)
@@ -254,6 +242,20 @@ function(apply_labels_to_test test_labels test_file)
             set_property(TEST ${test_file} APPEND PROPERTY LABELS ${label})
             message(STATUS "Added test label \"${label}\" for ${test_file}")
         endforeach()
+    endif()
+    if("disabledOnCurrentConfig" IN_LIST test_labels)
+        set(reason "disabledOn conditions match this configuration")
+    elseif("disabled" IN_LIST test_labels)
+        set(reason "disabled by tag")
+    endif()
+    if(DEFINED reason)
+        set_property(TEST ${test_file} PROPERTY DISABLED True)
+        # The tracking issues are the only labels shaped like one: plugin,
+        # platform and renderer labels cannot match.
+        set(issues "${test_labels}")
+        list(FILTER issues INCLUDE REGEX "^[A-Z]+-[0-9]+$")
+        list(JOIN issues ", " issues_text)
+        message(STATUS "Disabled ${test_file} : ${reason} (${issues_text})")
     endif()
 endfunction()
 

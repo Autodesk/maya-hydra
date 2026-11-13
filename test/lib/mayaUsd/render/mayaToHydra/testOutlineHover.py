@@ -264,8 +264,8 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
     def test_HoverReverseOcclusion(self):
         """Select nearest-to-farthest and hover the farthest, unselected sphere each time, so a
         nearer selected sphere occludes the hovered one (a case the forward pass cannot produce).
-        HVT gives selected outlines priority over unselected ones regardless of depth, so the images
-        pin down how the hover highlight is drawn at the overlap."""
+        Where the nearer selected sphere hides the hovered one, the edge is the nearer sphere's
+        silhouette and keeps its selection color: hovering a sphere behind it does not recolor it."""
         s1, s2, s3, s4 = self.buildScene()
         cmds.select(clear=True)
         self.enableHover()

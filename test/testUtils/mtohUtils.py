@@ -77,6 +77,19 @@ def setRenderer(editor, overrideName):
     if useHydraChanged:
         maya.mel.eval("applyUseHydraToModelPanels")
 
+def cameraExposureSupported():
+    '''Whether camera exposure reaches Hydra in this configuration.
+
+    It needs HdCameraSchema::linearExposureScale (OpenUSD 25.05+, must match the
+    PXR_VERSION >= 2505 guards in the camera adapter) and a Maya whose camera
+    node has the exposure attribute.
+    '''
+    return (Usd.GetVersion() >= (0, 25, 5)
+            and cmds.attributeQuery('exposure', type='camera', exists=True))
+
+CAMERA_EXPOSURE_SKIP_REASON = (
+    'Camera exposure requires OpenUSD 25.05+ and a Maya camera with the exposure attribute.')
+
 RENDER_GLOBALS_NODE = "defaultRenderGlobals"
 
 # Selection highlighting mode: a defaultRenderGlobals enum attribute. Only

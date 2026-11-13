@@ -176,7 +176,99 @@ Note that `depOnPlugins` key string is only used as cue while adding values in t
 
 The supported values for platform exclusion are: "osx", "win", "lin".
 
+## Disabling on a combination of conditions
 
+The label groups above cannot express a combination such as "disable on Maya
+2027, but only on macOS". Each group contributes its own labels, and ctest
+matches labels independently, so two skip groups on one test exclude the union
+of what they describe rather than the intersection.
+
+The `disabledOn` group covers that case. It is spelled
+`disabledOn:<conditions>:<issues>`, where the conditions must **all** hold for
+the test to be disabled, and the issues track the work of re-enabling it:
+
+```
+testMyTestFile.py|disabledOn:maya2027,osx:HYDRA-2709              # disabled on Maya 2027, on macOS only
+testMyTestFile.py|disabledOn:mayaGe2026,HdFlash:AGP-1034,AGP-1035 # disabled on Maya 2026 and later, under Flash only
+```
+
+Both halves are required, and the issues take the same form as in `disabled`,
+described below. They are checked on every configuration, so a misspelled issue
+is a configure error everywhere rather than only on the platform the conditions
+name.
+
+Several `disabledOn` groups on the same test remain independent of each other,
+so the test is disabled when any one of them holds.
+
+The supported conditions are:
+
+| Condition | Holds when |
+| --- | --- |
+| `maya2026` | Maya is exactly that version |
+| `mayaGe2026` | Maya is that version or later |
+| `mayaGt2026` | Maya is later than that version |
+| `mayaLe2026` | Maya is that version or earlier |
+| `mayaLt2026` | Maya is earlier than that version |
+| `osx`, `win`, `lin` | the tests are configured for that platform |
+| `HdStorm`, `HdFlash` | the tests are configured for that renderer |
+
+The version in a `maya...` condition is compared against the Maya being built
+against and is never checked against a list of known releases, so a condition
+may name a version that has not shipped yet: `mayaGt2027` stays false until
+someone configures against a later Maya.
+
+Anything else is a configure error, including a misspelling such as `mayaGE2026`
+and a plugin name such as `mtoa`. Plugin availability is not known at configure
+time, so it stays with `depOnPlugins` and the JSON file.
+
+The name differs from `skipOnPlatform` and `skipOnRenderer` because the
+mechanism does. Those add a label that `build.py` turns into a `ctest -LE`
+exclusion, which
+[tests-to-run.json](../../../../../../maya-hydra/tests-to-run.json) controls and
+which can therefore be changed without reconfiguring. `disabledOn` is instead
+evaluated while cmake runs and marks the test `DISABLED`, which ctest still
+lists but does not run. It has no counterpart in the JSON file and never labels
+its conditions, so changing which tests it disables requires reconfiguring the
+build.
+
+Its issues do become labels, but only on a configuration where the group
+actually disables the test. So `ctest -N -L HYDRA-2709` means the same thing for
+either disable group: the tests that issue has turned off here.
+
+## Disabling everywhere
+
+The `disabled` group disables a test on every configuration. Its comma
+separated values are the issues tracking the work of re-enabling it:
+
+```
+testMyTestFile.py|disabled:HYDRA-1940
+```
+
+An issue is required, and must be a project key and a number such as
+`HYDRA-1940` or `AGP-1034`. Anything else is a configure error. This is what
+keeps a disabled test attached to the work of fixing it, rather than letting it
+become a test nobody remembers turning off. Prefer this over commenting the test
+out: ctest keeps listing it as disabled, so it stays visible.
+
+Each issue also becomes a label on the test, so
+`ctest -N -L HYDRA-1940` lists what a given issue disabled. This is the same
+format and the same labelling `disabledOn` uses.
+
+Which group to reach for:
+
+| Group | Use for |
+| --- | --- |
+| `disabled` | a test that is broken and must be fixed, everywhere |
+| `disabledOn` | a test that is broken and must be fixed, but only on certain configurations |
+| `skipOnPlatform`, `skipOnRenderer` | configurations where the test does not apply, with nothing to fix |
+
+Both `disabled` groups mark work owed, so both require a tracking issue: every
+disabled test in the suite names the ticket that will bring it back. The
+`skipOn` groups describe a permanent limitation instead, with no work to track.
+
+In the maya-hydra project disabled tests have a label that starts with `HYDRA-`
+or `AGP-`.  To list all tests disabled because of issues, use
+`ctest -N -L "AGP-|HYDRA-"`.
 
 # Utilities
 
