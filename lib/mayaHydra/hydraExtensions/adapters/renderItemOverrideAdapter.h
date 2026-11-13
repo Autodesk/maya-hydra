@@ -123,6 +123,11 @@ public:
         return lost;
     }
 
+    // The payload's polygon face offsets from the last update, to re-publish the geomSubsets
+    // outside an update (MayaHydraSceneIndex::_RebindCarrierShadingChanges).
+    const VtIntArray& GetPolygonFaceOffsets() const { return _polygonFaceOffsets; }
+    void SetPolygonFaceOffsets(const VtIntArray& offsets) { _polygonFaceOffsets = offsets; }
+
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
     // The device-resident streams of a GPU-deformed carrier, shared with the
     // renderer exactly as MayaHydraGpuRenderItemAdapter shares VP2's.
@@ -174,8 +179,9 @@ private:
     enum class _VertexStorage : unsigned char { Unknown, Cpu, Device };
     _VertexStorage _lastVertexStorage = _VertexStorage::Unknown;
 
-    int  _geomSubsetCount = 0;
-    bool _geomSubsetsLost = false;
+    int        _geomSubsetCount = 0;
+    bool       _geomSubsetsLost = false;
+    VtIntArray _polygonFaceOffsets;
 
     // Velocity history for SamplePrimvar, kept only while motion samples are
     // on. _prevPositions is the previous frame's array (a refcount, not a

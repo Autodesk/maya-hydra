@@ -51,6 +51,7 @@
 #include <maya/MDagMessage.h>
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
+#include <maya/MFileIO.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnMesh.h>
 #include <maya/MFnSingleIndexedComponent.h>
@@ -391,10 +392,17 @@ void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* client
 {
     TF_UNUSED(made);
     const auto srcObj = srcPlug.node();
+    const auto destObj = destPlug.node();
+    // A shape joining or leaving a shading group: instObjGroups (whole object) or one of its
+    // objectGroups (faces) to the shading group's dagSetMembers.
+    if (srcObj.hasFn(MFn::kShape) && destObj.hasFn(MFn::kShadingEngine)) {
+        auto* index = reinterpret_cast<MayaHydraSceneIndex*>(clientData);
+        index->OnShadingGroupMembershipChanged(srcObj);
+        return;
+    }
     if (!srcObj.hasFn(MFn::kTransform)) {
         return;
     }
-    const auto destObj = destPlug.node();
     if (!destObj.hasFn(MFn::kSet)) {
         return;
     }
@@ -567,6 +575,8 @@ void MayaHydraSceneIndex::_Destroy()
     _skippedHighlightWires.clear();
     _customAdapters.clear();
     _velocityBlurred.clear();
+    _carrierShadingChanges.clear();
+    _shadedCarriersByShape.clear();
     // Render item override carriers need no teardown of their own: they are
     // MayaHydraRenderItemOverrideAdapters living in _renderItemsAdapters, cleared above.
 
@@ -601,6 +611,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(
 
     // Coalesce DirtyPrims notifications produced per render item.
     const Fvp::DirtyNotifier::DirtyBatchGuard dirtyBatchGuard(*this);
+
+    _RebindCarrierShadingChanges();
 
     // Evaluate-mode shutter captures queued by this pass's transform updates,
     // sampled in one batch after the loop (see CaptureShutterSample).
@@ -977,10 +989,15 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             // they index change (topology), when the assignment can have
             // (effect), and after the prim was re-inserted, which removed them.
             if (customData->kind == MayaHydraRenderItemPayload::kShadedMesh) {
+                if (isNewRenderitem) {
+                    _shadedCarriersByShape[MObjectHandle(carrier->GetNode())].insert(fastId);
+                }
+                carrier->SetPolygonFaceOffsets(customData->polygonFaceOffsets);
                 const bool lost = carrier->ConsumeGeomSubsetsLost();
                 if (lost || isNewRenderitem
                     || (effFlags & (MVS::MVS_changedEffect | MVS::MVS_changedTopo))) {
-                    _UpdateRenderItemOverrideGeomSubsets(*customData, *carrier);
+                    _UpdateRenderItemOverrideGeomSubsets(
+                        customData->dagPath, customData->polygonFaceOffsets, *carrier);
                 }
             }
         } else {
@@ -1650,6 +1667,15 @@ void MayaHydraSceneIndex::_RemoveRenderItem(int fastId)
         if (ria != nullptr) {
             const SdfPath& primPath = ria->GetID();
             _renderItemsAdapters.erase(primPath);
+            if (!_shadedCarriersByShape.empty()) {
+                const auto it = _shadedCarriersByShape.find(MObjectHandle(ria->GetNode()));
+                if (it != _shadedCarriersByShape.end()) {
+                    it->second.erase(fastId);
+                    if (it->second.empty()) {
+                        _shadedCarriersByShape.erase(it);
+                    }
+                }
+            }
         }
         
         _renderItemsAdaptersFast.erase(fastId);
@@ -1671,6 +1697,74 @@ void MayaHydraSceneIndex::_RemoveRenderItem(int fastId)
 // (_RemoveCarriersOf).
 
 bool MayaHydraSceneIndex::_renderItemOverrideEnabled = false;
+
+// Maya flags a carrier's material change (MVS_changedEffect) when the shape moves to a Maya
+// shading group, but not when it moves to a LookdevX MaterialX one while Maya hands the shape
+// over to us (and MRenderer::setGeometryDrawDirty doesn't get the carrier flagged either), so
+// assigning one left the mesh bound to its previous material. Record the shape; the next UpdateRenderItems rebinds its carriers
+// (_RebindCarrierShadingChanges). Costs one set insertion per shape whose assignment changed,
+// then one material lookup per carrier of it, nothing otherwise.
+void MayaHydraSceneIndex::OnShadingGroupMembershipChanged(const MObject& shape)
+{
+    // As MayaHydraAdapter::ShouldSkipHydraUpdates: a file read builds new carriers anyway.
+    if (!_RenderItemOverrideEnabled() || MFileIO::isOpeningFile() || IsTearingDown()
+        || !HasRenderDelegate()) {
+        return;
+    }
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+        .Msg(
+            "OnShadingGroupMembershipChanged: %s\n",
+            MFnDependencyNode(shape).name().asChar());
+    _carrierShadingChanges.insert(MObjectHandle(shape));
+}
+
+// The material block of UpdateRenderItems for an MVS_changedEffect, for carriers Maya did
+// not send (see OnShadingGroupMembershipChanged). Shaded mesh carriers only: a wireframe
+// carrier keeps the empty fallback material that makes its lines unlit.
+void MayaHydraSceneIndex::_RebindCarrierShadingChanges()
+{
+    if (_carrierShadingChanges.empty()) {
+        return;
+    }
+    for (const MObjectHandle& shape : _carrierShadingChanges) {
+        const auto it = _shadedCarriersByShape.find(shape);
+        if (it == _shadedCarriersByShape.end()) {
+            continue;
+        }
+        for (const int fastId : it->second) {
+            MayaHydraRenderItemAdapterPtr ria;
+            if (!_GetRenderItem(fastId, ria) || !ria) {
+                continue;
+            }
+            const auto carrier = std::dynamic_pointer_cast<MayaHydraRenderItemOverrideAdapter>(ria);
+            if (!carrier) {
+                continue;
+            }
+            const MDagPath& dagPath = carrier->GetDagPath();
+            if (!dagPath.isValid()) {
+                continue;
+            }
+            SdfPath       material;
+            const MObject shadingEngineNode = FindShadingEngine(dagPath);
+            if (!shadingEngineNode.isNull()) {
+                material = GetMaterialPath(shadingEngineNode);
+                if (TfMapLookupPtr(_materialAdapters, material) == nullptr) {
+                    CreateMaterial(material, shadingEngineNode);
+                }
+            }
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg(
+                    "_RebindCarrierShadingChanges: %s -> %s\n",
+                    carrier->GetID().GetText(),
+                    material.GetText());
+            carrier->SetMaterial(material);
+            MayaHydra::DirtyNotifier(carrier.get()).dirtyMaterialBinding();
+            _UpdateRenderItemOverrideGeomSubsets(
+                dagPath, carrier->GetPolygonFaceOffsets(), *carrier);
+        }
+    }
+    _carrierShadingChanges.clear();
+}
 
 bool MayaHydraSceneIndex::_RenderItemOverrideEnabled()
 {
@@ -2231,8 +2325,9 @@ int MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
 }
 
 void MayaHydraSceneIndex::_UpdateRenderItemOverrideGeomSubsets(
-    const MayaHydraRenderItemPayload& customData,
-    MayaHydraRenderItemOverrideAdapter&    carrier)
+    const MDagPath&                     dagPath,
+    const VtIntArray&                   polygonFaceOffsets,
+    MayaHydraRenderItemOverrideAdapter& carrier)
 {
     const SdfPath& primId = carrier.GetID();
 
@@ -2249,11 +2344,10 @@ void MayaHydraSceneIndex::_UpdateRenderItemOverrideGeomSubsets(
 
     // No mapping (smooth mesh preview), or no shape: the prim's single
     // material binding stays in charge, exactly as before subsets existed.
-    if (customData.polygonFaceOffsets.empty() || !customData.dagPath.isValid()) {
+    if (polygonFaceOffsets.empty() || !dagPath.isValid()) {
         return;
     }
-    carrier.SetGeomSubsetCount(
-        _InsertGeomSubsetsForMesh(customData.dagPath, primId, &customData.polygonFaceOffsets));
+    carrier.SetGeomSubsetCount(_InsertGeomSubsetsForMesh(dagPath, primId, &polygonFaceOffsets));
 }
 
 void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
