@@ -38,6 +38,7 @@
 #ifdef WANT_MATERIALX_BUILD
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 #include <pxr/usd/usdMtlx/reader.h>
+#include <pxr/usd/usdMtlx/utils.h>
 #endif
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usdImaging/usdImaging/materialParamUtils.h>
@@ -94,9 +95,14 @@ const TfTokenVector _stSamplerCoords = { TfToken("st") };
 
 #ifdef WANT_MATERIALX_BUILD
 // Collect the node-definition identifiers referenced by 'doc' (including inside
-// nodegraphs) that cannot currently be resolved from the document itself.
+// nodegraphs) that UsdMtlxRead cannot resolve: not in the document itself, nor in
+// the MaterialX libraries UsdMtlxRead falls back to. Documents usually reference
+// library definitions (e.g. ND_surfacematerial) without including them.
 void _CollectUnresolvedNodeDefs(const MaterialX::DocumentPtr& doc, std::set<std::string>& out)
 {
+    // The same cached library document UsdMtlxRead uses.
+    const MaterialX::ConstDocumentPtr libraries = UsdMtlxGetDocument("");
+
     std::vector<MaterialX::NodePtr> nodes = doc->getNodes();
     for (const auto& nodeGraph : doc->getNodeGraphs()) {
         const auto graphNodes = nodeGraph->getNodes();
@@ -105,7 +111,7 @@ void _CollectUnresolvedNodeDefs(const MaterialX::DocumentPtr& doc, std::set<std:
     for (const auto& node : nodes) {
         if (node && !node->getNodeDef()) {
             const std::string def = node->getNodeDefString();
-            if (!def.empty()) {
+            if (!def.empty() && !(libraries && libraries->getNodeDef(def))) {
                 out.insert(def);
             }
         }
