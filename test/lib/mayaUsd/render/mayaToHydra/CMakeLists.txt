@@ -48,6 +48,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
+	testMaterialXLiveUpdates.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa|disabledOn:maya2027,osx:HYDRA-1727
     testLightingRenderDelegates.py|depOnPlugins:prman|disabledOn:osx:HYDRA-2209|disabledOn:HdFlash:HYDRA-2677|disabledOn:maya2026:HYDRA-2719,HYDRA-2209 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : with HdFlash, Maya crash in IsStormRenderDelegate / FramePass::Initialize
