@@ -89,8 +89,8 @@ namespace {
 constexpr auto _renderOverride_PreAmble = R"mel(
 global proc mtohRenderOverride_ApplySetting(string $renderer, string $attr, string $node) {
     // This exists as a global function for the difference in how it is invoked from editorTemplate/AE or option-boxes
+    // -updateRenderGlobals queues the viewport refresh itself.
     mayaHydra -r $renderer -updateRenderGlobals $attr;
-    refresh -f;
 }
 // Last value the Attribute Editor saw for each attribute, as parallel arrays.
 global string $gMtohRenderOverrideAEAttrs[];
@@ -100,7 +100,18 @@ global string $gMtohRenderOverrideAEValues[];
 global proc mtohRenderOverride_AEApplySetting(string $renderer, string $attr, string $node) {
     global string $gMtohRenderOverrideAEAttrs[];
     global string $gMtohRenderOverrideAEValues[];
-    string $value = `getAttr ("defaultRenderGlobals." + $attr)`;
+    string $plug = "defaultRenderGlobals." + $attr;
+    string $value;
+    // Colors are float3: getAttr returns an array, which does not convert to a string.
+    string $type = `getAttr -type $plug`;
+    if (gmatch($type, "*[23]")) {
+        float $components[] = `getAttr $plug`;
+        for ($c in $components) {
+            $value += $c + " ";
+        }
+    } else {
+        $value = `getAttr $plug`;
+    }
     int $i = stringArrayFind($attr, 0, $gMtohRenderOverrideAEAttrs);
     if ($i < 0) {
         $i = size($gMtohRenderOverrideAEAttrs);
