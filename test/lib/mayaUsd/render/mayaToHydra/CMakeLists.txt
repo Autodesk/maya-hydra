@@ -29,10 +29,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMeshes.py|disabledOn:HdFlash:HYDRA-2665 # HYDRA-2665 : Inconsistent number of prims reported
     testNamespaces.py|disabledOn:HdFlash:HYDRA-2669 # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
-    testSmoothCage.py
-    testMapBorder.py
-    testCulling.py
-    testSmoothMaterials.py
     testRendererSwitching.py
     testSelectPrimWithoutDataSource.py
     testSelectNonDagNodes.py
@@ -223,6 +219,17 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 	#Disabled tests on OSX
 	testDataProducerSelHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
 )
+
+# Only registered when Maya has the render item override API. With it, they run
+# whatever MAYAHYDRA_RENDER_ITEM_OVERRIDE says: both paths draw the same images.
+if(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        testSmoothCage.py
+        testMapBorder.py
+        testCulling.py
+        testSmoothMaterials.py
+    )
+endif()
 
 # Interactive unit test scripts for Hydra Generative Procedurals.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
