@@ -98,6 +98,7 @@ public:
     {
         RebuildFlagPrim = 1 << 1,
         RebuildFlagCallbacks = 1 << 2,
+        RebuildFlagData = 1 << 3,
     };
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 

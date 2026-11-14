@@ -30,6 +30,7 @@
 #endif
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 
 #include <cmath>
 #include <limits>
@@ -131,13 +132,20 @@ HdDataSourceBaseHandle MayaHydraPrimvarsDataSource::Get(const TfToken& name)
 
     // Need to handle indexed case?
     assert(!(*it).second.indexed);
-    HdContainerDataSourceHandle primvar = HdPrimvarSchema::Builder()
-        .SetPrimvarValue(value)
+    HdPrimvarSchema::Builder builder;
+    builder.SetPrimvarValue(value)
         .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(
             (*it).second.interpolation))
         .SetRole(HdPrimvarSchema::BuildRoleDataSource(
-            (*it).second.role))
-        .Build();
+            (*it).second.role));
+#if PXR_VERSION >= 2603
+    // HdPrimvarSchema has no colorSpace before USD 26.03.
+    const TfToken colorSpace = _adapter ? _adapter->GetPrimvarColorSpace(name) : TfToken();
+    if (!colorSpace.IsEmpty()) {
+        builder.SetColorSpace(HdRetainedTypedSampledDataSource<TfToken>::New(colorSpace));
+    }
+#endif
+    HdContainerDataSourceHandle primvar = builder.Build();
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
     // When the adapter provides an externally-owned GPU buffer for this
