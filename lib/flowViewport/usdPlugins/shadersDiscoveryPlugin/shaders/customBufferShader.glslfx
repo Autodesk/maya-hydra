@@ -46,8 +46,8 @@ vec4
 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
     //The custom vertex buffer is supplied in the st primvar: x is the color intensity, y is the color channel index (0 = R, 1 = G, 2 = B)
-#ifdef HD_HAS_st
-    vec2 customStream = HdGet_st().xy;
+#ifdef HD_HAS_myCustomStream
+    vec2 customStream = HdGet_myCustomStream().xy;
 #else
     vec2 customStream = vec2(1.0, 1.0);//Not supplied by the geometry
 #endif

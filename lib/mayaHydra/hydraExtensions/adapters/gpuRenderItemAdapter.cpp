@@ -220,7 +220,7 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
         };
         withdraw(HdTokens->points, present.positions, dirty.positions);
         withdraw(HdTokens->normals, present.normals, dirty.normals);
-        withdraw(MayaHydraAdapterTokens->st, present.uvs, dirty.uvs);
+        withdraw(MayaHydraAdapterTokens->st, present.texcoordStreams != 0, dirty.uvs);
         withdraw(MayaHydraAdapterTokens->tangents, present.tangents, dirty.tangents);
     }
 

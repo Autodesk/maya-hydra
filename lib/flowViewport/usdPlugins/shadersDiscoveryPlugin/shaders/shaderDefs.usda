@@ -20,7 +20,7 @@ def Shader "FVP_CustomBasicLightingShader"
 #It colors the geometry from the custom vertex buffer supplied in the st primvar, see customBufferShader.glslfx
 def Shader "FVP_CustomBufferShader" (
     sdrMetadata = {
-        string primvars = "st"
+        string primvars = "myCustomStream"
     }
 )
 {
