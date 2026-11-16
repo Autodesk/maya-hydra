@@ -31,6 +31,8 @@
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -219,6 +221,16 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     createInfo.overridesSceneIndexCallback = [](HdSceneIndexBaseRefPtr const& inputSi) {
         return MayaHydra::MhExternalCameraOverrideSceneIndex::New(inputSi);
     };
+    // Report unloaded prims, with their loading status, so that Fvp::UnloadedPayloadBoundsSceneIndex
+    // can draw unloaded payloads as bounding boxes. Batch renders do not draw them, so don't need
+    // them.
+    if (_interactive) {
+        static const HdContainerDataSourceHandle stageSceneIndexInputArgs
+            = HdRetainedContainerDataSource::New(
+                UsdImagingStageSceneIndexTokens->includeUnloadedPrims,
+                HdRetainedTypedSampledDataSource<bool>::New(true));
+        createInfo.stageSceneIndexInputArgs = stageSceneIndexInputArgs;
+    }
 
     auto stage = proxyStage.getUsdStage();
     // Check whether the pseudo-root has children

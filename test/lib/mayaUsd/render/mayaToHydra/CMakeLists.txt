@@ -59,6 +59,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStagePayloadsReferences.py
+    testUnloadedPayloadBounds.py
     testNurbsPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testCurveTools.py
     testPolygonPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX

@@ -67,6 +67,7 @@
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPurposeFilteringSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpUnloadedPayloadBoundsSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -510,6 +511,7 @@ private:
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
     Fvp::ReprSelectorSceneIndexRefPtr         _reprSelectorSceneIndex;
     Fvp::BboxSceneIndexRefPtr                 _bboxSceneIndex;
+    Fvp::UnloadedPayloadBoundsSceneIndexRefPtr _unloadedPayloadBoundsSceneIndex;
     Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

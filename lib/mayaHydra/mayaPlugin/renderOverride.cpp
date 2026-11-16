@@ -139,6 +139,7 @@
 #include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <mayaUsdAPI/proxyStage.h>
+#include <mayaUsdAPI/utils.h>
 
 #include <maya/MDagPath.h>
 #include <maya/M3dView.h>
@@ -740,6 +741,29 @@ bool rendererDrawsSecondaryGraphics(const TfToken& rendererName)
     const JsObject& metadata = mayaHydraMetadata.GetJsObject();
     const auto      it = metadata.find("renderSecondaryGraphics");
     return it != metadata.end() && it->second.IsBool() && it->second.GetBool();
+}
+
+// State of the "USD Payload Bounding Boxes" toggle of the viewport Show menu, registered by
+// MayaUsd. On when the destination is not a model panel or the filter is not registered.
+bool unloadedPayloadBoundsDisplayed(const MHWRender::MFrameContext& frameContext)
+{
+#if defined(MAYAUSDAPI_API_VERSION) && MAYAUSDAPI_API_VERSION >= 10100
+    static const MString filterName = MAYAUSDAPI_NS::getPayloadBoundsDisplayFilter();
+#else
+    static const MString filterName("mayaUsdPayloadBoundsDisplayFilter");
+#endif
+
+    MString modelPanel;
+    if (frameContext.renderingDestination(modelPanel) != MHWRender::MFrameContext::k3dViewport) {
+        return true;
+    }
+    M3dView view;
+    if (M3dView::getM3dViewFromModelPanel(modelPanel, view) != MStatus::kSuccess) {
+        return true;
+    }
+    MStatus    status;
+    const bool displayed = view.pluginObjectDisplay(filterName, &status);
+    return status ? displayed : true;
 }
 } // namespace
 
@@ -2003,6 +2027,11 @@ MStatus MtohRenderOverride::Render(
                 _pruningSceneIndex->SetFilterStatus(fvpPruningToken, objectExclusions & mayaFilter);
             }
         }
+
+        if (_unloadedPayloadBoundsSceneIndex) {
+            _unloadedPayloadBoundsSceneIndex->SetEnabled(
+                unloadedPayloadBoundsDisplayed(*framecontext));
+        }
     }
 
     // Toggle textures in the material network
@@ -2102,6 +2131,10 @@ MStatus MtohRenderOverride::Render(
     const bool dormantColorPrefChanged = _dormantWireframeColorDirty.exchange(false);
     if ((selectionColorPrefChanged || dormantColorPrefChanged) && _wireframeColorInterfaceImp) {
         _wireframeColorInterfaceImp->RefreshColors();
+        // Unloaded payload bounding boxes pull a wireframe color in every display style.
+        if (_unloadedPayloadBoundsSceneIndex) {
+            _unloadedPayloadBoundsSceneIndex->DirtyWireframeColors();
+        }
     }
 
     if (selectionColorPrefChanged && _selection && _dirtySelectionColorsSceneIndex) {
@@ -3301,7 +3334,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     if (! _wireframeColorInterfaceImp){
         _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
-
     // Insert the bounding box filtering scene index which converts geometries into a bounding box
     // using the extent attribute
     _bboxSceneIndex = Fvp::BboxSceneIndex::New(
@@ -3309,6 +3341,15 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _bboxSceneIndex->AddExcludedSceneRoot(
         MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
     _lastFilteringSceneIndexBeforeCustomFiltering = _bboxSceneIndex;
+
+    // Bounding boxes of unloaded USD payloads. After the bounding box scene index, as they already
+    // are boxes. Maya native prims are never unloaded.
+    _lastFilteringSceneIndexBeforeCustomFiltering = _unloadedPayloadBoundsSceneIndex
+        = Fvp::UnloadedPayloadBoundsSceneIndex::New(
+            _lastFilteringSceneIndexBeforeCustomFiltering,
+            _wireframeColorInterfaceImp,
+            { MAYA_NATIVE_ROOT },
+            unloadedPayloadBoundsDisplayed(drawContext));
 
     // Repr selector Scene Index
     _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex =
