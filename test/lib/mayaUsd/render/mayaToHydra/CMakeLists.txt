@@ -73,7 +73,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testSceneModified.py
 	testIsolateSelectWithGeomSubset.py
     testMayaReference.py
-    testTexturedMode.py
+    testTexturedMode.py|disabledOn:maya2026,osx:HYDRA-2699 # HYDRA-2699 : occasional rendering artifacts on OSX build machines
     testSelectionColorPreferences.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testUsdDeleteCamera.py
     testUsdIncludedPurposes.py
