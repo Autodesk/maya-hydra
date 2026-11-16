@@ -220,7 +220,11 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         MGlobal::displayInfo(helpText);
     } else if (db.isFlagSet(_createRenderGlobals)) {
         bool userDefaults = db.isFlagSet(_userDefaultsId);
-        MtohRenderGlobals::CreateAttributes({ renderDelegateName, true, userDefaults });
+        // Read the attributes too, so that the first edit of one of them is compared with the
+        // value it had (see -updateRenderGlobals). Nothing was edited: no user setting to store.
+        constexpr bool storeUserSettings = false;
+        MtohRenderGlobals::GlobalChanged(
+            { renderDelegateName, true, userDefaults }, storeUserSettings);
     } else if (db.isFlagSet(_updateRenderGlobals)) {
         MString    attrFlag;
         const bool storeUserSettings = true;
@@ -228,8 +232,15 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
             bool          userDefaults = db.isFlagSet(_userDefaultsId);
             const TfToken attrName(attrFlag.asChar());
             MtohRenderGlobals::GlobalParams params = { attrName, false, userDefaults };
-            auto&         inst = MtohRenderGlobals::GlobalChanged(params, storeUserSettings);
-            MtohRenderOverride::UpdateRenderGlobals(inst, attrName);
+            bool          valueChanged = false;
+            auto&         inst
+                = MtohRenderGlobals::GlobalChanged(params, storeUserSettings, &valueChanged);
+            // Callers report attributes that did not change too: the Attribute Editor runs a
+            // control's change command when it builds the control. Only a new value needs the
+            // renderers updated and the viewport refreshed.
+            if (valueChanged) {
+                MtohRenderOverride::UpdateRenderGlobals(inst, attrName);
+            }
             return MS::kSuccess;
         }
         MtohRenderOverride::UpdateRenderGlobals(

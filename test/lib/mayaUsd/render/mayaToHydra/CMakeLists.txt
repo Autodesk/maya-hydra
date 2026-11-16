@@ -30,6 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py|disabledOn:HdFlash:HYDRA-2669 # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
     testRendererSwitching.py
+    testViewportRenderSettings.py
     testSelectPrimWithoutDataSource.py
     testSelectNonDagNodes.py
     testStageAddPrim.py
@@ -284,6 +285,8 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineRefinement.py
     testOutlinePointInstances.py
     testOutlineNativeInstances.py
+    # Mode-independent: it only reads a render setting, nothing is drawn selected.
+    testViewportRenderSettings.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to
