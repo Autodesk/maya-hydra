@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
         envSettings.cpp
         mayaColorPreferencesTranslator.cpp
         optionalSceneIndexPlugins.cpp
+        outlineSelection.cpp
         plugin.cpp
         pluginDebugCodes.cpp
         pluginUtils.cpp
