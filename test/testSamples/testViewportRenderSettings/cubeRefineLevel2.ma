@@ -2,7 +2,6 @@
 //Name: cubeRefineLevel2.ma
 //Last modified: Mon, Nov 16, 2026 10:58:36 AM
 //Codeset: 1252
-requires -nodeType "UsdDefaultSettings" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.39.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
 fileInfo "version" "Preview Release";
@@ -86,12 +85,6 @@ createNode lightLinker -s -n "lightLinker1";
 	rename -uid "FE7F3FFF-4EDC-68B2-9A3B-1C92309E28E1";
 	setAttr -s 2 ".lnk";
 	setAttr -s 2 ".slnk";
-createNode UsdDefaultSettings -n "UsdDefaultRenderDescription";
-	rename -uid "EB96630C-40EC-1F22-7F52-DE88F5444AF2";
-	setAttr ".srl" -type "string" "#usda 1.0\n(\n    renderSettingsPrimPath = \"/Render/SceneRenderSettings\"\n)\n\ndef Scope \"Render\"\n{\n    def RenderSettings \"SceneRenderSettings\"\n    {\n        custom string adskUsd:externalCamera = \"|persp\" (\n            displayName = \"External Camera\"\n        )\n        rel products = </Render/Beauty>\n    }\n\n    def RenderVar \"color\"\n    {\n        uniform string sourceName = \"color\"\n    }\n\n    def RenderProduct \"Beauty\"\n    {\n        rel orderedVars = </Render/color>\n        token productName = \"./default.png\"\n    }\n}\n\n";
-	setAttr ".ssl" -type "string" "#usda 1.0\n\n";
-	setAttr ".ard" -type "string" "UsdDefaultRenderDescription,/Render/SceneRenderSettings";
-lockNode -l 1 ;
 createNode shapeEditorManager -n "shapeEditorManager";
 	rename -uid "45F53DBB-4B5B-025A-C2A7-F18E8F6BCFC7";
 createNode poseInterpolatorManager -n "poseInterpolatorManager";
