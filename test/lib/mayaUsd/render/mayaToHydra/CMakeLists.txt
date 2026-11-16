@@ -23,6 +23,8 @@
 set(INTERACTIVE_TEST_SCRIPT_FILES
     testSceneStat.py|disabledOn:HdFlash:HYDRA-2670 # HYDRA-2670 : Scene statistics report 1 primitive instead of 3
     testImageDiffing.py
+    testFramePublication.py
+    testRenderThreadOverlap.py
     testMtohCommand.py
     testBasicRender.py
     testDagChanges.py
@@ -226,6 +228,17 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
     cpp/testHydraGenerativeProcedural.py
 )
 
+# The env flags below are read once per process, so these scripts get their own
+# registration. They also run in the default list above, with the flag off, to check
+# they are inert.
+set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_SNAPSHOT
+    testFramePublication.py
+)
+
+set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_PIPELINE_OVERLAP
+    testRenderThreadOverlap.py
+)
+
 # Interactive unit test scripts that run with the render item override off
 # (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0), on the stock render item path.
 set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
@@ -327,6 +340,46 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
         PYTHON_SCRIPT ${test_filename}
         ENV
             "MAYA_HYDRA_USE_MESH_ADAPTER=1"
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+            ${mode_env}
+    )
+
+    # Assign a CTest label to these tests for easy filtering.
+    apply_labels_to_test("${all_labels}" ${target})
+
+endforeach()
+
+# Enable the frame publication boundary, using interactive Maya with UI.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_SNAPSHOT})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    set(target "${target}_snapshot")
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYAHYDRA_SNAPSHOT=1"
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+            ${mode_env}
+    )
+
+    # Assign a CTest label to these tests for easy filtering.
+    apply_labels_to_test("${all_labels}" ${target})
+
+endforeach()
+
+# Enable the render thread, using interactive Maya with UI.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_PIPELINE_OVERLAP})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    set(target "${target}_overlap")
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYAHYDRA_PIPELINE_OVERLAP=1"
             "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
             ${mode_env}
     )

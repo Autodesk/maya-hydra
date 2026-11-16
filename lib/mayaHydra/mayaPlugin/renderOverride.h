@@ -44,6 +44,9 @@
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
+#include <mayaHydraLib/renderThread/renderThread.h>
+#include <mayaHydraLib/renderThread/renderThreadPresentBridge.h>
+#include <mayaHydraLib/renderThread/renderThreadSettle.h>
 
 #include <hvt/tasks/outline/outlineManager.h>
 
@@ -195,6 +198,14 @@ public:
 
     MStatus setup(const MString& destination) override;
     MStatus cleanup() override;
+
+    /// Waits until every running render thread has published the frame it is working on,
+    /// and returns how many were waited for. A barrier, not a cancellation: the in-flight
+    /// frame is kept, since callers are about to read the viewport.
+    static int DrainAllRenderThreads();
+
+    /// Render target size of the first initialized override, or {0, 0} if none is.
+    static std::pair<int, int> LastRenderTargetSize();
 
     // Utility function to get GPU memory usage stats
     static int GetUsedGPUMemory();
@@ -490,6 +501,12 @@ private:
     /// use the free camera, so failure needs no other handling.
     SdfPath _ResolveCameraPrimPath();
 
+    /// Draws the given passes, in order, sharing AOVs from one to the next. Takes the
+    /// pass list rather than recomputing it, so the caller controls when each half runs.
+    ///
+    /// Runs on the render thread when overlap is enabled, so it must not call into Maya.
+    void                     _DrawPasses(const std::vector<int>& orderedPassIndices);
+
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;
     const hvt::FramePassPtr& _GetFramePass(int passIndex)const;
@@ -597,6 +614,22 @@ private:
     const bool _isUsingHdFlash = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
+
+    // Null/false unless MAYAHYDRA_PIPELINE_OVERLAP is set. _renderThreadStarted is the
+    // single condition every overlap-gated site tests, and is false both when the flag
+    // is off and when the thread declined to start.
+    std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThread>              _renderThread;
+    std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadPresentBridge> _presentBridge;
+    MAYAHYDRA_NS_DEF::RenderThreadSettle                         _settle;
+    bool _renderThreadStarted = false;
+    // The first frame is drawn synchronously so a render op always leaves an image
+    // behind; overlap starts once this is true.
+    bool _firstFramePrimed = false;
+
+    // A frame from Maya's time-change callback, applied by Render() past the interlock
+    // because the callback cannot write to the scene index.
+    double            _pendingFrame = 0.0;
+    std::atomic<bool> _hasPendingFrame { false };
     bool       _hasDefaultLighting = false;
     bool       _currentlyTextured = false;
 

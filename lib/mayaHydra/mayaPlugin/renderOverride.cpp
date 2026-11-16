@@ -47,7 +47,11 @@
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 
+#include <mayaHydraLib/pipelineTiming.h>
 #include <mayaHydraLib/profilingUtils.h>
+#include <mayaHydraLib/renderThread/renderThreadContext.h>
+#include <mayaHydraLib/renderThread/renderThreadStats.h>
+#include <mayaHydraLib/snapshot/snapshotPublishBarrier.h>
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
@@ -152,6 +156,9 @@
 #include <maya/MObjectHandle.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
+#if defined(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
+#include <maya/MPxRenderItemOverridePrivate.h>   // render item override republish (private API)
+#endif
 #include <maya/MTimerMessage.h>
 
 #include <maya/MUiMessage.h>
@@ -437,6 +444,9 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     _ID = MAYA_NATIVE_ROOT.AppendChild(
                   TfToken(TfStringPrintf("_MayaHydra_%s_%p", desc.rendererName.GetText(), this)));
 
+    // Idempotent, so a second render override can call it again.
+    SnapshotManager::instance().Initialize();
+
     MStatus status;
     auto    id
         = MSceneMessage::addCallback(MSceneMessage::kBeforeNew, _ClearHydraCallback, this, &status);
@@ -677,6 +687,39 @@ VtValue MtohRenderOverride::_GetUsedGPUMemory() const
         return hdStRenderStat[HdPerfTokens->gpuMemoryUsed.GetString()];
     }
     return VtValue();
+}
+
+int MtohRenderOverride::DrainAllRenderThreads()
+{
+    int drained = 0;
+
+    std::lock_guard<std::mutex> lock(_allInstancesMutex);
+    for (auto* instance : _allInstances) {
+        if (!instance->_initializationSucceeded) {
+            continue;
+        }
+        if (instance->_renderThread && instance->_renderThread->IsRunning()) {
+            instance->_renderThread->WaitForQuiescence();
+            ++drained;
+        }
+    }
+    return drained;
+}
+
+std::pair<int, int> MtohRenderOverride::LastRenderTargetSize()
+{
+    std::lock_guard<std::mutex> lock(_allInstancesMutex);
+    for (auto* instance : _allInstances) {
+        if (!instance->_initializationSucceeded) {
+            continue;
+        }
+        const int width = static_cast<int>(instance->_viewport[2]);
+        const int height = static_cast<int>(instance->_viewport[3]);
+        if (width > 0 && height > 0) {
+            return { width, height };
+        }
+    }
+    return { 0, 0 };
 }
 
 int MtohRenderOverride::GetUsedGPUMemory()
@@ -1153,10 +1196,18 @@ MStatus MtohRenderOverride::Render(
     // Filled in below once the display style is known; read by renderFrame, which runs later.
     MayaHydraSceneIndex::RenderItemUpdateOptions renderItemOptions;
 
-    auto renderFrame = [&](bool markTime = false) {
-        MH_PROFILE_SCOPE("MtohRenderOverride::Render renderFrame lambda");
+    // Split into three steps rather than one loop: only the draw touches the GPU, the
+    // other two write scene indices and pass parameters. This lets the draw be described
+    // entirely by the pass indices preparePasses() returns.
+    auto pushSceneState = [&]() {
+        MH_PROFILE_SCOPE("MtohRenderOverride::Render pushSceneState lambda");
         {
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
+            // The copies below overwrite shared buffers the render thread's last
+            // frame drew from, on its own context; queue them behind that draw.
+            if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext() && _renderThread) {
+                _renderThread->OrderAfterLastRender();
+            }
             // Render items are the only publishers of shared buffers, and the
             // frame passes below are the consumer's frame, so the producer's
             // frame has to close here. Opened even when the scene is
@@ -1217,7 +1268,11 @@ MStatus MtohRenderOverride::Render(
             Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(
                 rendererNamesToUpdate);
         }
+    };
 
+    // Returns the passes that will draw, in draw order, as actual pass indices.
+    auto preparePasses = [&]() -> std::vector<int> {
+        MH_PROFILE_SCOPE("MtohRenderOverride::Render preparePasses lambda");
         const MIntArray& framePassesVisible    = 
             MayaHydraSetVisibleFramePasses::getVisibleFramePasses();
         int                 numVisibleFramePasses = framePassesVisible.length();
@@ -1228,25 +1283,38 @@ MStatus MtohRenderOverride::Render(
                 = numFramePasses;
         }
 
-        // Iterate over visible passes
+        // Drop missing passes up front so first/last below are relative to the passes
+        // that actually draw. Filtering inside the draw loop instead left the background
+        // uncleared or presentation disabled when an end pass was missing.
+        std::vector<int> orderedPassIndices;
+        orderedPassIndices.reserve(numVisibleFramePasses);
         for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
-            MH_PROFILE_SCOPE("MayaHydra frame pass");
-            const int actualPassIndex = framePassesVisible[visibleIdx]; // Get the actual pass index
-            const hvt::FramePassPtr& currentPass = _GetFramePass(actualPassIndex);
-            if (!currentPass) {
-                continue;
+            const int actualPassIndex = framePassesVisible[visibleIdx];
+            if (_GetFramePass(actualPassIndex)) {
+                orderedPassIndices.push_back(actualPassIndex);
             }
+        }
 
-            const bool isPass0              = (actualPassIndex == 0);
-            const bool isFirstVisiblePass   = (visibleIdx == 0);
-            const bool isLastVisiblePass    = (visibleIdx == numVisibleFramePasses - 1);//Put me back later
+        const int numDrawnPasses = static_cast<int>(orderedPassIndices.size());
+
+        for (int drawIdx = 0; drawIdx < numDrawnPasses; ++drawIdx) {
+            MH_PROFILE_SCOPE("MayaHydra frame pass params");
+            const int actualPassIndex = orderedPassIndices[drawIdx];
+            // Non-null: checked while building orderedPassIndices above.
+            const hvt::FramePassPtr& currentPass = _GetFramePass(actualPassIndex);
+
+            const bool isFirstVisiblePass   = (drawIdx == 0);
+            const bool isLastVisiblePass    = (drawIdx == numDrawnPasses - 1);
 
             // Clear background for the first visible pass only
             currentPass->params().clearBackgroundColor = isFirstVisiblePass;
             currentPass->params().clearBackgroundDepth = isFirstVisiblePass;
 
-            // Enable presentation for the last visible pass only
-            currentPass->params().enablePresentation = isLastVisiblePass;
+            // Enable presentation for the last visible pass only. With the render thread
+            // running the draw must not present: HgiInterop makes GL calls belonging to
+            // the presenting thread's context, so the main thread composites instead.
+            currentPass->params().enablePresentation =
+                isLastVisiblePass && !(_renderThreadStarted && _firstFramePrimed);
             // Set the AOV to visualize
             // Per HVT, the AOV to visualize must be set on the last visible pass, and HdAovTokens->color must be set on other passes
             TfToken visualizeAOV = HdAovTokens->color;
@@ -1261,65 +1329,23 @@ MStatus MtohRenderOverride::Render(
             }
             currentPass->params().visualizeAOV = visualizeAOV;
 
-            if (visibleIdx > 0) {
+            if (!isFirstVisiblePass) {
                 currentPass->params().renderParams.depthBiasEnable = true;
                 currentPass->params().renderParams.depthBiasUseDefault = false;
                 currentPass->params().renderParams.depthBiasConstantFactor = -1.0f;
                 currentPass->params().renderParams.depthBiasSlopeFactor = -1.0f;
             }
-
-            if (isPass0) {
-                // Do not share the AOVs, for the first pass only
-                HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
-#if PXR_VERSION >= 2605
-                if (_sceneGlobalsSceneIndex) {
-                    const SdfPath& cameraPath = currentPass->params().renderParams.camera;
-                    if (!cameraPath.IsEmpty()) {
-                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
-                    }
-                }
-#endif
-                
-                /*Debug code left here if needed later
-                hvt::FramePass& framePassToDebug = *currentPass;
-                std::ostringstream    content;
-                content << framePassToDebug;
-                std::string framePassParameters = content.str();
-                OutputDebugStringA("Main Frame Pass parameters:");
-                OutputDebugStringA(framePassParameters.c_str());
-                */
-
-                currentPass->Render(passTasks);
-            } else {
-                // Share AOVs from the previous visible pass or pass0
-                const int previousPassIndex = (visibleIdx > 0) ?framePassesVisible[visibleIdx - 1] : 0;
-                hvt::FramePassPtr& previousPass = _GetFramePass(previousPassIndex);
-                if (previousPass) {
-                    const hvt::RenderBufferBindings inputAOVs = previousPass->GetRenderBufferBindingsForNextPass(
-                            { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth }
-                    );
-                    HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
-#if PXR_VERSION >= 2605
-                    if (_sceneGlobalsSceneIndex) {
-                        const SdfPath& cameraPath = currentPass->params().renderParams.camera;
-                        if (!cameraPath.IsEmpty()) {
-                            _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
-                        }
-                    }
-#endif
-
-                    /*Debug code left here if needed later
-                    hvt::FramePass& framePassToDebug = *currentPass;
-                    std::ostringstream content;
-                    content << framePassToDebug;
-                    std::string framePassParameters = content.str();
-                    OutputDebugStringA("Second Frame Pass parameters:");
-                    OutputDebugStringA(framePassParameters.c_str());
-                    */
-                    currentPass->Render(passTasks);
-                }
-            }
         }
+
+        return orderedPassIndices;
+    };
+
+    auto renderFrame = [&](bool markTime = false) {
+        MH_PROFILE_SCOPE("MtohRenderOverride::Render renderFrame lambda");
+
+        pushSceneState();
+        const std::vector<int> orderedPassIndices = preparePasses();
+        _DrawPasses(orderedPassIndices);
 
         const auto fileName = Fvp::ImageBufferWriter::GetFileName();
         if (!fileName.empty()) {
@@ -1331,9 +1357,8 @@ MStatus MtohRenderOverride::Render(
 
         // Check convergence from the tasks first
         _isConverged = true;
-        for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
-            const int i = framePassesVisible[visibleIdx]; // Get the actual pass index
-            const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+        for (int passIndex : orderedPassIndices) {
+            const hvt::FramePassPtr& currentPass = _GetFramePass(passIndex);
             if (!currentPass) {
                 continue;
             }
@@ -1351,9 +1376,8 @@ MStatus MtohRenderOverride::Render(
             // Get the AOVs and check each render buffer's IsConverged().
             // Note: For Arnold, _taskController->IsConverged() always returns false; we must check
             // each AOV buffer directly.
-            auto isConverged = [this, &framePassesVisible, numVisibleFramePasses]() {
-                for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
-                    const int                i = framePassesVisible[visibleIdx];
+            auto isConverged = [this, &orderedPassIndices]() {
+                for (int i : orderedPassIndices) {
                     const hvt::FramePassPtr& currentPass = _GetFramePass(i);
                     if (!currentPass) {
                         continue;
@@ -1421,6 +1445,27 @@ MStatus MtohRenderOverride::Render(
 
         if (!_initializationSucceeded) {
             return MStatus::kFailure;
+        }
+    }
+
+    // Must precede every scene-index-invalidating operation below, because Hydra refuses
+    // invalidation while a SyncAll is in progress and that SyncAll is on the other thread.
+    //
+    // TODO: This wait is what currently limits the overlap achieved. Give the render
+    // thread an immutable per-frame copy of the scene state instead.
+    if (_renderThreadStarted && _renderThread) {
+        MH_PIPELINE_TIMING_SCOPE("render_thread_interlock");
+        _renderThread->WaitForIdle();
+    }
+
+    // Maya's time-change callback only records the frame, since it can fire while the
+    // render thread is in SyncAll. Past the interlock, mutating the scene index is safe.
+    if (_hasPendingFrame.exchange(false)) {
+        _SetCurrentFrameInHydraGlobalSceneIndex(_pendingFrame);
+        // The camera refresh travels with the deferred apply: the callback returned
+        // without touching the scene index, so this is the first safe point for it.
+        if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->RefreshCamerasOnTimeChange();
         }
     }
 
@@ -1496,7 +1541,11 @@ MStatus MtohRenderOverride::Render(
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetParams(delegateParams);
+
+        // Both are no-ops unless MAYAHYDRA_SNAPSHOT is set.
+        SnapshotManager::instance().AdvanceFrame();
         _mayaHydraSceneIndex->FlushPendingUpdates();
+        SnapshotManager::instance().PublishBarrier();
     }
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
@@ -1770,6 +1819,13 @@ MStatus MtohRenderOverride::Render(
 
             currentPass->params().renderBufferSize  = GfVec2i(width, height);
         }
+
+        // A frame in flight was drawn against the old buffer size, so drop it and prime
+        // again at the new size.
+        if (_renderThreadStarted && _renderThread) {
+            _renderThread->DiscardInFlight();
+            _firstFramePrimed = false;
+        }
     }
 
     const GfRange2f displayWindow(GfVec2f(0.0f), GfVec2f(width, height));
@@ -1840,9 +1896,59 @@ MStatus MtohRenderOverride::Render(
         _unsolvableFramingWarnedCameras.erase(cameraPath);
     }
 
+    // The scene push and pass preparation run on the main thread either way: they write
+    // to scene indices and pass parameters, which the render thread must not touch.
+    // The handoff is depth-1 and never replaces a request; the interlock above has
+    // already waited for the render thread to finish the previous one.
+    auto submitOrDrawFrame = [&]() {
+        if (_renderThreadStarted && _firstFramePrimed) {
+            MAYAHYDRA_NS_DEF::RenderThreadRequest request;
+            request.frameId       = SnapshotManager::instance().GetPublishedFrameId();
+            request.colorAovToken = HdAovTokens->color;
+            request.depthAovToken = HdAovTokens->depth;
+            request.dstRegion     = GfVec4i(0, 0, width, height);
+            {
+                MH_PIPELINE_TIMING_SCOPE("scene_push");
+                pushSceneState();
+                request.passIndices = preparePasses();
+            }
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+            // Covers the shared buffer copies the push just issued on Maya's context.
+            if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext()) {
+                request.producerFence
+                    = MAYAHYDRA_NS_DEF::RenderThreadFence::CreateAndSignal(_hgi.get());
+            }
+#endif
+            MH_PIPELINE_TIMING_SCOPE("SubmitCmds");
+            _renderThread->SubmitRequest(std::move(request));
+        } else {
+            renderFrame(true);
+            MAYAHYDRA_NS_DEF::RenderThreadStats::instance().RecordFrameRenderedSynchronously();
+            if (_renderThreadStarted) {
+                _firstFramePrimed = true;
+            }
+        }
+    };
+
     // Update all registered plugin before render.
     for (auto& entry : _sceneIndexRegistry->GetRegistrations()) {
         entry.second->Update();
+    }
+
+    // Put the most recently finished off-thread frame on screen, and let the settle
+    // notice if playback has just stopped.
+    if (_renderThreadStarted) {
+        if (_presentBridge && _renderThread) {
+            MH_PIPELINE_TIMING_SCOPE("present");
+            // An empty VtValue tells HgiInterop to composite into the currently bound
+            // framebuffer, which here is Maya's.
+            const VtValue dstFramebuffer;
+            _renderThread->CompositeLatest(*_presentBridge, dstFramebuffer);
+        }
+
+        _settle.OnRenderOpEntry(
+            MAnimControl::isPlaying(),
+            _renderThread ? _renderThread->HasCompletedFrame() : false);
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
@@ -2009,10 +2115,10 @@ MStatus MtohRenderOverride::Render(
         // all the required states.
         MayaHydraSetRenderGLState state;
 #endif
-        renderFrame(true);
+        submitOrDrawFrame();
 
     } else {
-        renderFrame(true);
+        submitOrDrawFrame();
     }
 
     //Store as old display style
@@ -2648,6 +2754,105 @@ void MtohRenderOverride::_InitHydraResources(
     
     _initializationSucceeded = true;
 
+    // From here on the render thread owns the graphics context it draws with and is the
+    // only caller of FramePass::Render. The main thread composites the latest completed
+    // frame at render op entry, so the screen lags the scene by one frame. The first
+    // frame is drawn synchronously, so a render op always leaves an image behind.
+    if (MAYAHYDRA_NS_DEF::usePipelineOverlap()) {
+        // Recorded before anything below can fail, so a test can distinguish the flag
+        // never taking effect from the thread declining to start.
+        MAYAHYDRA_NS_DEF::RenderThreadStats::instance().SetOverlapEnabled(true);
+        if (!_presentBridge) {
+            _presentBridge = MAYAHYDRA_NS_DEF::CreateGlPresentBridge();
+        }
+        if (!_renderThread) {
+            // Must be created here, on the main thread, while Maya's context is current:
+            // _InitHydraResources only runs from Render(), and a context captured
+            // anywhere else would be null. The thread then takes ownership.
+            //
+            // Vulkan submits to device queues rather than a current context, so it gets
+            // a null one and the thread skips MakeCurrent and the HgiGL arena. Ordering
+            // the composite against the render is HgiInteropVulkan's job there.
+            const bool isVulkan = _hgi && _hgi->GetAPIName() == HgiTokens->Vulkan;
+            std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadContext> context;
+            bool contextReady = isVulkan;
+            if (!isVulkan) {
+                context = MAYAHYDRA_NS_DEF::CreateGlRenderThreadContext();
+                if (context) {
+                    contextReady
+                        = context->CreateShared(MAYAHYDRA_NS_DEF::CaptureCurrentHostContext());
+                    if (!contextReady) {
+                        TF_WARN("MayaHydra: could not create a shared GL context for the "
+                                "render thread (%s). Falling back to synchronous rendering.",
+                                context->LastError().c_str());
+                    }
+                }
+            }
+
+            if (contextReady) {
+                _renderThread = std::make_unique<MAYAHYDRA_NS_DEF::RenderThread>();
+                // Runs on the render thread and makes no Maya API calls. The FramePass it
+                // touches is owned by the override and outlives the thread, which
+                // ClearHydraResources stops before freeing anything.
+                const bool started = _renderThread->Start(
+                    [this](const MAYAHYDRA_NS_DEF::RenderThreadRequest& request)
+                        -> MAYAHYDRA_NS_DEF::RenderThread::RenderResult {
+                        MAYAHYDRA_NS_DEF::RenderThread::RenderResult result;
+                        if (request.passIndices.empty()) {
+                            return result;
+                        }
+                        _DrawPasses(request.passIndices);
+
+                        // The last pass drawn is the one with presentation enabled, and so
+                        // the one holding the finished image.
+                        const hvt::FramePassPtr& presentPass
+                            = _GetFramePass(request.passIndices.back());
+                        if (!presentPass) {
+                            return result;
+                        }
+                        result.srcColor = presentPass->GetRenderTexture(request.colorAovToken);
+                        result.srcDepth = presentPass->GetRenderTexture(request.depthAovToken);
+                        result.srcHgi = _hgi.get();
+                        return result;
+                    },
+                    std::move(context),
+                    _hgi.get());
+
+                // Start() returns false when the context would not come current on the
+                // thread, having already joined it.
+                _renderThreadStarted = started;
+                if (!started) {
+                    _renderThread.reset();
+                    _presentBridge.reset();
+                }
+                if (_mayaHydraSceneIndex) {
+                    _mayaHydraSceneIndex->SetDeferCallbackRemovals(started);
+                }
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+                // Before the first scene push publishes anything. Storm on its own GL
+                // context cannot read VP2's buffers in place; Vulkan copies anyway.
+                MhExtGpuBufferBridge::SetConsumerOnSeparateContext(started && !isVulkan);
+#endif
+            } else {
+                // Leaving _renderThreadStarted false keeps every overlap-gated site on
+                // the synchronous path.
+                _presentBridge.reset();
+            }
+        }
+
+        _settle.Initialize(
+            [this]() -> bool {
+                if (!_renderThread || !_presentBridge) return false;
+                const VtValue dstFramebuffer;
+                return _renderThread->CompositeLatest(*_presentBridge, dstFramebuffer);
+            },
+            []() {
+                // Scheduled, not immediate, so the redraw cannot recurse into the render
+                // op currently executing.
+                M3dView::scheduleRefreshAllViews();
+            });
+    }
+
     // This instance starts drawing now: producers should hand it what it can use.
     _PublishDeviceStreamSupport();
 }
@@ -2675,6 +2880,25 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
+
+    // Must come before the resources below are freed: the thread releases its own context
+    // and GPU objects on its way out.
+    if (_renderThreadStarted) {
+        _settle.Reset();
+        if (_renderThread) {
+            _renderThread->Stop();
+            _renderThread.reset();
+        }
+        _presentBridge.reset();
+        _renderThreadStarted = false;
+        _firstFramePrimed = false;
+        if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->SetDeferCallbackRemovals(false);
+        }
+#if defined(USD_HAS_GPU_BUFFER_SHARING)
+        MhExtGpuBufferBridge::SetConsumerOnSeparateContext(false);
+#endif
+    }
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
     // Before the renderer goes, because the bridge's GL objects alias memory
@@ -3276,6 +3500,12 @@ bool MtohRenderOverride::select(
         return false; //When being in components picking, returning false will use maya/OGS for components selection
     }
 
+    // A frame rendered before the pick must not be composited after it, or the viewport
+    // shows a pre-pick image without the new selection.
+    if (_renderThreadStarted && _renderThread) {
+        _renderThread->DiscardInFlight();
+    }
+
     MStatus status = MStatus::kFailure;
 
     MMatrix viewMatrix = frameContext.getMatrix(MHWRender::MFrameContext::kViewMtx, &status);
@@ -3451,6 +3681,15 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
     // Get current frame from Maya
     const MTime currentTime = MAnimControl::currentTime();
     const double currentFrame = currentTime.value();
+
+    // This callback can land while the render thread is inside SyncAll, and setting the
+    // frame invalidates the scene index, which Hydra refuses during SyncAll. Record it
+    // instead; Render() applies it past the interlock.
+    if (instance->_renderThreadStarted) {
+        instance->_pendingFrame = currentFrame;
+        instance->_hasPendingFrame.store(true);
+        return;
+    }
 
     // Update frame in Hydra scene globals scene index
     instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
@@ -4104,6 +4343,52 @@ hvt::FramePassPtr& MtohRenderOverride::_GetFramePass(int passIndex)
 int MtohRenderOverride::_GetNumFramePasses()const
 {
     return static_cast<int>(_framePassesData.size());
+}
+
+void MtohRenderOverride::_DrawPasses(const std::vector<int>& orderedPassIndices)
+{
+    const int numPasses = static_cast<int>(orderedPassIndices.size());
+    for (int idx = 0; idx < numPasses; ++idx) {
+        MH_PROFILE_SCOPE("MayaHydra frame pass");
+        const int                passIndex   = orderedPassIndices[idx];
+        const hvt::FramePassPtr& currentPass = _GetFramePass(passIndex);
+        if (!currentPass) {
+            continue;
+        }
+
+        if (passIndex == 0) {
+            // Do not share the AOVs, for the first pass only
+            HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
+#if PXR_VERSION >= 2605
+            if (_sceneGlobalsSceneIndex) {
+                const SdfPath& cameraPath = currentPass->params().renderParams.camera;
+                if (!cameraPath.IsEmpty()) {
+                    _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                }
+            }
+#endif
+            currentPass->Render(passTasks);
+        } else {
+            // Share AOVs from the previous drawn pass, or pass0 as a fallback
+            const int          previousPassIndex = (idx > 0) ? orderedPassIndices[idx - 1] : 0;
+            hvt::FramePassPtr& previousPass      = _GetFramePass(previousPassIndex);
+            if (previousPass) {
+                const hvt::RenderBufferBindings inputAOVs
+                    = previousPass->GetRenderBufferBindingsForNextPass(
+                        { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth });
+                HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
+#if PXR_VERSION >= 2605
+                if (_sceneGlobalsSceneIndex) {
+                    const SdfPath& cameraPath = currentPass->params().renderParams.camera;
+                    if (!cameraPath.IsEmpty()) {
+                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                    }
+                }
+#endif
+                currentPass->Render(passTasks);
+            }
+        }
+    }
 }
 
 int MtohRenderOverride::_GetNumVisibleFramePasses() const

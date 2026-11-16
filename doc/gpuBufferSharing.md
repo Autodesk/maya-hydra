@@ -129,11 +129,12 @@ rescan the full index array for nothing, since no topology dirty is emitted.
 ## Bridge negotiation
 
 `MhExtGpuBufferBridge::ForHgi(hgi)` is the whole capability negotiation. It
-returns one of three kinds:
+returns one of four kinds:
 
 | Kind | Condition | Copies |
 | --- | --- | --- |
 | `OpenGL` | VP2 draws with OpenGL and the renderer's Hgi is OpenGL with an `HgiGLExternalBufferArena` | None (zero copy) |
+| `OpenGLCopy` | As `OpenGL`, but the renderer draws on its own GL context ([render thread](renderThreadPipelining.md)) | One GPU-side copy per refresh |
 | `Vulkan` | VP2 draws with OpenGL and the renderer's Hgi is Vulkan with an `HgiVulkanExternalBufferArena` | One GPU-side copy per refresh |
 | None | VP2 is not on OpenGL (for example Metal on macOS), or the Hgi has no external buffer arena | Not shareable; CPU path |
 
@@ -186,13 +187,58 @@ flowchart TB
 name. The buffer is registered, never adopted: VP2 owns it and recycles it on
 its own schedule, so the arena must never delete it.
 
-Registration is safe because VP2 and Storm share a single GL context. Commands
+Registration is safe because VP2 and Storm share a single GL context, which is
+true only while the render thread is off (see
+[OpenGL copy route](#opengl-copy-route)). Commands
 on one context execute in issue order, so a buffer VP2 recycles after the draw
 that read it is ordered after that read, and the driver defers the actual
 deletion until the GPU is done.
 
 `Refresh` is a no-op: the renderer is already looking at Maya's memory, so a
 rewrite in place is visible at the next draw.
+
+### OpenGL copy route
+
+With the render thread running, Storm draws frame N on its own GL context
+while VP2 evaluates frame N+1, and VP2 rewrites and recycles its buffers
+during that evaluation, before MayaHydra's render op is called again. A share
+group makes the buffers visible to both contexts but does not order their
+commands, and no fence can order a write VP2 has not issued yet. Registering
+VP2's buffers is therefore unsafe, and the renderer has to read memory VP2
+never writes.
+
+`MtohRenderOverride` calls `MhExtGpuBufferBridge::SetConsumerOnSeparateContext`
+when the render thread starts on OpenGL, and clears it when the thread stops.
+Every bridge made while it is set is an `OpenGLCopy` bridge:
+
+- `Create` allocates an immutable GL buffer on Maya's context, hands it to the
+  arena with `AdoptBuffer` (which, unlike `AllocateBuffer`, records the vertex
+  stride a direct bind needs), and copies Maya's bytes in. The arena deletes
+  the buffer once nothing references it and the renderer's work that named it
+  has retired.
+- `Refresh` repeats the copy into the existing buffer.
+
+The copy runs inside the render op, after the render thread interlock, which
+is the window after VP2's writes for this frame and before its writes for the
+next. Ordering across the two contexts is the render override's job, with two
+GL fences:
+
+- **Read after write.** After the scene push, a fence on Maya's context goes
+  with the render request (`RenderThreadRequest::producerFence`), and the
+  render thread queues a GPU wait on it before rendering.
+- **Write after read.** Before the next producer frame, Maya's context queues
+  a GPU wait on the fence the render thread signalled after its last render
+  (`RenderThread::OrderAfterLastRender`).
+
+Both waits are GPU-side (`glWaitSync`), so neither thread blocks. A fence that
+cannot be waited on is counted in the render thread's
+`sharedBufferFenceFailures` statistic. After an interlock timeout, the frame
+still in flight has no fence yet, so the copies are unordered against it, in
+the same way the scene push already races it.
+
+A stream records which kind of route published it, and a route change
+republishes the stream rather than refreshing it, so a copying bridge never
+copies into a buffer that VP2 owns.
 
 ### Vulkan route
 
@@ -223,7 +269,11 @@ Details that the implementation depends on:
   of every producer frame.
 - **Copy size versus allocation size.** See [Layout](#layout).
 - **GL error hygiene.** Pending GL errors left by Maya are drained before each
-  import and copy, so a stale error does not fail a good copy.
+  import, so a stale error does not fail a good one. Copies are not checked
+  unless `TF_DEBUG=MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING` is set: on a
+  threaded driver `glGetError` waits for the driver thread, and a deforming
+  scene copies every stream every frame. A rejected copy then leaves the
+  stream one frame stale instead of falling back to the CPU path.
 
 ## Publishing a stream
 
@@ -270,7 +320,7 @@ published:
 - **OpenGL (zero copy):** the renderer is bound to Maya's buffer itself, so a
   new GL name is a different allocation and must be republished with a new
   external buffer.
-- **Vulkan (copying):** the renderer is bound to the bridge's own allocation,
+- **OpenGL copy and Vulkan (copying):** the renderer is bound to the bridge's own allocation,
   so a new GL name only changes where the copy reads from. VP2 recycles buffer
   names from frame to frame during playback; treating each one as a new
   publication would allocate a fresh exportable buffer per object per frame
@@ -299,7 +349,7 @@ size:
 - `copyByteSize = byteOffset + (numElements - 1) * stride + elementSize` is
   the exact span the stream occupies in Maya's buffer. On an interleaved buffer
   `byteSize` can exceed Maya's real allocation, which is harmless for a bounds
-  check but would make a copy read out of range. The Vulkan route copies
+  check but would make a copy read out of range. The copying routes copy
   `copyByteSize`.
 
 ### Ownership and lifetime
@@ -470,7 +520,8 @@ box is used only when Maya reports none.
 ## Frame synchronization (Vulkan route)
 
 The OpenGL route needs no explicit synchronization because producer and
-consumer share one GL context. The Vulkan route writes into memory the Vulkan
+consumer share one GL context. The OpenGL copy route uses GL fences, described
+in [OpenGL copy route](#opengl-copy-route). The Vulkan route writes into memory the Vulkan
 renderer reads, from a different API, so the two sides are bracketed with a
 pair of binary semaphores created by the arena and imported into GL:
 

@@ -15,6 +15,9 @@
 //
 
 #include "envSettings.h"
+
+#include <mayaHydraLib/snapshot/snapshotEnvSettings.h>
+
 #include <pxr/base/tf/envSetting.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -50,6 +53,12 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
+    }
+
+    bool usePipelineOverlap()
+    {
+        // Registered in mayaHydraLib, next to the frame publication boundary it implies.
+        return IsPipelineOverlapEnabled();
     }
 
     bool hdArnoldUseV2RenderSettings()

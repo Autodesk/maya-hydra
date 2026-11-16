@@ -339,6 +339,12 @@ public:
     static void SetRenderItemOverrideEnabled(bool enabled) { _renderItemOverrideEnabled = enabled; }
     static bool IsRenderItemOverrideEnabled() { return _renderItemOverrideEnabled; }
 
+    /// Set while a render thread may be inside Hydra sync between render ops. Removals a
+    /// Maya callback asks for are then queued and applied by the next UpdateRenderItems,
+    /// which the render override runs behind its render thread interlock. Turning it off
+    /// applies whatever is queued. Main thread.
+    void SetDeferCallbackRemovals(bool defer);
+
 private:
 
     MayaHydraSceneIndex(
@@ -418,6 +424,12 @@ private:
 
     // See GetCurrentFrame().
     double _currentFrame = 0.0;
+
+    // See SetDeferCallbackRemovals(): render item fast ids whose removal waits for the next
+    // UpdateRenderItems.
+    bool             _deferCallbackRemovals = false;
+    std::vector<int> _deferredRenderItemRemovals;
+    void             _ApplyDeferredRenderItemRemovals();
 
     // Velocity motion samples (MAYAHYDRA_MOTION_SAMPLING_MODE=velocity): adapters
     // whose last published keys carry motion. A frame that brings an adapter no
