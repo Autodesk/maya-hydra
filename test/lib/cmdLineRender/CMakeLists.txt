@@ -595,7 +595,13 @@ function(_add_usdProxyShapeRenderSettings_test test_name renderer output_subdir 
     _mayaHydra_setup_test_common_path_vars()
     list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
     _mayaHydra_setup_test_common_defaults("${test_name}")
-    _mayaHydra_setup_test_plugins()
+    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
+    _mayaHydra_test_uses_prman(_uses_prman "${renderer}" "${parsed_labels}")
+    if(_uses_prman)
+        _mayaHydra_setup_test_plugins()
+    else()
+        _mayaHydra_setup_test_plugins(EXCLUDE_PRMAN)
+    endif()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
@@ -614,7 +620,6 @@ function(_add_usdProxyShapeRenderSettings_test test_name renderer output_subdir 
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "TF_FATAL_VERIFY=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
-    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
     apply_labels_to_test("${parsed_labels}" ${test_name})
 
 endfunction()
@@ -841,7 +846,14 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
     _mayaHydra_setup_test_common_path_vars()
     list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
     _mayaHydra_setup_test_common_defaults("${test_name}")
-    _mayaHydra_setup_test_plugins()
+    # Always renders with HdArnold, so only the labels can call for PRMan.
+    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
+    _mayaHydra_test_uses_prman(_uses_prman "" "${parsed_labels}")
+    if(_uses_prman)
+        _mayaHydra_setup_test_plugins()
+    else()
+        _mayaHydra_setup_test_plugins(EXCLUDE_PRMAN)
+    endif()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
@@ -851,7 +863,6 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_IGNORE_DIALOGS=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
-    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
     apply_labels_to_test("${parsed_labels}" ${test_name})
 endfunction()
 

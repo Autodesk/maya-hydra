@@ -33,6 +33,31 @@ if(NOT ADDITIONAL_PXR_PLUGINPATH_NAME AND DEFINED ENV{ADDITIONAL_PXR_PLUGINPATH_
         "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)" FORCE)
 endif()
 
+# HdPrman delegate path (extracted package, not merged into USD).
+# Sources (first wins): -DPRMAN_DELEGATE_PLUGIN_PATH=... or $ENV{PRMAN_DELEGATE_PLUGIN_PATH}
+if((NOT DEFINED PRMAN_DELEGATE_PLUGIN_PATH OR "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "") AND DEFINED ENV{PRMAN_DELEGATE_PLUGIN_PATH} AND NOT "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+    set(PRMAN_DELEGATE_PLUGIN_PATH "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" CACHE PATH "Path containing HdPrman plugInfo.json" FORCE)
+endif()
+
+# The HdPrman delegate artifact encodes the USD version it was built against in
+# its directory name (e.g. HydraPRManUSD26.05-PRMan27.1...).  A delegate built
+# against another USD fails to load, and its load errors break unrelated
+# renderers, so keep it out of the test environment.  If the name carries no
+# version, the delegate is used as is.
+set(MAYAHYDRA_TEST_PRMAN_ENABLED TRUE)
+if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL ""
+        AND DEFINED PXR_VERSION
+        AND PRMAN_DELEGATE_PLUGIN_PATH MATCHES "USD([0-9]+)\\.([0-9]+)")
+    math(EXPR _prman_pxr_version "${CMAKE_MATCH_1} * 100 + ${CMAKE_MATCH_2}")
+    if(NOT _prman_pxr_version EQUAL PXR_VERSION)
+        message(WARNING "HdPrman delegate at ${PRMAN_DELEGATE_PLUGIN_PATH} was built for "
+            "USD ${CMAKE_MATCH_1}.${CMAKE_MATCH_2}, but building against PXR_VERSION "
+            "${PXR_VERSION}: PRMan is excluded from the test environment.")
+        set(MAYAHYDRA_TEST_PRMAN_ENABLED FALSE)
+    endif()
+    unset(_prman_pxr_version)
+endif()
+
 # Define the single proper USD install location. When the "cut" build stage is used, or when the
 # POST_ZIPS option is enabled in Jenkins, a copy of the USD build will be done so that it exists 
 # besides mayaHydra and can be packaged together with it. We therefore want to point only to that
@@ -200,7 +225,12 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_DEFAULT_SURFACE_SHADER=standardSurface")
 
-    _mayaHydra_setup_test_plugins()
+    _mayaHydra_test_uses_prman(_uses_prman "${RENDERER}" "${ALL_LABELS}")
+    if(_uses_prman)
+        _mayaHydra_setup_test_plugins()
+    else()
+        _mayaHydra_setup_test_plugins(EXCLUDE_PRMAN)
+    endif()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
@@ -363,9 +393,29 @@ function(_mayaHydra_setup_test_common_defaults test_name)
     endforeach()
 endfunction()
 
+# Set out_var to TRUE if a test renders with PRMan, as given by its renderer
+# name or by the "prman" label (from a depOnPlugins:prman tag group), and to
+# FALSE otherwise.  Either argument may be empty.
+function(_mayaHydra_test_uses_prman out_var renderer labels)
+    if("${renderer}" STREQUAL "HdPrmanLoaderRendererPlugin" OR "prman" IN_LIST labels)
+        set(${out_var} TRUE PARENT_SCOPE)
+    else()
+        set(${out_var} FALSE PARENT_SCOPE)
+    endif()
+endfunction()
+
 # Emulate what the module files for mayaHydra, mayaUsdPlugin, and other plugins
 # would do.
+#
+# _mayaHydra_setup_test_plugins([EXCLUDE_PRMAN])
+#
+#   EXCLUDE_PRMAN  - keep the PRMan delegate and RenderMan runtime out of the
+#                    test environment.  Pass it for tests that do not render
+#                    with PRMan (see _mayaHydra_test_uses_prman), so that a
+#                    PRMan delegate failing to load cannot affect them.
 function(_mayaHydra_setup_test_plugins)
+    cmake_parse_arguments(_SETUP "EXCLUDE_PRMAN" "" "" ${ARGN})
+
     # mayaHydra
     list(APPEND MAYAHYDRA_VARNAME_PATH
          "${CMAKE_INSTALL_PREFIX}/lib")
@@ -492,9 +542,7 @@ function(_mayaHydra_setup_test_plugins)
     # prman: delegate path (extracted package, not merged into USD) and runtime
     # Platform selection driven by .yaml; if vars are set, configure test env.
     # Sources (first wins): -DVar=... or $ENV{Var} (ENV fallback for CI/standard RenderMan setup)
-    if((NOT DEFINED PRMAN_DELEGATE_PLUGIN_PATH OR "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "") AND DEFINED ENV{PRMAN_DELEGATE_PLUGIN_PATH} AND NOT "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
-        set(PRMAN_DELEGATE_PLUGIN_PATH "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" CACHE PATH "Path containing HdPrman plugInfo.json" FORCE)
-    endif()
+    # PRMAN_DELEGATE_PLUGIN_PATH is resolved once, at the top of this file.
     if((NOT DEFINED RMANTREE OR "${RMANTREE}" STREQUAL "") AND DEFINED ENV{RMANTREE} AND NOT "$ENV{RMANTREE}" STREQUAL "")
         set(RMANTREE "$ENV{RMANTREE}" CACHE PATH "RenderMan installation root" FORCE)
     endif()
@@ -507,7 +555,9 @@ function(_mayaHydra_setup_test_plugins)
     # Only enable PRMan on Windows: tests and plugins are supported there.
     # On OSX/Linux, loading PRMan artifacts causes TfType redefinition errors
     # (UsdSkelImaging* already defined) due to conflicting USD plugin loads.
-    if(IS_WINDOWS)
+    # Also skip PRMan when the delegate was built against another USD
+    # (MAYAHYDRA_TEST_PRMAN_ENABLED), or when the test does not use it.
+    if(IS_WINDOWS AND MAYAHYDRA_TEST_PRMAN_ENABLED AND NOT _SETUP_EXCLUDE_PRMAN)
         if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
             list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PRMAN_DELEGATE_PLUGIN_PATH}")
@@ -545,7 +595,8 @@ function(_mayaHydra_setup_test_plugins)
             set(MAYAHYDRA_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
         endif()
     else()
-        # Explicitly clear PRMan env vars on non-Windows to avoid accidental loads.
+        # Explicitly clear PRMan env vars when PRMan is not used, so that values
+        # inherited from the calling environment cannot cause accidental loads.
         list(APPEND ALL_TEST_VARS PRMAN_DELEGATE_PLUGIN_PATH RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE RMAN_SHADERPATH)
         set(MAYAHYDRA_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "")
         set(MAYAHYDRA_VARNAME_RMANTREE "")
@@ -1237,7 +1288,12 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
         "MAYA_DEFAULT_SURFACE_SHADER=standardSurface")
 
     # Emulate what the module files for mayaHydra and mayaUsdPlugin would do.
-    _mayaHydra_setup_test_plugins()
+    _mayaHydra_test_uses_prman(_uses_prman "${ARG_RENDERER}" "${ALL_LABELS}")
+    if(_uses_prman)
+        _mayaHydra_setup_test_plugins()
+    else()
+        _mayaHydra_setup_test_plugins(EXCLUDE_PRMAN)
+    endif()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
@@ -1436,7 +1492,13 @@ function(mayaHydra_add_mayabatch_render_test SCENE_FILE_LABELED)
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_DEFAULT_SURFACE_SHADER=standardSurface")
 
-    _mayaHydra_setup_test_plugins()
+    # No renderer argument: the scene's renderer is used, so rely on labels.
+    _mayaHydra_test_uses_prman(_uses_prman "" "${ALL_LABELS}")
+    if(_uses_prman)
+        _mayaHydra_setup_test_plugins()
+    else()
+        _mayaHydra_setup_test_plugins(EXCLUDE_PRMAN)
+    endif()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
