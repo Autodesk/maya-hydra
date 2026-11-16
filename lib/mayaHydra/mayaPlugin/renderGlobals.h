@@ -67,9 +67,13 @@ public:
     // Returning the settings stored on "defaultRenderGlobals"
     static const MtohRenderGlobals& GetInstance(bool storeUserSettings = false);
 
-    // Inform mayaHydra one of the settings stored on "defaultRenderGlobals" has changed
-    static const MtohRenderGlobals&
-    GlobalChanged(const GlobalParams&, bool storeUserSetting = false);
+    // Inform mayaHydra one of the settings stored on "defaultRenderGlobals" has changed.
+    // valueChanged, when given, receives whether a value read from the node differs from the one
+    // that was in use.
+    static const MtohRenderGlobals& GlobalChanged(
+        const GlobalParams&,
+        bool  storeUserSetting = false,
+        bool* valueChanged = nullptr);
 
     // Check that the attribute given affects the renderer given.
     static bool AffectsRenderer(const TfToken& mangledAttr, const TfToken& rendererName);
@@ -79,6 +83,14 @@ public:
 
     // Hook the renderer settings into the defaultRenderGlobals Attribute Editor
     static void RegisterAttributeEditorCallback();
+
+    // Take in the settings of the scene just opened or created, see SceneChanged().
+    static void RegisterSceneCallbacks();
+    static void DeregisterSceneCallbacks();
+
+    // Re-read the settings stored on "defaultRenderGlobals" after the scene changed, without
+    // creating attributes or storing user settings.
+    static void SceneChanged();
 
     // Build a UI options menu for the renderer and it's settings list
     static void BuildOptionsMenu(
@@ -93,7 +105,12 @@ public:
         const TfTokenVector& attrNames = {}) const;
 
 private:
-    static const MtohRenderGlobals& GetInstance(const GlobalParams&, bool storeUserSetting);
+    // createAttributes false reads the node as it is: only the renderer settings it has are
+    // held afterwards.
+    static const MtohRenderGlobals& GetInstance(
+        const GlobalParams&,
+        bool storeUserSetting,
+        bool createAttributes = true);
 
     class MtohSettingFilter;
     using RendererSettings = std::unordered_map<TfToken, VtValue, TfToken::HashFunctor>;

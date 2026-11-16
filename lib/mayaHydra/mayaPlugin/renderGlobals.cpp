@@ -34,6 +34,7 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MGlobal.h>
 #include <maya/MPlug.h>
+#include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MStatus.h>
 
@@ -90,40 +91,10 @@ constexpr auto _renderOverride_PreAmble = R"mel(
 global proc mtohRenderOverride_ApplySetting(string $renderer, string $attr, string $node) {
     // This exists as a global function for the difference in how it is invoked from editorTemplate/AE or option-boxes
     // -updateRenderGlobals queues the viewport refresh itself.
-    mayaHydra -r $renderer -updateRenderGlobals $attr;
-}
-// Last value the Attribute Editor saw for each attribute, as parallel arrays.
-global string $gMtohRenderOverrideAEAttrs[];
-global string $gMtohRenderOverrideAEValues[];
-// The Attribute Editor also runs a control's command when it builds the control. Applying then
-// would push every setting of every renderer, so only apply when the value really changed.
-global proc mtohRenderOverride_AEApplySetting(string $renderer, string $attr, string $node) {
-    global string $gMtohRenderOverrideAEAttrs[];
-    global string $gMtohRenderOverrideAEValues[];
-    string $plug = "defaultRenderGlobals." + $attr;
-    string $value;
-    // Colors are float3: getAttr returns an array, which does not convert to a string.
-    string $type = `getAttr -type $plug`;
-    if (gmatch($type, "*[23]")) {
-        float $components[] = `getAttr $plug`;
-        for ($c in $components) {
-            $value += $c + " ";
-        }
-    } else {
-        $value = `getAttr $plug`;
-    }
-    int $i = stringArrayFind($attr, 0, $gMtohRenderOverrideAEAttrs);
-    if ($i < 0) {
-        $i = size($gMtohRenderOverrideAEAttrs);
-        $gMtohRenderOverrideAEAttrs[$i] = $attr;
-        $gMtohRenderOverrideAEValues[$i] = $value;
-        return;
-    }
-    if ($gMtohRenderOverrideAEValues[$i] == $value) {
-        return;
-    }
-    $gMtohRenderOverrideAEValues[$i] = $value;
-    mtohRenderOverride_ApplySetting($renderer, $attr, $node);
+    // The Attribute Editor also runs this when it builds a control, for every setting of every
+    // renderer. -updateRenderGlobals does nothing when the value is the one already in use.
+    // -userDefaults: an attribute this has to create starts from the user's setting.
+    mayaHydra -r $renderer -userDefaults -updateRenderGlobals $attr;
 }
 // Label column width of the option box being built. Each renderer's OptionBox proc sets it from
 // its longest label (see MtohRenderGlobals::BuildOptionsMenu) before building its controls.
@@ -150,7 +121,6 @@ global proc mtohRenderOverride_AddAttribute(string $renderer, string $descriptio
         string $ctrl = `attrControlGrp -label $label -attribute ("defaultRenderGlobals." + $attr) -changeCommand $command -annotation $description`;
         mtohRenderOverride_FitLabel($ctrl);
     } else {
-        $command = "mtohRenderOverride_AEApplySetting " + $renderer + " " + $attr;
         editorTemplate -label $label -adc $attr $command -annotation $description;
     }
 }
@@ -193,6 +163,9 @@ global proc mtohRenderOverride_AEAttributesCallback(string $nodeName) {
         mtohRenderOverride_GlobalOptions(1);
         for ($renderer in `mayaHydra -lr`) {
             string $displayName = `mayaHydra -getRendererDisplayName -r $renderer`;
+            // A renderer's settings are only added to defaultRenderGlobals once it has drawn or
+            // its option box was opened: add them now, so the controls have attributes to show.
+            mayaHydra -createRenderGlobals -r $renderer -userDefaults;
             editorTemplate -beginLayout $displayName -collapse 1;
                 string $optionsCmd = "{{overridePrefix}}" + $renderer + "Options(1);";
                 eval($optionsCmd);
@@ -667,6 +640,30 @@ template <typename T> bool _SetColorOptionVar(const MString& attrName, const T& 
     return rval;
 }
 
+// The readers below take the value held in memory in "out" and replace it with the plug's.
+// MtohRenderGlobals::GlobalChanged() uses these two to tell whether the plug held a new value.
+
+// Set when a read replaces the value held in memory with a different one.
+bool _readChangedValue = false;
+// While set, a read that changes nothing does not store the user setting either.
+bool _storeOnlyChangedValues = false;
+
+bool _NoteRead(bool changed)
+{
+    _readChangedValue = _readChangedValue || changed;
+    return changed;
+}
+
+// The value a renderer setting holds in memory, or its default when it was never read.
+template <typename T, typename Settings>
+T _CurrentSetting(const Settings& settings, const TfToken& key, const VtValue& defaultValue)
+{
+    const auto it = settings.find(key);
+    return (it != settings.end() && it->second.template IsHolding<T>())
+        ? it->second.template UncheckedGet<T>()
+        : defaultValue.UncheckedGet<T>();
+}
+
 template <typename T>
 bool _GetAttribute(
     const MFnDependencyNode& node,
@@ -678,8 +675,10 @@ bool _GetAttribute(
     if (plug.isNull()) {
         return false;
     }
+    const T previous = out;
     _GetFromPlug<T>(plug, out);
-    if (storeUserSetting) {
+    const bool changed = _NoteRead(!(previous == out));
+    if (storeUserSetting && (changed || !_storeOnlyChangedValues)) {
         _SetOptionVar(attrName, out);
     }
     return true;
@@ -697,13 +696,16 @@ void _GetColorAttribute(
         return;
     }
 
+    const GfVec3f previous = out;
     out[0] = plug.child(0).asFloat();
     out[1] = plug.child(1).asFloat();
     out[2] = plug.child(2).asFloat();
     if (alphaOp) {
         // if alphaOp is provided, it is responsible for storing the settings
         alphaOp(out, storeUserSetting);
-    } else {
+    } else if (
+        const bool changed = _NoteRead(previous != out);
+        storeUserSetting && (changed || !_storeOnlyChangedValues)) {
         _SetColorOptionVar(attrName, out);
     }
 }
@@ -714,7 +716,7 @@ void _GetColorAttribute(
     GfVec4f&                 out,
     bool                     storeUserSetting)
 {
-    GfVec3f color3;
+    GfVec3f color3(out[0], out[1], out[2]);
     _GetColorAttribute(
         node, attrName, color3, storeUserSetting, [&](GfVec3f& color3, bool storeUserSetting) {
             const auto plugA = node.findPlug(_AlphaAttribute(attrName), true);
@@ -722,11 +724,13 @@ void _GetColorAttribute(
                 TF_WARN("[mayaHydra] No Alpha plug for GfVec4f");
                 return;
             }
+            const GfVec4f previous = out;
             out[0] = color3[0];
             out[1] = color3[1];
             out[2] = color3[2];
             out[3] = plugA.asFloat();
-            if (storeUserSetting) {
+            const bool changed = _NoteRead(previous != out);
+            if (storeUserSetting && (changed || !_storeOnlyChangedValues)) {
                 _SetColorOptionVar(attrName, out);
             }
         });
@@ -1390,11 +1394,24 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
     return mayaObject;
 }
 
-const MtohRenderGlobals&
-MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting)
+const MtohRenderGlobals& MtohRenderGlobals::GetInstance(
+    const GlobalParams& params,
+    bool                storeUserSetting,
+    bool                createAttributes)
 {
     static MtohRenderGlobals globals;
-    const auto               obj = CreateAttributes(params);
+    MObject                  obj;
+    if (createAttributes) {
+        obj = CreateAttributes(params);
+    } else {
+        MSelectionList slist;
+        slist.add(_tokens->defaultRenderGlobals.GetText());
+        if (slist.length() != 0) {
+            slist.getDependNode(0, obj);
+        }
+        // Only the settings found on the node are held from here on, see below.
+        globals._rendererSettings.clear();
+    }
     if (obj.isNull()) {
         return globals;
     }
@@ -1437,13 +1454,16 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             return globals;
         }
     }
+    // The attribute is 1024 times smaller than the parameter: read it in its own unit, so the
+    // reader compares like with like.
+    int textureMemoryPerTexture = globals.delegateParams.textureMemoryPerTexture / 1024;
     if (filter(_tokens->mtohTextureMemoryPerTexture)
         && _GetAttribute(
             node,
             filter.mayaString(),
-            globals.delegateParams.textureMemoryPerTexture,
+            textureMemoryPerTexture,
             storeUserSetting)) {
-        globals.delegateParams.textureMemoryPerTexture *= 1024;
+        globals.delegateParams.textureMemoryPerTexture = textureMemoryPerTexture * 1024;
         if (filter.attributeFilter()) {
             return globals;
         }
@@ -1483,11 +1503,10 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
         }
     }
     if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
-#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
-        TfToken mode("Legacy Selection");
-#else
-        TfToken mode("Outline Selection");
-#endif
+        // Start from the mode in use (its default follows
+        // MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT), so the reader sees whether it changed.
+        TfToken mode(
+            globals.outlineSelectionHighlight ? "Outline Selection" : "Legacy Selection");
         _GetAttribute(
             node,
             filter.mayaString(),
@@ -1556,45 +1575,56 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
                 continue;
             }
 
+            // Reading without creating: a setting the node does not have keeps no value.
+            if (!createAttributes && node.findPlug(filter.mayaString(), true).isNull()) {
+                continue;
+            }
+            // A setting with no value in memory was never read, so no renderer uses a value
+            // of it yet. Its first read is not a change, and is not stored as a user setting
+            // when a single attribute is reported.
+            const bool hadValue = settings.find(filter.attrName()) != settings.end();
+            const bool changedBefore = _readChangedValue;
+            const bool store = storeUserSetting && (hadValue || !_storeOnlyChangedValues);
+
             if (attr.defaultValue.IsHolding<bool>()) {
-                auto v = attr.defaultValue.UncheckedGet<bool>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<bool>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<int>()) {
-                auto v = attr.defaultValue.UncheckedGet<int>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<int>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<unsigned int>()) {
-                auto v = attr.defaultValue.UncheckedGet<unsigned int>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<unsigned int>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<float>()) {
-                auto v = attr.defaultValue.UncheckedGet<float>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<float>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<GfVec3f>()) {
-                auto v = attr.defaultValue.UncheckedGet<GfVec3f>();
-                _GetColorAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<GfVec3f>(settings, filter.attrName(), attr.defaultValue);
+                _GetColorAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<GfVec4f>()) {
-                auto v = attr.defaultValue.UncheckedGet<GfVec4f>();
-                _GetColorAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<GfVec4f>(settings, filter.attrName(), attr.defaultValue);
+                _GetColorAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<TfToken>()) {
-                auto v = attr.defaultValue.UncheckedGet<TfToken>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<TfToken>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<std::string>()) {
-                auto v = attr.defaultValue.UncheckedGet<std::string>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<std::string>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<TfEnum>()) {
-                auto v = attr.defaultValue.UncheckedGet<TfEnum>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<TfEnum>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<SdfAssetPath>()) {
-                auto v = attr.defaultValue.UncheckedGet<SdfAssetPath>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<SdfAssetPath>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else {
                 assert(
@@ -1606,6 +1636,9 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
                     attr.key.GetText(),
                     rendererName.GetText());
             }
+            if (!hadValue) {
+                _readChangedValue = changedBefore;
+            }
             if (filter.attributeFilter()) {
                 break;
             }
@@ -1614,15 +1647,64 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
     return globals;
 }
 
+namespace {
+
+MCallbackIdArray _sceneCallbackIds;
+
+void _SceneChangedCallback(void*) { MtohRenderGlobals::SceneChanged(); }
+
+} // namespace
+
+void MtohRenderGlobals::SceneChanged()
+{
+    // The node now holds another scene's settings. Take them in without creating attributes
+    // (that would modify the scene) and without storing user settings (nothing was edited), so
+    // that GlobalChanged() compares the next edit with what this scene holds. A renderer applies
+    // its settings when it initializes, as before.
+    constexpr bool storeUserSetting = false;
+    constexpr bool createAttributes = false;
+    GetInstance(GlobalParams(), storeUserSetting, createAttributes);
+}
+
+void MtohRenderGlobals::RegisterSceneCallbacks()
+{
+    for (const auto message : { MSceneMessage::kAfterNew, MSceneMessage::kAfterOpen }) {
+        MStatus           status;
+        const MCallbackId id
+            = MSceneMessage::addCallback(message, _SceneChangedCallback, nullptr, &status);
+        if (status) {
+            _sceneCallbackIds.append(id);
+        }
+    }
+}
+
+void MtohRenderGlobals::DeregisterSceneCallbacks()
+{
+    MMessage::removeCallbacks(_sceneCallbackIds);
+    _sceneCallbackIds.clear();
+}
+
 const MtohRenderGlobals& MtohRenderGlobals::GetInstance(bool storeUserSetting)
 {
     return GetInstance(GlobalParams(), storeUserSetting);
 }
 
-const MtohRenderGlobals&
-MtohRenderGlobals::GlobalChanged(const GlobalParams& params, bool storeUserSetting)
+const MtohRenderGlobals& MtohRenderGlobals::GlobalChanged(
+    const GlobalParams& params,
+    bool                storeUserSetting,
+    bool*               valueChanged)
 {
-    return GetInstance(params, storeUserSetting);
+    // For a single attribute, an unchanged value is not stored as a user setting either: the
+    // Attribute Editor reports every attribute it shows, changed or not.
+    const bool singleAttribute = !(params.filterIsRenderer || params.filter.IsEmpty());
+    _readChangedValue = false;
+    _storeOnlyChangedValues = singleAttribute;
+    const MtohRenderGlobals& globals = GetInstance(params, storeUserSetting);
+    _storeOnlyChangedValues = false;
+    if (valueChanged) {
+        *valueChanged = _readChangedValue;
+    }
+    return globals;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
