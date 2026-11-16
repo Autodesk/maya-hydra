@@ -1,12 +1,10 @@
-//Maya ASCII 2028ff01 scene
-//Name: sceneA.ma
+//Maya ASCII scene
+//Name: cubeRefineLevel2.ma
 //Last modified: Mon, Nov 16, 2026 10:58:36 AM
 //Codeset: 1252
-requires maya "2028ff01";
 requires -nodeType "UsdDefaultSettings" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.39.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
-fileInfo "product" "Maya 2028";
 fileInfo "version" "Preview Release";
 fileInfo "cutIdentifier" "202611141540-000000";
 fileInfo "osv" "Windows 11 Enterprise v2009 (Build: 26200)";
