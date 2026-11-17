@@ -16,6 +16,7 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
+import rendererUtils
 
 # What:   In outline mode, a shaded panel never gets a prim for a shape's VP2 selection
 #         wireframe (DormantPolyWire), neither while the shape is selected nor after it is
@@ -31,6 +32,9 @@ import mtohUtils
 #
 # Runs on the stock render item path (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0, see CMakeLists.txt): a
 # render item override carrier's wire is always translated, then hidden.
+#
+# Storm only: with Flash, Maya never sends the dormant wire render item to Hydra, so there is no
+# wire prim to count.
 class TestUnneededHighlightWire(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
@@ -38,9 +42,14 @@ class TestUnneededHighlightWire(mtohUtils.MayaHydraBaseTestCase):
     def wirePrims(self):
         return [p for p in self.getIndex() if 'dormantpolywire' in p.lower()]
 
-    def test_UnneededHighlightWire(self):
+    def skipUnlessWirePrimsExist(self):
         if self.selectionHighlightMode() != mtohUtils.SELECTION_HIGHLIGHT_MODE_OUTLINE:
             self.skipTest("Outline mode only: legacy mode draws the wire as the highlight.")
+        if rendererUtils.getTestRenderer() == rendererUtils.TEST_RENDERER_FLASH:
+            self.skipTest("Storm only: Maya sends no dormant wire render item to Flash.")
+
+    def test_UnneededHighlightWire(self):
+        self.skipUnlessWirePrimsExist()
 
         panel = self.activeEditor
         cmds.modelEditor(panel, edit=True, displayAppearance='smoothShaded',
@@ -66,8 +75,7 @@ class TestUnneededHighlightWire(mtohUtils.MayaHydraBaseTestCase):
         self.assertEqual(len(self.wirePrims()), 1, "No wire prim in a wireframe panel.")
 
     def test_TemplatedShapeKeepsItsWire(self):
-        if self.selectionHighlightMode() != mtohUtils.SELECTION_HIGHLIGHT_MODE_OUTLINE:
-            self.skipTest("Outline mode only: legacy mode draws the wire as the highlight.")
+        self.skipUnlessWirePrimsExist()
 
         panel = self.activeEditor
         cmds.modelEditor(panel, edit=True, displayAppearance='smoothShaded',
