@@ -118,10 +118,13 @@ public:
     /// thread but made current, released and destroyed on the render thread;
     /// \p hgi supplies this thread's HgiGL arena and is ignored for non-GL
     /// backends. Both may be null. Returns false, having rejoined the thread,
-    /// when the context could not be made current.
+    /// when the context could not be made current. \p presentBridge, when
+    /// given, prepares each frame on this thread (see
+    /// RenderThreadPresentBridge::Prepare) and must outlive Stop().
     bool Start(RenderCallback renderCallback,
                std::unique_ptr<RenderThreadContext> context = nullptr,
-               pxr::Hgi* hgi = nullptr);
+               pxr::Hgi* hgi = nullptr,
+               RenderThreadPresentBridge* presentBridge = nullptr);
 
     /// Drains pending requests and joins the thread. GPU resources must be
     /// freed on the owning context after this returns.
@@ -232,6 +235,7 @@ private:
     /// in which case the render runs on whatever arena Hgi defaults to.
     pxr::Hgi*                      _hgi{nullptr};
     pxr::HgiGLContextArenaHandle   _contextArena;
+    RenderThreadPresentBridge*     _presentBridge{nullptr};
     std::mutex                     _contextMutex;
     std::condition_variable        _contextCv;
     ContextState                   _contextState{ContextState::Pending};

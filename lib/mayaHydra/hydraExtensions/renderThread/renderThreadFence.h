@@ -38,9 +38,9 @@ namespace MAYAHYDRA_NS_DEF {
 /// context did the work. Immutable after construction, which is what makes it
 /// safe to share without a lock.
 ///
-/// For Vulkan the fence is a no-op: HgiInteropVulkan's _vkComplete/_glComplete
-/// semaphores already order the composite after the render and the next blit
-/// after the composite.
+/// For Vulkan the fence is a no-op: each HgiInteropVulkan slot's vkComplete and
+/// glComplete semaphores already order the composite after the copy and the
+/// next copy into that slot after the composite.
 class MAYAHYDRALIB_API RenderThreadFence
 {
 public:

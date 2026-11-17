@@ -40,6 +40,7 @@
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/texture.h>
 #include <pxr/imaging/hgi/types.h>
+#include <pxr/imaging/hgiInterop/hgiInterop.h>
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
@@ -86,6 +87,14 @@ struct CompletedFrame
     /// when they are not from a pair (the AOV-copy bypass). The main thread
     /// hands the index back so the write-after-read fence has a slot to go to.
     int copyIndex{-1};
+
+#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+    /// Set when the present bridge prepared this frame on the render thread
+    /// (Vulkan). The interop then owns the copy and its GPU ordering, so
+    /// srcColor and srcDepth are the live AOV, kept only for diagnostics, and
+    /// copyIndex is -1.
+    pxr::HgiInteropFrame interopFrame;
+#endif
 
     bool valid{false};
 };

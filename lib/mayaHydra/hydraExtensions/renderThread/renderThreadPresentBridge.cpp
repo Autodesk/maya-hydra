@@ -44,6 +44,7 @@ namespace MAYAHYDRA_NS_DEF
 // HgiInterop::TransferToApp, which dispatches on the source Hgi's API: GL
 // sources composite same-API, and Vulkan sources go through HgiInteropVulkan,
 // which owns the cross-API semaphore and GL_EXT_memory_object protocol itself.
+// Vulkan frames are prepared on the render thread and only composited here.
 class GlPresentBridge : public RenderThreadPresentBridge
 {
 public:
@@ -62,20 +63,8 @@ public:
             TF_CODING_ERROR("GlPresentBridge::Composite: null source Hgi or color texture");
             return;
         }
-
-        // GetRenderTexture returns an empty handle when the pass has no depth
-        // AOV and TransferToApp accepts that quietly, so manipulators and
-        // wireframe silently sort against Maya's stale depth. Count it.
-        if (!srcDepth)
+        if (!_ShouldComposite(bool(srcDepth), dstRegion))
         {
-            RenderThreadStats::instance().RecordPresentWithoutDepth();
-        }
-
-        // A zero-area destination blits nothing and leaves the previous frame
-        // in place, so the viewport appears frozen rather than reporting.
-        if (dstRegion[2] <= 0 || dstRegion[3] <= 0)
-        {
-            RenderThreadStats::instance().RecordPresentSkipped();
             return;
         }
 
@@ -90,6 +79,42 @@ public:
             dstRegion);
     }
 
+#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+    HgiInteropFrame Prepare(
+        Hgi*                   srcHgi,
+        HgiTextureHandle const& srcColor,
+        HgiTextureHandle const& srcDepth) override
+    {
+        // Only Vulkan: its copy into the interop's GL-importable storage is
+        // the render thread's copy of the AOV, and moving it here keeps the
+        // queue submission and any wait off Maya's thread. A GL source has
+        // nothing to prepare, and keeps the render thread's own copy pairs.
+        if (!srcHgi || !srcColor || srcHgi->GetAPIName() != HgiTokens->Vulkan)
+        {
+            return {};
+        }
+        return _interop.PrepareTransfer(srcHgi, srcColor, srcDepth, HgiTokens->OpenGL);
+    }
+
+    void CompositePrepared(
+        HgiInteropFrame const& frame,
+        bool                   hasDepth,
+        VtValue const&         dstFramebuffer,
+        GfVec4i const&         dstRegion) override
+    {
+        if (!frame)
+        {
+            TF_CODING_ERROR("GlPresentBridge::CompositePrepared: no prepared frame");
+            return;
+        }
+        if (!_ShouldComposite(hasDepth, dstRegion))
+        {
+            return;
+        }
+        _interop.TransferToApp(frame, dstFramebuffer, dstRegion);
+    }
+#endif
+
     TfToken GetSourceApiName(Hgi* srcHgi) const override
     {
         if (!srcHgi) return TfToken();
@@ -97,6 +122,28 @@ public:
     }
 
 private:
+    static bool _ShouldComposite(bool hasDepth, GfVec4i const& dstRegion)
+    {
+        // GetRenderTexture returns an empty handle when the pass has no depth
+        // AOV and TransferToApp accepts that quietly, so manipulators and
+        // wireframe silently sort against Maya's stale depth. Count it.
+        if (!hasDepth)
+        {
+            RenderThreadStats::instance().RecordPresentWithoutDepth();
+        }
+
+        // A zero-area destination blits nothing and leaves the previous frame
+        // in place, so the viewport appears frozen rather than reporting.
+        if (dstRegion[2] <= 0 || dstRegion[3] <= 0)
+        {
+            RenderThreadStats::instance().RecordPresentSkipped();
+            return false;
+        }
+        return true;
+    }
+
+    // Prepare runs on the render thread and the composites on the main thread.
+    // HgiInterop supports that split for prepared frames only.
     HgiInterop _interop;
 };
 

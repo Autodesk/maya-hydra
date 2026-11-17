@@ -43,6 +43,11 @@ set(SOURCES
     sceneIndexTreeWidget.cpp
 )
 
+if(PXR_VERSION VERSION_GREATER_EQUAL 2611)
+    list(APPEND HEADERS debugCodes.h)
+    list(APPEND SOURCES debugCodes.cpp)
+endif()
+
 # Get the versioning scheme used in the file download URLs : last two digits of the year + digits of the month
 # We first strip the major version (e.g. 0.23.8 -> 23.8)
 string(REGEX REPLACE "^[0-9]+\\.([0-9]+\\.[0-9]+)$" "\\1" USD_minor_patch_version ${USD_VERSION})
@@ -156,6 +161,9 @@ foreach(SOURCE IN ITEMS ${SOURCES})
     set(VTARRAY_GFVEC4F_TARGET_REPLACEMENT "return new Hdui_TypedArrayValueItemModel<GfVec3f>(value, parent);\n    }\n\n    if (value.IsHolding<VtArray<GfVec4f>>()) {\n        return new Hdui_TypedArrayValueItemModel<GfVec4f>(value, parent);\n    }")
     string(REGEX REPLACE "${VTARRAY_GFVEC4F_TARGET_REGEX}" "${VTARRAY_GFVEC4F_TARGET_REPLACEMENT}" FILE_CONTENTS "${FILE_CONTENTS}")
 
+    # Patched files live flat in PATCH_LOCATION, not under pxr/imaging/hdui/
+    string(REPLACE "#include \"pxr/imaging/hdui/" "#include \"" FILE_CONTENTS "${FILE_CONTENTS}")
+
     # Patch in '#include <QString>' to make sure we can use QLatin1StringView
     prepend_include(FILE_CONTENTS "#include <QString>")
 
@@ -172,6 +180,15 @@ foreach(HEADER IN ITEMS ${HEADERS})
     download(${HEADER})
 
     file(READ "${DOWNLOAD_LOCATION}/${HEADER}" FILE_CONTENTS)
+
+    string(REPLACE "#include \"pxr/imaging/hdui/" "#include \"" FILE_CONTENTS "${FILE_CONTENTS}")
+
+    # Upstream declares TF_DEBUG_CODES outside the pxr namespace, which only
+    # compiles when USD is built without PXR_USE_NAMESPACES.
+    if(HEADER STREQUAL "debugCodes.h" AND NOT FILE_CONTENTS MATCHES "PXR_NAMESPACE_OPEN_SCOPE")
+        string(REGEX REPLACE "(TF_DEBUG_CODES\\([^)]*\\);?)"
+            "PXR_NAMESPACE_OPEN_SCOPE\n\n\\1\n\nPXR_NAMESPACE_CLOSE_SCOPE" FILE_CONTENTS "${FILE_CONTENTS}")
+    endif()
 
     # Add DLL import/export support for Windows 
     # Insert 'HDUI_API' symbols for class declarations

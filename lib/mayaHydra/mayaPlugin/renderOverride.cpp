@@ -2771,8 +2771,9 @@ void MtohRenderOverride::_InitHydraResources(
             // anywhere else would be null. The thread then takes ownership.
             //
             // Vulkan submits to device queues rather than a current context, so it gets
-            // a null one and the thread skips MakeCurrent and the HgiGL arena. Ordering
-            // the composite against the render is HgiInteropVulkan's job there.
+            // a null one and the thread skips MakeCurrent and the HgiGL arena. The thread
+            // also copies each frame into HgiInteropVulkan's storage through the present
+            // bridge, which orders the composite against that copy with semaphores.
             const bool isVulkan = _hgi && _hgi->GetAPIName() == HgiTokens->Vulkan;
             std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadContext> context;
             bool contextReady = isVulkan;
@@ -2816,7 +2817,8 @@ void MtohRenderOverride::_InitHydraResources(
                         return result;
                     },
                     std::move(context),
-                    _hgi.get());
+                    _hgi.get(),
+                    _presentBridge.get());
 
                 // Start() returns false when the context would not come current on the
                 // thread, having already joined it.

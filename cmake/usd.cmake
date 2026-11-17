@@ -16,6 +16,8 @@
 function(init_usd)
     # Adjust PYTHONPATH, PATH
     mayaUsd_append_path_to_env_var("PYTHONPATH" "${PXR_USD_LOCATION}/lib/python")
+    # USD 0.26.11 and later install the pxr package to lib/site-packages.
+    mayaUsd_append_path_to_env_var("PYTHONPATH" "${PXR_USD_LOCATION}/lib/site-packages")
     if(WIN32)
         mayaUsd_append_path_to_env_var("PATH" "${PXR_USD_LOCATION}/bin;${PXR_USD_LOCATION}/lib")
     endif()

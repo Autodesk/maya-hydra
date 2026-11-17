@@ -627,8 +627,10 @@ function(_mayaHydra_setup_test_USD_paths)
         "PXR_USD_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}"
         "USD_INSTALL_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}")
     # Inherit any existing PYTHONPATH, but keep it at the end.
+    # USD 0.26.11 and later install the pxr package to lib/site-packages.
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-        "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/python")
+        "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/python"
+        "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/site-packages")
     if(IS_WINDOWS)
         list(APPEND MAYAHYDRA_VARNAME_PATH
             "${MAYAHYDRA_USD_INSTALL_LOCATION}/bin")

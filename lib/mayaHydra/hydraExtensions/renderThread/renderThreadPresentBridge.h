@@ -40,6 +40,7 @@
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/texture.h>
+#include <pxr/imaging/hgiInterop/hgiInterop.h>
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
@@ -77,6 +78,26 @@ public:
         pxr::HgiTextureHandle const& srcDepth,
         pxr::VtValue const&         dstFramebuffer,
         pxr::GfVec4i const&         dstRegion) = 0;
+
+#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+    /// Called on the render thread after a render: copy the AOV into the
+    /// bridge's own storage, without GL, for CompositePrepared. Returns an
+    /// empty frame when the source needs no preparation, in which case the
+    /// caller keeps its own copy of the AOV and calls Composite instead.
+    virtual pxr::HgiInteropFrame Prepare(
+        pxr::Hgi*                   srcHgi,
+        pxr::HgiTextureHandle const& srcColor,
+        pxr::HgiTextureHandle const& srcDepth) = 0;
+
+    /// Composite a frame returned by Prepare. Called on the main thread; the
+    /// interop orders the composite against the copy on the GPU, so there is
+    /// no fence to wait on first. \p hasDepth is for diagnostics only.
+    virtual void CompositePrepared(
+        pxr::HgiInteropFrame const& frame,
+        bool                        hasDepth,
+        pxr::VtValue const&         dstFramebuffer,
+        pxr::GfVec4i const&         dstRegion) = 0;
+#endif
 
     /// Returns the API name of the source Hgi (e.g. "OpenGL", "Vulkan").
     virtual pxr::TfToken GetSourceApiName(pxr::Hgi* srcHgi) const = 0;

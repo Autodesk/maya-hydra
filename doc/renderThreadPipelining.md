@@ -65,7 +65,10 @@ The render thread does not present.  It renders into AOVs and publishes them,
 and the main thread composites the most recent completed frame at the start of
 its next render operation.  Presentation is disabled on the render thread's
 passes because compositing goes through `HgiInterop`, whose GL calls belong to
-whichever context the presenting thread owns.
+whichever context the presenting thread owns.  Under Vulkan the render thread
+does the GL-free half, copying the frame into the interop's storage, and the
+main thread only composites it; see [Vulkan on the render
+thread](vulkanRenderThread.md).
 
 Colour and depth are both blitted, so Maya's own viewport overlays
 depth-compose against the composited scene.

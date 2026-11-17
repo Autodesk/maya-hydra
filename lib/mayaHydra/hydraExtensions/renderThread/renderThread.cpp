@@ -111,7 +111,8 @@ RenderThread::~RenderThread()
 bool
 RenderThread::Start(RenderCallback renderCallback,
                     std::unique_ptr<RenderThreadContext> context,
-                    Hgi* hgi)
+                    Hgi* hgi,
+                    RenderThreadPresentBridge* presentBridge)
 {
     if (_thread.joinable())
     {
@@ -121,6 +122,7 @@ RenderThread::Start(RenderCallback renderCallback,
     _renderCallback = std::move(renderCallback);
     _context = std::move(context);
     _hgi = hgi;
+    _presentBridge = presentBridge;
     _stop.store(false, std::memory_order_release);
 
     // Published so a benchmark reports the configuration it actually ran.
@@ -167,6 +169,7 @@ RenderThread::Start(RenderCallback renderCallback,
         _renderCallback = nullptr;
         _context.reset();
         _hgi = nullptr;
+        _presentBridge = nullptr;
         RenderThreadStats::instance().SetStarted(false);
         return false;
     }
@@ -191,6 +194,8 @@ RenderThread::Stop()
     _thread.join();
 
     _handoff.Clear();
+    _lastComposited = CompletedFrame{};
+    _presentBridge = nullptr;
 
     // The fences and the context were already torn down at the end of
     // _ThreadLoop, on the thread that owned the context. Destroy() nulled the
@@ -604,7 +609,24 @@ RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
     HgiTextureHandle publishColor = result.srcColor;
     HgiTextureHandle publishDepth = result.srcDepth;
     int              publishCopyIndex = -1;
-    if (!AovCopyBypassed())
+
+    // Under Vulkan the present bridge's copy into GL-importable storage is the
+    // owned copy, with its own GPU ordering against the composite, so the
+    // copy pairs below are not used.
+    bool prepared = false;
+#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+    HgiInteropFrame interopFrame;
+    if (_presentBridge && result.srcColor)
+    {
+        MH_PROFILE_SCOPE("RenderThread_PrepareTransfer");
+        ScopedNanos timeTheCopy(&RenderThreadStats::AddAovCopyNanos);
+        interopFrame = _presentBridge->Prepare(
+            result.srcHgi ? result.srcHgi : _hgi, result.srcColor, result.srcDepth);
+        prepared = bool(interopFrame);
+    }
+#endif
+
+    if (!prepared && !AovCopyBypassed())
     {
         MH_PROFILE_SCOPE("RenderThread_AOVCopy");
         ScopedNanos timeTheCopy(&RenderThreadStats::AddAovCopyNanos);
@@ -678,6 +700,9 @@ RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
     completed.dstRegion = request.dstRegion;
     completed.fence     = std::move(fence);
     completed.copyIndex = publishCopyIndex;
+#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+    completed.interopFrame = interopFrame;
+#endif
 
     _handoff.PublishCompletedFrame(completed);
 }
@@ -773,12 +798,22 @@ RenderThread::CompositeLatest(
     {
         MH_PROFILE_SCOPE("RenderThread_Blit");
         ScopedNanos timeTheBlit(&RenderThreadStats::AddCompositeBlitNanos);
-        presentBridge.Composite(
-            frame.srcHgi,
-            frame.srcColor,
-            frame.srcDepth,
-            dstFramebuffer,
-            frame.dstRegion);
+#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+        if (frame.interopFrame)
+        {
+            presentBridge.CompositePrepared(
+                frame.interopFrame, bool(frame.srcDepth), dstFramebuffer, frame.dstRegion);
+        }
+        else
+#endif
+        {
+            presentBridge.Composite(
+                frame.srcHgi,
+                frame.srcColor,
+                frame.srcDepth,
+                dstFramebuffer,
+                frame.dstRegion);
+        }
     }
 
     // Hand the pair back to the render thread with a fence saying when this
