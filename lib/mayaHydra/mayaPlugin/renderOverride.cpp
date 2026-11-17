@@ -1191,6 +1191,7 @@ MStatus MtohRenderOverride::Render(
         .Msg("MtohRenderOverride::Render() destination=%s (type %d) scene.changed=%s\n",
              destinationName.asChar(), int(destination),
              scene.changed() ? "yes" : "no");
+
     // We can use the mayaHydraSetVisibleFramePasses command to set the visible passes
 
     // Filled in below once the display style is known; read by renderFrame, which runs later.
@@ -1460,7 +1461,9 @@ MStatus MtohRenderOverride::Render(
 
     // Maya's time-change callback only records the frame, since it can fire while the
     // render thread is in SyncAll. Past the interlock, mutating the scene index is safe.
+    bool timeChangedWhileStopped = false;
     if (_hasPendingFrame.exchange(false)) {
+        timeChangedWhileStopped = !MAnimControl::isPlaying();
         _SetCurrentFrameInHydraGlobalSceneIndex(_pendingFrame);
         // The camera refresh travels with the deferred apply: the callback returned
         // without touching the scene index, so this is the first safe point for it.
@@ -1900,6 +1903,7 @@ MStatus MtohRenderOverride::Render(
     // to scene indices and pass parameters, which the render thread must not touch.
     // The handoff is depth-1 and never replaces a request; the interlock above has
     // already waited for the render thread to finish the previous one.
+    bool submittedToRenderThread = false;
     auto submitOrDrawFrame = [&]() {
         if (_renderThreadStarted && _firstFramePrimed) {
             MAYAHYDRA_NS_DEF::RenderThreadRequest request;
@@ -1921,6 +1925,7 @@ MStatus MtohRenderOverride::Render(
 #endif
             MH_PIPELINE_TIMING_SCOPE("SubmitCmds");
             _renderThread->SubmitRequest(std::move(request));
+            submittedToRenderThread = true;
         } else {
             renderFrame(true);
             MAYAHYDRA_NS_DEF::RenderThreadStats::instance().RecordFrameRenderedSynchronously();
@@ -1935,10 +1940,23 @@ MStatus MtohRenderOverride::Render(
         entry.second->Update();
     }
 
+    // Maya follows a time change outside playback (the start and end frame buttons, a
+    // single time slider step) with exactly one redraw. Compositing the previous
+    // frame's image here would leave the viewport a frame behind with nothing to
+    // correct it, so this render op composites its own frame once it completes.
+    // Maya's framebuffer and viewport are captured now, while they are still bound.
+    const bool compositeOwnFrame = timeChangedWhileStopped && _renderThreadStarted;
+    GLint      mayaFramebuffer = 0;
+    GLint      mayaViewport[4] = { 0, 0, 0, 0 };
+    if (compositeOwnFrame) {
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &mayaFramebuffer);
+        glGetIntegerv(GL_VIEWPORT, mayaViewport);
+    }
+
     // Put the most recently finished off-thread frame on screen, and let the settle
     // notice if playback has just stopped.
     if (_renderThreadStarted) {
-        if (_presentBridge && _renderThread) {
+        if (_presentBridge && _renderThread && !compositeOwnFrame) {
             MH_PIPELINE_TIMING_SCOPE("present");
             // An empty VtValue tells HgiInterop to composite into the currently bound
             // framebuffer, which here is Maya's.
@@ -1948,7 +1966,8 @@ MStatus MtohRenderOverride::Render(
 
         _settle.OnRenderOpEntry(
             MAnimControl::isPlaying(),
-            _renderThread ? _renderThread->HasCompletedFrame() : false);
+            _renderThread ? _renderThread->HasCompletedFrame() : false,
+            compositeOwnFrame);
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
@@ -2119,6 +2138,19 @@ MStatus MtohRenderOverride::Render(
 
     } else {
         submitOrDrawFrame();
+    }
+
+    if (compositeOwnFrame && submittedToRenderThread && _renderThread && _presentBridge) {
+        MH_PIPELINE_TIMING_SCOPE("present_own_frame");
+        // Composited even if the wait gives up: the previous frame is better than the
+        // cleared framebuffer Maya would otherwise show.
+        _renderThread->WaitForQuiescence();
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(mayaFramebuffer));
+        glViewport(mayaViewport[0], mayaViewport[1], mayaViewport[2], mayaViewport[3]);
+        const VtValue dstFramebuffer;
+        if (_renderThread->CompositeLatest(*_presentBridge, dstFramebuffer)) {
+            MAYAHYDRA_NS_DEF::RenderThreadStats::instance().RecordTimeChangeComposited();
+        }
     }
 
     //Store as old display style

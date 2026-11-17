@@ -151,6 +151,21 @@ and schedules redraws until the final frame has been composited, up to
 `kMaxSettleRetries`.  The retry is self-scheduling, so that bound is what
 keeps a thread which never produces the frame from spinning the viewport.
 
+**A time change while stopped composites its own frame.**  Jumping to the
+start or end frame, or stepping the time slider, is followed by exactly one
+redraw, so compositing the previous frame's image would leave the viewport a
+frame behind with nothing to correct it.  When the render override applies a
+time change while Maya is not playing, that render op skips the usual
+composite, submits its frame, waits for it (`WaitForQuiescence`) and composites
+it into Maya's framebuffer, captured at the start of the op.  Such frames do
+not overlap, which costs the same as the flag-off path.  Requesting a
+catch-up redraw instead does not work reliably, because nothing guarantees
+Maya runs it promptly.  The `timeChangesComposited` counter records these
+frames.  Such a render op also cancels a pending settle: the composite is
+depth-tested and blended over Maya's framebuffer, so compositing the settled
+frame as well, as happens when the jump is the first redraw after playback
+stops, would show the animation at both its old and new positions.
+
 ## Enabling it
 
 Pipelining is gated behind the `MAYAHYDRA_PIPELINE_OVERLAP` environment
@@ -202,5 +217,7 @@ stops happening.
   under the interlock above.
 - Composited overlays sort against the scene as of the last completed frame,
   which is one frame behind the main thread's current state.
-- The settle step triggers on a playing-to-stopped transition; other routes to
-  a final frame do not drive it.
+- The settle step triggers on a playing-to-stopped transition, and time
+  changes outside playback composite their own frame; other single-redraw
+  changes (for example a scripted attribute edit with no further redraw) still
+  show the previous frame until the next redraw.

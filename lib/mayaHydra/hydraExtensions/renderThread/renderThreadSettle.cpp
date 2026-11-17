@@ -37,14 +37,22 @@ RenderThreadSettle::Initialize(
 }
 
 bool
-RenderThreadSettle::OnRenderOpEntry(bool isPlaying, bool hasCompletedFrame)
+RenderThreadSettle::OnRenderOpEntry(bool isPlaying, bool hasCompletedFrame, bool compositesOwnFrame)
 {
     bool firedSettle = false;
 
     const bool wasPlaying = _wasPlaying.load(std::memory_order_acquire);
     _wasPlaying.store(isPlaying, std::memory_order_release);
 
-    if (wasPlaying && !isPlaying)
+    if (compositesOwnFrame)
+    {
+        // The render op puts a newer frame on screen than the settle would, and
+        // the composite blends over what is already in the framebuffer, so the
+        // settled frame would show through it.
+        _settlePending.store(false, std::memory_order_release);
+        _settleRetries.store(0, std::memory_order_release);
+    }
+    else if (wasPlaying && !isPlaying)
     {
         firedSettle = OnPlaybackStop();
     }

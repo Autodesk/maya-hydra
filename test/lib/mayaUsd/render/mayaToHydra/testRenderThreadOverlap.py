@@ -54,6 +54,7 @@ RENDER_THREAD_STAT_NAMES = [
     "compositeBlitMicros",
     "interlockBypassed",
     "aovCopyBypassed",
+    "timeChangesComposited",
 ]
 
 
@@ -80,9 +81,12 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             % (len(values), len(RENDER_THREAD_STAT_NAMES)))
         return dict(zip(RENDER_THREAD_STAT_NAMES, values))
 
-    def buildScene(self):
+    def buildScene(self, useTestRenderer=False):
         cmds.file(new=True, force=True)
-        self.setHdStormRenderer()
+        if useTestRenderer:
+            self.setTestRenderer()
+        else:
+            self.setHdStormRenderer()
         cube = cmds.polyCube()[0]
         self.setBasicCam()
         cmds.refresh(force=True)
@@ -214,6 +218,187 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
                 stats[name], 0,
                 "%s is %d, expected 0. Stats: %s"
                 % (name, stats[name], dict(stats)))
+
+    def test_aTimeChangeWhileStoppedShowsTheNewFrame(self):
+        """A jump to the start or end frame, which Maya follows with one redraw.
+
+        A redraw normally composites the image the render thread finished for
+        the previous redraw, so with nothing following it the new frame would
+        never reach the screen.
+        """
+        if not overlapRequested():
+            raise unittest.SkipTest("this registration runs with the flag off")
+
+        self.buildScene()
+        cmds.playbackOptions(minTime=1, maxTime=10)
+        cmds.currentTime(1)
+        cmds.refresh(force=True)
+        cmds.mayaHydraTesting(drainRenderThread=True)
+        cmds.mayaHydraTesting(resetRenderThreadStats=True)
+
+        # Evaluates and redraws exactly once, as the start and end frame
+        # buttons do: that render op has to put the new frame on screen itself.
+        cmds.currentTime(10)
+
+        stats = self.stats()
+        self.assertRenderThreadIsLive(stats)
+        self.assertEqual(
+            stats["timeChangesComposited"], 1,
+            "The time changed while playback was stopped, but the render op "
+            "that applied it did not composite its own frame, so the viewport "
+            "is left showing the previous frame. Stats: %s" % dict(stats))
+        self.assertEqual(stats["drainTimeouts"], 0, dict(stats))
+
+    def assertJumpLeavesNoGhost(self, what, fromFrame=1, toFrame=10, beforeJump=None):
+        """Jump between frames 1 and 10, where `what` is at x=-2.5 and x=2.5.
+
+        Reads Maya's colour buffer straight after the one refresh, rather than
+        through a playblast, which would refresh again and hide the state a
+        user sees. `beforeJump` runs after the view has settled on `fromFrame`
+        and must leave the time there.
+        """
+        import maya.api.OpenMaya as om
+        import maya.api.OpenMayaUI as omui
+
+        xAtFrame = {1: -2.5, 10: 2.5}
+
+        cmds.currentTime(fromFrame)
+        cmds.refresh(force=True)
+        cmds.mayaHydraTesting(drainRenderThread=True)
+        cmds.refresh(force=True)
+
+        view = omui.M3dView.active3dView()
+
+        def pixelAt(image, x, y):
+            import ctypes
+            width, height = image.getSize()
+            # MImage.pixels() is the address of width * height RGBA bytes.
+            data = (ctypes.c_ubyte * (width * height * 4)).from_address(image.pixels())
+            offset = (y * width + x) * 4
+            return tuple(data[offset:offset + 3])
+
+        def project(xWorld):
+            # Above the ground plane, off the grid's axis line.
+            x, y, _ = view.worldToView(om.MPoint(xWorld, 0.3, 0.3))
+            return x, y
+
+        oldX, oldY = project(xAtFrame[fromFrame])
+        newX, newY = project(xAtFrame[toFrame])
+
+        def readViewport():
+            image = om.MImage()
+            view.readColorBuffer(image, True)
+            return pixelAt(image, oldX, oldY), pixelAt(image, newX, newY)
+
+        # What the starting frame looks like at both positions once settled.
+        frame1Old, frame1New = readViewport()
+
+        if beforeJump:
+            beforeJump()
+
+        # Evaluates and redraws once, as the start and end frame buttons do.
+        cmds.currentTime(toFrame)
+        atOld, atNew = readViewport()
+
+        # And the target frame, settled, as the reference for the single refresh.
+        cmds.mayaHydraTesting(drainRenderThread=True)
+        cmds.refresh(force=True)
+        cmds.refresh(force=True)
+        settledOld, settledNew = readViewport()
+
+        def differs(a, b):
+            return max(abs(int(p) - int(q)) for p, q in zip(a, b)) > 8
+
+        self.assertTrue(
+            differs(frame1Old, settledOld),
+            "The probe at %s does not see the %s move away (frame %d %s, "
+            "frame %d %s), so this test cannot detect a ghost."
+            % ((oldX, oldY), what, fromFrame, frame1Old, toFrame, settledOld))
+        self.assertFalse(
+            differs(atNew, settledNew),
+            "After one refresh the frame-%d position %s shows %s, but the "
+            "settled frame %d shows %s."
+            % (toFrame, (newX, newY), atNew, toFrame, settledNew))
+        self.assertFalse(
+            differs(atOld, settledOld),
+            "After one refresh the frame-%d position %s shows %s, but the "
+            "settled frame %d shows %s: the %s is drawn at its old "
+            "position too."
+            % (fromFrame, (oldX, oldY), atOld, toFrame, settledOld, what))
+
+    def test_aJumpRightAfterPlaybackLeavesNoGhost(self):
+        """Play, stop, then jump: the settle armed by the stop must not show.
+
+        Stopping playback arms a settle for the next render op. When that op
+        is the jump, it composites its own frame, and compositing the settled
+        frame as well layers the old pose under the new one.
+        """
+        if not overlapRequested():
+            raise unittest.SkipTest("this registration runs with the flag off")
+
+        cube = self.buildScene(useTestRenderer=True)
+        cmds.playbackOptions(minTime=1, maxTime=10, loop="once")
+        cmds.setKeyframe(cube, attribute="translateX", time=1, value=-2.5)
+        cmds.setKeyframe(cube, attribute="translateX", time=10, value=2.5)
+
+        def playThenStop():
+            cmds.currentTime(1)
+            cmds.play(forward=True, wait=True)
+            self.assertEqual(cmds.currentTime(query=True), 10)
+            # The first render op after playback sees it stopped and arms
+            # the settle, which the jump's render op then meets.
+            cmds.refresh(force=True)
+
+        self.assertJumpLeavesNoGhost(
+            "cube", fromFrame=10, toFrame=1, beforeJump=playThenStop)
+
+    def test_aTimeChangeWhileStoppedLeavesNoGhost(self):
+        """A transform-animated cube must appear only at the new time."""
+        if not overlapRequested():
+            raise unittest.SkipTest("this registration runs with the flag off")
+
+        cube = self.buildScene(useTestRenderer=True)
+        cmds.playbackOptions(minTime=1, maxTime=10)
+        cmds.setKeyframe(cube, attribute="translateX", time=1, value=-2.5)
+        cmds.setKeyframe(cube, attribute="translateX", time=10, value=2.5)
+        self.assertJumpLeavesNoGhost("cube")
+
+    def test_aSkinnedMeshJumpUnderCachedPlaybackLeavesNoGhost(self):
+        """The same for a skinned mesh, deformed on the GPU and cached.
+
+        Each of these changes how the deformed points reach Hydra: the GPU
+        deformer shares them as device buffers, and cached playback serves
+        them from the cache instead of evaluating.
+        """
+        if not overlapRequested():
+            raise unittest.SkipTest("this registration runs with the flag off")
+
+        cube = self.buildScene(useTestRenderer=True)
+        cmds.delete(cube)
+        cmds.select(clear=True)
+        root = cmds.joint(position=(0, -0.5, 0))
+        cmds.joint(position=(0, 0.5, 0))
+        cylinder = cmds.polyCylinder(radius=0.6, height=1.0, subdivisionsHeight=4)[0]
+        cmds.skinCluster(root, cylinder, toSelectedBones=True)
+        cmds.playbackOptions(minTime=1, maxTime=10)
+        cmds.setKeyframe(root, attribute="translateX", time=1, value=-2.5)
+        cmds.setKeyframe(root, attribute="translateX", time=10, value=2.5)
+
+        previousMode = cmds.evaluationManager(query=True, mode=True)[0]
+        previousDeformer = cmds.evaluator(name="deformer", query=True, enable=True)
+        previousCache = cmds.evaluator(name="cache", query=True, enable=True)
+        self.addCleanup(cmds.evaluationManager, mode=previousMode)
+        self.addCleanup(cmds.evaluator, name="deformer", enable=bool(previousDeformer))
+        self.addCleanup(cmds.evaluator, name="cache", enable=bool(previousCache))
+        cmds.evaluationManager(mode="parallel")
+        cmds.evaluator(name="deformer", enable=True)
+        cmds.evaluator(name="cache", enable=True)
+        cmds.cacheEvaluator(cacheFillMode="syncOnly")
+        cmds.select(clear=True)
+        # Fill the cache by evaluating every frame once.
+        for frame in range(1, 11):
+            cmds.currentTime(frame)
+        self.assertJumpLeavesNoGhost("skinned cylinder")
 
     def test_aViewportPickDiscardsInFlightWork(self):
         """The pick path, which is the reason the discard exists.

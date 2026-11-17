@@ -275,6 +275,7 @@ MStatus MayaHydraTestingCommand::doIt(const MArgList& args)
         result.append(static_cast<int>(stats.compositeBlitNanos / 1000));
         result.append(stats.interlockBypassed ? 1 : 0);
         result.append(stats.aovCopyBypassed ? 1 : 0);
+        result.append(static_cast<int>(stats.timeChangesComposited));
         setResult(result);
     }
 

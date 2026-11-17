@@ -43,6 +43,7 @@ RenderThreadStats::Get() const
     out.settles             = _settles.load(std::memory_order_relaxed);
     out.settleRetries       = _settleRetries.load(std::memory_order_relaxed);
     out.settlesAbandoned    = _settlesAbandoned.load(std::memory_order_relaxed);
+    out.timeChangesComposited = _timeChangesComposited.load(std::memory_order_relaxed);
     out.presentsWithoutDepth = _presentsWithoutDepth.load(std::memory_order_relaxed);
     out.presentsSkipped     = _presentsSkipped.load(std::memory_order_relaxed);
     out.aovCopyFailures     = _aovCopyFailures.load(std::memory_order_relaxed);
@@ -80,6 +81,7 @@ RenderThreadStats::Reset()
     _settles.store(0, std::memory_order_relaxed);
     _settleRetries.store(0, std::memory_order_relaxed);
     _settlesAbandoned.store(0, std::memory_order_relaxed);
+    _timeChangesComposited.store(0, std::memory_order_relaxed);
     _presentsWithoutDepth.store(0, std::memory_order_relaxed);
     _presentsSkipped.store(0, std::memory_order_relaxed);
     _aovCopyFailures.store(0, std::memory_order_relaxed);

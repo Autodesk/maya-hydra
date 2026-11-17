@@ -55,7 +55,10 @@ public:
 
     /// Called at the start of each render op, with MAnimControl::isPlaying()
     /// and whether a completed frame is available. True if a settle fired.
-    bool OnRenderOpEntry(bool isPlaying, bool hasCompletedFrame);
+    /// \p compositesOwnFrame says this render op composites the frame it
+    /// submits, which supersedes any settle: compositing the settled frame as
+    /// well would layer two frames into one image.
+    bool OnRenderOpEntry(bool isPlaying, bool hasCompletedFrame, bool compositesOwnFrame = false);
 
     /// Called when MAnimControl::isPlaying() goes from true to false.
     bool OnPlaybackStop();

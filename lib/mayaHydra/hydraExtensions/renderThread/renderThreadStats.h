@@ -84,6 +84,10 @@ struct RenderThreadStatsSnapshot
     /// Settles abandoned after kMaxSettleRetries; the viewport may be stale.
     uint64_t settlesAbandoned = 0;
 
+    /// Render ops that applied a time change outside playback and composited
+    /// their own frame instead of the previous one.
+    uint64_t timeChangesComposited = 0;
+
     /// Composites with no depth AOV to blit. The colour blit still succeeds, so
     /// main-thread overlays sort against stale depth. Expected to be zero.
     uint64_t presentsWithoutDepth = 0;
@@ -200,6 +204,10 @@ public:
     void RecordSettle() { _settles.fetch_add(1, std::memory_order_relaxed); }
     void RecordSettleRetry() { _settleRetries.fetch_add(1, std::memory_order_relaxed); }
     void RecordSettleAbandoned() { _settlesAbandoned.fetch_add(1, std::memory_order_relaxed); }
+    void RecordTimeChangeComposited()
+    {
+        _timeChangesComposited.fetch_add(1, std::memory_order_relaxed);
+    }
     void RecordPresentWithoutDepth() { _presentsWithoutDepth.fetch_add(1, std::memory_order_relaxed); }
     void RecordPresentSkipped() { _presentsSkipped.fetch_add(1, std::memory_order_relaxed); }
     void RecordAovCopyFailure() { _aovCopyFailures.fetch_add(1, std::memory_order_relaxed); }
@@ -274,6 +282,7 @@ private:
     std::atomic<uint64_t> _settles{0};
     std::atomic<uint64_t> _settleRetries{0};
     std::atomic<uint64_t> _settlesAbandoned{0};
+    std::atomic<uint64_t> _timeChangesComposited{0};
     std::atomic<uint64_t> _presentsWithoutDepth{0};
     std::atomic<uint64_t> _presentsSkipped{0};
     std::atomic<uint64_t> _aovCopyFailures{0};
