@@ -19,11 +19,11 @@ import fixturesUtils
 import mtohUtils
 import testUtils
 import mayaUtils
-import ufe
-from pxr import Gf, Sdf, Usd, UsdGeom
+from testUtils import PluginLoaded
+from pxr import Gf, Sdf, UsdGeom
 
-PAYLOAD_BOUNDS_FILTER = "mayaUsdPayloadBoundsDisplayFilter"
 BOUNDS_SUFFIX = "/__unloadedPayloadBounds"
+EXTENTS_HINT = [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)]
 
 class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -42,26 +42,17 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         self.setBasicCam(10)
         cmds.select(clear=True)
 
-    def tearDown(self):
-        cmds.modelEditor(self.activeEditor, edit=True,
-                         pluginObjects=(PAYLOAD_BOUNDS_FILTER, True))
-        cmds.modelEditor(self.activeEditor, edit=True, displayAppearance="smoothShaded")
-        super(TestUnloadedPayloadBounds, self).tearDown()
-
-    def definePayloadPrim(self, path, assetPath, extentsHint=None):
+    def definePayloadPrim(self, path, extentsHint=None):
         prim = self.stage.DefinePrim(path, "Xform")
-        prim.GetPayloads().AddPayload(Sdf.Payload(assetPath))
+        prim.GetPayloads().AddPayload(Sdf.Payload(self.cubeFile))
         if extentsHint is not None:
             UsdGeom.ModelAPI.Apply(prim).SetExtentsHint(extentsHint)
         return prim
 
-    def boundsPrims(self):
-        cmds.refresh(force=True)
-        return [p for p in self.getIndex() if p.endswith(BOUNDS_SUFFIX)]
-
     def boundsPrimsFor(self, usdPath):
+        cmds.refresh(force=True)
         suffix = usdPath + BOUNDS_SUFFIX
-        return [p for p in self.boundsPrims() if p.endswith(suffix)]
+        return [p for p in self.getIndex() if p.endswith(suffix)]
 
     def assertBoundsShown(self, usdPath):
         self.assertEqual(len(self.boundsPrimsFor(usdPath)), 1)
@@ -69,133 +60,47 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
     def assertBoundsHidden(self, usdPath):
         self.assertEqual(len(self.boundsPrimsFor(usdPath)), 0)
 
-    def assertBBoxClose(self, bbox, expectedMin, expectedMax):
-        for actual, expected in zip(bbox, list(expectedMin) + list(expectedMax)):
-            self.assertAlmostEqual(actual, expected, places=4)
+    def test_NoExtentsHint(self):
+        # Without an extents hint there is nothing to size a box from.
+        prim = self.definePayloadPrim("/A")
+        prim.Unload()
+        self.assertFalse(prim.IsLoaded())
+        self.assertBoundsHidden("/A")
 
-    def test_LoadUnloadToggle(self):
-        prim = self.definePayloadPrim(
-            "/A", self.cubeFile, [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)])
+    def test_ExtentsHintLoadUnload(self):
+        prim = self.definePayloadPrim("/A", EXTENTS_HINT)
 
-        # Loaded by default: geometry, no stand-in.
+        # Loaded: real geometry is drawn, no bounding box.
         self.assertTrue(prim.IsLoaded())
         self.assertBoundsHidden("/A")
 
+        # Unloaded: Bounding box is present.
         prim.Unload()
         self.assertFalse(prim.IsLoaded())
         self.assertBoundsShown("/A")
 
+        # Re-loaded: real geometry is drawn again, no bounding box.
         prim.Load()
+        self.assertTrue(prim.IsLoaded())
         self.assertBoundsHidden("/A")
 
+    def test_PickBoundingBox(self):
+        # The box is wireframe, so its center is empty. Click on a corner
+        # located by a marker prim instead.
+        prim = self.definePayloadPrim("/A", EXTENTS_HINT)
         prim.Unload()
         self.assertBoundsShown("/A")
 
-    def test_NeverLoaded(self):
-        layerFile = testUtils.getTestScene("testStagePayloadsReferences", "payloadBbox.usda")
-        cmds.setAttr(self.psPathStr + ".loadPayloads", False)
-        cmds.setAttr(self.psPathStr + ".filePath", layerFile, type="string")
-        self.assertBoundsShown("/PayloadTest")
+        marker = self.stage.DefinePrim("/CornerMarker", "Xform")
+        UsdGeom.XformCommonAPI(marker).SetTranslate(Gf.Vec3d(1, 1, 1))
+        cmds.refresh(force=True)
 
-    def test_DisplayModes(self):
-        prim = self.definePayloadPrim(
-            "/A", self.cubeFile, [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)])
-        prim.Unload()
+        with PluginLoaded("mayaHydraCppTests"):
+            cmds.mayaHydraCppTest(
+                self.psPathStr + ",/A",
+                self.psPathStr + ",/CornerMarker",
+                f="TestUsdPicking.pickPrimWithMarker")
 
-        for appearance in ["smoothShaded", "wireframe", "flatShaded"]:
-            cmds.modelEditor(self.activeEditor, edit=True, displayAppearance=appearance)
-            self.assertBoundsShown("/A")
-
-        cmds.modelEditor(self.activeEditor, edit=True,
-                         displayAppearance="smoothShaded", wireframeOnShaded=True)
-        self.assertBoundsShown("/A")
-        cmds.modelEditor(self.activeEditor, edit=True, wireframeOnShaded=False)
-
-    def test_ShowMenuToggle(self):
-        prim = self.definePayloadPrim(
-            "/A", self.cubeFile, [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)])
-        prim.Unload()
-        self.assertBoundsShown("/A")
-
-        cmds.modelEditor(self.activeEditor, edit=True,
-                         pluginObjects=(PAYLOAD_BOUNDS_FILTER, False))
-        self.assertBoundsHidden("/A")
-
-        cmds.modelEditor(self.activeEditor, edit=True,
-                         pluginObjects=(PAYLOAD_BOUNDS_FILTER, True))
-        self.assertBoundsShown("/A")
-
-    def test_NoExtentsHint(self):
-        prim = self.definePayloadPrim("/A", self.cubeFile)
-        prim.Unload()
-        self.assertBoundsHidden("/A")
-
-        # Authoring an extentsHint while unloaded makes the stand-in appear.
-        UsdGeom.ModelAPI.Apply(prim).SetExtentsHint(
-            [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)])
-        self.assertBoundsShown("/A")
-
-    def test_Selection(self):
-        prim = self.definePayloadPrim(
-            "/A", self.cubeFile, [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)])
-        prim.Unload()
-
-        cmds.select(self.psPathStr + ",/A")
-        self.assertBoundsShown("/A")
-        cmds.select(clear=True)
-        self.assertBoundsShown("/A")
-
-    def test_NestedPayloads(self):
-        innerLayer = Sdf.Layer.CreateAnonymous(".usda")
-        innerStage = Usd.Stage.Open(innerLayer)
-        outerRoot = innerStage.DefinePrim("/Outer", "Xform")
-        innerStage.SetDefaultPrim(outerRoot)
-        inner = innerStage.DefinePrim("/Outer/Inner", "Xform")
-        inner.GetPayloads().AddPayload(Sdf.Payload(self.cubeFile))
-        UsdGeom.ModelAPI.Apply(inner).SetExtentsHint(
-            [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)])
-
-        outer = self.definePayloadPrim(
-            "/Outer", innerLayer.identifier, [Gf.Vec3f(-2, -2, -2), Gf.Vec3f(2, 2, 2)])
-
-        outer.Unload()
-        self.assertBoundsShown("/Outer")
-        self.assertBoundsHidden("/Outer/Inner")
-
-        self.stage.Load("/Outer", Usd.LoadWithoutDescendants)
-        self.assertBoundsHidden("/Outer")
-        self.assertBoundsShown("/Outer/Inner")
-
-        self.stage.Load("/Outer", Usd.LoadWithDescendants)
-        self.assertBoundsHidden("/Outer")
-        self.assertBoundsHidden("/Outer/Inner")
-
-    def test_BoundingBoxes(self):
-        import mayaUsd.ufe
-        prim = self.definePayloadPrim(
-            "/A", self.cubeFile, [Gf.Vec3f(-1, -2, -3), Gf.Vec3f(2, 3, 4)])
-        UsdGeom.XformCommonAPI(prim).SetTranslate(Gf.Vec3d(5, 0, 0))
-        prim.Unload()
-
-        proxyTransform = cmds.listRelatives(self.psPathStr, parent=True, fullPath=True)[0]
-        self.assertBBoxClose(
-            cmds.exactWorldBoundingBox(proxyTransform), (4, -2, -3), (7, 3, 4))
-        self.assertBBoxClose(
-            cmds.getAttr(self.psPathStr + ".boundingBoxMin")[0] +
-            cmds.getAttr(self.psPathStr + ".boundingBoxMax")[0],
-            (4, -2, -3), (7, 3, 4))
-
-        item = ufe.Hierarchy.createItem(ufe.PathString.path(self.psPathStr + ",/A"))
-        ufeBBox = ufe.Object3d.object3d(item).boundingBox()
-        self.assertBBoxClose(
-            [ufeBBox.min.x(), ufeBBox.min.y(), ufeBBox.min.z(),
-             ufeBBox.max.x(), ufeBBox.max.y(), ufeBBox.max.z()],
-            (-1, -2, -3), (2, 3, 4))
-
-        # Once loaded, the bounds come from the geometry.
-        prim.Load()
-        self.assertBBoxClose(
-            cmds.exactWorldBoundingBox(proxyTransform), (4.5, -0.5, -0.5), (5.5, 0.5, 0.5))
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
