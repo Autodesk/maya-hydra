@@ -74,6 +74,7 @@ target_sources(${TARGET_NAME}
         testDeferredHighlightWireInit.cpp
         testSceneGlobalsCurrentFrame.cpp
         testHydraGenerativeProcedural.cpp
+        testUnloadedPayloadBounds.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)

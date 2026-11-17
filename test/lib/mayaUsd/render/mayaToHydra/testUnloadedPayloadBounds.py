@@ -22,7 +22,6 @@ import mayaUtils
 from testUtils import PluginLoaded
 from pxr import Gf, Sdf, UsdGeom
 
-BOUNDS_SUFFIX = "/__unloadedPayloadBounds"
 EXTENTS_HINT = [Gf.Vec3f(-1, -1, -1), Gf.Vec3f(1, 1, 1)]
 
 class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
@@ -31,6 +30,11 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestUnloadedPayloadBounds, self).setUp()
+
+        # Keep the C++ tests plugin loaded for the whole test: PluginLoaded creates a new
+        # scene on exit, which would invalidate the stage between assertions.
+        self.enterContext(PluginLoaded("mayaHydraCppTests"))
+
         import mayaUsd_createStageWithNewLayer
         from mayaUsd import lib as mayaUsdLib
 
@@ -49,16 +53,19 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
             UsdGeom.ModelAPI.Apply(prim).SetExtentsHint(extentsHint)
         return prim
 
-    def boundsPrimsFor(self, usdPath):
+    def assertBoundsCount(self, usdPath, expectedCount):
+        # The boxes live in the secondary graphics pass (Storm), which the selected
+        # renderer's rprims (e.g. Flash) do not expose, so check them from C++.
         cmds.refresh(force=True)
-        suffix = usdPath + BOUNDS_SUFFIX
-        return [p for p in self.getIndex() if p.endswith(suffix)]
+        cmds.mayaHydraCppTest(
+            usdPath, str(expectedCount),
+            f="UnloadedPayloadBounds.countBoundsPrims")
 
     def assertBoundsShown(self, usdPath):
-        self.assertEqual(len(self.boundsPrimsFor(usdPath)), 1)
+        self.assertBoundsCount(usdPath, 1)
 
     def assertBoundsHidden(self, usdPath):
-        self.assertEqual(len(self.boundsPrimsFor(usdPath)), 0)
+        self.assertBoundsCount(usdPath, 0)
 
     def test_NoExtentsHint(self):
         # Without an extents hint there is nothing to size a box from.
@@ -95,11 +102,10 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         UsdGeom.XformCommonAPI(marker).SetTranslate(Gf.Vec3d(1, 1, 1))
         cmds.refresh(force=True)
 
-        with PluginLoaded("mayaHydraCppTests"):
-            cmds.mayaHydraCppTest(
-                self.psPathStr + ",/A",
-                self.psPathStr + ",/CornerMarker",
-                f="TestUsdPicking.pickPrimWithMarker")
+        cmds.mayaHydraCppTest(
+            self.psPathStr + ",/A",
+            self.psPathStr + ",/CornerMarker",
+            f="TestUsdPicking.pickPrimWithMarker")
 
 
 if __name__ == '__main__':
