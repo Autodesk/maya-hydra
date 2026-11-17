@@ -32,16 +32,15 @@ typedef PXR_NS::TfRefPtr<const UnloadedPayloadBoundsSceneIndex> UnloadedPayloadB
 
 /// \class UnloadedPayloadBoundsSceneIndex
 ///
-/// Draws the unloaded prims of USD stages as wireframe bounding boxes, as usdview does.
+/// Draws the unloaded prims of USD stages as wireframe bounding boxes.
 ///
 /// The input must report unloaded prims, i.e. the UsdImagingStageSceneIndex must be created with
 /// includeUnloadedPrims. A prim gets a box when UsdImaging reports it as not loaded and its parent
-/// as loaded, so an unloaded subtree gets one box, from the extent of its root. That extent comes
-/// from the authored extent, or from the extentsHint through UsdImagingExtentResolvingSceneIndex.
-/// Prims without extent get no box.
+/// as loaded, so an unloaded subtree gets one box, from the extent of its root. That extent is the
+/// authored extent of the prim. Prims without a valid, non-empty extent get no box.
 ///
-/// The box is a basisCurves child prim, named GetBoundsPrimName(), of the unloaded prim. It takes
-/// the transform, visibility and prim origin of the unloaded prim, so it is placed like it and
+/// The box is a basisCurves prim named __unloadedPayloadBounds, and a child of the unloaded prim. It
+/// takes the transform, visibility and prim origin of the unloaded prim, so it is placed like it and
 /// picking it picks the unloaded prim. It is drawn in the secondary graphics pass, in every display
 /// style, in the wireframe color of the unloaded prim, which follows the selection.
 ///
@@ -110,7 +109,6 @@ private:
     {
         return _unloadedPrims.find(primPath) != _unloadedPrims.end();
     }
-    // Whether the box of the unloaded prim at primPath exists.
     bool _HasBox(const PXR_NS::SdfPath& primPath) const
     {
         return _enabled && _unloadedPrimsWithExtents.find(primPath) != _unloadedPrimsWithExtents.end();
