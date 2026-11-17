@@ -110,16 +110,6 @@ _CopyFloatStream(MVertexBuffer* mvb, size_t count, VtArray<VecT>& out)
     mvb->unmap();
 }
 
-TfToken
-_GetTexcoordPrimvarName(const MVertexBufferDescriptor& desc)
-{
-    const MString name = desc.semanticName();
-    if (name.length() == 0 || name == "uvcoord") {
-        return MayaHydraAdapterTokens->st;
-    }
-    return TfToken(name.asChar());
-}
-
 void
 _EmitRenderItemTopologyDirtyLocators(
     Fvp::DirtyNotifier& notifier,
@@ -941,6 +931,15 @@ MayaHydraRenderItemAdapter::_GetStreamPresence(MGeometry* geom, int vertexBuffer
     return present;
 }
 
+TfToken MayaHydraRenderItemAdapter::_GetTexcoordPrimvarName(const MVertexBufferDescriptor& desc)
+{
+    const MString name = desc.semanticName();
+    if (name.length() == 0 || name == "uvcoord") {
+        return MayaHydraAdapterTokens->st;
+    }
+    return TfToken(name.asChar());
+}
+
 void MayaHydraRenderItemAdapter::_ClearAbsentTexcoordStreams(
     MGeometry*            geom,
     int                   vertexBufferCount,
@@ -962,14 +961,18 @@ void MayaHydraRenderItemAdapter::_ClearAbsentTexcoordStreams(
     };
     
     // Verify st
-    if (!isSupplied(MayaHydraAdapterTokens->st) && !_uvs.empty()) {
-        _uvs.clear();
-        dirty.uvs = true;
+    if (!isSupplied(MayaHydraAdapterTokens->st)) {
+        const bool withdrawn = _WithdrawStream(MayaHydraAdapterTokens->st);
+        if (withdrawn || !_uvs.empty()) {
+            _uvs.clear();
+            dirty.uvs = true;
+        }
     }
 
     // Verify custom streams
     for (auto it = _customStreams.begin(); it != _customStreams.end();) {
         if (!isSupplied(it->first)) {
+            _WithdrawStream(it->first);
             dirty.customPrimvars.insert(it->first);
             it = _customStreams.erase(it);
         } else {

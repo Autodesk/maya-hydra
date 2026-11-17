@@ -319,6 +319,10 @@ protected:
     /// Scan the vertex buffers of \p geom for the semantics they supply.
     static StreamPresence _GetStreamPresence(MGeometry* geom, int vertexBufferCount);
 
+    /// Returns a primvar name for a descriptor: st for UV coordinates, otherwise the
+    /// stream's semantic name.
+    static TfToken _GetTexcoordPrimvarName(const MVertexBufferDescriptor& desc);
+
     /// Number of values held from a previous update for the points, normals, st or
     /// tangents vertex stream.
     virtual size_t _StoredStreamCount(const TfToken& primvar) const;
@@ -356,6 +360,10 @@ protected:
         bool                   topoChanged,
         bool                   useMayaNormals,
         _StreamDirty&          dirty);
+
+    /// Withdraw the stream published outside the CPU arrays for \p primvar, which the geometry no
+    /// longer supplies. Returns true when there was one, so the renderer has to re-pull it.
+    virtual bool _WithdrawStream(const TfToken& /*primvar*/) { return false; }
 
     /// Whether the cached topology is rebuilt from freshly-read indices.
     virtual bool
