@@ -72,10 +72,6 @@ public:
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
 
-    /// Name of the box prim added under each unloaded prim.
-    FVP_API
-    static const PXR_NS::TfToken& GetBoundsPrimName();
-
     /// Show or hide all the boxes.
     FVP_API
     void SetEnabled(bool enabled);
@@ -117,8 +113,7 @@ private:
     // Whether the box of the unloaded prim at primPath exists.
     bool _HasBox(const PXR_NS::SdfPath& primPath) const
     {
-        return _enabled && _IsTracked(primPath)
-            && _unloadedPrimsWithoutExtent.find(primPath) == _unloadedPrimsWithoutExtent.end();
+        return _enabled && _unloadedPrimsWithExtents.find(primPath) != _unloadedPrimsWithExtents.end();
     }
     bool _IsExcluded(const PXR_NS::SdfPath& primPath) const;
 
@@ -137,8 +132,8 @@ private:
 
     // Roots of unloaded subtrees, sorted so that the ones under a path are a contiguous range.
     std::set<PXR_NS::SdfPath> _unloadedPrims;
-    // The subset of _unloadedPrims with no extent.
-    std::set<PXR_NS::SdfPath> _unloadedPrimsWithoutExtent;
+    // The subset of _unloadedPrims with a valid extent.
+    std::set<PXR_NS::SdfPath> _unloadedPrimsWithExtents;
 };
 
 } // namespace FVP_NS_DEF

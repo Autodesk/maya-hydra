@@ -91,7 +91,8 @@ UnloadedPayloadBoundsSceneIndex::UnloadedPayloadBoundsSceneIndex(
 {
     TF_AXIOM(_wireframeColorInterface);
 
-    // The input may already be populated, e.g. when the scene index chain is rebuilt.
+    // The input may already be populated, e.g. when the scene index chain is rebuilt,
+    // so traverse the whole scene to initialize the sets to track unloaded prims.
     const HdSceneIndexPrimView view(inputSceneIndex);
     for (auto it = view.begin(); it != view.end(); ++it) {
         const SdfPath& primPath = *it;
@@ -105,11 +106,6 @@ UnloadedPayloadBoundsSceneIndex::UnloadedPayloadBoundsSceneIndex(
             it.SkipDescendants();
         }
     }
-}
-
-const TfToken& UnloadedPayloadBoundsSceneIndex::GetBoundsPrimName()
-{
-    return _tokens->boundsPrimName;
 }
 
 HdSceneIndexPrim UnloadedPayloadBoundsSceneIndex::GetPrim(const SdfPath& primPath) const
@@ -141,32 +137,25 @@ void UnloadedPayloadBoundsSceneIndex::SetEnabled(bool enabled)
         return;
     }
 
-    // Collect the unloaded prims that have an extent, they are the only ones affected.
-    SdfPathVector affected;
-    for (const SdfPath& path : _unloadedPrims) {
-        if (_unloadedPrimsWithoutExtent.find(path) == _unloadedPrimsWithoutExtent.end()) {
-            affected.push_back(boxPath(path));
-        }
-    }
-
     _enabled = enabled;
 
-    if (affected.empty() || !_IsObserved()) {
+    // Only the boxes of the unloaded prims that have an extent are added or removed.
+    if (_unloadedPrimsWithExtents.empty() || !_IsObserved()) {
         return;
     }
 
     if (enabled) {
         HdSceneIndexObserver::AddedPrimEntries added;
-        added.reserve(affected.size());
-        for (const SdfPath& path : affected) {
-            added.emplace_back(path, HdPrimTypeTokens->basisCurves);
+        added.reserve(_unloadedPrimsWithExtents.size());
+        for (const SdfPath& path : _unloadedPrimsWithExtents) {
+            added.emplace_back(boxPath(path), HdPrimTypeTokens->basisCurves);
         }
         _SendPrimsAdded(added);
     } else {
         HdSceneIndexObserver::RemovedPrimEntries removed;
-        removed.reserve(affected.size());
-        for (const SdfPath& path : affected) {
-            removed.emplace_back(path);
+        removed.reserve(_unloadedPrimsWithExtents.size());
+        for (const SdfPath& path : _unloadedPrimsWithExtents) {
+            removed.emplace_back(boxPath(path));
         }
         _SendPrimsRemoved(removed);
     }
@@ -196,8 +185,10 @@ bool UnloadedPayloadBoundsSceneIndex::_IsExcluded(const SdfPath& primPath) const
 
 void UnloadedPayloadBoundsSceneIndex::_UpdateTracking(const SdfPath& primPath)
 {
+    // Default assumption : most prims are not unloaded, so should not be tracked.
+    // For the minority that are, we'll either add them, or at worst re-add them.
     _unloadedPrims.erase(primPath);
-    _unloadedPrimsWithoutExtent.erase(primPath);
+    _unloadedPrimsWithExtents.erase(primPath);
 
     if (!primPath.IsPrimPath()) {
         return;
@@ -212,8 +203,8 @@ void UnloadedPayloadBoundsSceneIndex::_UpdateTracking(const SdfPath& primPath)
     }
 
     _unloadedPrims.insert(primPath);
-    if (!hasValidExtent(prim.dataSource)) {
-        _unloadedPrimsWithoutExtent.insert(primPath);
+    if (hasValidExtent(prim.dataSource)) {
+        _unloadedPrimsWithExtents.insert(primPath);
     }
 }
 
@@ -221,12 +212,14 @@ void UnloadedPayloadBoundsSceneIndex::_AddColorDirtiesUnder(
     const SdfPath&                            primPath,
     HdSceneIndexObserver::DirtiedPrimEntries& inoutEntries) const
 {
-    for (auto it = _unloadedPrims.lower_bound(primPath);
-         it != _unloadedPrims.end() && it->HasPrefix(primPath);
+    if (!_enabled) {
+        return;
+    }
+    // Only the unloaded prims with an extent have a box.
+    for (auto it = _unloadedPrimsWithExtents.lower_bound(primPath);
+         it != _unloadedPrimsWithExtents.end() && it->HasPrefix(primPath);
          ++it) {
-        if (_HasBox(*it)) {
-            inoutEntries.emplace_back(boxPath(*it), displayColorLocators());
-        }
+        inoutEntries.emplace_back(boxPath(*it), displayColorLocators());
     }
 }
 
@@ -273,7 +266,7 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsRemoved(
         auto first = _unloadedPrims.lower_bound(entry.primPath);
         auto last = first;
         while (last != _unloadedPrims.end() && last->HasPrefix(entry.primPath)) {
-            _unloadedPrimsWithoutExtent.erase(*last);
+            _unloadedPrimsWithExtents.erase(*last);
             ++last;
         }
         _unloadedPrims.erase(first, last);
