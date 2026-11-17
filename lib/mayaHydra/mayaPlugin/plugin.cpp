@@ -379,6 +379,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    PXR_NS::MtohRenderGlobals::RegisterAttributeEditorCallback();
+    PXR_NS::MtohRenderGlobals::RegisterSceneCallbacks();
+
 #if MAYA_API_VERSION >= 20270000
     // Register Hydra renderers as Maya production renderers.
     for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
@@ -449,6 +452,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     for (const auto& callbackId : _pluginLoadingCallbackIds) {
         MSceneMessage::removeCallback(callbackId);
     }
+    PXR_NS::MtohRenderGlobals::DeregisterSceneCallbacks();
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
     MStatus   ret = MS::kSuccess;

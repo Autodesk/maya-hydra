@@ -105,6 +105,7 @@ class Selection;
 
 namespace MAYAHYDRA_NS_DEF {
 class HoverEventFilter;
+class NativeInstancerCache;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -566,8 +567,7 @@ private:
 
     /// Native instancer lookups of the outline, kept across selection changes and cleared when the
     /// native instancers change. Created on the first outline push. Render thread only.
-    class NativeInstancerCache;
-    std::unique_ptr<NativeInstancerCache> _nativeInstancerCache;
+    std::unique_ptr<MAYAHYDRA_NS_DEF::NativeInstancerCache> _nativeInstancerCache;
 
 #ifdef MAYAHYDRA_HAS_QT
     // One hover event filter per model panel, keyed by panel name.
