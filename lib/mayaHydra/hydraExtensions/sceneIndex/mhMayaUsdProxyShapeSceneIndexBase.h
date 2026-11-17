@@ -98,6 +98,10 @@ public:
     void UpdateTime();
     static Ufe::Path InterpretRprimPath(const HdSceneIndexBaseRefPtr& sceneIndex,const SdfPath& path);
 
+    // Whether the stage has prims to image. Unloaded root prims count, as they are imaged as
+    // bounding boxes, so a stage opened without loading its payloads is not considered empty.
+    static bool HasRootPrims(const UsdStageRefPtr& stage);
+
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const HdSceneIndexBase& sender, const HdSceneIndexObserver::AddedPrimEntries& entries) override{
         _SendPrimsAdded(entries);

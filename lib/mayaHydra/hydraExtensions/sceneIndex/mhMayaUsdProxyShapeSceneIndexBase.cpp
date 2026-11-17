@@ -291,7 +291,7 @@ void MayaUsdProxyShapeSceneIndexBase::Populate()
     if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
         // Check whether the pseudo-root has children
-        if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+        if (HasRootPrims(stage)) {
             ++_nbPopulateCalls;
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
             _usdImagingStageSceneIndex->SetStage(stage);
@@ -300,6 +300,15 @@ void MayaUsdProxyShapeSceneIndexBase::Populate()
             _populated = true;
         }
     }
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::HasRootPrims(const UsdStageRefPtr& stage)
+{
+    // Unlike GetChildren(), which uses UsdPrimDefaultPredicate, don't skip unloaded prims.
+    return stage
+        && !stage->GetPseudoRoot()
+                .GetFilteredChildren(UsdPrimIsActive && UsdPrimIsDefined && !UsdPrimIsAbstract)
+                .empty();
 }
 
 Ufe::Path MayaUsdProxyShapeSceneIndexBase::InterpretRprimPath(

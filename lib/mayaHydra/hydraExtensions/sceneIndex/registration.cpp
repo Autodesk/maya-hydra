@@ -234,7 +234,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 
     auto stage = proxyStage.getUsdStage();
     // Check whether the pseudo-root has children
-    if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+    if (MayaUsdProxyShapeSceneIndexBase::HasRootPrims(stage)) {
         createInfo.stage = stage;//Add the stage to the creation parameters
     }
             
