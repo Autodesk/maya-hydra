@@ -161,18 +161,6 @@ void UnloadedPayloadBoundsSceneIndex::SetEnabled(bool enabled)
     }
 }
 
-void UnloadedPayloadBoundsSceneIndex::DirtyWireframeColors()
-{
-    if (!_IsObserved()) {
-        return;
-    }
-    HdSceneIndexObserver::DirtiedPrimEntries dirtied;
-    _AddColorDirtiesUnder(SdfPath::AbsoluteRootPath(), dirtied);
-    if (!dirtied.empty()) {
-        _SendPrimsDirtied(dirtied);
-    }
-}
-
 void UnloadedPayloadBoundsSceneIndex::DirtyWireframeColors(const SdfPathVector& primPaths)
 {
     if (!_IsObserved()) {

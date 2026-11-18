@@ -76,16 +76,13 @@ public:
     void SetEnabled(bool enabled);
     bool IsEnabled() const { return _enabled; }
 
-    /// Makes the boxes re-pull their wireframe color, e.g. after a color preference change.
-    /// Selection changes are handled without calling this.
+    /// Makes the boxes at or under \p primPaths re-pull their wireframe color. By default, all
+    /// boxes are dirtied, e.g. after a color preference change. Pass specific paths to dirty only
+    /// some boxes, e.g. when the lead object changes. Selection changes are handled without
+    /// calling this, but a lead change is not a selection change, so it is not.
     FVP_API
-    void DirtyWireframeColors();
-
-    /// Makes only the boxes at or under \p primPaths re-pull their wireframe color, e.g. when the
-    /// lead object changes. Selection changes are handled without calling this, but a lead change
-    /// is not a selection change, so is not.
-    FVP_API
-    void DirtyWireframeColors(const PXR_NS::SdfPathVector& primPaths);
+    void DirtyWireframeColors(
+        const PXR_NS::SdfPathVector& primPaths = { PXR_NS::SdfPath::AbsoluteRootPath() });
 
 protected:
     FVP_API
