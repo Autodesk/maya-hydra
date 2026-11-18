@@ -38,7 +38,8 @@ typedef PXR_NS::TfRefPtr<const UnloadedPayloadBoundsSceneIndex> UnloadedPayloadB
 /// The input must report unloaded prims, i.e. the UsdImagingStageSceneIndex must be created with
 /// includeUnloadedPrims. A prim gets a box when UsdImaging reports it as not loaded and its parent
 /// as loaded, so an unloaded subtree gets one box, from the extent of its root. That extent is the
-/// authored extent of the prim. Prims without a valid, non-empty extent get no box.
+/// one UsdImaging resolves for the prim, which falls back to the extentsHint when no extent is
+/// authored. Prims without a valid, non-empty extent get no box.
 ///
 /// The box is a basisCurves prim named __unloadedPayloadBounds, and a child of the unloaded prim. It
 /// takes the transform, visibility and prim origin of the unloaded prim, so it is placed like it and
