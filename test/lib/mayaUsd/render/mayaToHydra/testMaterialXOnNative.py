@@ -13,9 +13,11 @@
 # limitations under the License.
 #
 import maya.cmds as cmds
+import maya.utils
 import mayaUtils
 import fixturesUtils
 import mtohUtils
+from maya.api import OpenMaya
 
 class TestMaterialXOnNative(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
@@ -35,6 +37,29 @@ class TestMaterialXOnNative(mtohUtils.MayaHydraBaseTestCase):
         self.setBasicCam(2)
         self.setTestRenderer()
         self.verifySnapshot("RedMtlxSphere.png")
+
+    def test_NoUnresolvedNodeDefWarning(self):
+        # The material references standard library node definitions without including
+        # them; they must not be reported as unresolved.
+        messages = []
+        def commandOutputCallback(message, _messageType, _clientData):
+            messages.append(message)
+
+        callbackId = OpenMaya.MCommandMessage.addCommandOutputCallback(commandOutputCallback)
+        try:
+            mayaUtils.openTestScene("testMaterialX", "RedMtlxSphere.ma")
+            self.setBasicCam(2)
+            self.setTestRenderer()
+            # The red sphere shows that the material was built from MaterialX,
+            # where the node definitions are checked.
+            self.verifySnapshot("RedMtlxSphere.png")
+            # Warnings from other threads can be delivered on idle.
+            maya.utils.processIdleEvents()
+        finally:
+            OpenMaya.MMessage.removeCallback(callbackId)
+
+        unresolved = [m for m in messages if "could not be resolved" in m]
+        self.assertEqual(unresolved, [])
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -21,7 +21,6 @@
 
 namespace MAYAHYDRA_NS_DEF {
     bool useSingleFramePass();
-    bool useCameraPrim();
     bool hdArnoldUseV2RenderSettings();
     bool secondaryGraphicsUseActiveRenderer();
     bool useRenderItemOverride();

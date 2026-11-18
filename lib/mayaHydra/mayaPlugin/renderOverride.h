@@ -105,6 +105,7 @@ class Selection;
 
 namespace MAYAHYDRA_NS_DEF {
 class HoverEventFilter;
+class NativeInstancerCache;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -484,6 +485,11 @@ private:
     // This ensures they stay synchronized and eliminates index-based access issues
     Fvp::FramePassDataPtrVector                                _framePassesData;
     
+    /// Return the Hydra camera prim the panel renders through, or an empty path when there is
+    /// none (orthographic, unmapped runtime, unexpected mapping). An empty path means the passes
+    /// use the free camera, so failure needs no other handling.
+    SdfPath _ResolveCameraPrimPath();
+
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;
     const hvt::FramePassPtr& _GetFramePass(int passIndex)const;
@@ -561,8 +567,7 @@ private:
 
     /// Native instancer lookups of the outline, kept across selection changes and cleared when the
     /// native instancers change. Created on the first outline push. Render thread only.
-    class NativeInstancerCache;
-    std::unique_ptr<NativeInstancerCache> _nativeInstancerCache;
+    std::unique_ptr<MAYAHYDRA_NS_DEF::NativeInstancerCache> _nativeInstancerCache;
 
 #ifdef MAYAHYDRA_HAS_QT
     // One hover event filter per model panel, keyed by panel name.
@@ -579,6 +584,11 @@ private:
     SdfPath _ID; // Root path to runtime data (like task controller)
 
     GfVec4d _viewport;
+
+    /// Camera prims already warned about for a projection that the solved framing cannot
+    /// reproduce. A camera is removed once its projection becomes solvable again, so a later
+    /// failure warns again.
+    TfHashSet<SdfPath, SdfPath::Hash> _unsolvableFramingWarnedCameras;
 
     int _currentOperation = -1;    
 

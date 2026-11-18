@@ -22,6 +22,7 @@
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/vec3f.h>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/types.h>
@@ -44,6 +45,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -372,6 +374,11 @@ protected:
         return true;
     }
 
+    /// Single object-space normal for all vertices when geometry is a known planar (e.g. image plane).
+    /// Authored as a normals primvar so renderers do not try to compute normals via GPU point readback
+    /// when using GPU buffer sharing. Set at construction; empty otherwise.
+    const std::optional<GfVec3f>& _ConstantNormal() const { return _constantNormal; }
+
     VtVec3fArray _positions = {};
     VtVec3fArray _normals = {};  //Are per vertex
     VtVec3fArray _tangents = {}; //Are face varying
@@ -454,6 +461,10 @@ protected:
     bool                        _isReplaceableHighlightWire = false;
     bool                        _isSelectionHighlightWireCandidate = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
+    // See _ConstantNormal().
+    std::optional<GfVec3f>      _constantNormal;
+    // True when _normals holds values synthesized from _constantNormal rather than read from VP2.
+    bool                        _normalsSynthesized = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API

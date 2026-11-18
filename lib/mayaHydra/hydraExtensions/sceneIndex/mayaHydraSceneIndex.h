@@ -337,6 +337,7 @@ public:
     /// override creator (adapters/renderItemOverrideCreator.h). Carriers exist only
     /// while it is registered, so every carrier branch keys on this. Main thread.
     static void SetRenderItemOverrideEnabled(bool enabled) { _renderItemOverrideEnabled = enabled; }
+    static bool IsRenderItemOverrideEnabled() { return _renderItemOverrideEnabled; }
 
 private:
 

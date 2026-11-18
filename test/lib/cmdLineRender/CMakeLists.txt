@@ -614,7 +614,8 @@ function(_add_usdProxyShapeRenderSettings_test test_name renderer output_subdir 
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "TF_FATAL_VERIFY=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
-    apply_labels_to_test("${test_labels}" ${test_name})
+    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
+    apply_labels_to_test("${parsed_labels}" ${test_name})
 
 endfunction()
 _add_usdProxyShapeRenderSettings_test(
@@ -628,7 +629,7 @@ if(IS_WINDOWS)
         usdProxyShapeRenderSettingsPRMan
         HdPrmanLoaderRendererPlugin
         usdProxyShapeRenderSettingsPRMan
-        "prman"
+        "depOnPlugins:prman"
         "renderSettings/prman/usdProxyShapeRenderSettings.ma")
 endif()
 
@@ -689,6 +690,22 @@ endfunction()
 _mayaHydra_add_relpath_variant(arnold)
 if(IS_WINDOWS)
     _mayaHydra_add_relpath_variant(prman)
+
+    # PRMan tests disabled until HYDRA-2711 is fixed.
+    mayaHydra_parse_test_label_groups(prman_disabled_labels "disabled:HYDRA-2711")
+    foreach(test_name
+            prmanResolution
+            prmanRenderDir
+            prmanImageName
+            prmanOutputFormat
+            mayaSphereMaterialXPRMan
+            mayaSphereMayaMaterialPRMan
+            mayaSphereMayaMaterialPRManRelativePath
+            usdCamera_PRMan
+            usdCamera_PRMan_v2_rs
+            usdSphereMaterialXPRMan)
+        apply_labels_to_test("${prman_disabled_labels}" ${test_name})
+    endforeach()
 endif()
 
 if(IS_MACOSX)
@@ -718,6 +735,12 @@ set_tests_properties(
   PROPERTIES
     LABELS      "cmdLineRender"
     ENVIRONMENT "MAYA_RENDER_DESC_PATH=${RENDER_DESC_PATH}")
+
+# Must follow the set_tests_properties() above, which overwrites LABELS while
+# apply_labels_to_test() appends to it.  The empty string is where "|"-separated
+# tag groups would go, as on a test script file name.
+mayaHydra_parse_test_label_groups(parsed_labels "")
+apply_labels_to_test("${parsed_labels}" registeredRenderRenderers)
 
 # Production rendering tests that require a Maya executable (mayabatch).
 # cmdLineRender is only registered for Maya > 2026 (see test/lib/CMakeLists.txt)
@@ -789,8 +812,9 @@ endforeach()
 # robustness.
 #
 # compare_lines is the number of leading lines of the dump to compare; see the
-# call sites below for why only the head of the dump is compared.
-function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file expected_file compare_lines)
+# call sites below for why only the head of the dump is compared.  test_labels
+# holds "|"-separated tag groups, as on a test script file name.
+function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file expected_file compare_lines test_labels)
     set(SCENE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/scenes/${scene_file}")
     set(COMPARE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/compareTextFiles.py")
 
@@ -827,6 +851,8 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_IGNORE_DIALOGS=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
+    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
+    apply_labels_to_test("${parsed_labels}" ${test_name})
 endfunction()
 
 # Smoke tests for the -hsd / -hsi flags: check that a scene index dump was
@@ -845,6 +871,7 @@ _add_scene_index_dump_test(
     "${_terminal_dump_file}"
     "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump.txt"
     11 # Compare first 11 lines
+    "" # No tag groups
 )
 
 set(_mayaHydra_dump_file
@@ -857,6 +884,7 @@ _add_scene_index_dump_test(
     "${_mayaHydra_dump_file}"
     "${CMAKE_CURRENT_SOURCE_DIR}/expected/mayaHydraSceneIndexDump.txt"
     4 # Compare first 4 lines
+    "" # No tag groups
 )
 
 # C++ unit tests

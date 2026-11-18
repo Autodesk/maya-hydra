@@ -52,6 +52,15 @@ TF_REGISTRY_FUNCTION(TfDebug)
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
         "Print status information from the batch render command.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
+        MAYAHYDRAPLUGIN_OPTIONAL_SCENE_INDEX_PLUGINS,
+        "Print which optional renderer scene index plugins are found and registered "
+        "when the mayaHydra plugin loads.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
+        MAYAHYDRAPLUGIN_RENDER_SETTINGS_UI,
+        "Print which render settings UI layout file is used for each renderer.");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

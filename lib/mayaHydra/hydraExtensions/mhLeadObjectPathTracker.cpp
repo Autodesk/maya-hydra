@@ -23,6 +23,8 @@
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
+#include <ufeExtensions/Global.h>
+
 //ufe
 #include <ufe/globalSelection.h>
 #include <ufe/observableSelection.h>
@@ -35,6 +37,16 @@ PXR_NAMESPACE_USING_DIRECTIVE
 // lead object when a new lead object is selected
 
 namespace {
+
+// A Maya node outside the DAG (material, set, render globals) has no Hydra prim, so as the lead
+// it resolves to no prims, without asking the path mappers, which would report a failed mapping.
+Fvp::PrimSelections resolveLeadObject(const Ufe::Path& leadObjectUfePath)
+{
+    if (UfeExtensions::isMayaNonDagNodePath(leadObjectUfePath)) {
+        return {};
+    }
+    return Fvp::ufePathToPrimSelections(leadObjectUfePath);
+}
 
 //GlobalSelectionChangedObs handles notifications from ufe when the global selection changes to track the lead object
 class GlobalSelectionChangedObs : public Ufe::Observer
@@ -80,7 +92,7 @@ MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtySelectionColorsSceneInde
         _leadObjectUfePath = leadObjectSceneItem->path();
         //_leadObjectPrimSelections can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
         //This is fixed at some point by calling updatePrimSelections()
-        _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
+        _leadObjectPrimSelections = resolveLeadObject(_leadObjectUfePath);
     }
 
    // Add ourself as an observer to the selection
@@ -121,7 +133,7 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
     auto oldLeadObjectPrimSelections = _leadObjectPrimSelections;
 
     _leadObjectUfePath  = newLeadObjectUfePath;
-    _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
+    _leadObjectPrimSelections = resolveLeadObject(_leadObjectUfePath);
 
     // Dirty the previous lead object
     if(_dirtySelectionColorsSceneIndex){
@@ -133,7 +145,7 @@ bool MhLeadObjectPathTracker::updatePrimSelections()
 { 
    // Update the lead object prim paths in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimSelections.empty()) {
-        _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
+        _leadObjectPrimSelections = resolveLeadObject(_leadObjectUfePath);
         // The only possible transition is empty -> resolved, so a non-empty result is a change.
         return !_leadObjectPrimSelections.empty();
     }

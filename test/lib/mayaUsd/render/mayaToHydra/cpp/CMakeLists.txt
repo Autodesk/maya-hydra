@@ -64,6 +64,7 @@ target_sources(${TARGET_NAME}
         testUsdStageInvalidate.cpp
         testWriteFile.cpp
         testCamera.cpp
+        testCameraFraming.cpp
         testCustomAttributes.cpp
         testCustomAttributeTypes.cpp
         testMaterialBlocking.cpp

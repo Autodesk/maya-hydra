@@ -59,10 +59,7 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(activeRenderers, [])
 
         activeEditor = cmds.playblast(ae=1)
-        mtohUtils.setMayaUseHydra(True)
-        cmds.modelEditor(
-            activeEditor, e=1,
-            rendererOverrideName=STORM_OVERRIDE)
+        mtohUtils.setRenderer(activeEditor, STORM_OVERRIDE)
         cmds.refresh(f=1)
 
         activeRenderers = cmds.mayaHydra(listActiveRenderers=1)
@@ -70,18 +67,15 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(activeRenderers, [STORM_RENDERER])
 
         if self.has_embree():
-            mtohUtils.setMayaUseHydra(True)
-            cmds.modelEditor(
-                activeEditor, e=1,
-                rendererOverrideName="mtohRenderOverride_HdEmbreeRendererPlugin")
+            mtohUtils.setRenderer(
+                activeEditor, "mtohRenderOverride_HdEmbreeRendererPlugin")
             cmds.refresh(f=1)
 
             activeRenderers = cmds.mayaHydra(listActiveRenderers=1)
             self.assertEqual(activeRenderers, cmds.mayaHydra(lar=1))
             self.assertEqual(activeRenderers, ["HdEmbreeRendererPlugin"])
 
-        mtohUtils.setMayaUseHydra(False)
-        cmds.modelEditor(activeEditor, rendererOverrideName="", e=1)
+        mtohUtils.setRenderer(activeEditor, "")
         cmds.refresh(f=1)
 
         activeRenderers = cmds.mayaHydra(listActiveRenderers=1)

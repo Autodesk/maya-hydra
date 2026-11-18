@@ -104,6 +104,8 @@ protected:
     void _AddHierarchyChangedCallbacks(MDagPath& dag);
     MAYAHYDRALIB_API
     virtual bool _GetVisibility() const;
+    MAYAHYDRALIB_API
+    virtual GfMatrix4d _ComputeTransform() const;
 
 private:
     MDagPath   _dagPath;

@@ -40,13 +40,7 @@ class TestSnapshot(BasicRenderBaseTestCase):
         # Note that we use the default viewport2 renderer, because we're not testing
         # whether hdmaya works with this test - just whether we can make a snapshot
 
-        self.setMayaUseHydra(False)
-        cmds.modelEditor(
-            activeEditor, e=1,
-            rendererName='vp2Renderer')
-        cmds.modelEditor(
-            activeEditor, e=1,
-            rendererOverrideName="")
+        mtohUtils.setRenderer(activeEditor, "")
 
         cube = cmds.polyCube()[0]
         shader = cmds.shadingNode("surfaceShader", asShader=1)

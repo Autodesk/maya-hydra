@@ -39,6 +39,7 @@ HdDataSourceLocator curvesTopologyLocator = HdBasisCurvesSchema::GetTopologyLoca
 HdDataSourceLocator meshTopologyLocator = HdMeshSchema::GetTopologyLocator();
 HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
+#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
 // A linear curve can be described either way: VP2 render items use 2-vertex `segmented` pieces,
 // while render item override carriers (MAYAHYDRA_RENDER_ITEM_OVERRIDE) describe a NURBS curve as one `nonperiodic`
 // polyline (some renderers do not draw `segmented`). Rewrite a nonperiodic topology into the
@@ -77,7 +78,6 @@ HdDataSourceBaseHandle asSegmentedTopology(const HdDataSourceBaseHandle& dataSou
         HdRetainedTypedSampledDataSource<TfToken>::New(HdTokens->segmented));
 }
 
-#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
 FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfToken& primType)
 {
     return [nurbsName,

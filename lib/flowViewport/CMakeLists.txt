@@ -8,6 +8,7 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         debugCodes.cpp
+        fvpCameraFraming.cpp
         fvpDirtyNotifier.cpp
         fvpInstruments.cpp
         fvpPrimUtils.cpp
@@ -21,6 +22,7 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     api.h
     debugCodes.h
+    fvpCameraFraming.h
     fvpDirtyNotifier.h
     fvpInstruments.h
     fvpPrimUtils.h

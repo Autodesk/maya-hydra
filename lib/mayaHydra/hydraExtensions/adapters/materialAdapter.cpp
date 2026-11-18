@@ -41,18 +41,31 @@
 #ifdef WANT_MATERIALX_BUILD
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 #include <pxr/usd/usdMtlx/reader.h>
+#include <pxr/usd/usdMtlx/utils.h>
 #endif
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usdImaging/usdImaging/materialParamUtils.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
+#include <maya/MDagPath.h>
 #include <maya/MFnAttribute.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MObjectHandle.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
 
+#include <ufe/attributes.h>
+#include <ufe/attributesNotification.h>
+#include <ufe/observer.h>
+#include <ufe/path.h>
+#include <ufe/pathString.h>
+#include <ufeExtensions/Global.h>
+
+#include <algorithm>
+#include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #ifdef WANT_MATERIALX_BUILD
@@ -63,6 +76,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class MayaHydraShadingEngineAdapter;
+
 namespace {
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -71,6 +86,11 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((mtlxSurface, "mtlx:surface"))
     (surface)
     (GLSLShader)
+    (MaterialXSurfaceShader)
+    // LookdevX MaterialXSurfaceShader attributes: the MaterialX stack shape it reads its
+    // document from, and the UFE path of its surface material in that stack.
+    (stack)
+    (up)
 );
 
 const VtValue       _emptyValue;
@@ -79,9 +99,14 @@ const TfTokenVector _stSamplerCoords = { TfToken("st") };
 
 #ifdef WANT_MATERIALX_BUILD
 // Collect the node-definition identifiers referenced by 'doc' (including inside
-// nodegraphs) that cannot currently be resolved from the document itself.
+// nodegraphs) that UsdMtlxRead cannot resolve: not in the document itself, nor in
+// the MaterialX libraries UsdMtlxRead falls back to. Documents usually reference
+// library definitions (e.g. ND_surfacematerial) without including them.
 void _CollectUnresolvedNodeDefs(const MaterialX::DocumentPtr& doc, std::set<std::string>& out)
 {
+    // The same cached library document UsdMtlxRead uses.
+    const MaterialX::ConstDocumentPtr libraries = UsdMtlxGetDocument("");
+
     std::vector<MaterialX::NodePtr> nodes = doc->getNodes();
     for (const auto& nodeGraph : doc->getNodeGraphs()) {
         const auto graphNodes = nodeGraph->getNodes();
@@ -90,13 +115,83 @@ void _CollectUnresolvedNodeDefs(const MaterialX::DocumentPtr& doc, std::set<std:
     for (const auto& node : nodes) {
         if (node && !node->getNodeDef()) {
             const std::string def = node->getNodeDefString();
-            if (!def.empty()) {
+            if (!def.empty() && !(libraries && libraries->getNodeDef(def))) {
                 out.insert(def);
             }
         }
     }
 }
 #endif // WANT_MATERIALX_BUILD
+
+// LookdevX reports edits to a MaterialX document (input values, nodes and connections added or
+// removed) through UFE attribute notifications on the document's nodes, for example
+// "|materialXStack1|materialXStackShape1,%document1%open_pbr_surface1" inputs:base_color.
+// It dirties the MaterialXSurfaceShader node (updateId) only once VP2 has drawn the material, which
+// never happens for the shapes Maya hands over to MayaHydra (render item override), so the DG
+// callbacks of the shading engine adapters can't see those edits. One global UFE attribute
+// observer, active while the render item override is and a LookdevX shading engine adapter exists,
+// routes each notification of the MaterialX runtime to the adapters reading that stack shape and
+// document: one Maya name lookup and a few hash lookups per notification, whatever the scene
+// size. Without the override, VP2 draws the materials and updateId keeps them up to date.
+struct _MObjectHandleHash
+{
+    size_t operator()(const MObjectHandle& handle) const { return handle.hashCode(); }
+};
+
+using _AdapterList = std::vector<MayaHydraShadingEngineAdapter*>;
+// Stack shape -> document name -> adapters. An empty document name matches every document.
+using _DocumentAdapters = std::unordered_map<std::string, _AdapterList>;
+std::unordered_map<MObjectHandle, _DocumentAdapters, _MObjectHandleHash> _materialXAdapters;
+
+class _MaterialXDocumentObserver : public Ufe::Observer
+{
+public:
+    void operator()(const Ufe::Notification& notification) override;
+};
+
+Ufe::Observer::Ptr _materialXDocumentObserver;
+// The UFE runtime of the MaterialX documents (from a surface material path), to skip the other
+// runtimes' notifications (USD prims of a proxy shape) before the Maya name lookup. 0: unknown.
+Ufe::Rtid _materialXRunTimeId = 0;
+
+void _RegisterMaterialXAdapter(
+    const MObjectHandle&           stack,
+    const std::string&             document,
+    MayaHydraShadingEngineAdapter* adapter)
+{
+    if (_materialXAdapters.empty()) {
+        if (!_materialXDocumentObserver) {
+            _materialXDocumentObserver = std::make_shared<_MaterialXDocumentObserver>();
+        }
+        Ufe::Attributes::addObserver(_materialXDocumentObserver);
+    }
+    _materialXAdapters[stack][document].push_back(adapter);
+}
+
+void _UnregisterMaterialXAdapter(
+    const MObjectHandle&           stack,
+    const std::string&             document,
+    MayaHydraShadingEngineAdapter* adapter)
+{
+    auto stackIt = _materialXAdapters.find(stack);
+    if (stackIt == _materialXAdapters.end()) {
+        return;
+    }
+    auto documentIt = stackIt->second.find(document);
+    if (documentIt != stackIt->second.end()) {
+        auto& adapters = documentIt->second;
+        adapters.erase(std::remove(adapters.begin(), adapters.end(), adapter), adapters.end());
+        if (adapters.empty()) {
+            stackIt->second.erase(documentIt);
+        }
+    }
+    if (stackIt->second.empty()) {
+        _materialXAdapters.erase(stackIt);
+    }
+    if (_materialXAdapters.empty() && _materialXDocumentObserver) {
+        Ufe::Attributes::removeObserver(_materialXDocumentObserver);
+    }
+}
 
 } // namespace
 
@@ -194,7 +289,20 @@ public:
         _CacheNodeAndTypes();
     }
 
-    ~MayaHydraShadingEngineAdapter() override { _RemoveSurfaceShaderCallbacks(); }
+    ~MayaHydraShadingEngineAdapter() override
+    {
+        _RemoveSurfaceShaderCallbacks();
+        _UnregisterMaterialXDocument();
+    }
+
+    // A UFE attribute notification on a node of the MaterialX document this adapter reads.
+    void OnMaterialXDocumentChanged()
+    {
+        if (MayaHydraAdapter::ShouldSkipHydraUpdates(GetMayaHydraSceneIndex())) {
+            return;
+        }
+        _DirtySurfaceShaderMaterial();
+    }
 
     void CreateCallbacks() override
     {
@@ -256,6 +364,14 @@ private:
         if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
             adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
             return;
+        }
+        if (adapter->_surfaceShaderType == _tokens->MaterialXSurfaceShader) {
+            const MPlug   topPlug = MayaHydra::GetTopPlug(plug);
+            const MString attrName = MFnAttribute(topPlug.attribute()).name();
+            const MString attrShortName = MFnAttribute(topPlug.attribute()).shortName();
+            if (attrName == _tokens->stack.GetText() || attrShortName == _tokens->up.GetText()) {
+                adapter->_RegisterMaterialXDocument();
+            }
         }
         adapter->_DirtySurfaceShaderMaterial();
     }
@@ -343,10 +459,68 @@ private:
         }
     }
 
+    // Route the UFE notifications of the LookdevX MaterialX document read by the surface shader
+    // to this adapter (see _MaterialXDocumentObserver).
+    void _RegisterMaterialXDocument()
+    {
+        _UnregisterMaterialXDocument();
+        if (!MayaHydraSceneIndex::IsRenderItemOverrideEnabled() || _surfaceShader.isNull()
+            || _surfaceShaderType != _tokens->MaterialXSurfaceShader) {
+            return;
+        }
+        MStatus           status;
+        MFnDependencyNode shader(_surfaceShader, &status);
+        if (!status) {
+            return;
+        }
+        const MPlug stackPlug = shader.findPlug(_tokens->stack.GetText(), true, &status);
+        if (!status || stackPlug.isNull()) {
+            return;
+        }
+        const MPlug stackSource = stackPlug.source();
+        if (stackSource.isNull()) {
+            return;
+        }
+        // The surface material's UFE path is "<stack shape>,%<document>%<material>". Without it,
+        // match every document of the stack.
+        std::string document;
+        const MPlug upPlug = shader.findPlug(_tokens->up.GetText(), true, &status);
+        if (status && !upPlug.isNull()) {
+            try {
+                const Ufe::Path materialPath = Ufe::PathString::path(upPlug.asString().asChar());
+                if (materialPath.nbSegments() == 2) {
+                    const auto& components = materialPath.getSegments()[1].components();
+                    if (!components.empty()) {
+                        document = components.front().string();
+                    }
+                    _materialXRunTimeId = materialPath.getSegments()[1].runTimeId();
+                }
+            } catch (const std::exception&) {
+                document.clear();
+            }
+        }
+        _materialXStack = MObjectHandle(stackSource.node());
+        _materialXDocument = document;
+        _materialXRegistered = true;
+        _RegisterMaterialXAdapter(_materialXStack, _materialXDocument, this);
+    }
+
+    void _UnregisterMaterialXDocument()
+    {
+        if (!_materialXRegistered) {
+            return;
+        }
+        _UnregisterMaterialXAdapter(_materialXStack, _materialXDocument, this);
+        _materialXRegistered = false;
+        _materialXStack = MObjectHandle();
+        _materialXDocument.clear();
+    }
+
     void _CreateSurfaceMaterialCallback()
     {
         _CacheNodeAndTypes();
         _RemoveSurfaceShaderCallbacks();
+        _RegisterMaterialXDocument();
 
         if (_surfaceShader != MObject::kNullObj) {
             MStatus status;
@@ -635,10 +809,60 @@ private:
 
     MCallbackId _surfaceShaderCallback;
     MCallbackId _surfaceShaderDirtyCallback { 0 };
+
+    // The LookdevX MaterialX stack shape and document read by _surfaceShader, if any.
+    MObjectHandle _materialXStack;
+    std::string   _materialXDocument;
+    bool          _materialXRegistered { false };
 #ifdef MAYAHYDRALIB_OIT_ENABLED
     bool _isTranslucent = false;
 #endif
 };
+
+namespace {
+
+void _MaterialXDocumentObserver::operator()(const Ufe::Notification& notification)
+{
+    const auto* attributeChanged = dynamic_cast<const Ufe::AttributeChanged*>(&notification);
+    if (!attributeChanged
+        || dynamic_cast<const Ufe::AttributeMetadataChanged*>(attributeChanged)) {
+        return;
+    }
+    // A MaterialX node: the stack shape (Maya segment), then the document and the node.
+    const Ufe::Path& path = attributeChanged->path();
+    if (path.nbSegments() != 2) {
+        return;
+    }
+    const Ufe::PathSegment& stackSegment = path.getSegments()[0];
+    const Ufe::PathSegment& documentSegment = path.getSegments()[1];
+    if (stackSegment.runTimeId() != UfeExtensions::getMayaRunTimeId()
+        || (_materialXRunTimeId != 0 && documentSegment.runTimeId() != _materialXRunTimeId)
+        || documentSegment.components().empty()) {
+        return;
+    }
+    const MDagPath stackDagPath = UfeExtensions::ufeToDagPath(Ufe::Path(stackSegment));
+    if (!stackDagPath.isValid()) {
+        return;
+    }
+    const auto stackIt = _materialXAdapters.find(MObjectHandle(stackDagPath.node()));
+    if (stackIt == _materialXAdapters.end()) {
+        return;
+    }
+    // Copy: an adapter may unregister while it is being dirtied.
+    _AdapterList adapters;
+    for (const std::string& document :
+         { documentSegment.components().front().string(), std::string() }) {
+        const auto documentIt = stackIt->second.find(document);
+        if (documentIt != stackIt->second.end()) {
+            adapters.insert(adapters.end(), documentIt->second.begin(), documentIt->second.end());
+        }
+    }
+    for (MayaHydraShadingEngineAdapter* adapter : adapters) {
+        adapter->OnMaterialXDocumentChanged();
+    }
+}
+
+} // namespace
 
 TF_REGISTRY_FUNCTION(TfType)
 {

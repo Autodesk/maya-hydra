@@ -78,6 +78,11 @@ public:
     FVP_API
     void SetReprType(RepSelectorType reprType, bool needsReprChanged, int refineLevel);
 
+    /// The reprs this scene index authors on meshes, so a host can ask the renderers for
+    /// support of the ones they do not draw natively.
+    FVP_API
+    static const PXR_NS::TfTokenVector& GetAuthoredReprs();
+
 protected:
     
 ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface);

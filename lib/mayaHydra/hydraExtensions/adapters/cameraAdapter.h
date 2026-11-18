@@ -86,6 +86,9 @@ public:
 protected:
     /// Return the Hydra camera type token.
     static TfToken CameraType();
+
+    /// Return the world transform without the camera transform's own scale, as VP2 does.
+    GfMatrix4d _ComputeTransform() const override;
 };
 
 using MayaHydraCameraAdapterPtr = std::shared_ptr<MayaHydraCameraAdapter>;

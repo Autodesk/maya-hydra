@@ -30,6 +30,7 @@
 #include "setVisibleFramePassesCommand.h"
 
 #include "mayaColorPreferencesTranslator.h"
+#include "outlineSelection.h"
 #include "pluginDebugCodes.h"
 #include "renderOverrideUtils.h"
 #include "renderSettingsUtils.h"
@@ -39,6 +40,7 @@
 #endif
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
+#include <mayaHydraLib/mhSceneModifiedGuard.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
@@ -50,6 +52,7 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
+#include <flowViewport/fvpCameraFraming.h>
 #include <flowViewport/fvpDirtyNotifier.h>
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
@@ -122,8 +125,6 @@
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
-#include <pxr/imaging/hd/instancerTopologySchema.h>
-#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/meshSchema.h>
@@ -167,7 +168,7 @@
 #include <iterator>
 #include <limits>
 #include <set>
-#include <unordered_map>
+#include <stdexcept>
 #include <vector>
 
 #include <pxr/base/tf/getenv.h>
@@ -238,6 +239,30 @@ namespace {
 std::mutex                       _allInstancesMutex;
 std::vector<MtohRenderOverride*> _allInstances;
 
+//! \brief  Replaces the Hydra selection with the UFE selection, minus the Maya nodes outside the
+//!         DAG (materials, sets, render globals).
+//!
+//! Those nodes have no Hydra prim; mapping one reports a failed mapping. The selection is copied
+//! only when it holds such a node.
+void replaceHydraSelection(const Fvp::SelectionSceneIndexRefPtr& selectionSceneIndex,
+                           const Ufe::Selection&                 ufeSelection)
+{
+    const auto isNonDag = [](const Ufe::SceneItem::Ptr& item) {
+        return UfeExtensions::isMayaNonDagNodePath(item->path());
+    };
+    if (std::none_of(ufeSelection.cbegin(), ufeSelection.cend(), isNonDag)) {
+        selectionSceneIndex->ReplaceSelection(ufeSelection);
+        return;
+    }
+    Ufe::Selection drawnItems;
+    for (const auto& item : ufeSelection) {
+        if (!isNonDag(item)) {
+            drawnItems.append(item);
+        }
+    }
+    selectionSceneIndex->ReplaceSelection(drawnItems);
+}
+
 //! \brief  Whether a display style draws a wireframe for objects, so VP2's wireframe items must be
 //!         left alone rather than treated as selection highlighting.
 //!
@@ -249,388 +274,6 @@ bool viewportDrawsWireframes(unsigned int displayStyle)
         = static_cast<unsigned int>(MHWRender::MFrameContext::kWireFrame)
         | static_cast<unsigned int>(MHWRender::MFrameContext::kShadeActiveOnly);
     return (displayStyle & wireframeDrawingBits) != 0;
-}
-
-//! \brief  Whether \p path is at or below any entry of \p sortedSelectedPaths.
-//!
-//! \p sortedSelectedPaths must be sorted with SdfPath's default (std::less) ordering, as returned by
-//! Selection::GetFullySelectedPaths().
-//!
-//! Binary-searches each ancestor of \p path, O(depth * log n), since this runs on every hover change
-//! and selections can be large.
-bool isPathInSelection(const SdfPathVector& sortedSelectedPaths, const SdfPath& path)
-{
-    if (sortedSelectedPaths.empty() || path.IsEmpty()) {
-        return false;
-    }
-    for (SdfPath p = path; !p.IsEmpty();) {
-        if (std::binary_search(sortedSelectedPaths.begin(), sortedSelectedPaths.end(), p)) {
-            return true;
-        }
-        // GetParentPath() of the absolute root is itself.
-        const SdfPath parent = p.GetParentPath();
-        if (parent == p) {
-            break;
-        }
-        p = parent;
-    }
-    return false;
-}
-
-//! \brief  The outline target of a prim selection.
-//!
-//! One level per instancer of its nested instance indices, none when it carries no instance
-//! indices (the whole prim). The indices are instancer-wide on both sides, so they pass through
-//! unchanged, and the prototype index is dropped: an instancer-wide index belongs to one prototype.
-//! Paths are in the render index namespace, as the selection is.
-HVT_NS::Outline::OutlineTarget toOutlineTarget(const Fvp::PrimSelection& primSelection)
-{
-    HVT_NS::Outline::OutlineTarget target { primSelection.primPath, {} };
-    for (const Fvp::InstancesSelection& instances : primSelection.nestedInstanceIndices) {
-        // An OutlineTarget has one level per instancer: merge the entries of one instancer that
-        // differ only by prototype.
-        auto level = std::find_if(
-            target.instanceLevels.begin(),
-            target.instanceLevels.end(),
-            [&](const HVT_NS::Outline::OutlineInstanceLevel& l) {
-                return l.instancer == instances.instancerPath;
-            });
-        if (level == target.instanceLevels.end()) {
-            target.instanceLevels.push_back({ instances.instancerPath, {} });
-            level = std::prev(target.instanceLevels.end());
-        }
-        for (int instanceIndex : instances.instanceIndices) {
-            level->instanceIndices.push_back(instanceIndex);
-        }
-    }
-    return target;
-}
-
-//! \brief  Append the outline targets of one prim's selections to \p targets, merged.
-//!
-//! The Instances pick mode adds one PrimSelection per selected instance, so a marquee of N
-//! instances would give N targets. Hydra Viewport Toolbox merges them as well, but the targets
-//! cached by the caller are copied and compared on every outline push, hover changes included, so
-//! they are merged once, on the selection change: the targets with one level on the same instancer
-//! become one target listing the sorted union of their indices. Targets with several levels are
-//! kept apart: a union of intersections is not the intersection of the unions.
-void appendMergedOutlineTargets(
-    const Fvp::PrimSelections&       primSelections,
-    HVT_NS::Outline::OutlineTargets& targets)
-{
-    const auto first = static_cast<std::ptrdiff_t>(targets.size());
-    bool       merged = false;
-    for (const Fvp::PrimSelection& primSelection : primSelections) {
-        HVT_NS::Outline::OutlineTarget target = toOutlineTarget(primSelection);
-        if (target.instanceLevels.size() == 1) {
-            // All the selections of one prim share its path: match on the instancer only.
-            const SdfPath& instancer = target.instanceLevels[0].instancer;
-            auto           found = std::find_if(
-                targets.begin() + first,
-                targets.end(),
-                [&](const HVT_NS::Outline::OutlineTarget& t) {
-                    return t.instanceLevels.size() == 1
-                        && t.instanceLevels[0].instancer == instancer;
-                });
-            if (found != targets.end()) {
-                VtIntArray& indices = found->instanceLevels[0].instanceIndices;
-                for (int instanceIndex : target.instanceLevels[0].instanceIndices) {
-                    indices.push_back(instanceIndex);
-                }
-                merged = true;
-                continue;
-            }
-        }
-        targets.push_back(std::move(target));
-    }
-
-    if (!merged) {
-        return;
-    }
-    // Sorted and deduplicated, so that the targets do not depend on the selection order.
-    for (auto it = targets.begin() + first; it != targets.end(); ++it) {
-        if (it->instanceLevels.size() != 1) {
-            continue;
-        }
-        VtIntArray&      indices = it->instanceLevels[0].instanceIndices;
-        std::vector<int> sorted(indices.cbegin(), indices.cend());
-        std::sort(sorted.begin(), sorted.end());
-        sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
-        indices = VtIntArray(sorted.begin(), sorted.end());
-    }
-}
-
-//! The scope under which UsdImaging adds the native instancers. A UsdImaging name
-//! (niInstanceAggregationSceneIndex.cpp), not exported.
-const TfToken& propagatedPrototypesScope()
-{
-    static const TfToken scope("UsdNiPropagatedPrototypes");
-    return scope;
-}
-
-//! Whether \p path is at or under a UsdNiPropagatedPrototypes scope, where UsdImaging keeps its
-//! native instancers.
-bool isUnderPropagatedPrototypes(const SdfPath& path)
-{
-    for (SdfPath p = path; !p.IsEmpty() && !p.IsAbsoluteRootPath(); p = p.GetParentPath()) {
-        if (p.GetNameToken() == propagatedPrototypesScope()) {
-            return true;
-        }
-    }
-    return false;
-}
-
-//! \brief  Finds the native instancers drawing the native instances under a prim, for the outline.
-//!
-//! UsdImaging draws the native instances found under a prim P through instancers that it adds at
-//! P/UsdNiPropagatedPrototypes/<binding>/<prototype>/UsdNiInstancer, each drawing one prototype.
-//! P is the stage root for the instances outside any prototype, and the prototype root for the
-//! instances nested in a prototype, so the instancers drawing the instances at or under a path are
-//! under the scope of one of its strict ancestors. Lookups are cached until Clear(): the render
-//! override keeps one finder across outline pushes and clears it when the instancers change (see
-//! MtohRenderOverride::NativeInstancerCache), so that a selection change reads no scope again.
-class NativeInstancerFinder
-{
-public:
-    struct Instancer
-    {
-        SdfPath path;
-        SdfPath prototype;
-        //! (instance location, instance index) pairs, sorted by location. SdfPath sorts
-        //! dictionary-style, so the instances at or under a path are the range that starts at the
-        //! path: a lookup costs O(log n + matches), not a scan of every instance.
-        std::vector<std::pair<SdfPath, int>> sortedLocations;
-
-        //! Append to \p indices the indices of the instances at or under \p path, in location
-        //! order.
-        void AppendInstancesUnder(const SdfPath& path, std::vector<int>& indices) const
-        {
-            auto it = std::lower_bound(
-                sortedLocations.begin(),
-                sortedLocations.end(),
-                path,
-                [](const std::pair<SdfPath, int>& location, const SdfPath& p) {
-                    return location.first < p;
-                });
-            for (; it != sortedLocations.end() && it->first.HasPrefix(path); ++it) {
-                indices.push_back(it->second);
-            }
-        }
-    };
-    using Instancers = std::vector<Instancer>;
-
-    explicit NativeInstancerFinder(HdSceneIndexBaseRefPtr sceneIndex)
-        : _sceneIndex(std::move(sceneIndex))
-    {
-    }
-
-    //! The native instancers that UsdImaging added for the native instances under \p root.
-    const Instancers& GetInstancersUnder(const SdfPath& root)
-    {
-        auto [it, inserted] = _instancersByRoot.try_emplace(root);
-        if (!inserted || !_sceneIndex) {
-            return it->second;
-        }
-        const SdfPath scope = root.AppendChild(propagatedPrototypesScope());
-        for (const SdfPath& binding : _sceneIndex->GetChildPrimPaths(scope)) {
-            for (const SdfPath& prototypeBase : _sceneIndex->GetChildPrimPaths(binding)) {
-                for (const SdfPath& instancerPath : _sceneIndex->GetChildPrimPaths(prototypeBase)) {
-                    const HdSceneIndexPrim prim = _sceneIndex->GetPrim(instancerPath);
-                    if (prim.primType != HdPrimTypeTokens->instancer) {
-                        continue;
-                    }
-                    const HdInstancerTopologySchema topology
-                        = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
-                    const HdPathArrayDataSourceHandle prototypesDs = topology.GetPrototypes();
-                    const HdPathArrayDataSourceHandle locationsDs
-                        = topology.GetInstanceLocations();
-                    if (!prototypesDs || !locationsDs) {
-                        continue;
-                    }
-                    const VtArray<SdfPath> prototypes = prototypesDs->GetTypedValue(0.0f);
-                    if (prototypes.size() != 1) {
-                        continue;
-                    }
-                    // The instance index is the position in instanceLocations, as in
-                    // HdInstanceSchema::instanceIndex.
-                    const VtArray<SdfPath> locations = locationsDs->GetTypedValue(0.0f);
-                    Instancer instancer { instancerPath, prototypes[0], {} };
-                    instancer.sortedLocations.reserve(locations.size());
-                    for (size_t i = 0; i < locations.size(); ++i) {
-                        instancer.sortedLocations.emplace_back(locations[i], static_cast<int>(i));
-                    }
-                    // UsdImaging lists the locations sorted in practice: check before sorting,
-                    // which is the costly part for many instances.
-                    if (!std::is_sorted(
-                            instancer.sortedLocations.begin(), instancer.sortedLocations.end())) {
-                        std::sort(
-                            instancer.sortedLocations.begin(), instancer.sortedLocations.end());
-                    }
-                    it->second.push_back(std::move(instancer));
-                }
-            }
-        }
-        return it->second;
-    }
-
-    //! Forget every lookup, for when the instancers may have changed.
-    void Clear() { _instancersByRoot.clear(); }
-
-private:
-    HdSceneIndexBaseRefPtr                                 _sceneIndex;
-    std::unordered_map<SdfPath, Instancers, SdfPath::Hash> _instancersByRoot;
-};
-
-//! \brief  Append the outline targets of the native instances that \p sortedWholePaths and
-//!         \p targets select.
-//!
-//! A native instance prim has no rprim under it: its instancer draws its prototype elsewhere in the
-//! namespace. So neither a path selected whole nor a target outlines the native instances at or
-//! under its path. For each native instancer drawing some of them, a target on its prototype keeps
-//! them: its levels are those of the selecting target (none for a whole path), plus one on the
-//! instancer.
-//! The instance index is the position in instanceLocations, as in HdInstanceSchema::instanceIndex.
-//! Instancers drawn under the selecting path are skipped: their rprims are already under it.
-//!
-//! \p sortedWholePaths must be sorted, as for isPathInSelection().
-void appendNativeInstanceTargets(
-    NativeInstancerFinder&           finder,
-    const SdfPathVector&             sortedWholePaths,
-    HVT_NS::Outline::OutlineTargets& targets)
-{
-    // The roots whose scope can hold the instancers of the instances at or under path.
-    const auto forEachRoot = [](const SdfPath& path, auto&& fn) {
-        for (SdfPath root = path.GetParentPath(); !root.IsEmpty();
-             root = root.IsAbsoluteRootPath() ? SdfPath() : root.GetParentPath()) {
-            fn(root);
-        }
-    };
-
-    // Ascending and unique, as the instance indices of a target are expected to be.
-    const auto toTargetIndices = [](std::vector<int>& indices) {
-        std::sort(indices.begin(), indices.end());
-        indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
-        return VtIntArray(indices.begin(), indices.end());
-    };
-
-    // Targets with instance levels: the native instances under a point instance, or nested in the
-    // prototype of another native instance. Appended targets are not visited again.
-    const size_t targetCount = targets.size();
-    for (size_t iTarget = 0; iTarget < targetCount; ++iTarget) {
-        if (targets[iTarget].instanceLevels.empty()) {
-            continue;
-        }
-        // Copies: push_back() below can reallocate targets.
-        const SdfPath path = targets[iTarget].path;
-        const auto    levels = targets[iTarget].instanceLevels;
-        forEachRoot(path, [&](const SdfPath& root) {
-            for (const auto& instancer : finder.GetInstancersUnder(root)) {
-                if (instancer.path.HasPrefix(path)) {
-                    continue;
-                }
-                std::vector<int> indices;
-                instancer.AppendInstancesUnder(path, indices);
-                if (!indices.empty()) {
-                    HVT_NS::Outline::OutlineTarget target { instancer.prototype, levels };
-                    target.instanceLevels.push_back({ instancer.path, toTargetIndices(indices) });
-                    targets.push_back(std::move(target));
-                }
-            }
-        });
-    }
-
-    // Paths selected whole: one target per instancer, with the instances of all of them. An
-    // instance is in the selection when one of the paths is a prefix of its location, so each path
-    // looks up its own range, instead of testing every instance against the selection.
-    std::set<SdfPath> roots;
-    for (const SdfPath& path : sortedWholePaths) {
-        forEachRoot(path, [&](const SdfPath& root) { roots.insert(root); });
-    }
-    for (const SdfPath& root : roots) {
-        for (const auto& instancer : finder.GetInstancersUnder(root)) {
-            if (isPathInSelection(sortedWholePaths, instancer.path)) {
-                continue;
-            }
-            std::vector<int> indices;
-            for (const SdfPath& path : sortedWholePaths) {
-                instancer.AppendInstancesUnder(path, indices);
-            }
-            if (!indices.empty()) {
-                targets.push_back(
-                    { instancer.prototype, { { instancer.path, toTargetIndices(indices) } } });
-            }
-        }
-    }
-}
-
-//! \brief  Split the Fvp selection into the outline's whole-prim paths and instance targets.
-//!
-//! A prim with a PrimSelection that carries no instance indices is selected whole and goes to
-//! \p selectedPaths, sorted like Selection::GetFullySelectedPaths() (isPathInSelection() relies on
-//! it). Otherwise its PrimSelections become targets of \p selectedTargets, merged per instancer
-//! (see appendMergedOutlineTargets()). The selected native instances add targets on their
-//! prototypes (see appendNativeInstanceTargets()).
-void getOutlineSelection(
-    const Fvp::Selection&            selection,
-    NativeInstancerFinder&           nativeInstancerFinder,
-    SdfPathVector&                   selectedPaths,
-    HVT_NS::Outline::OutlineTargets& selectedTargets)
-{
-    selectedPaths.clear();
-    selectedTargets.clear();
-    for (const auto& [primPath, primSelections] : selection) {
-        const bool selectedWhole = std::any_of(
-            primSelections.begin(), primSelections.end(), [](const Fvp::PrimSelection& s) {
-                return s.nestedInstanceIndices.empty();
-            });
-        if (selectedWhole) {
-            selectedPaths.push_back(primPath);
-            continue;
-        }
-
-        appendMergedOutlineTargets(primSelections, selectedTargets);
-    }
-    appendNativeInstanceTargets(nativeInstancerFinder, selectedPaths, selectedTargets);
-}
-
-//! \brief  Split the lead object's prim selections into the outline's lead path and lead targets.
-//!
-//! The first prim selection without instance indices goes to \p leadPath, the others to
-//! \p leadTargets: level-less for the other whole prims, so every prim of the lead gets the lead
-//! color, with instance levels for instance selections, so that only the lead instances do. The
-//! native instances of the lead add targets on their prototypes (see
-//! appendNativeInstanceTargets()); then all the whole prims are level-less targets, as a native
-//! instance prim resolves to no prim ID and would make \p leadPath warn.
-void getOutlineLead(
-    const Fvp::PrimSelections&       leadSelections,
-    NativeInstancerFinder&           nativeInstancerFinder,
-    SdfPath&                         leadPath,
-    HVT_NS::Outline::OutlineTargets& leadTargets)
-{
-    leadPath = SdfPath();
-    leadTargets.clear();
-    SdfPathVector wholePaths;
-    for (const Fvp::PrimSelection& primSelection : leadSelections) {
-        if (primSelection.nestedInstanceIndices.empty()) {
-            wholePaths.push_back(primSelection.primPath);
-        } else {
-            leadTargets.push_back(toOutlineTarget(primSelection));
-        }
-    }
-
-    SdfPathVector sortedWholePaths = wholePaths;
-    std::sort(sortedWholePaths.begin(), sortedWholePaths.end());
-    const size_t targetCount = leadTargets.size();
-    appendNativeInstanceTargets(nativeInstancerFinder, sortedWholePaths, leadTargets);
-    const bool hasNativeInstances = leadTargets.size() > targetCount;
-
-    for (const SdfPath& path : wholePaths) {
-        if (leadPath.IsEmpty() && !hasNativeInstances) {
-            leadPath = path;
-        } else {
-            leadTargets.push_back({ path, {} });
-        }
-    }
 }
 
 //! \brief  Post-multiply onto a projection matrix so the pick region fills the whole viewport.
@@ -768,77 +411,6 @@ public:
 
 private:
     MtohRenderOverride& _renderOverride;
-};
-
-// Keeps the native instancer lookups of the outline across selection changes: reading and sorting
-// the instance locations of many native instances costs more than the rest of a selection change.
-// They are cleared when UsdImaging may have changed its native instancers: a prim added, or dirtied
-// in its instancer topology, under a UsdNiPropagatedPrototypes scope, or any prim removed or
-// renamed (such a subtree can hold a scope without naming it). The notices only set a flag: the
-// lookups belong to Render().
-class MtohRenderOverride::NativeInstancerCache : public HdSceneIndexObserver
-{
-public:
-    explicit NativeInstancerCache(HdSceneIndexBaseRefPtr sceneIndex)
-        : _sceneIndex(std::move(sceneIndex))
-        , _finder(_sceneIndex)
-    {
-        _sceneIndex->AddObserver(HdSceneIndexObserverPtr(this));
-    }
-
-    ~NativeInstancerCache() override { _sceneIndex->RemoveObserver(HdSceneIndexObserverPtr(this)); }
-
-    //! The cached lookups, cleared first if the native instancers changed since the last call.
-    NativeInstancerFinder& GetFinder()
-    {
-        if (_instancersChanged.exchange(false)) {
-            _finder.Clear();
-        }
-        return _finder;
-    }
-
-    void PrimsAdded(const HdSceneIndexBase&, const AddedPrimEntries& entries) override
-    {
-        for (const AddedPrimEntry& entry : entries) {
-            if (isUnderPropagatedPrototypes(entry.primPath)) {
-                _InstancersChanged();
-                return;
-            }
-        }
-    }
-
-    void PrimsRemoved(const HdSceneIndexBase&, const RemovedPrimEntries& entries) override
-    {
-        if (!entries.empty()) {
-            _InstancersChanged();
-        }
-    }
-
-    void PrimsDirtied(const HdSceneIndexBase&, const DirtiedPrimEntries& entries) override
-    {
-        for (const DirtiedPrimEntry& entry : entries) {
-            // The locator test first: it is the cheaper one, and rarely passes.
-            if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())
-                && isUnderPropagatedPrototypes(entry.primPath)) {
-                _InstancersChanged();
-                return;
-            }
-        }
-    }
-
-    void PrimsRenamed(const HdSceneIndexBase&, const RenamedPrimEntries& entries) override
-    {
-        if (!entries.empty()) {
-            _InstancersChanged();
-        }
-    }
-
-private:
-    void _InstancersChanged() { _instancersChanged = true; }
-
-    HdSceneIndexBaseRefPtr _sceneIndex;
-    NativeInstancerFinder  _finder;
-    std::atomic<bool>      _instancersChanged = { false };
 };
 
 // MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of VP2.0.
@@ -1024,7 +596,11 @@ void MtohRenderOverride::UpdateRenderGlobals(
                 continue;
             }
 
-            // Will be applied in _InitHydraResources later anyway
+            // Will be applied in _InitHydraResources later anyway. A renderer not drawing in any
+            // viewport has no frame pass, so skip it rather than ask for one.
+            if (instance->_framePassesData.empty()) {
+                continue;
+            }
             if (auto* renderDelegate = instance->_GetRenderDelegate()) {
                 instance->_globals.ApplySettings(
                     renderDelegate,
@@ -1513,6 +1089,44 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
     }
 }
 
+SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
+{
+    MStatus       status;
+    const MString ufePathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+    if (!status || ufePathString.length() == 0) {
+        return {};
+    }
+    // Maya builds this string, so it is a valid UFE path.
+    const Ufe::Path ufePath = Ufe::PathString::path(ufePathString.asChar());
+
+    if (ufePath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
+        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+        if (!status || !_mayaHydraSceneIndex) {
+            return {};
+        }
+        MFnCamera camera(camPath, &status);
+        // TODO: Support orthographic cameras.
+        if (!status || camera.isOrtho()) {
+            return {};
+        }
+        return _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
+    }
+
+    // Only runtimes that registered a path mapper (MayaUSD) publish camera prims. Checking first
+    // keeps the registry's no-mapping warning out of every draw. Orthographic USD cameras are
+    // rejected later, when the camera prim projection is computed.
+    if (!Fvp::PathMapperRegistry::Instance().HasMapper(ufePath)) {
+        return {};
+    }
+    const Fvp::PrimSelections selections = Fvp::ufePathToPrimSelections(ufePath);
+    // A camera is not instanced, so it maps to exactly one prim, as in
+    // mhExternalCameraResolvingSceneIndex.
+    if (selections.size() != 1) {
+        return {};
+    }
+    return selections.front().primPath;
+}
+
 MStatus MtohRenderOverride::Render(
     const MHWRender::MDrawContext&                         drawContext,
     const MHWRender::MDataServerOperation::MViewportScene& scene)
@@ -1865,7 +1479,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (_needToReplaceSelection){
-        _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+        replaceHydraSelection(_selectionSceneIndex, *Ufe::GlobalSelection::get());
         _needToReplaceSelection = false;
         // No selection notification comes with this replace, so push the outline inputs again.
         _outlineInputsDirty = true;
@@ -2170,34 +1784,28 @@ MStatus MtohRenderOverride::Render(
     const int maxX = std::clamp(renderRegion.GetMaxX(), minX, width - 1);
     const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
     renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
-    for (int i = 0; i < numFramePasses; ++i) {
-        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-        if (!currentPass) {
-            continue;
-        }
-        currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
-    }
 
-    // Storm renders through the free camera, built from Maya's view and projection matrices. The
-    // camera prim does not translate every Maya projection input (overscan, resolution gate,
-    // film transforms, 2D pan/zoom), and Storm is picked with Maya's matrices, so binding the prim
-    // would desync the draw from the pick. Other delegates bind the prim for the render
-    // parameters the free camera lacks.
-    SdfPath cameraPath;
-    if (useCameraPrim() && !_isUsingHdSt) {
-        MStatus        status;
-        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-        if (status == MStatus::kSuccess) {
-            const MString ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
-            const Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-            // TODO: Support USD cameras.
-            if (ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-                MFnCamera camera(camPath, &status);
-                // TODO: Support orthographic cameras.
-                if (status == MStatus::kSuccess && !camera.isOrtho() && _mayaHydraSceneIndex) {
-                    cameraPath = _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
-                }
-            }
+    // Every delegate renders through the camera prim translated from the Maya or USD camera, so
+    // that it gets the render parameters the free camera lacks. Orthographic cameras still use
+    // the free camera.
+    const SdfPath cameraPath = _ResolveCameraPrimPath();
+
+    // The camera prim holds the raw camera attributes, shared by every panel looking through that
+    // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
+    // disabling window conforming and solving the display window so that the framed prim
+    // projection equals Maya's projection matrix.
+    // Every pass uses the same Maya projection matrix.
+    // The display window is solved once, from the main pass.
+    const GfVec2i             panelSize(width, height);
+    std::optional<GfMatrix4d> cameraPrimProjection;
+    std::optional<GfRange2f>  solvedWindow;
+    if (!cameraPath.IsEmpty() && numFramePasses > 0 && _GetFramePass(0)) {
+        // Compute the base projection matrix of the camera prim.
+        cameraPrimProjection = Fvp::computeCameraPrimProjection(
+            _GetFramePass(0)->GetRenderIndex()->GetTerminalSceneIndex(), cameraPath);
+        if (cameraPrimProjection) {
+            solvedWindow
+                = Fvp::solveDisplayWindow(projectionMatrix, *cameraPrimProjection, panelSize);
         }
     }
 
@@ -2206,13 +1814,34 @@ MStatus MtohRenderOverride::Render(
         if (!currentPass) {
             continue;
         }
-        currentPass->params().renderParams.camera = cameraPath;
-        // A bound camera prim carries its own window policy, translated from the Maya film fit,
-        // so disable the override. The free camera needs the default override back, since the
-        // camera path goes empty again when switching to an ortho or USD camera.
-        currentPass->params().renderParams.overrideWindowPolicy = cameraPath.IsEmpty()
-            ? std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit)
-            : std::nullopt;
+        auto& params = currentPass->params();
+
+        if (!cameraPrimProjection) {
+            params.viewInfo.framing = CameraUtilFraming(displayWindow, renderRegion);
+            params.renderParams.camera = SdfPath();
+            params.renderParams.overrideWindowPolicy
+                = std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit);
+            continue;
+        }
+
+        params.viewInfo.framing
+            = CameraUtilFraming(solvedWindow.value_or(displayWindow), renderRegion);
+        params.renderParams.camera = cameraPath;
+        params.renderParams.overrideWindowPolicy
+            = std::optional<CameraUtilConformWindowPolicy>(CameraUtilDontConform);
+    }
+
+    if (cameraPrimProjection && !solvedWindow) {
+        // Warn once per camera. Panels looking through different cameras render in turn.
+        if (_unsolvableFramingWarnedCameras.insert(cameraPath).second) {
+            TF_WARN(
+                "The projection of camera %s cannot be reproduced through its camera prim (for "
+                "example because of film roll). The viewport may not match Maya's framing.",
+                cameraPath.GetText());
+        }
+    } else if (solvedWindow) {
+        // The display window solves again (i.e., the film roll was removed).
+        _unsolvableFramingWarnedCameras.erase(cameraPath);
     }
 
     // Update all registered plugin before render.
@@ -2221,10 +1850,14 @@ MStatus MtohRenderOverride::Render(
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
-    // delegate. The Storm-specific task setup below only disables the shadow task;
-    // other delegates rely on the lights management scene index turning off shadow
-    // casting on the light prims themselves.
-    bool  enableShadows = true;
+    // delegate. All delegates, Storm included, rely on the lights management scene index
+    // turning off shadow casting on the light prims themselves.
+    // MLightParameterInformation::getParameter(kGlobalShadowOn) only actually
+    // returns data when the shadows are enabled. If there is no light or shadows
+    // are off, the call will not be successful. Therefore, assume shadows are off
+    // by default, and only enable them if they are. Note : despite being a Maya
+    // API, MLightParameterInformation does indeed work for USD lights.
+    bool  enableShadows = false;
     auto* lightParam = drawContext.getLightParameterInformation(
         0, MHWRender::MDrawContext::kFilteredIgnoreLightLimit);
     if (lightParam != nullptr) {
@@ -2253,7 +1886,13 @@ MStatus MtohRenderOverride::Render(
                 continue;
             }
 
-            currentPass->SetEnableShadows(enableShadows);
+            // Keep the Storm shadow pipeline always enabled: turning
+            // HdxSimpleLightTaskParams::enableShadows off and then on again leaves the shadow
+            // task drawing into an incomplete framebuffer on the frame it is re-enabled
+            // (GL_INVALID_FRAMEBUFFER_OPERATION), so nothing is drawn in that frame.
+            // Shadows are already enabled/disabled for every light by the lights management
+            // scene index, so no need to turn the task off. 
+            currentPass->SetEnableShadows(true);
             currentPass->SetShadowParams(shadowParams);
         }
         if (_mayaHydraSceneIndex) {
@@ -2728,6 +2367,11 @@ void MtohRenderOverride::_InitHydraResources(
         .Msg("MtohRenderOverride::_InitHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
     _initializationAttempted = true;
+
+    // Initializing Hydra adds attributes to defaultRenderGlobals and has MayaUSD populate
+    // UsdDefaultRenderDescription. Neither is a user edit, so keep them from marking the scene as
+    // modified.
+    const MayaHydra::SceneModifiedGuard sceneModifiedGuard;
 
     // Absorb the opened scene's defaultRenderGlobals first: the selection-highlight mode decides
     // below whether the outline manager or the legacy highlight scene indices get installed, and
@@ -3303,7 +2947,7 @@ void MtohRenderOverride::SelectionChanged(
 
     TF_AXIOM(_selectionSceneIndex);
 
-    // Two considerations:
+    // Three considerations:
     // 1) Reading from the Maya active selection list only returns
     //    Maya objects, so must read from the UFE selection.
     // 2) The UFE selection does not have Maya component selections.
@@ -3312,13 +2956,19 @@ void MtohRenderOverride::SelectionChanged(
     //    notification is sent before the Maya selection is ready, so
     //    reading the Maya selection must be done from the Maya selection
     //    changed callback, not the UFE selection changed callback.
+    // 3) Maya nodes outside the DAG (materials, sets, render globals)
+    //    can be selected but have no Hydra prim, so they are skipped.
     using SnOp = Ufe::SelectionCompositeNotification::Op;
     using SnSiPtr = Fvp::SelectionSceneIndexRefPtr;
     static auto appendSn = [](const SnOp& op, const SnSiPtr& si) {
-        si->AddSelection(op.item->path());
+        if (!UfeExtensions::isMayaNonDagNodePath(op.item->path())) {
+            si->AddSelection(op.item->path());
+        }
     };
     static auto removeSn = [](const SnOp& op, const SnSiPtr& si) {
-        si->RemoveSelection(op.item->path());
+        if (!UfeExtensions::isMayaNonDagNodePath(op.item->path())) {
+            si->RemoveSelection(op.item->path());
+        }
     };
     // FLOW_VIEWPORT_TODO  Support selection insert.  PPT, 19-Oct-2023
     static auto insertSn = [](const SnOp&, const SnSiPtr& si) {
@@ -3328,7 +2978,7 @@ void MtohRenderOverride::SelectionChanged(
         si->ClearSelection();
     };
     static auto replaceWithSn = [](const SnOp& op, const SnSiPtr& si) {
-        si->ReplaceSelection(*Ufe::GlobalSelection::get());
+        replaceHydraSelection(si, *Ufe::GlobalSelection::get());
     };
     static std::function<void(const SnOp&, const SnSiPtr&)> changeSn[] = {appendSn, removeSn, insertSn, clearSn, replaceWithSn};
 

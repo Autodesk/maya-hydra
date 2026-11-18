@@ -32,6 +32,8 @@ class TestUsdNestedNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
 
     def setUp(self):
         super(TestUsdNestedNativeInstancePicking, self).setUp()
+        # The scene is Y-up, and the camera below assumes Maya is too.
+        cmds.upAxis(axis='y')
         self.loadUsdScene()
         cmds.select(clear=True)
         # Looking down -z at the middle of the front row (Outer_2, at z = 8), which hides the
