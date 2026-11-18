@@ -1457,6 +1457,10 @@ MStatus MtohRenderOverride::Render(
     if (_renderThreadStarted && _renderThread) {
         MH_PIPELINE_TIMING_SCOPE("render_thread_interlock");
         _renderThread->WaitForIdle();
+        // Applies what Maya callbacks changed while the last frame was syncing.
+        if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->SetRenderThreadBusy(false);
+        }
     }
 
     // Maya's time-change callback only records the frame, since it can fire while the
@@ -1924,6 +1928,9 @@ MStatus MtohRenderOverride::Render(
             }
 #endif
             MH_PIPELINE_TIMING_SCOPE("SubmitCmds");
+            if (_mayaHydraSceneIndex) {
+                _mayaHydraSceneIndex->SetRenderThreadBusy(true);
+            }
             _renderThread->SubmitRequest(std::move(request));
             submittedToRenderThread = true;
         } else {
@@ -2927,6 +2934,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         _renderThreadStarted = false;
         _firstFramePrimed = false;
         if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->SetRenderThreadBusy(false);
             _mayaHydraSceneIndex->SetDeferCallbackRemovals(false);
         }
 #if defined(USD_HAS_GPU_BUFFER_SHARING)

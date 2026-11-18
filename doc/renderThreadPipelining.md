@@ -104,10 +104,19 @@ reported and survived.  After 500 ms it warns that it is still waiting and
 counts the frame in `idleWaitTimeouts`, then keeps waiting.
 
 Maya callbacks run outside `Render()`, so they must not write to the scene index
-either.  The one that did, the node-removed callback dropping a deleted shape's
-render item override carriers, queues the removals while the render thread runs
-(`MayaHydraSceneIndex::SetDeferCallbackRemovals`), and the next
-`UpdateRenderItems` applies them.
+either, yet adapters dirty, add and remove prims from their callbacks (transform,
+visibility and attribute changes, lights, custom DAG nodes).  `MayaHydraSceneIndex`
+therefore queues `AddPrims`, `RemovePrims` and `DirtyPrims` from submitting a
+frame until the next interlock (`SetRenderThreadBusy`): in call order, with
+repeated dirties of a prim merged into one entry.  The interlock applies the
+queue right after the wait.  Queued changes are not visible to queries on the
+scene index until then.
+
+Notices are not the only hazard: an adapter destroyed while the render thread
+reads its data sources is one too.  The node-removed callback dropping a deleted
+shape's render item override carriers therefore keeps the carriers alive while
+the render thread runs (`MayaHydraSceneIndex::SetDeferCallbackRemovals`), and
+the next `UpdateRenderItems` drops them.
 
 Overlap therefore covers the part of the draw after sync rather than the whole
 draw, and the interlock, not the frame handoff, is what bounds the speedup.
@@ -215,6 +224,12 @@ stops happening.
 
 - Overlap covers only the portion of the draw after `SyncAll`, as described
   under the interlock above.
+- Only `MayaHydraSceneIndex` queues its notices.  Other scene indices that
+  change from a Maya callback rather than from `Render()` are not covered.
+- An adapter that changes its cached data from a callback, rather than only
+  sending a notice, can still be read mid-change by a sync on the render thread
+  (for example a sync that pulls some attributes from the old data and some from
+  the new).  Such adapters need a commit step that runs behind the interlock.
 - Composited overlays sort against the scene as of the last completed frame,
   which is one frame behind the main thread's current state.
 - The settle step triggers on a playing-to-stopped transition, and time

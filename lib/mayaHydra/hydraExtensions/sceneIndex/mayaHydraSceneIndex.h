@@ -345,6 +345,17 @@ public:
     /// applies whatever is queued. Main thread.
     void SetDeferCallbackRemovals(bool defer);
 
+    /// Set from submitting a frame to the render thread until the next interlock, while the
+    /// thread may be inside SyncAll, where Hydra refuses scene invalidation. AddPrims,
+    /// RemovePrims and DirtyPrims made meanwhile (Maya callbacks) are queued in call order,
+    /// repeated dirties of a prim merged, and applied when this is turned off. Until then
+    /// queries on this scene index do not reflect the queued changes. Main thread.
+    void SetRenderThreadBusy(bool busy);
+
+    void AddPrims(const AddedPrimEntries& entries) override;
+    void RemovePrims(const HdSceneIndexObserver::RemovedPrimEntries& entries) override;
+    void DirtyPrims(const HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
+
 private:
 
     MayaHydraSceneIndex(
@@ -430,6 +441,21 @@ private:
     bool             _deferCallbackRemovals = false;
     std::vector<int> _deferredRenderItemRemovals;
     void             _ApplyDeferredRenderItemRemovals();
+
+    // See SetRenderThreadBusy(). Each queued change is one call, of the kind its non-empty
+    // entries say.
+    struct _QueuedSceneChange
+    {
+        AddedPrimEntries                         added;
+        HdSceneIndexObserver::RemovedPrimEntries removed;
+        HdSceneIndexObserver::DirtiedPrimEntries dirtied;
+    };
+    bool                            _renderThreadBusy = false;
+    std::vector<_QueuedSceneChange> _queuedSceneChanges;
+    // Index in the last queued change's dirtied entries of each prim it dirties, valid while
+    // that change is a dirty one.
+    std::unordered_map<SdfPath, size_t, SdfPath::Hash> _queuedDirtyIndex;
+    void                                                _ApplyQueuedSceneChanges();
 
     // Velocity motion samples (MAYAHYDRA_MOTION_SAMPLING_MODE=velocity): adapters
     // whose last published keys carry motion. A frame that brings an adapter no
