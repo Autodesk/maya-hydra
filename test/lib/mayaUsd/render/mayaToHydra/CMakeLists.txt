@@ -68,6 +68,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
     testCustomShadersNode.py
+    testCustomMaterial.py
     testMayaDefaultMaterial.py
 	testSceneModified.py
 	testIsolateSelectWithGeomSubset.py
