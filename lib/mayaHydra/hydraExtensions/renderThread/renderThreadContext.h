@@ -14,11 +14,13 @@
 //
 // The graphics context the render thread owns.
 //
-// A context created in Maya's share group can be made current on a
-// MayaHydra-owned thread, with GL fences and shared objects working across the
-// two. That was established by experiment and does NOT cover Hgi/Storm
-// resource creation on the worker context. A GL context belongs to one thread
-// at a time, so its whole lifetime after creation sits on that thread.
+// A context created in Maya's share group and made current on a MayaHydra-owned
+// thread shares buffers, textures, programs and sync objects with Maya's
+// context, but not container objects such as framebuffers and vertex arrays.
+// A GL context belongs to one thread at a time, so from MakeCurrent until
+// DestroyContext it sits on the render thread. Its drawing surface is a window,
+// which Win32 ties to the thread that created it, so the surface is created and
+// destroyed on the main thread.
 
 #ifndef MAYAHYDRALIB_RENDER_THREAD_CONTEXT_H
 #define MAYAHYDRALIB_RENDER_THREAD_CONTEXT_H
@@ -46,10 +48,11 @@ struct RenderThreadHostContext
 MAYAHYDRALIB_API
 RenderThreadHostContext CaptureCurrentHostContext();
 
-/// One implementation per graphics API. GL today; Vulkan later.
 class MAYAHYDRALIB_API RenderThreadContext
 {
 public:
+    /// Main thread. Destroys the surface, and the context if DestroyContext
+    /// was not called.
     virtual ~RenderThreadContext() = default;
 
     /// Create a context sharing objects with \p host. Main thread.
@@ -58,20 +61,12 @@ public:
     /// Bind the context to the calling thread. Render thread only.
     virtual bool MakeCurrent() = 0;
 
-    /// Unbind. Render thread only, and required before Destroy.
+    /// Unbind. Render thread only, and required before DestroyContext.
     virtual void ReleaseCurrent() = 0;
 
-    /// Flush this context's command stream. A fence created here only makes
-    /// progress on the *creating* context's flush, not the waiting thread's.
-    virtual void Flush() = 0;
-
-    /// Release the context and any surface it owns. Render thread only, after
+    /// Delete the context, leaving the surface. Render thread only, after
     /// ReleaseCurrent.
-    virtual void Destroy() = 0;
-
-    /// True when this context created its own drawing surface rather than
-    /// borrowing Maya's. Decided at runtime by fallback.
-    virtual bool OwnsSurface() const = 0;
+    virtual void DestroyContext() = 0;
 
     /// Last failure, empty when none.
     virtual const std::string& LastError() const = 0;

@@ -15,14 +15,18 @@
 #ifndef MAYAHYDRA_RENDER_THREAD_H
 #define MAYAHYDRA_RENDER_THREAD_H
 
-// The render thread owns the render index and the graphics context, and is the
-// only submitter of Hgi commands. hgi/hgi.h requires submission on the "main
-// thread", which for OpenGL it defines as the thread the GL context is bound
-// on, so a thread owning its own context satisfies that contract. hgiGL/hgi.h
-// then requires a context arena per GL context, for the container resources
-// (framebuffers) that cannot be shared. The render thread makes ZERO Maya API
-// calls: Maya reads happen at push/flush time, and scene-index notices are
-// queued and applied on the render thread at frame boundaries.
+// The render thread owns its graphics context and runs HdEngine::Execute while
+// overlap is running. hgi/hgi.h requires submission on the "main thread", which
+// for OpenGL it defines as the thread the GL context is bound on, so a thread
+// owning its own context satisfies that contract. hgiGL/hgi.h then requires a
+// context arena per GL context, for the container resources (framebuffers)
+// that cannot be shared.
+//
+// The main thread pushes scene state only while this thread is idle (see
+// WaitForIdle), and MayaHydraSceneIndex queues the notices Maya callbacks send
+// in between. This thread itself makes no Maya API calls, but Hydra's sync on
+// it pulls from the scene index's data sources, and some adapters read Maya
+// when pulled; see doc/renderThreadPipelining.md.
 
 #include "renderThreadContext.h"
 #include "renderThreadFence.h"
@@ -69,7 +73,7 @@ namespace MAYAHYDRA_NS_DEF {
 /// One render request handed to the render thread.
 struct RenderThreadRequest
 {
-    /// The frameId (from SnapshotManager) of the snapshot to consume.
+    /// Increases with every request; names the frame in warnings.
     uint64_t frameId{0};
 
     /// FramePass::GetRenderTasks, owned by the caller and not modified here.
@@ -146,16 +150,18 @@ public:
         pxr::VtValue const&        dstFramebuffer,
         std::chrono::milliseconds timeout = std::chrono::milliseconds(16));
 
-    /// For pick and resize: wait for pending and running renders to finish,
-    /// then clear the handoff so no frame produced before this call can be
-    /// composited after it. Pending work is rendered rather than dropped, for
-    /// the reason given on SubmitRequest. Returns false if the thread did not
-    /// go idle within the budget, in which case a late frame may still arrive.
-    bool DiscardInFlight();
+    /// For pick, resize and a change of panel: wait for pending and running
+    /// renders to finish, then clear the handoff so no frame produced before
+    /// this call can be composited after it. Pending work is rendered rather
+    /// than dropped, for the reason given on SubmitRequest. The wait has no
+    /// time limit, because the caller goes on to render on the main thread or
+    /// for another panel, and must not overlap a render still running.
+    void DiscardInFlight();
 
-    /// For settle-before-capture: wait for the pending request to be rendered,
-    /// published and its GPU work completed, and KEEP it in the handoff so the
-    /// next render op composites it. Returns false on timeout.
+    /// For an image capture, or a render op compositing its own frame: wait for
+    /// the pending request to be rendered, published and its GPU work completed,
+    /// and keep it in the handoff so it can be composited. Returns false on
+    /// timeout.
     bool WaitForQuiescence();
 
     /// Wait until the render thread is not touching the render index. The main
@@ -173,16 +179,7 @@ public:
     /// usable fence.
     bool OrderAfterLastRender();
 
-    // No RenderSynchronous(): the prime, resize and pick cases use
-    // renderFrame(true) on the main thread. TODO: restore it once the render
-    // thread owns the render index and main-thread rendering becomes illegal.
-
     bool IsRunning() const { return _thread.joinable(); }
-
-    /// 0 if no frame has completed.
-    uint64_t GetCompletedFrameId() const { return _handoff.GetCompletedFrameId(); }
-
-    bool HasCompletedFrame() const { return _handoff.HasCompletedFrame(); }
 
 private:
     void _ThreadLoop();

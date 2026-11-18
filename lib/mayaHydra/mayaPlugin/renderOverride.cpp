@@ -47,11 +47,9 @@
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 
-#include <mayaHydraLib/pipelineTiming.h>
 #include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/renderThread/renderThreadContext.h>
 #include <mayaHydraLib/renderThread/renderThreadStats.h>
-#include <mayaHydraLib/snapshot/snapshotPublishBarrier.h>
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
@@ -156,9 +154,6 @@
 #include <maya/MObjectHandle.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
-#if defined(MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
-#include <maya/MPxRenderItemOverridePrivate.h>   // render item override republish (private API)
-#endif
 #include <maya/MTimerMessage.h>
 
 #include <maya/MUiMessage.h>
@@ -443,9 +438,6 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
             _rendererDesc.displayName.GetText());
     _ID = MAYA_NATIVE_ROOT.AppendChild(
                   TfToken(TfStringPrintf("_MayaHydra_%s_%p", desc.rendererName.GetText(), this)));
-
-    // Idempotent, so a second render override can call it again.
-    SnapshotManager::instance().Initialize();
 
     MStatus status;
     auto    id
@@ -1455,11 +1447,7 @@ MStatus MtohRenderOverride::Render(
 
     // Must precede every scene-index-invalidating operation below, because Hydra refuses
     // invalidation while a SyncAll is in progress and that SyncAll is on the other thread.
-    //
-    // TODO: This wait is what currently limits the overlap achieved. Give the render
-    // thread an immutable per-frame copy of the scene state instead.
     if (_renderThreadStarted && _renderThread) {
-        MH_PIPELINE_TIMING_SCOPE("render_thread_interlock");
         _renderThread->WaitForIdle();
         // Applies what Maya callbacks changed while the last frame was syncing.
         if (_mayaHydraSceneIndex) {
@@ -1552,11 +1540,7 @@ MStatus MtohRenderOverride::Render(
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetParams(delegateParams);
-
-        // Both are no-ops unless MAYAHYDRA_SNAPSHOT is set.
-        SnapshotManager::instance().AdvanceFrame();
         _mayaHydraSceneIndex->FlushPendingUpdates();
-        SnapshotManager::instance().PublishBarrier();
     }
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
@@ -1915,15 +1899,12 @@ MStatus MtohRenderOverride::Render(
     auto submitOrDrawFrame = [&]() {
         if (_renderThreadStarted && _firstFramePrimed) {
             MAYAHYDRA_NS_DEF::RenderThreadRequest request;
-            request.frameId       = SnapshotManager::instance().GetPublishedFrameId();
+            request.frameId       = ++_renderThreadFrameId;
             request.colorAovToken = HdAovTokens->color;
             request.depthAovToken = HdAovTokens->depth;
             request.dstRegion     = GfVec4i(0, 0, width, height);
-            {
-                MH_PIPELINE_TIMING_SCOPE("scene_push");
-                pushSceneState();
-                request.passIndices = preparePasses();
-            }
+            pushSceneState();
+            request.passIndices = preparePasses();
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
             // Covers the shared buffer copies the push just issued on Maya's context.
             if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext()) {
@@ -1931,7 +1912,6 @@ MStatus MtohRenderOverride::Render(
                     = MAYAHYDRA_NS_DEF::RenderThreadFence::CreateAndSignal(_hgi.get());
             }
 #endif
-            MH_PIPELINE_TIMING_SCOPE("SubmitCmds");
             if (_mayaHydraSceneIndex) {
                 _mayaHydraSceneIndex->SetRenderThreadBusy(true);
             }
@@ -1951,12 +1931,26 @@ MStatus MtohRenderOverride::Render(
         entry.second->Update();
     }
 
+    // One override draws every Hydra panel, and other destinations such as playblasts,
+    // but the handoff holds a single frame. A frame drawn for another panel must not be
+    // composited into this one, so it is discarded, and this render op composites its
+    // own frame instead.
+    bool panelChanged = false;
+    if (_renderThreadStarted && _renderThread) {
+        panelChanged = panelNameStr != _renderThreadPanel;
+        if (panelChanged) {
+            _renderThread->DiscardInFlight();
+            _renderThreadPanel = panelNameStr;
+        }
+    }
+
     // Maya follows a time change outside playback (the start and end frame buttons, a
     // single time slider step) with exactly one redraw. Compositing the previous
     // frame's image here would leave the viewport a frame behind with nothing to
     // correct it, so this render op composites its own frame once it completes.
     // Maya's framebuffer and viewport are captured now, while they are still bound.
-    const bool compositeOwnFrame = timeChangedWhileStopped && _renderThreadStarted;
+    const bool compositeOwnFrame
+        = (timeChangedWhileStopped || panelChanged) && _renderThreadStarted;
     GLint      mayaFramebuffer = 0;
     GLint      mayaViewport[4] = { 0, 0, 0, 0 };
     if (compositeOwnFrame) {
@@ -1964,21 +1958,13 @@ MStatus MtohRenderOverride::Render(
         glGetIntegerv(GL_VIEWPORT, mayaViewport);
     }
 
-    // Put the most recently finished off-thread frame on screen, and let the settle
-    // notice if playback has just stopped.
-    if (_renderThreadStarted) {
-        if (_presentBridge && _renderThread && !compositeOwnFrame) {
-            MH_PIPELINE_TIMING_SCOPE("present");
-            // An empty VtValue tells HgiInterop to composite into the currently bound
-            // framebuffer, which here is Maya's.
-            const VtValue dstFramebuffer;
-            _renderThread->CompositeLatest(*_presentBridge, dstFramebuffer);
-        }
-
-        _settle.OnRenderOpEntry(
-            MAnimControl::isPlaying(),
-            _renderThread ? _renderThread->HasCompletedFrame() : false,
-            compositeOwnFrame);
+    // Put the frame the previous render op submitted on screen. The interlock above
+    // waited for it, so after playback stops the next redraw shows the final frame.
+    if (_renderThreadStarted && _presentBridge && _renderThread && !compositeOwnFrame) {
+        // An empty VtValue tells HgiInterop to composite into the currently bound
+        // framebuffer, which here is Maya's.
+        const VtValue dstFramebuffer;
+        _renderThread->CompositeLatest(*_presentBridge, dstFramebuffer);
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
@@ -2152,15 +2138,15 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (compositeOwnFrame && submittedToRenderThread && _renderThread && _presentBridge) {
-        MH_PIPELINE_TIMING_SCOPE("present_own_frame");
         // Composited even if the wait gives up: the previous frame is better than the
-        // cleared framebuffer Maya would otherwise show.
+        // cleared framebuffer Maya would otherwise show. After a change of panel the
+        // handoff was cleared, so it never holds another panel's frame.
         _renderThread->WaitForQuiescence();
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(mayaFramebuffer));
         glViewport(mayaViewport[0], mayaViewport[1], mayaViewport[2], mayaViewport[3]);
         const VtValue dstFramebuffer;
         if (_renderThread->CompositeLatest(*_presentBridge, dstFramebuffer)) {
-            MAYAHYDRA_NS_DEF::RenderThreadStats::instance().RecordTimeChangeComposited();
+            MAYAHYDRA_NS_DEF::RenderThreadStats::instance().RecordOwnFrameComposited();
         }
     }
 
@@ -2860,7 +2846,16 @@ void MtohRenderOverride::_InitHydraResources(
                         if (request.passIndices.empty()) {
                             return result;
                         }
-                        _DrawPasses(request.passIndices);
+                        if (_isUsingHdSt && _hgi->GetAPIName() == HgiTokens->OpenGL) {
+#ifndef MAYAHYDRALIB_OIT_ENABLED
+                            // As on the main thread, Storm needs this for transparency,
+                            // and this thread's context does not share Maya's state.
+                            MayaHydraSetRenderGLState state;
+#endif
+                            _DrawPasses(request.passIndices);
+                        } else {
+                            _DrawPasses(request.passIndices);
+                        }
 
                         // The last pass drawn is the one with presentation enabled, and so
                         // the one holding the finished image.
@@ -2901,18 +2896,6 @@ void MtohRenderOverride::_InitHydraResources(
                 _presentBridge.reset();
             }
         }
-
-        _settle.Initialize(
-            [this]() -> bool {
-                if (!_renderThread || !_presentBridge) return false;
-                const VtValue dstFramebuffer;
-                return _renderThread->CompositeLatest(*_presentBridge, dstFramebuffer);
-            },
-            []() {
-                // Scheduled, not immediate, so the redraw cannot recurse into the render
-                // op currently executing.
-                M3dView::scheduleRefreshAllViews();
-            });
     }
 
     // This instance starts drawing now: producers should hand it what it can use.
@@ -2946,7 +2929,6 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // Must come before the resources below are freed: the thread releases its own context
     // and GPU objects on its way out.
     if (_renderThreadStarted) {
-        _settle.Reset();
         if (_renderThread) {
             _renderThread->Stop();
             _renderThread.reset();
@@ -2954,6 +2936,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         _presentBridge.reset();
         _renderThreadStarted = false;
         _firstFramePrimed = false;
+        _renderThreadPanel.clear();
         if (_mayaHydraSceneIndex) {
             _mayaHydraSceneIndex->SetRenderThreadBusy(false);
             _mayaHydraSceneIndex->SetDeferCallbackRemovals(false);

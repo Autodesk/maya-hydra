@@ -15,14 +15,14 @@
 #ifndef MAYAHYDRA_RENDER_THREAD_PRESENT_BRIDGE_H
 #define MAYAHYDRA_RENDER_THREAD_PRESENT_BRIDGE_H
 
-// Graphics-context and present bridge interface.
+// Present bridge interface.
 //
-// The render thread owns the Hgi and the render index; the main thread owns
-// Maya's GL framebuffer. The present bridge is the seam between them: the main
-// thread composites the latest completed AOV (color + depth) into Maya's FBO at
-// the start of the render op. Maya's viewport is always GL while the renderer
-// may use any API, so all cross-API interop is confined here. The bridge does
-// not own the AOV textures; it reads the handoff's completed-frame snapshot.
+// The render thread draws into Hydra's AOVs; the main thread owns Maya's GL
+// framebuffer. The present bridge is the seam between them: the main thread
+// composites the latest completed AOV (color + depth) into Maya's FBO during
+// the render op. Maya's viewport is always GL while the renderer may use any
+// API, so all cross-API interop is confined here. The bridge does not own the
+// AOV textures; it reads the handoff's completed frame.
 
 #include <mayaHydraLib/api.h>
 
@@ -98,9 +98,6 @@ public:
         pxr::VtValue const&         dstFramebuffer,
         pxr::GfVec4i const&         dstRegion) = 0;
 #endif
-
-    /// Returns the API name of the source Hgi (e.g. "OpenGL", "Vulkan", "Metal").
-    virtual pxr::TfToken GetSourceApiName(pxr::Hgi* srcHgi) const = 0;
 };
 
 /// Factory: create the GL present bridge, which composites via

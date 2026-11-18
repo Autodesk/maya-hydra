@@ -16,7 +16,6 @@ target_sources(${TARGET_NAME}
         mixedUtils.cpp
         mhWireframeColorInterfaceImp.cpp
         mhLeadObjectPathTracker.cpp
-        pipelineTiming.cpp
         mhSharedGLContext.cpp
         profilingUtils.cpp
         tokens.cpp
@@ -35,7 +34,6 @@ set(HEADERS
     mhWireframeColorInterfaceImp.h
     mhLeadObjectPathTracker.h
     mhSceneModifiedGuard.h
-    pipelineTiming.h
     mhSharedGLContext.h
     profilingUtils.h
     tokens.h
@@ -97,8 +95,8 @@ if (USD_HAS_HGI_VULKAN)
         PRIVATE USD_HAS_HGI_VULKAN=1)
 endif()
 
-# The render item override creator (adapters/renderItemOverrideCreator) and the
-# scene index's shutter hand-off need Maya's private render-item override API.
+# The render item override creator (adapters/renderItemOverrideCreator) needs
+# Maya's private render-item override API.
 # Without it the creator compiles to nothing, the plugin registers nothing, and
 # MayaHydra behaves as stock whatever MAYAHYDRA_RENDER_ITEM_OVERRIDE says.
 if (MAYA_HAS_RENDER_ITEM_OVERRIDE_PRIVATE)
@@ -246,4 +244,3 @@ add_subdirectory(adapters)
 add_subdirectory(pick)
 add_subdirectory(renderThread)
 add_subdirectory(sceneIndex)
-add_subdirectory(snapshot)

@@ -51,11 +51,6 @@ namespace
 
 const char* const kWindowClassName = "MayaHydraRenderThreadContext";
 
-LRESULT CALLBACK _NullWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
-{
-    return DefWindowProcA(hwnd, msg, wp, lp);
-}
-
 std::string _Win32Error(const char* what)
 {
     char buf[160];
@@ -63,17 +58,20 @@ std::string _Win32Error(const char* what)
     return buf;
 }
 
-/// The GL context the render thread owns. Two routes for the drawing surface:
-/// a 1x1 hidden window of our own, preferred because a borrowed Maya viewport
-/// device context goes stale if Maya recreates that window (renderer switch,
-/// panel teardown) while the thread has it current; failing that, Maya's
-/// surface borrowed. Route 1 can fail legitimately, since the legacy
+/// The GL context the render thread owns, drawing to a 1x1 hidden window of its
+/// own rather than to a Maya viewport, whose device context goes stale if Maya
+/// recreates that window (renderer switch, panel teardown) while the thread has
+/// it current. Creation can fail legitimately, since the legacy
 /// PIXELFORMATDESCRIPTOR from DescribePixelFormat cannot express everything
-/// WGL_ARB_pixel_format can, so wglMakeCurrent may refuse the copied format.
+/// WGL_ARB_pixel_format can; the caller then renders synchronously.
 class GlRenderThreadContext final : public RenderThreadContext
 {
 public:
-    ~GlRenderThreadContext() override { Destroy(); }
+    ~GlRenderThreadContext() override
+    {
+        DestroyContext();
+        _DestroySurface();
+    }
 
     bool CreateShared(const RenderThreadHostContext& host) override
     {
@@ -83,33 +81,14 @@ public:
             return false;
         }
 
-        HDC   hostDc  = static_cast<HDC>(host.nativeSurface);
-        HGLRC hostCtx = static_cast<HGLRC>(host.nativeContext);
-
-        // Route 1: our own surface, pixel format copied from Maya's.
-        if (_CreateOwnSurface(hostDc)) {
-            if (_CreateContext(_dc, hostCtx)) {
-                _ownsSurface = true;
-                return true;
-            }
-            // The surface came up but no context would share against it.
-            _DestroyOwnSurface();
+        if (!_CreateSurface(static_cast<HDC>(host.nativeSurface))) {
+            return false;
         }
-
-        // Route 2: borrow Maya's surface.
-        const std::string ownFailure = _lastError;
-        _dc = hostDc;
-        if (_CreateContext(_dc, hostCtx)) {
-            _ownsSurface = false;
-            if (!ownFailure.empty()) {
-                _lastError = "using Maya's device context; an owned surface was not "
-                             "available (" + ownFailure + ")";
-            }
-            return true;
+        if (!_CreateContext(static_cast<HGLRC>(host.nativeContext))) {
+            _DestroySurface();
+            return false;
         }
-
-        _dc = nullptr;
-        return false;
+        return true;
     }
 
     bool MakeCurrent() override
@@ -134,23 +113,18 @@ public:
 
     void ReleaseCurrent() override { wglMakeCurrent(nullptr, nullptr); }
 
-    void Flush() override { glFlush(); }
-
-    void Destroy() override
+    void DestroyContext() override
     {
         if (_ctx) {
             wglDeleteContext(_ctx);
             _ctx = nullptr;
         }
-        _DestroyOwnSurface();
-        _dc = nullptr;
     }
 
-    bool               OwnsSurface() const override { return _ownsSurface; }
     const std::string& LastError() const override { return _lastError; }
 
 private:
-    bool _CreateContext(HDC dc, HGLRC shareWith)
+    bool _CreateContext(HGLRC shareWith)
     {
         // Share at creation rather than via wglShareLists, which requires the
         // new context own no objects yet and is driver-dependent when called
@@ -165,7 +139,7 @@ private:
                 WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
                 0
             };
-            _ctx = createContextAttribs(dc, shareWith, attribs);
+            _ctx = createContextAttribs(_dc, shareWith, attribs);
             if (_ctx) {
                 return true;
             }
@@ -175,7 +149,7 @@ private:
         }
 
         // Fallback: an unshared context plus wglShareLists.
-        _ctx = wglCreateContext(dc);
+        _ctx = wglCreateContext(_dc);
         if (!_ctx) {
             _lastError = _Win32Error("wglCreateContext");
             return false;
@@ -189,7 +163,7 @@ private:
         return true;
     }
 
-    bool _CreateOwnSurface(HDC hostDc)
+    bool _CreateSurface(HDC hostDc)
     {
         // Copy Maya's pixel format so the shared context is compatible with
         // both surfaces. Without this the context creates but cannot be made
@@ -206,8 +180,10 @@ private:
             return false;
         }
 
+        // DefWindowProcA lives in user32, so the class stays valid if this
+        // library is unloaded and loaded again at another address.
         WNDCLASSA wc {};
-        wc.lpfnWndProc   = _NullWndProc;
+        wc.lpfnWndProc   = DefWindowProcA;
         wc.hInstance     = GetModuleHandleA(nullptr);
         wc.lpszClassName = kWindowClassName;
         // A duplicate registration is expected on the second context and is not
@@ -221,32 +197,30 @@ private:
             return false;
         }
 
-        _ownDc = GetDC(_hwnd);
-        if (!_ownDc) {
+        _dc = GetDC(_hwnd);
+        if (!_dc) {
             _lastError = _Win32Error("GetDC on the render thread surface");
-            _DestroyOwnSurface();
+            _DestroySurface();
             return false;
         }
 
         // Match by descriptor rather than by index: format indices are
         // per-device-context and Maya's index means nothing on our window.
-        const int ourFormat = ChoosePixelFormat(_ownDc, &pfd);
-        if (ourFormat == 0 || !SetPixelFormat(_ownDc, ourFormat, &pfd)) {
+        const int ourFormat = ChoosePixelFormat(_dc, &pfd);
+        if (ourFormat == 0 || !SetPixelFormat(_dc, ourFormat, &pfd)) {
             _lastError = _Win32Error("ChoosePixelFormat/SetPixelFormat matching Maya's format");
-            _DestroyOwnSurface();
+            _DestroySurface();
             return false;
         }
-
-        _dc = _ownDc;
         return true;
     }
 
-    void _DestroyOwnSurface()
+    void _DestroySurface()
     {
-        if (_ownDc && _hwnd) {
-            ReleaseDC(_hwnd, _ownDc);
+        if (_dc && _hwnd) {
+            ReleaseDC(_hwnd, _dc);
         }
-        _ownDc = nullptr;
+        _dc = nullptr;
         if (_hwnd) {
             DestroyWindow(_hwnd);
             _hwnd = nullptr;
@@ -254,10 +228,8 @@ private:
     }
 
     HWND        _hwnd { nullptr };
-    HDC         _ownDc { nullptr };
-    HDC         _dc { nullptr };   ///< Either _ownDc or Maya's, never owned twice.
+    HDC         _dc { nullptr };
     HGLRC       _ctx { nullptr };
-    bool        _ownsSurface { false };
     std::string _lastError;
 };
 

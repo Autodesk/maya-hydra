@@ -17,14 +17,12 @@
 #include "renderThreadStats.h"
 
 #include <mayaHydraLib/debugCodes.h>
-#include <mayaHydraLib/pipelineTiming.h>
 #include <mayaHydraLib/profilingUtils.h>
 
 // GL loading library needs to be included before any other OpenGL headers.
 #include <pxr/imaging/garch/glApi.h>
 
 #include <pxr/base/tf/diagnostic.h>
-#include <pxr/base/tf/getenv.h>
 #include <pxr/imaging/hgiGL/texture.h>
 #if defined(USD_HAS_HGI_VULKAN)
 #include <pxr/imaging/hgiVulkan/blitCmds.h>
@@ -70,68 +68,18 @@ private:
 #endif
 };
 
-// The drain budgets trade the same way: long enough that a heavy frame always
-// lands, short enough that a wedged render thread costs a visible hitch rather
-// than a hung Maya.
-constexpr uint64_t kDrainFenceBudgetNanos = 250ull * 1000ull * 1000ull; // 250ms
-
-constexpr auto kDrainIdleBudget = std::chrono::milliseconds(250);
-
-// Longer, because a settle-before-capture is not interactive and a capture that
-// races the frame it means to measure is worse than a slow one.
-constexpr auto kQuiescenceBudget = std::chrono::milliseconds(2000);
+// The quiescence budgets are long enough that a heavy frame lands, and short
+// enough that a wedged render thread costs a visible hitch rather than a hung
+// Maya. A capture that races the frame it means to show is worse than a slow
+// one, so they are generous.
+constexpr auto     kQuiescenceBudget          = std::chrono::milliseconds(2000);
+constexpr uint64_t kQuiescenceFenceBudgetNanos = 250ull * 1000ull * 1000ull; // 250ms
 
 // How long the main thread waits for the render thread to leave the render
 // index before counting the wait as slow. Never a timeout: the first render of
 // a scene can take seconds, and pushing into a render index that is inside
 // SyncAll is not a recoverable race.
 constexpr auto kIdleInterlockWarnAfter = std::chrono::milliseconds(500);
-
-// Diagnostic bypasses to attribute the cost of the interlock and the AOV copy
-// separately. BOTH PRODUCE KNOWN-INCORRECT RENDERING: NO_INTERLOCK races the
-// render index, NO_AOV_COPY publishes the live AOV and tears. Read once, so a
-// flag cannot change mid-measurement.
-bool
-InterlockBypassed()
-{
-    static const bool bypassed = TfGetenvBool("MAYAHYDRA_OVERLAP_NO_INTERLOCK", false);
-    return bypassed;
-}
-
-bool
-AovCopyBypassed()
-{
-    static const bool bypassed = TfGetenvBool("MAYAHYDRA_OVERLAP_NO_AOV_COPY", false);
-    return bypassed;
-}
-
-/// Accumulate elapsed nanoseconds into a stats bucket on scope exit.
-class ScopedNanos
-{
-public:
-    using Sink = void (RenderThreadStats::*)(uint64_t);
-
-    explicit ScopedNanos(Sink sink)
-        : _sink(sink)
-        , _start(std::chrono::steady_clock::now())
-    {
-    }
-
-    ~ScopedNanos()
-    {
-        const auto elapsed = std::chrono::steady_clock::now() - _start;
-        (RenderThreadStats::instance().*_sink)(
-            static_cast<uint64_t>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()));
-    }
-
-    ScopedNanos(const ScopedNanos&)            = delete;
-    ScopedNanos& operator=(const ScopedNanos&) = delete;
-
-private:
-    Sink                                  _sink;
-    std::chrono::steady_clock::time_point _start;
-};
 
 } // namespace
 
@@ -158,20 +106,6 @@ RenderThread::Start(RenderCallback renderCallback,
     _hgi = hgi;
     _presentBridge = presentBridge;
     _stop.store(false, std::memory_order_release);
-
-    // Published so a benchmark reports the configuration it actually ran.
-    RenderThreadStats::instance().SetInterlockBypassed(InterlockBypassed());
-    RenderThreadStats::instance().SetAovCopyBypassed(AovCopyBypassed());
-    if (InterlockBypassed() || AovCopyBypassed())
-    {
-        TF_WARN("RenderThread: running with a diagnostic flag set "
-                "(MAYAHYDRA_OVERLAP_NO_INTERLOCK=%d "
-                "MAYAHYDRA_OVERLAP_NO_AOV_COPY=%d). Rendering is knowingly "
-                "incorrect in this configuration - these exist to measure, not "
-                "to be used.",
-                int(InterlockBypassed()),
-                int(AovCopyBypassed()));
-    }
 
     {
         std::lock_guard<std::mutex> lock(_contextMutex);
@@ -209,7 +143,6 @@ RenderThread::Start(RenderCallback renderCallback,
     }
 
     RenderThreadStats::instance().SetStarted(true);
-    RenderThreadStats::instance().SetOwnsSurface(_context && _context->OwnsSurface());
     return true;
 }
 
@@ -231,9 +164,9 @@ RenderThread::Stop()
     _lastComposited = CompletedFrame{};
     _presentBridge = nullptr;
 
-    // The fences and the context were already torn down at the end of
-    // _ThreadLoop, on the thread that owned the context. Destroy() nulled the
-    // holder's handles, so this destructor finds nothing to do.
+    // The fences and the GL context were already torn down at the end of
+    // _ThreadLoop, on the thread that owned the context. This destroys the
+    // drawing surface, here on the thread that created it.
     _context.reset();
 
     _renderCallback = nullptr;
@@ -352,30 +285,22 @@ RenderThread::_ThreadLoop()
     if (_context)
     {
         _context->ReleaseCurrent();
-        _context->Destroy();
+        _context->DestroyContext();
     }
 }
 
 void
 RenderThread::_AcquireContextArena()
 {
+    // Vulkan and Metal have no arena concept, and a null Hgi is the
+    // configuration a non-GPU test uses.
     HgiGL* hgiGl = dynamic_cast<HgiGL*>(_hgi);
     if (hgiGl == nullptr)
     {
-        // Not an error: Vulkan and Metal have no arena concept, and a null Hgi
-        // is the configuration a non-GPU test uses. The stat means "the render
-        // thread has what it needs to render off-thread", so both set it.
-        if (_hgi
-            && (_hgi->GetAPIName() == HgiTokens->Vulkan
-                || _hgi->GetAPIName() == HgiTokens->Metal))
-        {
-            RenderThreadStats::instance().SetContextArenaAcquired(true);
-        }
         return;
     }
 
     _contextArena = hgiGl->CreateContextArena();
-    RenderThreadStats::instance().SetContextArenaAcquired(bool(_contextArena));
     if (!_contextArena)
     {
         // The render still runs, but on Hgi's default arena, whose framebuffers
@@ -394,7 +319,7 @@ namespace {
 bool
 EnsureMatchingTexture(Hgi* hgi, const HgiTextureHandle& src, HgiTextureHandle& dst)
 {
-    if (!hgi || !src)
+    if (!src)
     {
         // A pass without a depth AOV hands back an empty handle, so an empty
         // source is not an error.
@@ -595,7 +520,6 @@ RenderThread::_ReleaseContextArena()
     // HgiGL requires the arena be unset before it is destroyed.
     hgiGl->SetContextArena(HgiGLContextArenaHandle());
     hgiGl->DestroyContextArena(&_contextArena);
-    RenderThreadStats::instance().SetContextArenaAcquired(false);
 }
 
 void
@@ -606,10 +530,8 @@ RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
         return;
     }
 
-    // Threading contract: this thread makes ZERO Maya API calls. The callback,
-    // supplied by the render override, runs FramePass::Render (Hydra's
-    // SyncAll+Execute+SubmitCmds) and returns the AOV texture handles.
-    MH_PIPELINE_TIMING_SCOPE("SyncAll_Execute_renderThread");
+    // The callback, supplied by the render override, runs FramePass::Render
+    // (Hydra's SyncAll+Execute+SubmitCmds) and returns the AOV texture handles.
     MH_PROFILE_SCOPE("RenderThread_ExecuteRequest");
 
     // Read-after-write: the scene push may have copied into shared buffers on
@@ -661,17 +583,15 @@ RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
     if (_presentBridge && result.srcColor)
     {
         MH_PROFILE_SCOPE("RenderThread_PrepareTransfer");
-        ScopedNanos timeTheCopy(&RenderThreadStats::AddAovCopyNanos);
         interopFrame = _presentBridge->Prepare(
             result.srcHgi ? result.srcHgi : _hgi, result.srcColor, result.srcDepth);
         prepared = bool(interopFrame);
     }
 #endif
 
-    if (!prepared && !AovCopyBypassed())
+    if (!prepared)
     {
         MH_PROFILE_SCOPE("RenderThread_AOVCopy");
-        ScopedNanos timeTheCopy(&RenderThreadStats::AddAovCopyNanos);
 
         const int  targetIndex = _nextCopyTarget;
         FrameCopy& target      = _copyTargets[targetIndex];
@@ -689,20 +609,10 @@ RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
             // not wait on a stale, already-signalled fence.
             target.compositeDone.reset();
         }
+        // Only valid fences are stored, so the wait cannot fail.
         if (priorComposite)
         {
-            if (priorComposite->WaitOnGpu())
-            {
-                RenderThreadStats::instance().RecordCopyTargetWaited();
-            }
-            else
-            {
-                // The pair may still be being read. Counted rather than
-                // dropped: submission order still orders the copy behind the
-                // blit on most drivers, and refusing the frame would stall the
-                // viewport over a synchronisation primitive.
-                RenderThreadStats::instance().RecordCopyTargetWaitFailure();
-            }
+            priorComposite->WaitOnGpu();
         }
 
         if (!_CopyIntoOwnedTextures(result, target))
@@ -786,34 +696,30 @@ RenderThread::CompositeLatest(
     // Runs on the main thread at the start of the render op, compositing the
     // latest completed AOV into Maya's FBO and accepting one frame of lag.
     MH_PROFILE_SCOPE("RenderThread_CompositeLatest");
-    ScopedNanos timeTheComposite(&RenderThreadStats::AddCompositeNanos);
 
     CompletedFrame frame;
     {
         MH_PROFILE_SCOPE("RenderThread_HandoffWait");
-        ScopedNanos timeTheHandoffWait(&RenderThreadStats::AddCompositeHandoffNanos);
         frame = _handoff.WaitForCompletedFrame(timeout);
     }
     if (!frame.valid)
     {
-        // Nothing published yet, or the handoff was just cleared by a pick or
-        // resize. In both cases the caller is about to draw synchronously, so
-        // there is deliberately no fallback here.
+        // Nothing published yet, or the handoff was just cleared by
+        // DiscardInFlight, so there is no frame that may be shown.
         return false;
     }
 
     // Order the blit behind THIS frame's fence, on the GPU. The fence travels
     // with the frame, so it covers the AOV handles about to be read.
     //
-    // GPU-side (glWaitSync), not a CPU block (glClientWaitSync): blocking here
-    // made frame time CPU+GPU instead of max(CPU,GPU), 17.1 ms of a 31.6 ms
-    // frame on the reference heavy scene. A GPU-side wait cannot report "not
-    // ready", so false below means no usable fence, not a slow GPU, and the
-    // blit is only issued on return -- hence the composite-done fence later.
+    // GPU-side (glWaitSync), not a CPU block (glClientWaitSync), so that frame
+    // time is max(CPU, GPU) rather than their sum. A GPU-side wait cannot
+    // report "not ready", so false below means no usable fence, not a slow
+    // GPU, and the blit is only issued on return -- hence the composite-done
+    // fence later.
     bool fenceReady = false;
     {
         MH_PROFILE_SCOPE("RenderThread_FenceWait");
-        ScopedNanos timeTheFenceWait(&RenderThreadStats::AddCompositeFenceNanos);
         fenceReady = frame.fence && frame.fence->WaitOnGpu();
     }
     if (!fenceReady)
@@ -832,14 +738,12 @@ RenderThread::CompositeLatest(
             return false;
         }
         frame = _lastComposited;
-        RenderThreadStats::instance().RecordCompositeReusedLastGood();
     }
 
     // Blit both colour AND depth, so main-thread VP2 overlays depth-compose
     // correctly over the one-frame-stale colour.
     {
         MH_PROFILE_SCOPE("RenderThread_Blit");
-        ScopedNanos timeTheBlit(&RenderThreadStats::AddCompositeBlitNanos);
 #if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
         if (frame.interopFrame)
         {
@@ -862,8 +766,8 @@ RenderThread::CompositeLatest(
     // blit is done reading it. Created after Composite, on Maya's context, so
     // it covers the blit just issued; CreateAndSignal's flush is what makes the
     // sync object reachable by the render thread's wait, which would otherwise
-    // stay pending until Maya's own end-of-frame flush. copyIndex is -1 under
-    // the AOV-copy bypass, where there is no pair to protect.
+    // stay pending until Maya's own end-of-frame flush. copyIndex is -1 for a
+    // frame the present bridge prepared, which orders its own reuse.
     if (frame.copyIndex >= 0 && frame.copyIndex < kNumCopyTargets)
     {
         RenderThreadFencePtr compositeDone =
@@ -880,8 +784,7 @@ RenderThread::CompositeLatest(
         else
         {
             // The next write to this pair is now unordered against the blit
-            // just issued. Counted, not fatal: it degrades to the exposure this
-            // path had before the fence existed.
+            // just issued, so it may tear.
             RenderThreadStats::instance().RecordCompositeFenceSignalFailure();
         }
     }
@@ -899,13 +802,7 @@ RenderThread::WaitForIdle()
         return true;
     }
 
-    if (InterlockBypassed())
-    {
-        return true;
-    }
-
     MH_PROFILE_SCOPE("RenderThread_WaitForIdle");
-    ScopedNanos timeTheWait(&RenderThreadStats::AddIdleWaitNanos);
 
     auto isIdle = [this] {
         return !_inFlight.load(std::memory_order_acquire)
@@ -927,8 +824,7 @@ RenderThread::WaitForIdle()
     lock.unlock();
     TF_DEBUG(MAYAHYDRALIB_RENDER_THREAD)
         .Msg("RenderThread::WaitForIdle: the render thread is still in the "
-             "render index after %lld ms; waiting for it to finish before "
-             "pushing scene state.\n",
+             "render index after %lld ms; waiting for it to finish.\n",
              static_cast<long long>(kIdleInterlockWarnAfter.count()));
     lock.lock();
     _idleCv.wait(lock, isIdle);
@@ -944,43 +840,21 @@ RenderThread::WaitForIdle()
     return false;
 }
 
-bool
+void
 RenderThread::DiscardInFlight()
 {
     // Nothing produced before this call may reach the screen afterwards.
     RenderThreadStats::instance().RecordDrain();
 
-    bool wentIdle = false;
-    {
-        std::unique_lock<std::mutex> lock(_requestMutex);
+    // A request the thread has not started is rendered rather than dropped, as
+    // SubmitRequest explains, and its frame is discarded with the rest below.
+    // A render already running cannot be cancelled either.
+    WaitForIdle();
 
-        // A request the thread has not started is rendered rather than dropped,
-        // as SubmitRequest explains, and its frame is discarded with the rest
-        // below. A render already running cannot be cancelled either. Waiting
-        // on _hasPending alone would return early, because that flag goes
-        // false at pickup rather than at completion.
-        wentIdle = _idleCv.wait_for(lock, kDrainIdleBudget, [this] {
-            return !_hasPending.load(std::memory_order_acquire)
-                && !_inFlight.load(std::memory_order_acquire);
-        });
-    }
-
-    if (!wentIdle)
-    {
-        // The frame still in flight will publish after we clear, so a late
-        // composite is possible. Reported because the symptom, a stale frame
-        // briefly on screen after a pick, looks like a redraw ordering bug.
-        RenderThreadStats::instance().RecordDrainTimeout();
-        TF_WARN("RenderThread::DiscardInFlight: the render thread did not go "
-                "idle within the budget, so a frame rendered before this call "
-                "may still be composited after it.");
-    }
-
-    // Also releases the last reference to that frame's fence, deleting the sync
-    // object.
+    // Also releases the last reference to those frames' fences, deleting the
+    // sync objects.
     _handoff.Clear();
-
-    return wentIdle;
+    _lastComposited = CompletedFrame{};
 }
 
 bool
@@ -988,8 +862,6 @@ RenderThread::WaitForQuiescence()
 {
     // A barrier, not a cancellation: the frame in flight is the one the caller
     // wants, so it is waited for and left in the handoff.
-    RenderThreadStats::instance().RecordQuiescenceWait();
-
     bool wentIdle = false;
     {
         std::unique_lock<std::mutex> lock(_requestMutex);
@@ -1011,11 +883,11 @@ RenderThread::WaitForQuiescence()
     // CPU-side idle is not enough for a capture: the frame is published but its
     // GPU writes may still be in flight. Left published, so the next render op
     // composites it.
-    const CompletedFrame settled = _handoff.TryGetCompletedFrame();
-    if (settled.valid && settled.fence && !settled.fence->Wait(kDrainFenceBudgetNanos))
+    const CompletedFrame latest = _handoff.TryGetCompletedFrame();
+    if (latest.valid && latest.fence && !latest.fence->Wait(kQuiescenceFenceBudgetNanos))
     {
         RenderThreadStats::instance().RecordFenceWaitTimeout();
-        TF_WARN("RenderThread::WaitForQuiescence: the settled frame's GPU work "
+        TF_WARN("RenderThread::WaitForQuiescence: the latest frame's GPU work "
                 "did not complete within the budget.");
         return false;
     }

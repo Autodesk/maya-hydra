@@ -19,9 +19,9 @@
 // main thread waits before compositing. glFenceSync for GL; a no-op for Vulkan
 // and Metal, whose interop orders the composite itself.
 //
-// GL sync objects are shared across a share group (confirmed on NVIDIA 591.86),
-// so either thread can wait on the other's fence. Used for read-after-write
-// (CompletedFrame::fence) and write-after-read (FrameCopy::compositeDone).
+// GL sync objects are shared across a share group, so either thread can wait
+// on the other's fence. Used for read-after-write (CompletedFrame::fence) and
+// write-after-read (FrameCopy::compositeDone).
 
 #include <mayaHydraLib/api.h>
 
@@ -65,18 +65,11 @@ public:
     /// is a Vulkan or Metal no-op fence.
     bool IsValid() const { return _isNoop || _glFence != nullptr; }
 
-    /// Wait for this frame's GPU work to complete. Callable from any thread
-    /// whose context is in the same share group as the creating context.
-    ///
-    /// \p timeoutNanos 0 is a non-blocking poll. UINT64_MAX waits indefinitely;
-    ///    main-thread callers should pass a bound, because an unbounded wait
-    ///    here turns a stalled render thread into a frozen application.
-    ///
-    /// True only when the GPU work is known to be complete.
+    /// Block the calling thread for up to \p timeoutNanos until this frame's GPU
+    /// work completes. Callable from any thread whose context is in the same
+    /// share group as the creating context. True only when the GPU work is
+    /// known to be complete.
     bool Wait(uint64_t timeoutNanos) const;
-
-    /// Non-blocking check. Equivalent to Wait(0).
-    bool IsSignaled() const { return Wait(0); }
 
     /// Order the CALLING context's subsequent GPU work after this fence without
     /// blocking the CPU. Where Wait() (glClientWaitSync) blocks the calling

@@ -46,7 +46,6 @@
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
 #include <mayaHydraLib/renderThread/renderThread.h>
 #include <mayaHydraLib/renderThread/renderThreadPresentBridge.h>
-#include <mayaHydraLib/renderThread/renderThreadSettle.h>
 
 #include <hvt/tasks/outline/outlineManager.h>
 
@@ -620,11 +619,13 @@ private:
     // is off and when the thread declined to start.
     std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThread>              _renderThread;
     std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadPresentBridge> _presentBridge;
-    MAYAHYDRA_NS_DEF::RenderThreadSettle                         _settle;
     bool _renderThreadStarted = false;
     // The first frame is drawn synchronously so a render op always leaves an image
     // behind; overlap starts once this is true.
     bool _firstFramePrimed = false;
+    // The panel the render thread's frames are drawn for.
+    std::string _renderThreadPanel;
+    uint64_t    _renderThreadFrameId = 0;
 
     // A frame from Maya's time-change callback, applied by Render() past the interlock
     // because the callback cannot write to the scene index.

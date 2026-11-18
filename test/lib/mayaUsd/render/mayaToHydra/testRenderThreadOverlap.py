@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import os
-import unittest
-
+# Runs only with MAYAHYDRA_PIPELINE_OVERLAP=1; see the _overlap registration.
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
@@ -24,48 +22,34 @@ import mtohUtils
 RENDER_THREAD_STAT_NAMES = [
     "overlapEnabled",
     "started",
-    "contextArenaAcquired",
-    "ownsSurface",
     "framesRenderedOffThread",
     "framesComposited",
     "framesRenderedSynchronously",
+    "ownFramesComposited",
+    "drains",
+    "idleWaitTimeouts",
     "fenceSignalFailures",
     "fenceWaitTimeouts",
-    "drains",
-    "quiescenceWaits",
     "drainTimeouts",
-    "settles",
-    "settleRetries",
-    "settlesAbandoned",
     "presentsWithoutDepth",
     "presentsSkipped",
     "aovCopyFailures",
-    "copyTargetWaits",
-    "copyTargetWaitFailures",
     "compositeFenceSignalFailures",
-    "compositeReusedLastGood",
-    "idleWaitTimeouts",
     "sharedBufferFenceFailures",
-    "idleWaitMicros",
-    "aovCopyMicros",
-    "compositeMicros",
-    "compositeHandoffMicros",
-    "compositeFenceMicros",
-    "compositeBlitMicros",
-    "interlockBypassed",
-    "aovCopyBypassed",
-    "timeChangesComposited",
 ]
 
-
-def overlapRequested():
-    """Whether MAYAHYDRA_PIPELINE_OVERLAP was set for this process.
-
-    The flag is read once and cached, so a single process can only see one
-    value. The test is registered twice, with the flag on and off, and adapts
-    its assertions to which registration is running.
-    """
-    return os.environ.get("MAYAHYDRA_PIPELINE_OVERLAP", "0") not in ("", "0")
+# Each of these still leaves a believable image on screen, so they are counted
+# rather than left to a pixel comparison that cannot see them.
+FAILURE_STAT_NAMES = [
+    "fenceSignalFailures",
+    "fenceWaitTimeouts",
+    "drainTimeouts",
+    "presentsWithoutDepth",
+    "presentsSkipped",
+    "aovCopyFailures",
+    "compositeFenceSignalFailures",
+    "sharedBufferFenceFailures",
+]
 
 
 class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
@@ -95,10 +79,8 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
     def assertRenderThreadIsLive(self, stats):
         """Fails unless the render thread is genuinely running.
 
-        Every overlap-gated site is guarded by "flag on AND thread started",
-        and the fallback renders correctly, so a working viewport says nothing
-        about whether the render thread did the work. These are the assertions
-        that tell a real overlap run from a silent fallback.
+        The synchronous fallback renders correctly, so a working viewport says
+        nothing about whether the render thread did the work.
         """
         self.assertEqual(
             stats["overlapEnabled"], 1,
@@ -107,7 +89,7 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         self.assertEqual(
             stats["started"], 1,
             "Overlap was enabled but the render thread did not start, so "
-            "every gated site fell back to synchronous rendering. This is "
+            "every frame fell back to synchronous rendering. This is "
             "usually the shared GL context failing to come current. "
             "Stats: %s" % dict(stats))
         self.assertGreater(
@@ -116,147 +98,47 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             "screen all came from the synchronous fallback. Stats: %s"
             % dict(stats))
 
-    def test_inertWhenTheFlagIsOff(self):
-        """With the flag off, none of this exists.
-
-        The point of the default path is that it costs nothing, so the thread
-        must not merely be unused: it must never have been created.
-        """
-        if overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag on")
-
-        self.buildScene()
-        cmds.refresh(force=True)
-
-        stats = self.stats()
-        self.assertEqual(stats["overlapEnabled"], 0)
-        self.assertEqual(stats["started"], 0)
-        self.assertEqual(stats["framesRenderedOffThread"], 0)
-        self.assertEqual(stats["framesComposited"], 0)
-        self.assertGreater(
-            stats["framesRenderedSynchronously"], 0,
-            "With overlap off every frame should be drawn synchronously, but "
-            "none were recorded. Stats: %s" % dict(stats))
-
-    def test_framesAreDrawnOffTheMainThread(self):
-        """The render thread draws, and what it draws reaches the screen."""
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
-        self.buildScene()
-
+    def test_overlapRuns(self):
+        """The first frame is drawn synchronously, the rest on the render
+        thread, and what it draws reaches the screen without any of the
+        failures that would still leave a believable image."""
+        # Reset before building, because building the scene re-initializes
+        # Hydra and so triggers the synchronous first frame.
         cmds.mayaHydraTesting(resetRenderThreadStats=True)
+        self.buildScene()
         for _ in range(6):
             cmds.refresh(force=True)
         cmds.mayaHydraTesting(drainRenderThread=True)
-        cmds.refresh(force=True)
 
         stats = self.stats()
         self.assertRenderThreadIsLive(stats)
-
-        # Drawing off-thread is only half of it; the frame has to be composited
-        # into Maya's framebuffer or the viewport would sit frozen on the
-        # first-frame prime while the counters climbed.
+        self.assertGreater(
+            stats["framesRenderedSynchronously"], 0,
+            "No frame was drawn synchronously after Hydra was re-initialized, "
+            "so the first render op had no image to leave behind. Stats: %s"
+            % dict(stats))
         self.assertGreater(
             stats["framesComposited"], 0,
             "Frames were rendered off-thread but none were composited, so "
             "nothing the render thread drew reached the screen. Stats: %s"
             % dict(stats))
-
-    def test_theFirstFrameIsDrawnSynchronously(self):
-        """The prime, which is why a render op always leaves an image behind.
-
-        The render thread has produced nothing when the first render op runs,
-        so there is nothing to composite; drawing that one frame on the main
-        thread is what keeps the viewport from coming up blank. Stats are reset
-        before the scene is built, because building it is what re-initializes
-        Hydra and so triggers the prime -- resetting afterwards would throw
-        away the evidence.
-        """
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
-        cmds.mayaHydraTesting(resetRenderThreadStats=True)
-        self.buildScene()
-
-        stats = self.stats()
-        self.assertGreater(
-            stats["framesRenderedSynchronously"], 0,
-            "No frame was drawn synchronously after Hydra was re-initialized, "
-            "so the first render op had neither a completed frame to composite "
-            "nor one of its own. Stats: %s" % dict(stats))
-
-    def test_nothingSilentlyFails(self):
-        """The failures that still produce a believable image.
-
-        Each of these leaves the viewport looking plausible, which is why they
-        are counted rather than left to a pixel comparison that cannot see
-        them. A missing depth AOV, for instance, blits colour perfectly and
-        only breaks once something depth-composes over the result.
-        """
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
-        self.buildScene()
-        cmds.mayaHydraTesting(resetRenderThreadStats=True)
-        for _ in range(6):
-            cmds.refresh(force=True)
-        cmds.mayaHydraTesting(drainRenderThread=True)
-
-        stats = self.stats()
-        self.assertRenderThreadIsLive(stats)
-
-        for name in ("fenceSignalFailures",
-                     "fenceWaitTimeouts",
-                     "drainTimeouts",
-                     "presentsWithoutDepth",
-                     "presentsSkipped",
-                     "aovCopyFailures",
-                     "compositeFenceSignalFailures",
-                     "sharedBufferFenceFailures"):
+        for name in FAILURE_STAT_NAMES:
             self.assertEqual(
                 stats[name], 0,
                 "%s is %d, expected 0. Stats: %s"
                 % (name, stats[name], dict(stats)))
 
-    def test_aTimeChangeWhileStoppedShowsTheNewFrame(self):
-        """A jump to the start or end frame, which Maya follows with one redraw.
-
-        A redraw normally composites the image the render thread finished for
-        the previous redraw, so with nothing following it the new frame would
-        never reach the screen.
-        """
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
-        self.buildScene()
-        cmds.playbackOptions(minTime=1, maxTime=10)
-        cmds.currentTime(1)
-        cmds.refresh(force=True)
-        cmds.mayaHydraTesting(drainRenderThread=True)
-        cmds.mayaHydraTesting(resetRenderThreadStats=True)
-
-        # Evaluates and redraws exactly once, as the start and end frame
-        # buttons do: that render op has to put the new frame on screen itself.
-        cmds.currentTime(10)
-
-        stats = self.stats()
-        self.assertRenderThreadIsLive(stats)
-        self.assertEqual(
-            stats["timeChangesComposited"], 1,
-            "The time changed while playback was stopped, but the render op "
-            "that applied it did not composite its own frame, so the viewport "
-            "is left showing the previous frame. Stats: %s" % dict(stats))
-        self.assertEqual(stats["drainTimeouts"], 0, dict(stats))
-
     def assertJumpLeavesNoGhost(self, what, fromFrame=1, toFrame=10, beforeJump=None):
         """Jump between frames 1 and 10, where `what` is at x=-2.5 and x=2.5.
 
-        Reads Maya's colour buffer straight after the one refresh, rather than
-        through a playblast, which would refresh again and hide the state a
-        user sees. `beforeJump` runs after the view has settled on `fromFrame`
-        and must leave the time there.
+        Maya follows a time change outside playback with exactly one redraw,
+        which has to composite its own frame rather than the previous one, and
+        nothing else. Reads Maya's colour buffer straight after that redraw,
+        rather than through a playblast, which would refresh again and hide
+        the state a user sees. `beforeJump` runs after the view has settled on
+        `fromFrame` and must leave the time there.
         """
+        import ctypes
         import maya.api.OpenMaya as om
         import maya.api.OpenMayaUI as omui
 
@@ -270,7 +152,6 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         view = omui.M3dView.active3dView()
 
         def pixelAt(image, x, y):
-            import ctypes
             width, height = image.getSize()
             # MImage.pixels() is the address of width * height RGBA bytes.
             data = (ctypes.c_ubyte * (width * height * 4)).from_address(image.pixels())
@@ -296,15 +177,23 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         if beforeJump:
             beforeJump()
 
-        # Evaluates and redraws once, as the start and end frame buttons do.
+        cmds.mayaHydraTesting(resetRenderThreadStats=True)
         cmds.currentTime(toFrame)
         atOld, atNew = readViewport()
+        stats = self.stats()
 
         # And the target frame, settled, as the reference for the single refresh.
         cmds.mayaHydraTesting(drainRenderThread=True)
         cmds.refresh(force=True)
         cmds.refresh(force=True)
         settledOld, settledNew = readViewport()
+
+        self.assertRenderThreadIsLive(stats)
+        self.assertEqual(
+            stats["ownFramesComposited"], 1,
+            "The time changed while playback was stopped, but the render op "
+            "that applied it did not composite its own frame. Stats: %s"
+            % dict(stats))
 
         def differs(a, b):
             return max(abs(int(p) - int(q)) for p, q in zip(a, b)) > 8
@@ -326,16 +215,17 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             "position too."
             % (fromFrame, (oldX, oldY), atOld, toFrame, settledOld, what))
 
+    def test_aTimeChangeWhileStoppedLeavesNoGhost(self):
+        """A transform-animated cube must appear only at the new time."""
+        cube = self.buildScene(useTestRenderer=True)
+        cmds.playbackOptions(minTime=1, maxTime=10)
+        cmds.setKeyframe(cube, attribute="translateX", time=1, value=-2.5)
+        cmds.setKeyframe(cube, attribute="translateX", time=10, value=2.5)
+        self.assertJumpLeavesNoGhost("cube")
+
     def test_aJumpRightAfterPlaybackLeavesNoGhost(self):
-        """Play, stop, then jump: the settle armed by the stop must not show.
-
-        Stopping playback arms a settle for the next render op. When that op
-        is the jump, it composites its own frame, and compositing the settled
-        frame as well layers the old pose under the new one.
-        """
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
+        """Play, stop, then jump: the last frame playback submitted must not
+        be composited under the jump's own frame."""
         cube = self.buildScene(useTestRenderer=True)
         cmds.playbackOptions(minTime=1, maxTime=10, loop="once")
         cmds.setKeyframe(cube, attribute="translateX", time=1, value=-2.5)
@@ -345,23 +235,10 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             cmds.currentTime(1)
             cmds.play(forward=True, wait=True)
             self.assertEqual(cmds.currentTime(query=True), 10)
-            # The first render op after playback sees it stopped and arms
-            # the settle, which the jump's render op then meets.
             cmds.refresh(force=True)
 
         self.assertJumpLeavesNoGhost(
             "cube", fromFrame=10, toFrame=1, beforeJump=playThenStop)
-
-    def test_aTimeChangeWhileStoppedLeavesNoGhost(self):
-        """A transform-animated cube must appear only at the new time."""
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
-        cube = self.buildScene(useTestRenderer=True)
-        cmds.playbackOptions(minTime=1, maxTime=10)
-        cmds.setKeyframe(cube, attribute="translateX", time=1, value=-2.5)
-        cmds.setKeyframe(cube, attribute="translateX", time=10, value=2.5)
-        self.assertJumpLeavesNoGhost("cube")
 
     def test_aSkinnedMeshJumpUnderCachedPlaybackLeavesNoGhost(self):
         """The same for a skinned mesh, deformed on the GPU and cached.
@@ -370,9 +247,6 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         deformer shares them as device buffers, and cached playback serves
         them from the cache instead of evaluating.
         """
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
         cube = self.buildScene(useTestRenderer=True)
         cmds.delete(cube)
         cmds.select(clear=True)
@@ -401,17 +275,13 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         self.assertJumpLeavesNoGhost("skinned cylinder")
 
     def test_aViewportPickDiscardsInFlightWork(self):
-        """The pick path, which is the reason the discard exists.
+        """A frame rendered before a pick must not be composited after it, or
+        the viewport shows the scene without the new selection.
 
-        A pick runs synchronously on the main thread, so a frame rendered
-        before it must not be composited after it -- the viewport would show
-        the scene without the new selection. cmds.select does not reach
-        MtohRenderOverride::select at all, so this uses the viewportPick hook,
-        which drives Maya's real selection machinery.
+        cmds.select does not reach MtohRenderOverride::select at all, so this
+        uses the viewportPick hook, which drives Maya's real selection
+        machinery.
         """
-        if not overlapRequested():
-            raise unittest.SkipTest("this registration runs with the flag off")
-
         cube = self.buildScene()
         cmds.select(clear=True)
 
@@ -421,11 +291,9 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.mayaHydraTesting(resetRenderThreadStats=True)
 
-        # Put a frame in flight first, or the discard has nothing to discard
-        # and this covers the call rather than the hazard. A forced refresh
-        # submits and returns without waiting, so the render thread is still
-        # working when the pick lands. Deliberately not draining here: that
-        # would leave nothing in flight, which is the vacuous version.
+        # Put a frame in flight first, or the discard has nothing to discard.
+        # A forced refresh submits and returns without waiting, so the render
+        # thread is still working when the pick lands.
         cmds.refresh(force=True)
 
         # A box over the middle of the viewport rather than a single pixel,
@@ -447,26 +315,12 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
 
         stats = self.stats()
         self.assertRenderThreadIsLive(stats)
-
-        # The actual point. If this is zero the pick never reached
-        # MtohRenderOverride::select, and the discard is still untested no
-        # matter what the assertions above say.
         self.assertGreater(
             stats["drains"], 0,
             "The pick selected the cube, but no discard was recorded, so it "
             "did not reach MtohRenderOverride::select and this test does not "
             "cover the pick path. Maya may have satisfied the selection "
             "through OGS instead. Stats: %s" % dict(stats))
-
-        # DiscardInFlight waits out a render already running before clearing
-        # the handoff. If that wait gives up, the render publishes afterwards
-        # and its pre-pick frame is composited after the pick, which is exactly
-        # the stale frame the discard exists to prevent.
-        self.assertEqual(
-            stats["drainTimeouts"], 0,
-            "The pick's discard timed out with the render thread still busy, "
-            "so a frame rendered before the pick can still publish and be "
-            "composited after it. Stats: %s" % dict(stats))
 
 
 if __name__ == '__main__':

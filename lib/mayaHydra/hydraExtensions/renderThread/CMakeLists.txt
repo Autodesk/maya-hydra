@@ -7,7 +7,6 @@ target_sources(${TARGET_NAME}
         renderThreadContext.cpp
         renderThreadFence.cpp
         renderThreadPresentBridge.cpp
-        renderThreadSettle.cpp
         renderThreadStats.cpp
 )
 
@@ -17,7 +16,6 @@ set(HEADERS
     renderThreadFence.h
     renderThreadHandoff.h
     renderThreadPresentBridge.h
-    renderThreadSettle.h
     renderThreadStats.h
 )
 

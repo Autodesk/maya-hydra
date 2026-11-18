@@ -111,24 +111,9 @@ RenderThreadFence::Wait(uint64_t timeoutNanos) const
 
     GLsync target = reinterpret_cast<GLsync>(_glFence);
 
-    // A single non-blocking poll, so Wait(0) does not pay for the loop below.
-    if (timeoutNanos == 0)
-    {
-        const GLenum result = glClientWaitSync(target, 0, 0);
-        return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
-    }
-
     // Flags stay 0 rather than GL_SYNC_FLUSH_COMMANDS_BIT, which would flush
     // this thread's context and not the one holding the fence's commands.
-    //
-    // Elapsed-since-start rather than a precomputed deadline:
-    // std::chrono::nanoseconds has a SIGNED 64-bit representation, so
-    // nanoseconds(UINT64_MAX) wraps to -1ns and now() + that lands in the past,
-    // turning "wait indefinitely" into "give up after one poll". Comparing
-    // elapsed time also avoids overflowing the time_point on a large timeout.
-    const auto start     = std::chrono::steady_clock::now();
-    const bool unbounded = (timeoutNanos == UINT64_MAX);
-
+    const auto start = std::chrono::steady_clock::now();
     while (true)
     {
         const GLenum result = glClientWaitSync(target, 0, 1000000); // 1ms
@@ -146,15 +131,12 @@ RenderThreadFence::Wait(uint64_t timeoutNanos) const
         }
 
         // GL_TIMEOUT_EXPIRED.
-        if (!unbounded)
+        const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::steady_clock::now() - start)
+                                 .count();
+        if (static_cast<uint64_t>(elapsed) >= timeoutNanos)
         {
-            const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                     std::chrono::steady_clock::now() - start)
-                                     .count();
-            if (elapsed >= 0 && static_cast<uint64_t>(elapsed) >= timeoutNanos)
-            {
-                return false;
-            }
+            return false;
         }
 
         // Avoid a tight CPU spin.

@@ -7,10 +7,6 @@ gets on with producing the next one.  The two overlap instead of running
 strictly one after the other, which recovers the GPU time that would otherwise
 sit idle while Maya evaluates.
 
-This builds on the [frame publication boundary](framePublication.md), which
-supplies the frame id that identifies the scene state a given draw belongs to.
-Enabling pipelining enables that boundary.
-
 ## Structure
 
 `Render()` runs in three stages.  `pushSceneState()` applies scene,
@@ -31,7 +27,13 @@ so both contexts can see the same resources.
 Creation happens on the main thread while Maya's context is current, because
 that is the only place the share group is reachable.  The context is then made
 current on the render thread and stays current there for its entire lifetime.
-It is never current on two threads, and never migrates.
+It is never current on two threads, and never migrates.  Its drawable is a
+hidden window that the main thread creates and destroys, because Win32
+requires a window to be destroyed on the thread that created it.
+
+The share group shares textures, buffers, programs and sync objects, but not
+framebuffers or vertex array objects; those belong to the context that created
+them.
 
 `hgi/hgi.h` requires command submission on the "main thread", which for OpenGL
 it defines as the thread the context is bound on, so a thread owning its own
@@ -47,23 +49,22 @@ Metal need no context.
 
 ## Handing frames across
 
-Work crosses to the render thread as a request carrying the frame id, the
+Work crosses to the render thread as a request carrying a frame id, the
 colour and depth AOV tokens, the ordered pass list, and the destination
 region.  Completed frames come back the same way, carrying the rendered AOV
 textures and a GPU fence.
 
 Both directions have a depth of one.  Completed frames are latest wins: if the
 render thread publishes before the main thread composites, the older frame is
-replaced, for the same reason as the publication boundary: an interactive
-viewport wants the newest frame, not a backlog.
+replaced: an interactive viewport wants the newest frame, not a backlog.
 
 Requests are never replaced or dropped.  Each request's scene push has already
 closed a [GPU buffer sharing](gpuBufferSharing.md) producer frame, and under a
 Vulkan Hgi that signalled a binary semaphore which only that request's render
 waits on; losing the request would signal it twice for one wait.  The interlock
-leaves the pending slot empty before the next submit.  A pick or resize lets pending work render before
-discarding its frame, and stopping the thread renders a pending request before
-exiting.
+leaves the pending slot empty before the next submit.  A pick, resize or change
+of panel lets pending work render before discarding its frame, and stopping the
+thread renders a pending request before exiting.
 
 The render thread does not present.  It renders into AOVs and publishes them,
 and the main thread composites the most recent completed frame at the start of
@@ -78,6 +79,10 @@ thread](metalRenderThread.md).
 
 Colour and depth are both blitted, so Maya's own viewport overlays
 depth-compose against the composited scene.
+
+Under an OpenGL Hgi the render thread applies the same GL state around Storm's
+passes as the main thread does (`MayaHydraSetRenderGLState`), since its context
+does not inherit Maya's.
 
 ## Shared vertex buffers
 
@@ -149,24 +154,31 @@ When the render thread is not running, the callback applies the time and
 refreshes cameras immediately, so behaviour with the feature disabled is
 unchanged.
 
-## Priming, discarding and settling
+## Priming, discarding and compositing
 
 **The first frame is drawn synchronously.**  There is nothing to composite
 before a frame has been produced, so the first frame after resources are
 initialised takes the main-thread path, and overlap begins with the second.
 
-**In-flight work is discarded** when it can no longer be valid: on viewport
-resize, where the render target has changed size underneath the frame, and on
-picking, where a frame rendered before the pick would otherwise be composited
-after it and show a pre-pick image.  After a discard the next frame primes
-synchronously again.
+**Each render op composites the previous op's frame.**  The interlock waits
+for that frame before the composite, so the composite never shows anything
+older.  In particular, the first redraw after playback stops shows the final
+frame of playback, and needs no extra step.
 
-**Playback stop is settled explicitly.**  When playback stops, the last
-overlapped frame may still be in flight, so the viewport would otherwise show
-the second-to-last frame indefinitely.  A settle step detects the transition
-and schedules redraws until the final frame has been composited, up to
-`kMaxSettleRetries`.  The retry is self-scheduling, so that bound is what
-keeps a thread which never produces the frame from spinning the viewport.
+**In-flight work is discarded** when it can no longer be valid: on viewport
+resize, where the render target has changed size underneath the frame; on
+picking, where a frame rendered before the pick would otherwise be composited
+after it and show a pre-pick image; and when the render op is for a different
+panel or destination than the last frame was drawn for.  The discard waits,
+with no time limit, for any render still running.  After a resize the next
+frame primes synchronously again.
+
+**A change of panel composites its own frame.**  One render override draws
+every Hydra panel, but the handoff holds a single frame, so a frame drawn for
+one panel must not be composited into another.  A render op for a different
+panel than the last one discards the handoff and composites its own frame, as
+below.  With several Hydra panels visible, every render op does this, so they
+do not overlap.
 
 **A time change while stopped composites its own frame.**  Jumping to the
 start or end frame, or stepping the time slider, is followed by exactly one
@@ -177,17 +189,15 @@ composite, submits its frame, waits for it (`WaitForQuiescence`) and composites
 it into Maya's framebuffer, captured at the start of the op.  Such frames do
 not overlap, which costs the same as the flag-off path.  Requesting a
 catch-up redraw instead does not work reliably, because nothing guarantees
-Maya runs it promptly.  The `timeChangesComposited` counter records these
-frames.  Such a render op also cancels a pending settle: the composite is
-depth-tested and blended over Maya's framebuffer, so compositing the settled
-frame as well, as happens when the jump is the first redraw after playback
-stops, would show the animation at both its old and new positions.
+Maya runs it promptly.  The `ownFramesComposited` counter records these
+frames.  Such a render op composites only its own frame: the composite is
+depth-tested and blended over Maya's framebuffer, so compositing the previous
+frame as well would show the animation at both its old and new positions.
 
 ## Enabling it
 
 Pipelining is gated behind the `MAYAHYDRA_PIPELINE_OVERLAP` environment
-variable and is off by default.  Setting it also enables the frame publication
-boundary, since overlapped drawing cannot identify its frame without one.
+variable and is off by default.  It is read once per process.
 
 Every overlap-sensitive site is guarded on the flag being set *and* the thread
 having actually started, so a failed startup degrades to the original
@@ -196,11 +206,11 @@ synchronous path rather than to a half-enabled one.
 ## Observability
 
 The render thread keeps counters covering frames drawn off the main thread,
-frames composited, frames drawn synchronously, discards, quiescence waits,
-settles and settle retries, and each distinct failure mode: fence signal
-failures, fence wait timeouts, drain timeouts, presents skipped or without
-depth, AOV copy failures, copy-target wait failures and shared buffer fence
-failures.
+frames composited, frames drawn synchronously, render ops that composited
+their own frame, discards, slow interlock waits, and each distinct failure
+mode: fence signal failures, fence wait timeouts, drain timeouts, presents
+skipped or without depth, AOV copy failures, composite fence failures and
+shared buffer fence failures.
 
 They are readable from a test through `mayaHydraTesting -renderThreadStats`,
 with `-resetRenderThreadStats` to zero them and `-drainRenderThread` to force
@@ -213,14 +223,16 @@ feature did nothing.
 
 ## Testing
 
-`testRenderThreadOverlap.py` is registered twice, once with the flag off and
-once with it on.
+`testRenderThreadOverlap.py` runs only with the flag on.  It asserts that the
+thread started, that frames were drawn off the main thread and composited,
+that the first frame was drawn synchronously, and that every failure counter
+is zero.
 
-With the flag off it asserts every counter is zero, which is what proves the
-feature is genuinely inert rather than merely harmless.  With it on it asserts
-that the thread started, that frames were drawn off the main thread and
-composited, that the first frame was drawn synchronously, and that every
-failure counter is zero.
+Three tests jump the time while stopped (a transform-animated cube, the same
+right after playback, and a GPU-deformed skinned mesh under cached playback)
+and read Maya's colour buffer after the single redraw, asserting the object
+appears only at its new position and that the render op composited its own
+frame.
 
 Picking is covered through a `-viewportPick` command that calls Maya's
 screen-selection API directly, because scripted selection does not reach the
@@ -238,9 +250,15 @@ stops happening.
   sending a notice, can still be read mid-change by a sync on the render thread
   (for example a sync that pulls some attributes from the old data and some from
   the new).  Such adapters need a commit step that runs behind the interlock.
+- The render thread makes no Maya API calls itself, but Hydra's sync pulls from
+  data sources, and some of those read Maya's dependency graph lazily.  Such a
+  read runs on the render thread while the main thread may be evaluating.
 - Composited overlays sort against the scene as of the last completed frame,
   which is one frame behind the main thread's current state.
-- The settle step triggers on a playing-to-stopped transition, and time
-  changes outside playback composite their own frame; other single-redraw
-  changes (for example a scripted attribute edit with no further redraw) still
-  show the previous frame until the next redraw.
+- Time changes outside playback and changes of panel composite their own
+  frame; other single-redraw changes (for example a scripted attribute edit
+  with no further redraw) still show the previous frame until the next redraw.
+- HgiGL deletes and recreates a pipeline's vertex array object on whichever
+  context is current when the pipeline binds.  A synchronous main-thread frame
+  (a pick, or the prime after a resize) that binds a pipeline the render thread
+  last used deletes a VAO name on Maya's context that it never created there.

@@ -15,8 +15,7 @@ As with Vulkan, everything keys off the Hgi's API name.
 
 Metal submits to a command queue rather than to a current context, so the
 render thread receives a null context and skips both `MakeCurrent` and the
-`HgiGL` context arena.  The per-frame fence is a no-op, and
-`contextArenaAcquired` reports true, both as under Vulkan.
+`HgiGL` context arena.  The per-frame fence is a no-op, as under Vulkan.
 
 ## HgiMetal stays on one thread at a time
 

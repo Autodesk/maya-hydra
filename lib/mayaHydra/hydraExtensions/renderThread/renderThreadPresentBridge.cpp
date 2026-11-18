@@ -120,12 +120,6 @@ public:
     }
 #endif
 
-    TfToken GetSourceApiName(Hgi* srcHgi) const override
-    {
-        if (!srcHgi) return TfToken();
-        return srcHgi->GetAPIName();
-    }
-
 private:
     static bool _ShouldComposite(bool hasDepth, GfVec4i const& dstRegion)
     {

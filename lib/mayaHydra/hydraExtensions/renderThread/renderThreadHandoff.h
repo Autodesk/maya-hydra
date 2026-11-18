@@ -17,11 +17,9 @@
 
 // Handoff protocol.
 //
-// Main signals "snapshot(frameId) ready"; the render thread signals
-// "frame(frameId) complete" and carries the color and depth AOV handles plus a
-// GPU fence (glFenceSync or Hgi) that main waits on before blitting. frameId
-// comes from SnapshotManager. Depth-1 latest-wins: when eval outruns draw,
-// intermediate snapshots are dropped by the snapshot publish barrier.
+// The render thread publishes "frame(frameId) complete" with the color and
+// depth AOV handles and a GPU fence the main thread waits on before blitting.
+// frameId is the id the render override gave the request.
 
 #include "renderThreadFence.h"
 
@@ -60,10 +58,10 @@ namespace MAYAHYDRA_NS_DEF {
 /// WaitForCompletedFrame().
 struct CompletedFrame
 {
-    /// The SnapshotManager frameId consumed by the render thread.
+    /// The id of the request this frame was rendered for.
     uint64_t frameId{0};
 
-    /// The color AOV texture handle. Valid until the next frame completes.
+    /// The color AOV texture handle.
     pxr::HgiTextureHandle srcColor;
 
     /// The depth AOV texture handle (may be empty if no depth AOV).
@@ -84,7 +82,7 @@ struct CompletedFrame
     RenderThreadFencePtr fence;
 
     /// Which of the render thread's copy pairs these textures live in, or -1
-    /// when they are not from a pair (the AOV-copy bypass). The main thread
+    /// when the present bridge prepared the frame instead. The main thread
     /// hands the index back so the write-after-read fence has a slot to go to.
     int copyIndex{-1};
 
@@ -158,22 +156,6 @@ public:
             return _completed;
         }
         return CompletedFrame{};
-    }
-
-    /// Returns the frameId of the latest completed frame, or 0 if none.
-    uint64_t GetCompletedFrameId() const
-    {
-        std::lock_guard<std::mutex> lock(_mutex);
-        if (_hasFrame.load(std::memory_order_acquire))
-        {
-            return _completed.frameId;
-        }
-        return 0;
-    }
-
-    bool HasCompletedFrame() const
-    {
-        return _hasFrame.load(std::memory_order_acquire);
     }
 
     /// Drop the completed frame. Called by DiscardInFlight() so a frame

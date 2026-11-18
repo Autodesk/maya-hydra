@@ -16,10 +16,6 @@ makes current for its whole lifetime.  Vulkan submits to device queues rather
 than to a current context, so the thread receives a null context instead and
 skips both `MakeCurrent` and the `HgiGL` context arena.
 
-The `contextArenaAcquired` stat still reports true under Vulkan.  It means "the
-thread has what it needs to render off-thread", which holds; it does not mean
-an arena was allocated.
-
 ## No fence to signal
 
 The per-frame fence that orders the main thread's composite behind the render
