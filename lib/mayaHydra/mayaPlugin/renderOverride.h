@@ -443,6 +443,10 @@ private:
     // too. Kept sorted for std::set_symmetric_difference.
     PXR_NS::SdfPathVector                 _previouslySelectedPaths;
 
+    // Lead object paths at the last unloaded payload box color invalidation, so the boxes of the
+    // previous lead are dirtied too.
+    PXR_NS::SdfPathVector                 _previousLeadPaths;
+
     // A color preference changed: rebuild and push the OutlineManager style.
     std::atomic<bool>                     _outlineStyleDirty = { true };
 

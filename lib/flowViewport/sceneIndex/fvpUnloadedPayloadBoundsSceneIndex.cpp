@@ -173,6 +173,20 @@ void UnloadedPayloadBoundsSceneIndex::DirtyWireframeColors()
     }
 }
 
+void UnloadedPayloadBoundsSceneIndex::DirtyWireframeColors(const SdfPathVector& primPaths)
+{
+    if (!_IsObserved()) {
+        return;
+    }
+    HdSceneIndexObserver::DirtiedPrimEntries dirtied;
+    for (const SdfPath& primPath : primPaths) {
+        _AddColorDirtiesUnder(primPath, dirtied);
+    }
+    if (!dirtied.empty()) {
+        _SendPrimsDirtied(dirtied);
+    }
+}
+
 bool UnloadedPayloadBoundsSceneIndex::_IsExcluded(const SdfPath& primPath) const
 {
     for (const SdfPath& root : _excludedSceneRoots) {

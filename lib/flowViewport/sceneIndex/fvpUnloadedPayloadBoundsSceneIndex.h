@@ -81,6 +81,12 @@ public:
     FVP_API
     void DirtyWireframeColors();
 
+    /// Makes only the boxes at or under \p primPaths re-pull their wireframe color, e.g. when the
+    /// lead object changes. Selection changes are handled without calling this, but a lead change
+    /// is not a selection change, so is not.
+    FVP_API
+    void DirtyWireframeColors(const PXR_NS::SdfPathVector& primPaths);
+
 protected:
     FVP_API
     UnloadedPayloadBoundsSceneIndex(

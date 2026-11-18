@@ -2176,6 +2176,22 @@ MStatus MtohRenderOverride::Render(
         _previouslySelectedPaths = currentlySelected;
     }
 
+    // Unloaded payload boxes pull a wireframe color in every display style, so they cannot rely on
+    // the lead dirties above, which setColorDirtiesEnabled() may suppress. Dirty only the boxes of
+    // the old and new lead: the global color dirties would walk every prim under the selection.
+    if (_unloadedPayloadBoundsSceneIndex && _leadObjectPathTracker) {
+        SdfPathVector currentLeadPaths;
+        for (const Fvp::PrimSelection& leadSelection :
+             _leadObjectPathTracker->getLeadObjectPrimSelections()) {
+            currentLeadPaths.push_back(leadSelection.primPath);
+        }
+        if (currentLeadPaths != _previousLeadPaths) {
+            _unloadedPayloadBoundsSceneIndex->DirtyWireframeColors(_previousLeadPaths);
+            _unloadedPayloadBoundsSceneIndex->DirtyWireframeColors(currentLeadPaths);
+            _previousLeadPaths = std::move(currentLeadPaths);
+        }
+    }
+
     if (reprWillBePushed) {
         _reprSelectorSceneIndex->SetReprType(
             wantedRepr.reprType, wantedRepr.needsReprChanged, wantedRepr.refineLevel);
@@ -3239,6 +3255,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _appliedReprTreatment.reset();
     _previouslySelectedPaths.clear();
     _previouslySelectedPaths.shrink_to_fit();
+    _previousLeadPaths.clear();
+    _previousLeadPaths.shrink_to_fit();
 
     // Cleanup passes
 
