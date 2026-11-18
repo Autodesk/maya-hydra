@@ -105,10 +105,6 @@ public:
     virtual void RemovePrim() = 0;
     /// Insert the prim into the scene index.
     virtual void Populate() = 0;
-    /// Re-read the Maya data this adapter caches for its data sources and dirty what changed.
-    /// Requested with MayaHydraSceneIndex::RebuildFlagData; runs on the main thread during the
-    /// scene push, when the DG may be read and no render thread is inside Hydra sync.
-    virtual void RefreshData() { }
 
     MAYAHYDRALIB_API
     /// Perform any one-time adapter initialization.

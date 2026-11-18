@@ -20,10 +20,10 @@
 // radiance:sphericalHarmonicsCoefficients (degree 0 only).
 //
 // Unlike OpenVDB volumes, no render delegate reads the splat file itself, so the adapter reads
-// the node's PLY file and publishes its contents. Hydra may pull the primvars from a render
-// thread, which must not touch Maya; they therefore serve an immutable snapshot that the
-// adapter loads on the main thread. Maya callbacks only record that the file changed;
-// RefreshData() reloads it during the scene push.
+// the node's PLY file and publishes its contents. The file path is resolved on the main thread,
+// when the prim is populated and when the file attributes change, which also dirties the
+// primvars. The file itself is loaded lazily when Hydra first pulls a primvar; that only does
+// file I/O, so it is safe on a render thread.
 //
 
 #include "gaussianSplatPlyReader.h"
@@ -138,7 +138,7 @@ public:
         }
         _upAxisRotation = _ReadUpAxisRotation();
         _SetColorSpace(_ReadColorSpace());
-        _RefreshSplats(false);
+        _SetFile(_ResolveFilePath());
         GetMayaHydraSceneIndex()->InsertPrim(this, HdPrimTypeTokens->particleField, GetID());
         _isPopulated = true;
     }
@@ -157,18 +157,7 @@ public:
             sceneIndex->AddPrims(
                 { { GetID(), TfToken(), HdRetainedContainerDataSource::New() } });
         }
-        _pendingReload = false;
         _isPopulated = false;
-    }
-
-    void RefreshData() override
-    {
-        if (!std::exchange(_pendingReload, false) || !_CanNotify()) {
-            return;
-        }
-        if (_RefreshSplats(true)) {
-            MayaHydra::DirtyNotifier(this).dirtyPrimvars();
-        }
     }
 
     void CreateCallbacks() override
@@ -264,10 +253,47 @@ protected:
 private:
     using _SplatsPtr = std::shared_ptr<const MayaHydraGaussianSplats>;
 
+    /// Splats of the current file, loaded on first use. Callable from any thread: it does not
+    /// touch Maya, and concurrent callers wait for a single load.
     _SplatsPtr _GetSplats() const
     {
         std::lock_guard<std::mutex> lock(_splatsMutex);
+        if (!_splatsLoaded) {
+            _splatsLoaded = true;
+            _splats = _LoadSplats();
+        }
         return _splats;
+    }
+
+    /// Called with _splatsMutex held.
+    _SplatsPtr _LoadSplats() const
+    {
+        if (_filePath.empty()) {
+            return nullptr;
+        }
+        auto        splats = std::make_shared<MayaHydraGaussianSplats>();
+        std::string error;
+        if (!MayaHydraReadGaussianSplatPly(_filePath, *splats, error)) {
+            TF_WARN(
+                "aiGaussianSplat %s: cannot read '%s': %s",
+                _nodeName.c_str(),
+                _filePath.c_str(),
+                error.c_str());
+            return nullptr;
+        }
+        return splats;
+    }
+
+    /// Main thread only. Points the adapter at \p path; the file is (re)loaded on the next pull
+    /// even when the path is unchanged, so setting the same file name again reloads it.
+    void _SetFile(std::string path)
+    {
+        std::string nodeName = GetDagPath().partialPathName().asChar();
+        std::lock_guard<std::mutex> lock(_splatsMutex);
+        _filePath = std::move(path);
+        _nodeName = std::move(nodeName);
+        _splats.reset();
+        _splatsLoaded = false;
     }
 
     bool _CanNotify() const
@@ -355,48 +381,6 @@ private:
         return std::exchange(_colorSpace, colorSpace) != colorSpace;
     }
 
-    /// Main thread only. Loads the splats of the current file; unless \p force, keeps the loaded
-    /// ones when the file did not change. Returns whether the published splats changed.
-    bool _RefreshSplats(bool force)
-    {
-        const std::string path = _ResolveFilePath();
-        if (!force && path == _loadedPath) {
-            return false;
-        }
-        const bool hadSplats = _GetSplats() != nullptr;
-        _loadedPath = path;
-
-        _SplatsPtr splats;
-        if (!path.empty()) {
-            auto        loaded = std::make_shared<MayaHydraGaussianSplats>();
-            std::string error;
-            if (MayaHydraReadGaussianSplatPly(path, *loaded, error)) {
-                splats = std::move(loaded);
-            } else {
-                TF_WARN(
-                    "aiGaussianSplat %s: cannot read '%s': %s",
-                    GetDagPath().partialPathName().asChar(),
-                    path.c_str(),
-                    error.c_str());
-            }
-        }
-        {
-            std::lock_guard<std::mutex> lock(_splatsMutex);
-            _splats = std::move(splats);
-        }
-        return hadSplats || _GetSplats() != nullptr;
-    }
-
-    void _RequestReload()
-    {
-        if (!_CanNotify()) {
-            return;
-        }
-        _pendingReload = true;
-        GetMayaHydraSceneIndex()->RebuildAdapterOnIdle(
-            GetID(), MayaHydraSceneIndex::RebuildFlagData);
-    }
-
     static void _AttributeChanged(
         MNodeMessage::AttributeMessage msg,
         MPlug&                         plug,
@@ -411,7 +395,10 @@ private:
         const MString name = MayaHydra::GetTopPlug(plug).partialName(
             false, false, false, false, false, true);
         if (name == "filename" || name == "useFile") {
-            adapter->_RequestReload();
+            if (adapter->_CanNotify()) {
+                adapter->_SetFile(adapter->_ResolveFilePath());
+                MayaHydra::DirtyNotifier(adapter).dirtyPrimvars();
+            }
         } else if (name == "upAxis") {
             const int degrees = adapter->_ReadUpAxisRotation();
             if (degrees != adapter->_upAxisRotation && adapter->_CanNotify()) {
@@ -425,10 +412,12 @@ private:
         }
     }
 
+    // Guards the file and the splats loaded from it.
     mutable std::mutex _splatsMutex;
-    _SplatsPtr         _splats;
-    std::string        _loadedPath;
-    bool               _pendingReload { false };
+    std::string        _filePath;
+    std::string        _nodeName;
+    mutable _SplatsPtr _splats;
+    mutable bool       _splatsLoaded { false };
     std::atomic<int>   _upAxisRotation { 0 };
     mutable std::mutex _colorSpaceMutex;
     TfToken            _colorSpace;

@@ -1371,8 +1371,6 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
                         if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagPrim) {
                             a->RemovePrim();
                             a->Populate();
-                        } else if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagData) {
-                            a->RefreshData();
                         }
                     },
                     _shapeAdapters,
