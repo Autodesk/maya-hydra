@@ -59,7 +59,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStagePayloadsReferences.py
-    testUnloadedPayloadBounds.py
     testNurbsPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testCurveTools.py
     testPolygonPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
@@ -142,6 +141,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testLegacyHighlightPassRouting.py
     cpp/testDeferredHighlightWireInit.py
     cpp/testRenderItemDirtyLocators.py
+    cpp/testUnloadedPayloadBounds.py
 )
 
 # These two test files are identical, except for disabled tests.  See

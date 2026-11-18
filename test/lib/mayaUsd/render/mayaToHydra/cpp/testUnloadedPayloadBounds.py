@@ -28,6 +28,9 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    IMAGEDIFF_FAIL_THRESHOLD = 0.05
+    IMAGEDIFF_FAIL_PERCENT = 0.5
+
     def setUp(self):
         super(TestUnloadedPayloadBounds, self).setUp()
 
@@ -43,7 +46,7 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         self.stage = mayaUsdLib.GetPrim(self.psPathStr).GetStage()
         self.cubeFile = testUtils.getTestScene("testStagePayloadsReferences", "cube.usda")
         self.setTestRenderer()
-        self.setBasicCam(10)
+        self.setBasicCam(3)
         cmds.select(clear=True)
 
     def definePayloadPrim(self, path, extentsHint=None):
@@ -61,6 +64,11 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
             usdPath, str(expectedCount),
             f="UnloadedPayloadBounds.countBoundsPrims")
 
+    def assertImageClose(self, imageName):
+        cmds.refresh(force=True)
+        self.assertSnapshotClose(
+            imageName, self.IMAGEDIFF_FAIL_THRESHOLD, self.IMAGEDIFF_FAIL_PERCENT)
+
     def assertBoundsShown(self, usdPath):
         self.assertBoundsCount(usdPath, 1)
 
@@ -73,6 +81,7 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         prim.Unload()
         self.assertFalse(prim.IsLoaded())
         self.assertBoundsHidden("/A")
+        self.assertImageClose("unloadedPayloadNoExtentsHint.png")
 
     def test_ExtentsHintLoadUnload(self):
         prim = self.definePayloadPrim("/A", EXTENTS_HINT)
@@ -80,16 +89,19 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         # Loaded: real geometry is drawn, no bounding box.
         self.assertTrue(prim.IsLoaded())
         self.assertBoundsHidden("/A")
+        self.assertImageClose("unloadedPayloadLoaded.png")
 
         # Unloaded: Bounding box is present.
         prim.Unload()
         self.assertFalse(prim.IsLoaded())
         self.assertBoundsShown("/A")
+        self.assertImageClose("unloadedPayloadBoundingBox.png")
 
         # Re-loaded: real geometry is drawn again, no bounding box.
         prim.Load()
         self.assertTrue(prim.IsLoaded())
         self.assertBoundsHidden("/A")
+        self.assertImageClose("unloadedPayloadLoaded.png")
 
     def test_PickBoundingBox(self):
         # The box is wireframe, so its center is empty. Click on a corner
