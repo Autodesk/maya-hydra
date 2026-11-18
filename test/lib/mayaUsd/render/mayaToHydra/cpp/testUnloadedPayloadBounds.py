@@ -162,6 +162,38 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
             self.psPathStr + ",/CornerMarker",
             f="TestUsdPicking.pickPrimWithMarker")
 
+    def test_WireframeColors(self):
+        prim = self.definePayloadPrim("/A", EXTENTS_HINT)
+        prim.Unload()
+        self.assertBoundsShown("/A")
+
+        # /B only serves to take the lead from /A, so that /A can be selected without
+        # being the lead object.
+        self.stage.DefinePrim("/B", "Xform")
+
+        pathA = self.psPathStr + ",/A"
+        pathB = self.psPathStr + ",/B"
+
+        # Nothing is selected.
+        cmds.select(clear=True)
+        self.assertImageClose("unloadedPayloadWireframe_unselected.png")
+
+        # /A is selected first, it should be the lead.
+        cmds.select(pathA, replace=True)
+        self.assertImageClose("unloadedPayloadWireframe_lead.png")
+
+        # /A remains selected, but is no longer the lead.
+        cmds.select(pathB, add=True)
+        self.assertImageClose("unloadedPayloadWireframe_active.png")
+
+        # /A remains selected, and takes the lead back.
+        cmds.select(pathB, deselect=True)
+        self.assertImageClose("unloadedPayloadWireframe_lead.png")
+
+        # Go back to nothing selected.
+        cmds.select(clear=True)
+        self.assertImageClose("unloadedPayloadWireframe_unselected.png")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
