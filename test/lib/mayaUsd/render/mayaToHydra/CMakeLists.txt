@@ -30,6 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py|disabledOn:HdFlash:HYDRA-2669 # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
     testRendererSwitching.py
+    testViewportRenderSettings.py
     testSelectPrimWithoutDataSource.py
     testSelectNonDagNodes.py
     testStageAddPrim.py
@@ -48,6 +49,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
+	testMaterialXLiveUpdates.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa|disabledOn:maya2027,osx:HYDRA-1727
     testLightingRenderDelegates.py|depOnPlugins:prman|disabledOn:osx:HYDRA-2209|disabledOn:HdFlash:HYDRA-2677|disabledOn:maya2026:HYDRA-2719,HYDRA-2209 # HYDRA-2209: re-enable on OSX | HYDRA-2677 : with HdFlash, Maya crash in IsStormRenderDelegate / FramePass::Initialize
@@ -73,7 +75,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testSceneModified.py
 	testIsolateSelectWithGeomSubset.py
     testMayaReference.py
-    testTexturedMode.py
+    testTexturedMode.py|disabledOn:maya2026,osx:HYDRA-2699 # HYDRA-2699 : occasional rendering artifacts on OSX build machines
     testSelectionColorPreferences.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testUsdDeleteCamera.py
     testUsdIncludedPurposes.py
@@ -240,6 +242,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0), on the stock render item path.
 set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
     testMayaComponentsPicking.py|disabledOn:osx:HYDRA-1882 # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
+    testUnneededHighlightWire.py # A render item override carrier's wire is always translated, then hidden
 )
 
 # Every interactive test runs in both selection highlighting modes: the primary
@@ -301,6 +304,9 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     # Mode-independent: nothing is selected, so there is no highlight to differ.
     testCulling.py
     testSmoothMaterials.py
+    # Mode-independent: it only reads a render setting, nothing is drawn selected.
+    testViewportRenderSettings.py
+    testUnneededHighlightWire.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to

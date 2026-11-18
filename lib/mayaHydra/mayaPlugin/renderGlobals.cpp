@@ -17,6 +17,7 @@
 #include "renderGlobals.h"
 
 #include "renderOverride.h"
+#include "renderSettingsUiConfig.h"
 
 #include <mayaHydraLib/tokens.h>
 
@@ -33,11 +34,16 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MGlobal.h>
 #include <maya/MPlug.h>
+#include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MStatus.h>
 
+#include <algorithm>
+#include <array>
 #include <functional>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
 
 // This file is where we build the UI and expose to MEL the global parameters from this plug-in and
 // the parameters from the chosen render delegate.
@@ -84,17 +90,68 @@ namespace {
 constexpr auto _renderOverride_PreAmble = R"mel(
 global proc mtohRenderOverride_ApplySetting(string $renderer, string $attr, string $node) {
     // This exists as a global function for the difference in how it is invoked from editorTemplate/AE or option-boxes
-    mayaHydra -r $renderer -updateRenderGlobals $attr;
-    refresh -f;
+    // -updateRenderGlobals queues the viewport refresh itself.
+    // The Attribute Editor also runs this when it builds a control, for every setting of every
+    // renderer. -updateRenderGlobals does nothing when the value is the one already in use.
+    // -userDefaults: an attribute this has to create starts from the user's setting.
+    mayaHydra -r $renderer -userDefaults -updateRenderGlobals $attr;
+}
+// Label column width of the option box being built. Each renderer's OptionBox proc sets it from
+// its longest label (see MtohRenderGlobals::BuildOptionsMenu) before building its controls.
+global int $gMtohRenderOverrideLabelWidth = 220;
+// Widen the label column of a control created by attrControlGrp so long labels are not clipped.
+// attrControlGrp returns a rowGroupLayout whose short name starts with the command that made it
+// (checkBoxGrp, attrFieldSliderGrp, attrEnumOptionMenuGrp, textFieldGrp, attrColorSliderGrp...).
+global proc mtohRenderOverride_FitLabel(string $ctrl) {
+    global int $gMtohRenderOverrideLabelWidth;
+    string $parts[];
+    tokenize $ctrl "|" $parts;
+    if (size($parts) == 0) {
+        return;
+    }
+    string $cmd = `match "^[A-Za-z]+" $parts[size($parts) - 1]`;
+    if ($cmd != "") {
+        catchQuiet(eval($cmd + " -e -columnWidth 1 " + $gMtohRenderOverrideLabelWidth + " \"" + $ctrl + "\""));
+    }
 }
 global proc mtohRenderOverride_AddAttribute(string $renderer, string $description, string $attr, string $label, int $fromAE) {
     string $command = "mtohRenderOverride_ApplySetting " + $renderer + " " + $attr;
     if (!$fromAE) {
         $command = $command + " defaultRenderGlobals";
-        attrControlGrp -label $label -attribute ("defaultRenderGlobals." + $attr) -changeCommand $command -annotation $description;
+        string $ctrl = `attrControlGrp -label $label -attribute ("defaultRenderGlobals." + $attr) -changeCommand $command -annotation $description`;
+        mtohRenderOverride_FitLabel($ctrl);
     } else {
         editorTemplate -label $label -adc $attr $command -annotation $description;
     }
+}
+// Collapsible category: a frameLayout in the option box, a layout in the Attribute Editor.
+global proc mtohRenderOverride_BeginGroup(string $label, int $collapse, int $fromAE) {
+    if (!$fromAE) {
+        frameLayout -label $label -collapsable true -collapse $collapse -marginWidth 4 -marginHeight 2;
+        columnLayout -adjustableColumn true;
+    } else {
+        editorTemplate -beginLayout $label -collapse $collapse;
+    }
+}
+global proc mtohRenderOverride_EndGroup(int $fromAE) {
+    if (!$fromAE) {
+        setParent ..;
+        setParent ..;
+    } else {
+        editorTemplate -endLayout;
+    }
+}
+
+// Settings shared by every render delegate (refine level, display purpose). Shown once in the Attribute Editor rather than under
+// each renderer, so the same attribute is not added to the editorTemplate several times. The
+// renderer "mayaHydra" addresses all renderers (see MtohViewCmd).
+global proc mtohRenderOverride_GlobalOptions(int $fromAE) {
+    mtohRenderOverride_BeginGroup("All renderers", 0, $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Subdivision refine level (mayaHydraRefinementLevel)", "mayaHydraRefinementLevel", "Refine level", $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Draw prims with the proxy purpose (mayaHydraProxyPurpose)", "mayaHydraProxyPurpose", "Proxy purpose", $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Draw prims with the render purpose (mayaHydraRenderPurpose)", "mayaHydraRenderPurpose", "Render purpose", $fromAE);
+        mtohRenderOverride_AddAttribute("mayaHydra", "Draw prims with the guide purpose (mayaHydraGuidePurpose)", "mayaHydraGuidePurpose", "Guide purpose", $fromAE);
+    mtohRenderOverride_EndGroup($fromAE);
 }
 
 global proc mtohRenderOverride_AEAttributesCallback(string $nodeName) {
@@ -103,19 +160,20 @@ global proc mtohRenderOverride_AEAttributesCallback(string $nodeName) {
     }
 
     editorTemplate -beginLayout "Hydra Settings" -collapse 1;
-        mtohRenderOverride_AddMTOHAttributes(1);
+        mtohRenderOverride_GlobalOptions(1);
         for ($renderer in `mayaHydra -lr`) {
             string $displayName = `mayaHydra -getRendererDisplayName -r $renderer`;
+            // A renderer's settings are only added to defaultRenderGlobals once it has drawn or
+            // its option box was opened: add them now, so the controls have attributes to show.
+            mayaHydra -createRenderGlobals -r $renderer -userDefaults;
             editorTemplate -beginLayout $displayName -collapse 1;
-                string $optionsCmd = "mtohRenderOverride_" + $renderer + "Options(1);";
+                string $optionsCmd = "{{overridePrefix}}" + $renderer + "Options(1);";
                 eval($optionsCmd);
             editorTemplate -endLayout;
         }
     editorTemplate -endLayout;
 }
 
-// Make our attributes look nice and get sent from the AttributeEditor
-callbacks -o mayaHydra -hook AETemplateCustomContent -addCallback mtohRenderOverride_AEAttributesCallback;
 )mel";
 
 constexpr auto _renderOverrideOptionBoxTemplate = R"mel(
@@ -130,18 +188,30 @@ global proc {{override}}OptionBox() {
     //
     mayaHydra -createRenderGlobals -r "{{hydraplugin}}" -userDefaults;
 
-    window -title "Maya to Hydra Settings" "{{override}}OptionsWindow";
-    scrollLayout;
+    // Sized to this renderer's longest label, computed when the plugin built this proc.
+    global int $gMtohRenderOverrideLabelWidth;
+    $gMtohRenderOverrideLabelWidth = {{labelWidth}};
+    window -title "Maya to Hydra settings" -widthHeight {{windowWidth}} 640 "{{override}}OptionsWindow";
+    scrollLayout -childResizable true;
+    columnLayout -adjustableColumn true;
+
+    // Settings shared by all renderers come first, as in the Attribute Editor.
+    mtohRenderOverride_GlobalOptions(0);
 
     frameLayout -label "{{hydraDisplayName}}" -collapsable true;
-    columnLayout;
+    columnLayout -adjustableColumn true;
     {{override}}Options(0);
     setParent ..;
     setParent ..;
 
     setParent ..;
+    setParent ..;
 
     showWindow $windowName;
+    // Maya restores a saved window size; widen it if the labels need more room than that.
+    if (`window -q -width $windowName` < {{windowWidth}}) {
+        window -e -width {{windowWidth}} $windowName;
+    }
 }
 )mel";
 
@@ -570,6 +640,30 @@ template <typename T> bool _SetColorOptionVar(const MString& attrName, const T& 
     return rval;
 }
 
+// The readers below take the value held in memory in "out" and replace it with the plug's.
+// MtohRenderGlobals::GlobalChanged() uses these two to tell whether the plug held a new value.
+
+// Set when a read replaces the value held in memory with a different one.
+bool _readChangedValue = false;
+// While set, a read that changes nothing does not store the user setting either.
+bool _storeOnlyChangedValues = false;
+
+bool _NoteRead(bool changed)
+{
+    _readChangedValue = _readChangedValue || changed;
+    return changed;
+}
+
+// The value a renderer setting holds in memory, or its default when it was never read.
+template <typename T, typename Settings>
+T _CurrentSetting(const Settings& settings, const TfToken& key, const VtValue& defaultValue)
+{
+    const auto it = settings.find(key);
+    return (it != settings.end() && it->second.template IsHolding<T>())
+        ? it->second.template UncheckedGet<T>()
+        : defaultValue.UncheckedGet<T>();
+}
+
 template <typename T>
 bool _GetAttribute(
     const MFnDependencyNode& node,
@@ -581,8 +675,10 @@ bool _GetAttribute(
     if (plug.isNull()) {
         return false;
     }
+    const T previous = out;
     _GetFromPlug<T>(plug, out);
-    if (storeUserSetting) {
+    const bool changed = _NoteRead(!(previous == out));
+    if (storeUserSetting && (changed || !_storeOnlyChangedValues)) {
         _SetOptionVar(attrName, out);
     }
     return true;
@@ -600,13 +696,16 @@ void _GetColorAttribute(
         return;
     }
 
+    const GfVec3f previous = out;
     out[0] = plug.child(0).asFloat();
     out[1] = plug.child(1).asFloat();
     out[2] = plug.child(2).asFloat();
     if (alphaOp) {
         // if alphaOp is provided, it is responsible for storing the settings
         alphaOp(out, storeUserSetting);
-    } else {
+    } else if (
+        const bool changed = _NoteRead(previous != out);
+        storeUserSetting && (changed || !_storeOnlyChangedValues)) {
         _SetColorOptionVar(attrName, out);
     }
 }
@@ -617,7 +716,7 @@ void _GetColorAttribute(
     GfVec4f&                 out,
     bool                     storeUserSetting)
 {
-    GfVec3f color3;
+    GfVec3f color3(out[0], out[1], out[2]);
     _GetColorAttribute(
         node, attrName, color3, storeUserSetting, [&](GfVec3f& color3, bool storeUserSetting) {
             const auto plugA = node.findPlug(_AlphaAttribute(attrName), true);
@@ -625,11 +724,13 @@ void _GetColorAttribute(
                 TF_WARN("[mayaHydra] No Alpha plug for GfVec4f");
                 return;
             }
+            const GfVec4f previous = out;
             out[0] = color3[0];
             out[1] = color3[1];
             out[2] = color3[2];
             out[3] = plugA.asFloat();
-            if (storeUserSetting) {
+            const bool changed = _NoteRead(previous != out);
+            if (storeUserSetting && (changed || !_storeOnlyChangedValues)) {
                 _SetColorOptionVar(attrName, out);
             }
         });
@@ -688,6 +789,35 @@ TfToken _MangleName(const TfToken& settingKey, const TfToken& rendererName = {})
     return _MangleString(settingKey, rendererName);
 }
 
+// Escape a string for use inside a double-quoted MEL string literal. Double quotes become single
+// quotes rather than \": attrControlGrp fails to create enum controls whose label holds a '"'.
+std::string _EscapeMel(const std::string& str)
+{
+    std::string out;
+    out.reserve(str.size());
+    for (const char c : str) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '"': out += '\''; break;
+        case '\n': out += "\\n"; break;
+        default: out += c;
+        }
+    }
+    return out;
+}
+
+std::string _QuoteMel(const std::string& str) { return "\"" + _EscapeMel(str) + "\""; }
+
+// The delegate's display name without trailing periods, or the setting id if it has none.
+std::string _DefaultSettingLabel(const HdRenderSettingDescriptor& desc)
+{
+    std::string label = desc.name;
+    while (!label.empty() && (label.back() == '.' || label.back() == ' ')) {
+        label.pop_back();
+    }
+    return label.empty() ? desc.key.GetString() : label;
+}
+
 } // namespace
 
 MtohRenderGlobals::MtohRenderGlobals() { }
@@ -734,17 +864,187 @@ bool MtohRenderGlobals::ApplySettings(
 
 void MtohRenderGlobals::OptionsPreamble()
 {
-    MStatus status = MGlobal::executeCommand(_renderOverride_PreAmble);
+    // The per-renderer Options procs are named after the render override, see BuildOptionsMenu.
+    const auto preamble = TfStringReplace(
+        _renderOverride_PreAmble, "{{overridePrefix}}", MayaHydra::MTOH_RENDER_OVERRIDE_PREFIX);
+    MStatus status = MGlobal::executeCommand(preamble.c_str());
     if (status) {
         return;
     }
-    TF_WARN("[mayaHydra] Error executing preamble:\n%s", _renderOverride_PreAmble);
+    TF_WARN("[mayaHydra] Error executing preamble:\n%s", preamble.c_str());
+}
+
+void MtohRenderGlobals::RegisterAttributeEditorCallback()
+{
+    // Not part of the preamble: the preamble runs once per process, but uninitializePlugin clears
+    // every mayaHydra callback, so the hook must be added again on each plugin load.
+    MGlobal::executeCommand(
+        "catchQuiet(`callbacks -o mayaHydra -hook AETemplateCustomContent -removeCallback "
+        "mtohRenderOverride_AEAttributesCallback`);\n"
+        "callbacks -o mayaHydra -hook AETemplateCustomContent -addCallback "
+        "mtohRenderOverride_AEAttributesCallback;");
 }
 
 void MtohRenderGlobals::BuildOptionsMenu(
     const MtohRendererDescription&       rendererDesc,
     const HdRenderSettingDescriptorList& rendererSettingDescriptors)
 {
+    // Every setting this renderer can show, in the delegate's order, then MayaHydra's own
+    // per-renderer attributes. The layout file (see renderSettingsUiConfig.h) only places and
+    // labels them: whether a setting exists is decided here.
+    struct UiEntry
+    {
+        TfToken     key;
+        std::string defaultLabel;
+        std::string delegateName; // The delegate's display name, empty for MayaHydra attributes.
+        std::string annotation;   // Fixed tooltip, used when delegateName is empty.
+        std::string attrName;
+    };
+    std::vector<UiEntry> entries;
+    for (const auto& desc : rendererSettingDescriptors) {
+        if (!_IsSupportedAttribute(desc.defaultValue)) {
+            continue;
+        }
+        entries.push_back({ desc.key,
+                            _DefaultSettingLabel(desc),
+                            desc.name,
+                            {},
+                            _MangleName(desc.key, rendererDesc.rendererName).GetString() });
+    }
+    const auto addMayaHydraAttr
+        = [&](const TfToken& attr, const char* label, const char* annotation) {
+              entries.push_back({ attr, label, {}, annotation, _MangleName(attr).GetString() });
+          };
+
+    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
+        addMayaHydraAttr(
+            MtohTokens->mtohMaximumShadowMapResolution,
+            "Max shadow map size",
+            "Maximum shadow map size");
+    }
+    // The renderers that support the outline (see MtohRenderOverride::_RendererSupportsOutline()).
+    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin
+        || rendererDesc.rendererName == MayaHydraRendererTokens->HdFlashRendererPlugin) {
+        // Dropdown: Outline Selection / Legacy Selection.
+        addMayaHydraAttr(
+            MtohTokens->mayaHydraSelectionHighlightMode,
+            "Selection highlight",
+            "Selection highlight mode (Outline or Legacy)");
+    }
+    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
+        // Checkbox, shown only where hover can work: it needs Qt for the cursor position
+        // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
+        // everywhere, so scenes saved on a capable build load on any build.
+#if defined(MAYAHYDRA_HAS_QT) && !defined(MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT)
+        addMayaHydraAttr(
+            MtohTokens->mayaHydraOutlineHoverHighlighting,
+            "Hover highlight (experimental)",
+            "Outline the object under the cursor. Requires the Outline selection highlight mode.");
+#endif
+    }
+    // Refine level and the display purpose attributes are shared by all renderers: see
+    // mtohRenderOverride_GlobalOptions in the preamble.
+
+    const auto renderer = _QuoteMel(rendererDesc.rendererName.GetString());
+
+    std::stringstream ss;
+    // The "All renderers" group shares the option box, so its labels count too.
+    size_t     longestLabel = std::string("Render purpose").size();
+    const auto emitEntry = [&](const UiEntry& entry, const std::string& labelOverride) {
+        const std::string& label = labelOverride.empty() ? entry.defaultLabel : labelOverride;
+        longestLabel = std::max(longestLabel, label.size());
+        // Tooltip: the delegate's full display name, then the setting id it maps to.
+        std::string annotation = !entry.annotation.empty() ? entry.annotation
+            : entry.delegateName.empty() || entry.delegateName == label
+            ? entry.key.GetString()
+            : entry.delegateName + " (" + entry.key.GetString() + ")";
+        ss << "\t\tmtohRenderOverride_AddAttribute(" << renderer << ',' << _QuoteMel(annotation)
+           << ',' << _QuoteMel(entry.attrName) << ',' << _QuoteMel(label) << ", $fromAE);\n";
+    };
+    const auto emitGroup = [&](const RenderSettingsUiCategory&                   category,
+                               const std::vector<std::pair<const UiEntry*, std::string>>& items) {
+        if (items.empty()) {
+            return;
+        }
+        ss << "\tmtohRenderOverride_BeginGroup(" << _QuoteMel(category.label) << ", "
+           << (category.collapsed ? 1 : 0) << ", $fromAE);\n";
+        for (const auto& item : items) {
+            emitEntry(*item.first, item.second);
+        }
+        ss << "\tmtohRenderOverride_EndGroup($fromAE);\n";
+    };
+
+    ss << "global proc " << rendererDesc.overrideName << "Options(int $fromAE) {\n";
+    if (const auto* layout = MtohGetRenderSettingsUiLayout(rendererDesc.rendererName)) {
+        std::unordered_map<TfToken, const UiEntry*, TfToken::HashFunctor> byKey;
+        for (const auto& entry : entries) {
+            byKey.emplace(entry.key, &entry);
+        }
+        // A key is shown once: the first category that lists it wins, hidden keys never show.
+        TfToken::Set placed = layout->hidden;
+
+        std::vector<std::vector<std::pair<const UiEntry*, std::string>>> groups(
+            layout->categories.size());
+        for (size_t i = 0; i < layout->categories.size(); ++i) {
+            for (const auto& setting : layout->categories[i].settings) {
+                // Keys this renderer does not report are skipped: one file can serve several
+                // delegate versions.
+                const auto it = byKey.find(setting.key);
+                if (it != byKey.end() && placed.insert(setting.key).second) {
+                    groups[i].emplace_back(it->second, setting.label);
+                }
+            }
+        }
+        // Settings no category lists go to the "other" group, in the delegate's order. If a
+        // category has the same id, they are appended to it rather than shown twice.
+        std::vector<std::pair<const UiEntry*, std::string>>* leftovers = nullptr;
+        for (size_t i = 0; i < layout->categories.size() && !leftovers; ++i) {
+            if (layout->categories[i].id == layout->other.id) {
+                leftovers = &groups[i];
+            }
+        }
+        std::vector<std::pair<const UiEntry*, std::string>> otherGroup;
+        if (!leftovers) {
+            leftovers = &otherGroup;
+        }
+        for (const auto& entry : entries) {
+            if (placed.insert(entry.key).second) {
+                leftovers->emplace_back(&entry, std::string());
+            }
+        }
+        for (size_t i = 0; i < layout->categories.size(); ++i) {
+            emitGroup(layout->categories[i], groups[i]);
+        }
+        emitGroup(layout->other, otherGroup);
+    } else {
+        // No layout file for this renderer: a flat list in the delegate's order.
+        for (const auto& entry : entries) {
+            emitEntry(entry, std::string());
+        }
+    }
+    ss << "}\n";
+
+    const auto optionsCommand = ss.str();
+    auto status = MGlobal::executeCommand(optionsCommand.c_str());
+    if (!status) {
+        TF_WARN(
+            "[mayaHydra] Error in render delegate options function: \n%s",
+            status.errorString().asChar());
+    }
+
+    // Size the option box's label column to the longest label: an estimate of the label font's
+    // average character width, kept within limits so one very long label does not make the window
+    // huge (the full text stays in the tooltip). The controls keep the width they had before.
+    constexpr int kPixelsPerChar = 7;
+    constexpr int kLabelPadding = 16;
+    constexpr int kMinLabelWidth = 150;
+    constexpr int kMaxLabelWidth = 400;
+    constexpr int kControlsWidth = 260;
+    const int     labelWidth = std::clamp(
+        static_cast<int>(longestLabel) * kPixelsPerChar + kLabelPadding,
+        kMinLabelWidth,
+        kMaxLabelWidth);
+
     auto optionBoxCommand = TfStringReplace(
         _renderOverrideOptionBoxTemplate, "{{override}}", rendererDesc.overrideName.GetText());
     optionBoxCommand
@@ -756,118 +1056,15 @@ void MtohRenderGlobals::BuildOptionsMenu(
         "{{hydraRenderDelegateName}}",
         rendererDesc.rendererName); // Is the name of the render delegate since we are displaying
                                     // its settings
+    optionBoxCommand
+        = TfStringReplace(optionBoxCommand, "{{labelWidth}}", std::to_string(labelWidth));
+    optionBoxCommand = TfStringReplace(
+        optionBoxCommand, "{{windowWidth}}", std::to_string(labelWidth + kControlsWidth));
 
-    auto status = MGlobal::executeCommand(optionBoxCommand.c_str());
+    status = MGlobal::executeCommand(optionBoxCommand.c_str());
     if (!status) {
         TF_WARN(
             "[mayaHydra] Error in render override option box command function: \n%s",
-            status.errorString().asChar());
-    }
-
-    auto quote = [&](std::string str, const char* strb = nullptr) -> std::string {
-        if (strb)
-            str += strb;
-        return "\"" + str + "\"";
-    };
-
-    std::stringstream ss;
-    ss << "global proc " << rendererDesc.overrideName << "Options(int $fromAE) {\n";
-    for (const auto& desc : rendererSettingDescriptors) {
-        if (!_IsSupportedAttribute(desc.defaultValue)) {
-            continue;
-        }
-
-        ss << "\tmtohRenderOverride_AddAttribute("
-           << quote(rendererDesc.rendererName.GetString()) // Renderer name
-           << ',' << quote(desc.name) << ','               // Description
-           << quote(_MangleName(desc.key, rendererDesc.rendererName).GetString())
-           << ','                       // Attribute name
-           << quote(desc.key.GetText()) // Label
-           << ", $fromAE);\n";
-    }
-    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Maximum shadow map size") << ',' // Description
-           << quote(_MangleName(MtohTokens->mtohMaximumShadowMapResolution).GetString())
-           << ','                                                         // Attribute name
-           << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
-           << ", $fromAE);\n";
-    }
-    // The renderers that support the outline (see MtohRenderOverride::_RendererSupportsOutline()).
-    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin
-        || rendererDesc.rendererName == MayaHydraRendererTokens->HdFlashRendererPlugin) {
-        // Dropdown: Outline Selection / Legacy Selection.
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
-           << quote(_MangleName(MtohTokens->mayaHydraSelectionHighlightMode).GetString())
-           << ','                                                          // Attribute name
-           << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
-           << ", $fromAE);\n";
-    }
-    if (rendererDesc.rendererName == MayaHydraRendererTokens->HdStormRendererPlugin) {
-        // Checkbox, shown only where hover can work: it needs Qt for the cursor position
-        // (MAYAHYDRA_HAS_QT) and the Outline mode. CreateAttributes() still creates the attribute
-        // everywhere, so scenes saved on a capable build load on any build.
-#if defined(MAYAHYDRA_HAS_QT) && !defined(MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT)
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Outline the object under the cursor. Requires the Outline selection "
-                           "highlight mode.")
-           << ','                                                             // Description
-           << quote(_MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting).GetString())
-           << ','                                                             // Attribute name
-           << quote(
-                  MtohTokens->mayaHydraOutlineHoverHighlighting.GetString(),
-                  " (Experimental)") // Label
-           << ", $fromAE);\n";
-#endif
-    }
-
-    {
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Refine level") << ',' // Description
-           << quote(_MangleName(MtohTokens->mayaHydraRefinementLevel).GetString())
-           << ','                                                         // Attribute name
-           << quote(MtohTokens->mayaHydraRefinementLevel.GetText()) // Label
-           << ", $fromAE);\n";
-    }
-
-    // Temp solution to store global settings for USD Purpose tags
-    {
-        ss << "\tframeLayout -label \"Display Purpose\" -collapsable true;";
-    }
-    {        
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Display Purpose") << ',' // Description
-           << quote(_MangleName(_tokens->mayaHydraProxyPurpose).GetString())
-           << ','                                                         // Attribute name
-           << quote("Proxy")                                              // Label
-           << ", $fromAE);\n";
-    }
-    {        
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Display Purpose") << ',' // Description
-           << quote(_MangleName(_tokens->mayaHydraRenderPurpose).GetString())
-           << ','                                                         // Attribute name
-           << quote("Render")                                             // Label
-           << ", $fromAE);\n";
-    }
-    {        
-        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
-           << ',' << quote("Display Purpose") << ',' // Description
-           << quote(_MangleName(_tokens->mayaHydraGuidePurpose).GetString())
-           << ','                                                         // Attribute name
-           << quote("Guide")                                              // Label
-           << ", $fromAE);\n";
-    }
-    ss << "setParent ..;";
-    ss << "setParent ..;";
-    ss << "}\n";
-
-    const auto optionsCommand = ss.str();
-    status = MGlobal::executeCommand(optionsCommand.c_str());
-    if (!status) {
-        TF_WARN(
-            "[mayaHydra] Error in render delegate options function: \n%s",
             status.errorString().asChar());
     }
 }
@@ -1197,11 +1394,24 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
     return mayaObject;
 }
 
-const MtohRenderGlobals&
-MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting)
+const MtohRenderGlobals& MtohRenderGlobals::GetInstance(
+    const GlobalParams& params,
+    bool                storeUserSetting,
+    bool                createAttributes)
 {
     static MtohRenderGlobals globals;
-    const auto               obj = CreateAttributes(params);
+    MObject                  obj;
+    if (createAttributes) {
+        obj = CreateAttributes(params);
+    } else {
+        MSelectionList slist;
+        slist.add(_tokens->defaultRenderGlobals.GetText());
+        if (slist.length() != 0) {
+            slist.getDependNode(0, obj);
+        }
+        // Only the settings found on the node are held from here on, see below.
+        globals._rendererSettings.clear();
+    }
     if (obj.isNull()) {
         return globals;
     }
@@ -1244,13 +1454,16 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             return globals;
         }
     }
+    // The attribute is 1024 times smaller than the parameter: read it in its own unit, so the
+    // reader compares like with like.
+    int textureMemoryPerTexture = globals.delegateParams.textureMemoryPerTexture / 1024;
     if (filter(_tokens->mtohTextureMemoryPerTexture)
         && _GetAttribute(
             node,
             filter.mayaString(),
-            globals.delegateParams.textureMemoryPerTexture,
+            textureMemoryPerTexture,
             storeUserSetting)) {
-        globals.delegateParams.textureMemoryPerTexture *= 1024;
+        globals.delegateParams.textureMemoryPerTexture = textureMemoryPerTexture * 1024;
         if (filter.attributeFilter()) {
             return globals;
         }
@@ -1290,11 +1503,10 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
         }
     }
     if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
-#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
-        TfToken mode("Legacy Selection");
-#else
-        TfToken mode("Outline Selection");
-#endif
+        // Start from the mode in use (its default follows
+        // MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT), so the reader sees whether it changed.
+        TfToken mode(
+            globals.outlineSelectionHighlight ? "Outline Selection" : "Legacy Selection");
         _GetAttribute(
             node,
             filter.mayaString(),
@@ -1363,45 +1575,56 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
                 continue;
             }
 
+            // Reading without creating: a setting the node does not have keeps no value.
+            if (!createAttributes && node.findPlug(filter.mayaString(), true).isNull()) {
+                continue;
+            }
+            // A setting with no value in memory was never read, so no renderer uses a value
+            // of it yet. Its first read is not a change, and is not stored as a user setting
+            // when a single attribute is reported.
+            const bool hadValue = settings.find(filter.attrName()) != settings.end();
+            const bool changedBefore = _readChangedValue;
+            const bool store = storeUserSetting && (hadValue || !_storeOnlyChangedValues);
+
             if (attr.defaultValue.IsHolding<bool>()) {
-                auto v = attr.defaultValue.UncheckedGet<bool>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<bool>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<int>()) {
-                auto v = attr.defaultValue.UncheckedGet<int>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<int>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<unsigned int>()) {
-                auto v = attr.defaultValue.UncheckedGet<unsigned int>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<unsigned int>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<float>()) {
-                auto v = attr.defaultValue.UncheckedGet<float>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<float>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<GfVec3f>()) {
-                auto v = attr.defaultValue.UncheckedGet<GfVec3f>();
-                _GetColorAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<GfVec3f>(settings, filter.attrName(), attr.defaultValue);
+                _GetColorAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<GfVec4f>()) {
-                auto v = attr.defaultValue.UncheckedGet<GfVec4f>();
-                _GetColorAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<GfVec4f>(settings, filter.attrName(), attr.defaultValue);
+                _GetColorAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<TfToken>()) {
-                auto v = attr.defaultValue.UncheckedGet<TfToken>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<TfToken>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<std::string>()) {
-                auto v = attr.defaultValue.UncheckedGet<std::string>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<std::string>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<TfEnum>()) {
-                auto v = attr.defaultValue.UncheckedGet<TfEnum>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<TfEnum>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<SdfAssetPath>()) {
-                auto v = attr.defaultValue.UncheckedGet<SdfAssetPath>();
-                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                auto v = _CurrentSetting<SdfAssetPath>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else {
                 assert(
@@ -1413,6 +1636,9 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
                     attr.key.GetText(),
                     rendererName.GetText());
             }
+            if (!hadValue) {
+                _readChangedValue = changedBefore;
+            }
             if (filter.attributeFilter()) {
                 break;
             }
@@ -1421,15 +1647,64 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
     return globals;
 }
 
+namespace {
+
+MCallbackIdArray _sceneCallbackIds;
+
+void _SceneChangedCallback(void*) { MtohRenderGlobals::SceneChanged(); }
+
+} // namespace
+
+void MtohRenderGlobals::SceneChanged()
+{
+    // The node now holds another scene's settings. Take them in without creating attributes
+    // (that would modify the scene) and without storing user settings (nothing was edited), so
+    // that GlobalChanged() compares the next edit with what this scene holds. A renderer applies
+    // its settings when it initializes, as before.
+    constexpr bool storeUserSetting = false;
+    constexpr bool createAttributes = false;
+    GetInstance(GlobalParams(), storeUserSetting, createAttributes);
+}
+
+void MtohRenderGlobals::RegisterSceneCallbacks()
+{
+    for (const auto message : { MSceneMessage::kAfterNew, MSceneMessage::kAfterOpen }) {
+        MStatus           status;
+        const MCallbackId id
+            = MSceneMessage::addCallback(message, _SceneChangedCallback, nullptr, &status);
+        if (status) {
+            _sceneCallbackIds.append(id);
+        }
+    }
+}
+
+void MtohRenderGlobals::DeregisterSceneCallbacks()
+{
+    MMessage::removeCallbacks(_sceneCallbackIds);
+    _sceneCallbackIds.clear();
+}
+
 const MtohRenderGlobals& MtohRenderGlobals::GetInstance(bool storeUserSetting)
 {
     return GetInstance(GlobalParams(), storeUserSetting);
 }
 
-const MtohRenderGlobals&
-MtohRenderGlobals::GlobalChanged(const GlobalParams& params, bool storeUserSetting)
+const MtohRenderGlobals& MtohRenderGlobals::GlobalChanged(
+    const GlobalParams& params,
+    bool                storeUserSetting,
+    bool*               valueChanged)
 {
-    return GetInstance(params, storeUserSetting);
+    // For a single attribute, an unchanged value is not stored as a user setting either: the
+    // Attribute Editor reports every attribute it shows, changed or not.
+    const bool singleAttribute = !(params.filterIsRenderer || params.filter.IsEmpty());
+    _readChangedValue = false;
+    _storeOnlyChangedValues = singleAttribute;
+    const MtohRenderGlobals& globals = GetInstance(params, storeUserSetting);
+    _storeOnlyChangedValues = false;
+    if (valueChanged) {
+        *valueChanged = _readChangedValue;
+    }
+    return globals;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
