@@ -28,6 +28,9 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    # Plugin object display filter backing the Show menu toggle, registered by MayaUsd.
+    PAYLOAD_BOUNDS_DISPLAY_FILTER = 'mayaUsdPayloadBoundsDisplayFilter'
+
     IMAGEDIFF_FAIL_THRESHOLD = 0.05
     IMAGEDIFF_FAIL_PERCENT = 0.5
 
@@ -102,6 +105,49 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         self.assertTrue(prim.IsLoaded())
         self.assertBoundsHidden("/A")
         self.assertImageClose("unloadedPayloadLoaded.png")
+
+    def test_ShowMenuToggle(self):
+        # The "USD Payload Bounding Boxes" toggle of the viewport Show menu is a plugin
+        # object display filter registered by MayaUsd, set per model panel.
+        panel = mayaUtils.activeModelPanel()
+        self.assertIsNotNone(panel)
+        filterName = self.PAYLOAD_BOUNDS_DISPLAY_FILTER
+
+        def setToggle(value):
+            cmds.modelEditor(panel, edit=True, pluginObjects=(filterName, value))
+
+        def getToggle():
+            return bool(cmds.modelEditor(panel, query=True, pluginObjects=filterName))
+
+        # Restore the original state so other tests are not affected.
+        self.addCleanup(setToggle, getToggle())
+        cmds.setFocus(panel)
+
+        prim = self.definePayloadPrim("/A", EXTENTS_HINT)
+        prim.Unload()
+        self.assertFalse(prim.IsLoaded())
+
+        # Toggle on: boxes shown.
+        setToggle(True)
+        self.assertTrue(getToggle())
+        self.assertTrue(prim.IsLoaded())
+        self.assertBoundsShown("/A")
+        self.assertImageClose("unloadedPayloadBoundingBox.png")
+
+        # Toggle off: boxes hidden, even though the payload is still unloaded. Nothing is
+        # drawn, as the payload has no geometry to show.
+        setToggle(False)
+        self.assertFalse(getToggle())
+        self.assertFalse(prim.IsLoaded())
+        self.assertBoundsHidden("/A")
+        self.assertImageClose("unloadedPayloadNoExtentsHint.png")
+
+        # Toggle back on: boxes shown again.
+        setToggle(True)
+        self.assertTrue(getToggle())
+        self.assertTrue(prim.IsLoaded())
+        self.assertBoundsShown("/A")
+        self.assertImageClose("unloadedPayloadBoundingBox.png")
 
     def test_PickBoundingBox(self):
         # The box is wireframe, so its center is empty. Click on a corner
