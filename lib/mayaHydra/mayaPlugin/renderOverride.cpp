@@ -486,9 +486,12 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
         std::filesystem::path resourcePath
             = pluginPath.parent_path().parent_path() / resourceSubPath;
         for (std::filesystem::path dir = pluginPath;
-             !std::filesystem::exists(resourcePath) && dir != dir.parent_path();
+             !std::filesystem::exists(resourcePath);
              dir = dir.parent_path()) {
             resourcePath = dir / resourceSubPath;
+            if (dir == dir.parent_path()) {
+                break;
+            }
         }
 
         // Without the resources, Viewport Toolbox features that load shaders (such as outline
