@@ -38,12 +38,7 @@
 #include <pxr/base/tf/stringUtils.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/array.h>
-#include <pxr/imaging/hd/renderIndex.h>
-#include <pxr/imaging/hd/renderSettings.h>
-#include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/utils.h>
 #include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usdRender/tokens.h>
 #include <pxr/usd/usdRender/pass.h>
 
 #include <algorithm>
@@ -338,59 +333,6 @@ SdfPath GetActiveRenderPassHydraPath()
         return {};
     }
     return hydraPath.empty() ? SdfPath() : hydraPath[0].primPath;
-}
-
-TfTokenVector GetRenderOutputsFromActiveRenderSettings(const HdRenderIndex* renderIndex)
-{
-    TfTokenVector renderOutputs;
-#if PXR_VERSION >= 2308
-    if (!renderIndex) {
-        return renderOutputs;
-    }
-
-    const HdSceneIndexBaseRefPtr terminalSceneIndex = renderIndex->GetTerminalSceneIndex();
-    SdfPath renderSettingsPath;
-    if (!HdUtils::HasActiveRenderSettingsPrim(terminalSceneIndex, &renderSettingsPath)) {
-        return renderOutputs;
-    }
-
-    HdBprim* const bprim
-        = renderIndex->GetBprim(HdPrimTypeTokens->renderSettings, renderSettingsPath);
-    const auto* renderSettings = dynamic_cast<const HdRenderSettings*>(bprim);
-    if (!renderSettings) {
-        return renderOutputs;
-    }
-
-    for (const auto& product : renderSettings->GetRenderProducts()) {
-        for (const auto& renderVar : product.renderVars) {
-            TfToken varName = renderVar.varPath.GetNameToken();
-            if (varName.IsEmpty() && !renderVar.sourceName.empty()) {
-                varName = TfToken(renderVar.sourceName);
-            }
-            if (renderVar.sourceType == UsdRenderTokens->lpe) {
-                const std::string lpeExpr = !renderVar.sourceName.empty()
-                    ? renderVar.sourceName
-                    : varName.GetString();
-                if (!lpeExpr.empty()) {
-                    varName = TfToken(std::string("lpe:") + lpeExpr);
-                }
-            } else if (!renderVar.sourceName.empty()) {
-                if (renderVar.sourceName == "Ci") {
-                    varName = HdAovTokens->color;
-                } else if (renderVar.sourceName == "z") {
-                    varName = HdAovTokens->depth;
-                }
-            }
-
-            if (!varName.IsEmpty()
-                && std::find(renderOutputs.begin(), renderOutputs.end(), varName)
-                    == renderOutputs.end()) {
-                renderOutputs.push_back(varName);
-            }
-        }
-    }
-#endif
-    return renderOutputs;
 }
 
 RenderTimes::RenderTimes(std::vector<TimeRange> timeRangesIn, float timeIncrIn)
