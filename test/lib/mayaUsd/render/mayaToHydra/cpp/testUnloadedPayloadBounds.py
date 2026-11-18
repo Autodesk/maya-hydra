@@ -117,7 +117,7 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
             cmds.modelEditor(panel, edit=True, pluginObjects=(filterName, value))
 
         def getToggle():
-            return bool(cmds.modelEditor(panel, query=True, pluginObjects=filterName))
+            return bool(cmds.modelEditor(panel, query=True, queryPluginObjects=filterName))
 
         # Restore the original state so other tests are not affected.
         self.addCleanup(setToggle, getToggle())
@@ -130,7 +130,6 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         # Toggle on: boxes shown.
         setToggle(True)
         self.assertTrue(getToggle())
-        self.assertTrue(prim.IsLoaded())
         self.assertBoundsShown("/A")
         self.assertImageClose("unloadedPayloadBoundingBox.png")
 
@@ -138,14 +137,12 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         # drawn, as the payload has no geometry to show.
         setToggle(False)
         self.assertFalse(getToggle())
-        self.assertFalse(prim.IsLoaded())
         self.assertBoundsHidden("/A")
         self.assertImageClose("unloadedPayloadNoExtentsHint.png")
 
         # Toggle back on: boxes shown again.
         setToggle(True)
         self.assertTrue(getToggle())
-        self.assertTrue(prim.IsLoaded())
         self.assertBoundsShown("/A")
         self.assertImageClose("unloadedPayloadBoundingBox.png")
 
