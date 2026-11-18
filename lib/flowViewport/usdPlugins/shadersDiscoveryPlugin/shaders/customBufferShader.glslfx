@@ -45,13 +45,11 @@ vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 vec4
 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
-    //The custom vertex buffer is supplied in the st primvar: x is the color intensity, y is the color channel index (0 = R, 1 = G, 2 = B)
-#ifdef HD_HAS_myCustomStream
-    vec2 customStream = HdGet_myCustomStream().xy;
+#ifdef HD_HAS_myCustomStreamB
+    vec4 customStream = HdGet_myCustomStreamB();
 #else
-    vec2 customStream = vec2(1.0, 1.0);//Not supplied by the geometry
+    vec4 customStream = vec4(0);
 #endif
 
-    vec4 outColor = vec4(customStream.y * 0.5, 0.0, customStream.x, 1.0);
-    return outColor;
+    return vec4(customStream.xyz * -0.5 + vec3(0.5), 1.0);
 }

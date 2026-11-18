@@ -42,7 +42,7 @@ const char* const kUnregisterFlag     = "-u";
 const char* const kUnregisterFlagLong = "-unregister";
 
 //Shader file name, without directory and extension, of the Maya GLSLShader "shader" attribute the callback is registered for.
-const char* const kGLSLShaderName = "vertexBufferGenerator";
+const char* const kGLSLShaderName = "myCustomShader";
 
 //Material creation callback registered in the flow viewport MaterialCreationInterface under kGLSLShaderName.
 //MayaHydra calls it for the Maya GLSLShader materials whose shader file name matches kGLSLShaderName,

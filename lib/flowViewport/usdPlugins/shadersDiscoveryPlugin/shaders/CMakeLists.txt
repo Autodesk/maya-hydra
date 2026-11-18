@@ -3,6 +3,7 @@ set(SHADERS_FILES
     customBasicLightingShader.glslfx
     customBufferShader.glslfx
 	shaderDefs.usda
+    myCustomShader.ogsfx
 )
 
 # -----------------------------------------------------------------------------
