@@ -111,7 +111,7 @@ UnloadedPayloadBoundsSceneIndex::UnloadedPayloadBoundsSceneIndex(
 
 HdSceneIndexPrim UnloadedPayloadBoundsSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    if (primPath.IsPrimPath() && primPath.GetNameToken() == _tokens->boundsPrimName) {
+    if (!_unloadedPrims.empty() && primPath.IsPrimPath() && primPath.GetNameToken() == _tokens->boundsPrimName) {
         const SdfPath unloadedPrimPath = primPath.GetParentPath();
         if (_HasBox(unloadedPrimPath)) {
             return { HdPrimTypeTokens->basisCurves,
@@ -126,6 +126,9 @@ HdSceneIndexPrim UnloadedPayloadBoundsSceneIndex::GetPrim(const SdfPath& primPat
 SdfPathVector UnloadedPayloadBoundsSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
     SdfPathVector childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    if (_unloadedPrims.empty()) {
+        return childPaths;
+    }
     if (_HasBox(primPath)) {
         childPaths.push_back(boxPath(primPath));
     }
