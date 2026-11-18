@@ -280,14 +280,16 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsRemoved(
 {
     // Removing an unloaded prim removes its box, which is its child, so only the bookkeeping
     // needs updating.
-    for (const auto& entry : entries) {
-        auto first = _unloadedPrims.lower_bound(entry.primPath);
-        auto last = first;
-        while (last != _unloadedPrims.end() && last->HasPrefix(entry.primPath)) {
-            _unloadedPrimsWithExtents.erase(*last);
-            ++last;
+    if (!_unloadedPrims.empty()) {
+        for (const auto& entry : entries) {
+            auto first = _unloadedPrims.lower_bound(entry.primPath);
+            auto last = first;
+            while (last != _unloadedPrims.end() && last->HasPrefix(entry.primPath)) {
+                _unloadedPrimsWithExtents.erase(*last);
+                ++last;
+            }
+            _unloadedPrims.erase(first, last);
         }
-        _unloadedPrims.erase(first, last);
     }
 
     if (_IsObserved()) {
