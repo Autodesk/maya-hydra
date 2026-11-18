@@ -311,15 +311,17 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);
     dataProducerSceneIndexData->SetDataProducerLastSceneIndexChain(registration->rootSceneIndex);
 
+    // Add the registration record before adding the scene index to the views, as the prims added
+    // to the views query the registry, e.g. Fvp::UnloadedPayloadBoundsSceneIndex calls
+    // MayHaveUnloadedPrims(), which would otherwise not find this stage on its initial load.
+    _registrations.insert({ registration->sceneIndexPathPrefix, registration });
+    _registrationsByObjectHandle.insert({ registration->dagNode, registration });
+
     //Add this chain scene index to the render index proxy from all views
     const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSceneIndexData);
     if (false == bRes){
         TF_CODING_ERROR("Fvp::DataProducerSceneIndexInterfaceImp::get().addDataProducerSceneIndex returned false !");
     }
-
-    // Add registration record if everything succeeded
-    _registrations.insert({ registration->sceneIndexPathPrefix, registration });
-    _registrationsByObjectHandle.insert({ registration->dagNode, registration });
 }
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeAddedCallback(MObject& dagNode, void* clientData)

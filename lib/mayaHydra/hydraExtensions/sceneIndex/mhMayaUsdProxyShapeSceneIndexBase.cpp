@@ -295,8 +295,9 @@ void MayaUsdProxyShapeSceneIndexBase::Populate()
         if (HasRootPrims(stage)) {
             ++_nbPopulateCalls;
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
-            _usdImagingStageSceneIndex->SetStage(stage);
+            // Set _stage before calling SetStage(), as the latter's PrimsAdded handlers call MayHaveUnloadedPrims().
             _stage = stage;
+            _usdImagingStageSceneIndex->SetStage(stage);
             // Set the initial time
             UpdateTime();
             _populated = true;
