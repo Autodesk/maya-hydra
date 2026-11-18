@@ -227,7 +227,8 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsAdded(
     const HdSceneIndexBase&                       sender,
     const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
-    HdSceneIndexObserver::AddedPrimEntries   added = entries;
+    // Box entries go in their own vectors, so the input entries are forwarded without a copy.
+    HdSceneIndexObserver::AddedPrimEntries   added;
     HdSceneIndexObserver::RemovedPrimEntries removed;
 
     for (const auto& entry : entries) {
@@ -250,10 +251,13 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsAdded(
     if (!_IsObserved()) {
         return;
     }
+    if (!added.empty()) {
+        _SendPrimsAdded(added);
+    }
     if (!removed.empty()) {
         _SendPrimsRemoved(removed);
     }
-    _SendPrimsAdded(added);
+    _SendPrimsAdded(entries);
 }
 
 void UnloadedPayloadBoundsSceneIndex::_PrimsRemoved(
@@ -291,7 +295,8 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsDirtied(
     static const HdDataSourceLocator& extentLocator = HdExtentSchema::GetDefaultLocator();
     static const HdDataSourceLocator& selectionsLocator = HdSelectionsSchema::GetDefaultLocator();
 
-    HdSceneIndexObserver::DirtiedPrimEntries dirtied = entries;
+    // Box entries go in their own vectors, so the input entries are forwarded without a copy.
+    HdSceneIndexObserver::DirtiedPrimEntries dirtied;
     HdSceneIndexObserver::AddedPrimEntries   added;
     HdSceneIndexObserver::RemovedPrimEntries removed;
 
@@ -334,10 +339,13 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsDirtied(
     if (!removed.empty()) {
         _SendPrimsRemoved(removed);
     }
+    _SendPrimsDirtied(entries);
     if (!added.empty()) {
         _SendPrimsAdded(added);
     }
-    _SendPrimsDirtied(dirtied);
+    if (!dirtied.empty()) {
+        _SendPrimsDirtied(dirtied);
+    }
 }
 
 } // namespace FVP_NS_DEF
