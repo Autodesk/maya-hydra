@@ -244,7 +244,8 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     };
     // Report unloaded prims, with their loading status, so that Fvp::UnloadedPayloadBoundsSceneIndex
     // can draw unloaded payloads as bounding boxes. Batch renders do not draw them, so don't need
-    // them.
+    // them. UsdImaging's built-in displayUnloadedPrimsWithBounds is not used, see
+    // fvpUnloadedPayloadBoundsSceneIndex.h as to why.
     if (_interactive) {
         static const HdContainerDataSourceHandle stageSceneIndexInputArgs
             = HdRetainedContainerDataSource::New(

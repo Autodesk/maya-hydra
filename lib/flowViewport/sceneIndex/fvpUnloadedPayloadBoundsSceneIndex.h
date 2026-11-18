@@ -45,6 +45,13 @@ typedef PXR_NS::TfRefPtr<const UnloadedPayloadBoundsSceneIndex> UnloadedPayloadB
 /// picking it picks the unloaded prim. It is drawn in the secondary graphics pass, in every display
 /// style, in the wireframe color of the unloaded prim, which follows the selection.
 ///
+/// UsdImaging's built-in displayUnloadedPrimsWithBounds is deliberately not used, because it:
+/// - has no selection color, so the box does not follow the selection;
+/// - cannot be toggled at run time, which the "USD Payload Bounding Boxes" Show-menu filter needs;
+/// - leaves a stale box behind when the payload is loaded, since USD 25.08.
+/// - the UsdImagingDrawModeSceneIndex strips the isLoaded data from the prim, making the drawn
+///   boxes impossible to differentiate from any other basisCurves.
+///
 /// The input transforms and visibilities must be flattened, and this scene index must come after
 /// the selection scene index, whose dirty notifications it relies on.
 class UnloadedPayloadBoundsSceneIndex

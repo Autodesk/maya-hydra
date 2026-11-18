@@ -2028,7 +2028,7 @@ MStatus MtohRenderOverride::Render(
             }
         }
 
-        if (_unloadedPayloadBoundsSceneIndex) {
+        if (_unloadedPayloadBoundsSceneIndex && framecontext) {
             _unloadedPayloadBoundsSceneIndex->SetEnabled(
                 unloadedPayloadBoundsDisplayed(*framecontext));
         }
