@@ -71,32 +71,33 @@ namespace FVP_NS_DEF {
 UnloadedPayloadBoundsSceneIndexRefPtr UnloadedPayloadBoundsSceneIndex::New(
     const HdSceneIndexBaseRefPtr&                   inputSceneIndex,
     const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
-    const SdfPathVector&                            excludedSceneRoots,
+    const MayHaveUnloadedPrimsFn&                   mayHaveUnloadedPrims,
     bool                                            enabled)
 {
     return TfCreateRefPtr(new UnloadedPayloadBoundsSceneIndex(
-        inputSceneIndex, wireframeColorInterface, excludedSceneRoots, enabled));
+        inputSceneIndex, wireframeColorInterface, mayHaveUnloadedPrims, enabled));
 }
 
 UnloadedPayloadBoundsSceneIndex::UnloadedPayloadBoundsSceneIndex(
     const HdSceneIndexBaseRefPtr&                   inputSceneIndex,
     const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
-    const SdfPathVector&                            excludedSceneRoots,
+    const MayHaveUnloadedPrimsFn&                   mayHaveUnloadedPrims,
     bool                                            enabled)
     : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
     , InputSceneIndexUtils(inputSceneIndex)
     , _wireframeColorInterface(wireframeColorInterface)
-    , _excludedSceneRoots(excludedSceneRoots)
+    , _mayHaveUnloadedPrims(mayHaveUnloadedPrims)
     , _enabled(enabled)
 {
     TF_AXIOM(_wireframeColorInterface);
+    TF_AXIOM(_mayHaveUnloadedPrims);
 
     // The input may already be populated, e.g. when the scene index chain is rebuilt,
     // so traverse the whole scene to initialize the sets to track unloaded prims.
     const HdSceneIndexPrimView view(inputSceneIndex);
     for (auto it = view.begin(); it != view.end(); ++it) {
         const SdfPath& primPath = *it;
-        if (_IsExcluded(primPath)) {
+        if (!_mayHaveUnloadedPrims(primPath)) {
             it.SkipDescendants();
             continue;
         }
@@ -175,22 +176,17 @@ void UnloadedPayloadBoundsSceneIndex::DirtyWireframeColors(const SdfPathVector& 
     }
 }
 
-bool UnloadedPayloadBoundsSceneIndex::_IsExcluded(const SdfPath& primPath) const
+void UnloadedPayloadBoundsSceneIndex::_StopTracking(const SdfPath& primPath)
 {
-    for (const SdfPath& root : _excludedSceneRoots) {
-        if (primPath.HasPrefix(root)) {
-            return true;
-        }
-    }
-    return false;
+    _unloadedPrims.erase(primPath);
+    _unloadedPrimsWithExtents.erase(primPath);
 }
 
 void UnloadedPayloadBoundsSceneIndex::_UpdateTracking(const SdfPath& primPath)
 {
     // Default assumption : most prims are not unloaded, so should not be tracked.
     // For the minority that are, we'll either add them, or at worst re-add them.
-    _unloadedPrims.erase(primPath);
-    _unloadedPrimsWithExtents.erase(primPath);
+    _StopTracking(primPath);
 
     if (!primPath.IsPrimPath()) {
         return;
@@ -234,7 +230,13 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsAdded(
     HdSceneIndexObserver::RemovedPrimEntries removed;
 
     for (const auto& entry : entries) {
-        if (_IsExcluded(entry.primPath)) {
+        if (!_mayHaveUnloadedPrims(entry.primPath)) {
+            if (_IsTracked(entry.primPath)) {
+                if (_HasBox(entry.primPath)) {
+                    removed.emplace_back(boxPath(entry.primPath));
+                }
+                _StopTracking(entry.primPath);
+            }
             continue;
         }
 

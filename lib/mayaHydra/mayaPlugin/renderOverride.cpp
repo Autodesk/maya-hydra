@@ -3361,12 +3361,16 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering = _bboxSceneIndex;
 
     // Bounding boxes of unloaded USD payloads. After the bounding box scene index, as they already
-    // are boxes. Maya native prims are never unloaded.
+    // are boxes. Only the USD stages that are not fully loaded can have unloaded prims.
+    const std::weak_ptr<MayaHydraSceneIndexRegistry> sceneIndexRegistry = _sceneIndexRegistry;
     _lastFilteringSceneIndexBeforeCustomFiltering = _unloadedPayloadBoundsSceneIndex
         = Fvp::UnloadedPayloadBoundsSceneIndex::New(
             _lastFilteringSceneIndexBeforeCustomFiltering,
             _wireframeColorInterfaceImp,
-            { MAYA_NATIVE_ROOT },
+            [sceneIndexRegistry](const SdfPath& primPath) {
+                const auto registry = sceneIndexRegistry.lock();
+                return registry && registry->MayHaveUnloadedPrims(primPath);
+            },
             unloadedPayloadBoundsDisplayed(drawContext));
 
     // Repr selector Scene Index

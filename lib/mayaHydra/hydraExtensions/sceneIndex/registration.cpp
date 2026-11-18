@@ -71,6 +71,12 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
         proxyShapeSceneIndex->UpdateTime();
     }
 
+    bool MayHaveUnloadedPrims() const override {
+        auto proxyShapeSceneIndex
+            = TfDynamic_cast<::MayaHydra::MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
+        return proxyShapeSceneIndex->MayHaveUnloadedPrims();
+    }
+
 #ifdef CODE_COVERAGE_WORKAROUND
     void Destroy() override {
         auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
@@ -147,6 +153,21 @@ const MayaHydraSceneIndexRegistry::Registrations&
 MayaHydraSceneIndexRegistry::GetRegistrations() const
 {
     return _registrations;
+}
+
+bool MayaHydraSceneIndexRegistry::MayHaveUnloadedPrims(const SdfPath& primPath) const
+{
+    for (const auto& reg : _registrations) {
+        const SdfPath& prefix = reg.first;
+        if (primPath.HasPrefix(prefix)) {
+            return reg.second->MayHaveUnloadedPrims();
+        }
+        // Ancestors of the scene index have its prims as descendants.
+        if (prefix.HasPrefix(primPath) && reg.second->MayHaveUnloadedPrims()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()

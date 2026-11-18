@@ -21,6 +21,7 @@
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
+#include <functional>
 #include <memory>
 #include <set>
 
@@ -53,13 +54,16 @@ class UnloadedPayloadBoundsSceneIndex
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
-    /// No box is created under \p excludedSceneRoots, which skips looking for unloaded prims in
-    /// subtrees known to have none.
+    /// Whether the prim at primPath, or any of its descendants, may be unloaded. It is called for
+    /// every added prim, so must be cheap, and must reflect the current state of the input, e.g.
+    /// a USD stage that is loaded with all its descendants has no unloaded prims.
+    using MayHaveUnloadedPrimsFn = std::function<bool(const PXR_NS::SdfPath& primPath)>;
+
     FVP_API
     static UnloadedPayloadBoundsSceneIndexRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&           inputSceneIndex,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
-        const PXR_NS::SdfPathVector&                    excludedSceneRoots,
+        const MayHaveUnloadedPrimsFn&                   mayHaveUnloadedPrims,
         bool                                            enabled);
 
     FVP_API
@@ -89,7 +93,7 @@ protected:
     UnloadedPayloadBoundsSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr&           inputSceneIndex,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
-        const PXR_NS::SdfPathVector&                    excludedSceneRoots,
+        const MayHaveUnloadedPrimsFn&                   mayHaveUnloadedPrims,
         bool                                            enabled);
 
     FVP_API
@@ -116,11 +120,11 @@ private:
     {
         return _enabled && _unloadedPrimsWithExtents.find(primPath) != _unloadedPrimsWithExtents.end();
     }
-    bool _IsExcluded(const PXR_NS::SdfPath& primPath) const;
 
     // Starts or stops tracking primPath, depending on whether it is the root of an unloaded
     // subtree.
     void _UpdateTracking(const PXR_NS::SdfPath& primPath);
+    void _StopTracking(const PXR_NS::SdfPath& primPath);
 
     // Appends a wireframe color dirty entry for each box at or under primPath.
     void _AddColorDirtiesUnder(
@@ -128,7 +132,7 @@ private:
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& inoutEntries) const;
 
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
-    const PXR_NS::SdfPathVector                    _excludedSceneRoots;
+    const MayHaveUnloadedPrimsFn                   _mayHaveUnloadedPrims;
     bool                                           _enabled;
 
     // Roots of unloaded subtrees, sorted so that the ones under a path are a contiguous range.
