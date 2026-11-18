@@ -18,7 +18,10 @@
 #
 import maya.cmds as cmds
 import fixturesUtils
+import mayaUtils
 import mtohUtils
+import platform
+import unittest
 from testUtils import PluginLoaded
 
 HD_ARNOLD = "HdArnoldRendererPlugin"
@@ -85,6 +88,8 @@ class TestArnoldCustomAttributesMayaNodes(mtohUtils.MayaHydraBaseTestCase):
             cmds.setAttr(self._areaLightShape + ".aiRoundness", 0.25)
         cmds.refresh()
 
+    @unittest.skipIf(platform.system() == "Darwin" and mayaUtils.mayaMajorVersion() > 2027,
+                     "Hangs until timeout on macOS on Maya > 2027.")
     def test_meshArnoldPrimvars(self):
         self._setArnoldRenderer()
         self._setupMesh()
