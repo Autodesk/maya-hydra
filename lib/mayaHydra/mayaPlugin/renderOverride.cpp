@@ -606,7 +606,11 @@ void MtohRenderOverride::UpdateRenderGlobals(
                 continue;
             }
 
-            // Will be applied in _InitHydraResources later anyway
+            // Will be applied in _InitHydraResources later anyway. A renderer not drawing in any
+            // viewport has no frame pass, so skip it rather than ask for one.
+            if (instance->_framePassesData.empty()) {
+                continue;
+            }
             if (auto* renderDelegate = instance->_GetRenderDelegate()) {
                 instance->_globals.ApplySettings(
                     renderDelegate,
