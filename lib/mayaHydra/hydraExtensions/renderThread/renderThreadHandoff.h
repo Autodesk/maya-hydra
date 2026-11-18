@@ -90,7 +90,7 @@ struct CompletedFrame
 
 #if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
     /// Set when the present bridge prepared this frame on the render thread
-    /// (Vulkan). The interop then owns the copy and its GPU ordering, so
+    /// (Vulkan, Metal). The interop then owns the copy and its ordering, so
     /// srcColor and srcDepth are the live AOV, kept only for diagnostics, and
     /// copyIndex is -1.
     pxr::HgiInteropFrame interopFrame;

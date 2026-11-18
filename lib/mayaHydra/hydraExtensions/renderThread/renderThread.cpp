@@ -16,6 +16,7 @@
 
 #include "renderThreadStats.h"
 
+#include <mayaHydraLib/debugCodes.h>
 #include <mayaHydraLib/pipelineTiming.h>
 #include <mayaHydraLib/profilingUtils.h>
 
@@ -29,12 +30,45 @@
 #include <pxr/imaging/hgiVulkan/blitCmds.h>
 #include <pxr/imaging/hgiVulkan/hgi.h>
 #endif
+
+#if defined(__APPLE__)
+// What @autoreleasepool compiles to, callable from C++.
+extern "C" void* objc_autoreleasePoolPush(void);
+extern "C" void  objc_autoreleasePoolPop(void* pool);
+#endif
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF
 {
 
 namespace {
+
+/// Drains, on scope exit, the Objective-C objects autoreleased on this thread
+/// in its scope. Metal autoreleases objects it hands out, and nothing else
+/// drains them on a thread without a run loop, so each would leak.
+class ScopedAutoreleasePool
+{
+public:
+#if defined(__APPLE__)
+    ScopedAutoreleasePool()
+        : _pool(objc_autoreleasePoolPush())
+    {
+    }
+    ~ScopedAutoreleasePool() { objc_autoreleasePoolPop(_pool); }
+#else
+    // User-provided, so a scoped instance is not reported as unused.
+    ScopedAutoreleasePool() { }
+#endif
+
+    ScopedAutoreleasePool(const ScopedAutoreleasePool&)            = delete;
+    ScopedAutoreleasePool& operator=(const ScopedAutoreleasePool&) = delete;
+
+#if defined(__APPLE__)
+private:
+    void* _pool;
+#endif
+};
 
 // The drain budgets trade the same way: long enough that a heavy frame always
 // lands, short enough that a wedged render thread costs a visible hitch rather
@@ -48,9 +82,9 @@ constexpr auto kDrainIdleBudget = std::chrono::milliseconds(250);
 constexpr auto kQuiescenceBudget = std::chrono::milliseconds(2000);
 
 // How long the main thread waits for the render thread to leave the render
-// index before warning that it is still waiting. Only a warning: the first
-// render of a scene can take seconds, and pushing into a render index that is
-// inside SyncAll is not a recoverable race.
+// index before counting the wait as slow. Never a timeout: the first render of
+// a scene can take seconds, and pushing into a render index that is inside
+// SyncAll is not a recoverable race.
 constexpr auto kIdleInterlockWarnAfter = std::chrono::milliseconds(500);
 
 // Diagnostic bypasses to attribute the cost of the interlock and the AOV copy
@@ -292,7 +326,10 @@ RenderThread::_ThreadLoop()
             // Wakes a SubmitRequest waiting for the pending slot to empty.
             _idleCv.notify_all();
 
-            _ExecuteRequest(request);
+            {
+                ScopedAutoreleasePool pool;
+                _ExecuteRequest(request);
+            }
 
             {
                 std::lock_guard<std::mutex> lock(_requestMutex);
@@ -306,6 +343,7 @@ RenderThread::_ThreadLoop()
     // framebuffers were created on this context, so they have to go before it
     // does. Clearing the handoff drops the last reference to any published
     // frame's fence, which is what deletes those sync objects here.
+    ScopedAutoreleasePool teardownPool;
     _handoff.Clear();
     _lastComposited = CompletedFrame{};
     _RecordRenderDone(nullptr);
@@ -326,8 +364,10 @@ RenderThread::_AcquireContextArena()
     {
         // Not an error: Vulkan and Metal have no arena concept, and a null Hgi
         // is the configuration a non-GPU test uses. The stat means "the render
-        // thread has what it needs to render off-thread", so Vulkan sets it.
-        if (_hgi && _hgi->GetAPIName() == HgiTokens->Vulkan)
+        // thread has what it needs to render off-thread", so both set it.
+        if (_hgi
+            && (_hgi->GetAPIName() == HgiTokens->Vulkan
+                || _hgi->GetAPIName() == HgiTokens->Metal))
         {
             RenderThreadStats::instance().SetContextArenaAcquired(true);
         }
@@ -443,6 +483,8 @@ CopyVulkanTexture(Hgi* hgi, const HgiTextureHandle& src, const HgiTextureHandle&
 
 // Hgi has no backend-neutral texture-to-texture GPU copy, so the copy branches
 // on the API. A backend that is neither GL nor Vulkan needs its own case here.
+// Metal has none: its frames are copied by the present bridge, and one the
+// bridge could not prepare is dropped here.
 bool
 CopyTexture(Hgi* hgi, const HgiTextureHandle& src, const HgiTextureHandle& dst)
 {
@@ -610,9 +652,9 @@ RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
     HgiTextureHandle publishDepth = result.srcDepth;
     int              publishCopyIndex = -1;
 
-    // Under Vulkan the present bridge's copy into GL-importable storage is the
-    // owned copy, with its own GPU ordering against the composite, so the
-    // copy pairs below are not used.
+    // Under Vulkan and Metal the present bridge's copy into GL-readable
+    // storage is the owned copy, with its own ordering against the
+    // composite, so the copy pairs below are not used.
     bool prepared = false;
 #if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
     HgiInteropFrame interopFrame;
@@ -876,25 +918,29 @@ RenderThread::WaitForIdle()
         return true;
     }
 
-    // Counted and reported, but still waited out: the push this guards would
-    // otherwise invalidate the render index during the render thread's SyncAll.
+    // Counted, but still waited out: the push this guards would otherwise
+    // invalidate the render index during the render thread's SyncAll. Reported
+    // only under a debug flag, because the first sync of every heavy scene
+    // gets here and is not a fault.
     RenderThreadStats::instance().RecordIdleWaitTimeout();
     const auto slowStart = std::chrono::steady_clock::now();
     lock.unlock();
-    TF_WARN("RenderThread::WaitForIdle: the render thread is still in the "
-            "render index after %lld ms; waiting for it to finish before "
-            "pushing scene state.",
-            static_cast<long long>(kIdleInterlockWarnAfter.count()));
+    TF_DEBUG(MAYAHYDRALIB_RENDER_THREAD)
+        .Msg("RenderThread::WaitForIdle: the render thread is still in the "
+             "render index after %lld ms; waiting for it to finish before "
+             "pushing scene state.\n",
+             static_cast<long long>(kIdleInterlockWarnAfter.count()));
     lock.lock();
     _idleCv.wait(lock, isIdle);
     lock.unlock();
 
-    TF_STATUS("RenderThread::WaitForIdle: the render thread went idle after a "
-              "further %lld ms.",
-              static_cast<long long>(
-                  std::chrono::duration_cast<std::chrono::milliseconds>(
-                      std::chrono::steady_clock::now() - slowStart)
-                      .count()));
+    TF_DEBUG(MAYAHYDRALIB_RENDER_THREAD)
+        .Msg("RenderThread::WaitForIdle: the render thread went idle after a "
+             "further %lld ms.\n",
+             static_cast<long long>(
+                 std::chrono::duration_cast<std::chrono::milliseconds>(
+                     std::chrono::steady_clock::now() - slowStart)
+                     .count()));
     return false;
 }
 

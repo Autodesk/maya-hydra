@@ -90,8 +90,8 @@ public:
         pxr::HgiTextureHandle const& srcDepth) = 0;
 
     /// Composite a frame returned by Prepare. Called on the main thread; the
-    /// interop orders the composite against the copy on the GPU, so there is
-    /// no fence to wait on first. \p hasDepth is for diagnostics only.
+    /// interop orders the composite against the copy, so there is no fence to
+    /// wait on first. \p hasDepth is for diagnostics only.
     virtual void CompositePrepared(
         pxr::HgiInteropFrame const& frame,
         bool                        hasDepth,
@@ -99,13 +99,18 @@ public:
         pxr::GfVec4i const&         dstRegion) = 0;
 #endif
 
-    /// Returns the API name of the source Hgi (e.g. "OpenGL", "Vulkan").
+    /// Returns the API name of the source Hgi (e.g. "OpenGL", "Vulkan", "Metal").
     virtual pxr::TfToken GetSourceApiName(pxr::Hgi* srcHgi) const = 0;
 };
 
 /// Factory: create the GL present bridge, which composites via
 /// HgiInterop::TransferToApp into Maya's FBO.
 MAYAHYDRALIB_API std::unique_ptr<RenderThreadPresentBridge> CreateGlPresentBridge();
+
+/// Whether the present bridge can copy Metal frames on the render thread. A
+/// Metal render thread requires it: compositing an unprepared Metal frame
+/// would read the live AOV and drive HgiMetal from the main thread.
+MAYAHYDRALIB_API bool CanPrepareMetalFrames();
 
 } // namespace MAYAHYDRA_NS_DEF
 

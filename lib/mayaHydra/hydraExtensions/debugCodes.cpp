@@ -24,6 +24,12 @@ TF_REGISTRY_FUNCTION(TfDebug)
 {
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         MAYAHYDRALIB_SCENE_INDEX, "Print info about the Maya Hydra scene index.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
+        MAYAHYDRALIB_RENDER_THREAD,
+        "Print when the main thread waits more than 500 ms for the render "
+        "thread to leave the render index, as the first sync of a heavy scene "
+        "does.");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

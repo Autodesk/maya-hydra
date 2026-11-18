@@ -2813,14 +2813,26 @@ void MtohRenderOverride::_InitHydraResources(
             // _InitHydraResources only runs from Render(), and a context captured
             // anywhere else would be null. The thread then takes ownership.
             //
-            // Vulkan submits to device queues rather than a current context, so it gets
-            // a null one and the thread skips MakeCurrent and the HgiGL arena. The thread
-            // also copies each frame into HgiInteropVulkan's storage through the present
-            // bridge, which orders the composite against that copy with semaphores.
-            const bool isVulkan = _hgi && _hgi->GetAPIName() == HgiTokens->Vulkan;
+            // Vulkan and Metal submit to command queues rather than a current context,
+            // so they get a null one and the thread skips MakeCurrent and the HgiGL
+            // arena. The thread also copies each frame into the interop's GL-readable
+            // storage through the present bridge, which orders the composite against
+            // that copy: with semaphores under Vulkan, with waits on the main thread
+            // under Metal.
+            const TfToken hgiApi = _hgi ? _hgi->GetAPIName() : TfToken();
+            const bool    isVulkan = hgiApi == HgiTokens->Vulkan;
+            const bool    isMetal = hgiApi == HgiTokens->Metal;
             std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadContext> context;
             bool contextReady = isVulkan;
-            if (!isVulkan) {
+            if (isMetal) {
+                // Without the interop's Metal copy every frame would be dropped, and
+                // HgiMetal, which is not thread-safe, would be driven from both threads.
+                contextReady = MAYAHYDRA_NS_DEF::CanPrepareMetalFrames();
+                if (!contextReady) {
+                    TF_WARN("MayaHydra: this USD's HgiInterop cannot prepare Metal frames "
+                            "on the render thread. Falling back to synchronous rendering.");
+                }
+            } else if (!isVulkan) {
                 context = MAYAHYDRA_NS_DEF::CreateGlRenderThreadContext();
                 if (context) {
                     contextReady
@@ -2830,6 +2842,9 @@ void MtohRenderOverride::_InitHydraResources(
                                 "render thread (%s). Falling back to synchronous rendering.",
                                 context->LastError().c_str());
                     }
+                } else {
+                    TF_WARN("MayaHydra: the render thread has no GL context implementation "
+                            "on this platform. Falling back to synchronous rendering.");
                 }
             }
 
@@ -2875,8 +2890,10 @@ void MtohRenderOverride::_InitHydraResources(
                 }
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
                 // Before the first scene push publishes anything. Storm on its own GL
-                // context cannot read VP2's buffers in place; Vulkan copies anyway.
-                MhExtGpuBufferBridge::SetConsumerOnSeparateContext(started && !isVulkan);
+                // context cannot read VP2's buffers in place; Vulkan copies anyway, and
+                // Metal does not share them.
+                MhExtGpuBufferBridge::SetConsumerOnSeparateContext(
+                    started && !isVulkan && !isMetal);
 #endif
             } else {
                 // Leaving _renderThreadStarted false keeps every overlap-gated site on

@@ -16,8 +16,8 @@
 #define MAYAHYDRA_RENDER_THREAD_FENCE_H
 
 // GPU fence on the AOV: the render thread signals after FramePass::Render, the
-// main thread waits before compositing. glFenceSync for GL, an Hgi timeline
-// semaphore for Vulkan.
+// main thread waits before compositing. glFenceSync for GL; a no-op for Vulkan
+// and Metal, whose interop orders the composite itself.
 //
 // GL sync objects are shared across a share group (confirmed on NVIDIA 591.86),
 // so either thread can wait on the other's fence. Used for read-after-write
@@ -40,7 +40,9 @@ namespace MAYAHYDRA_NS_DEF {
 ///
 /// For Vulkan the fence is a no-op: each HgiInteropVulkan slot's vkComplete and
 /// glComplete semaphores already order the composite after the copy and the
-/// next copy into that slot after the composite.
+/// next copy into that slot after the composite. Likewise for Metal, where
+/// HgiInteropMetal does both on the main thread: it waits for the copy to be
+/// scheduled before drawing, and for GL's fence before a slot is reused.
 class MAYAHYDRALIB_API RenderThreadFence
 {
 public:
@@ -49,7 +51,7 @@ public:
     /// the flush belongs here rather than in Wait(), because a fence cannot make
     /// progress until the context that created it has flushed.
     ///
-    /// \p hgi When Vulkan, the fence is a no-op. When GL or null, a GL sync
+    /// \p hgi When Vulkan or Metal, the fence is a no-op. When GL or null, a GL sync
     /// object is created. Never returns null: with no context current
     /// glFenceSync returns 0 and the fence comes back invalid instead.
     static std::shared_ptr<RenderThreadFence> CreateAndSignal(pxr::Hgi* hgi = nullptr);
@@ -60,7 +62,7 @@ public:
     RenderThreadFence& operator=(const RenderThreadFence&) = delete;
 
     /// True when Wait() can mean something: a real sync object exists, or this
-    /// is a Vulkan no-op fence.
+    /// is a Vulkan or Metal no-op fence.
     bool IsValid() const { return _isNoop || _glFence != nullptr; }
 
     /// Wait for this frame's GPU work to complete. Callable from any thread

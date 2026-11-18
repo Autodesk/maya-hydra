@@ -59,9 +59,10 @@ If the main thread composites again before a newer frame arrives, the same
 slot is drawn again.  If a newer frame has been prepared in the meantime, the
 newest frame is composited instead.
 
-A backend that is neither GL nor Vulkan warns and drops the frame rather than
-publishing a handle to the live AOV, which would be read while the next frame
-overwrites it.
+Metal frames are prepared the same way; see [Metal on the render
+thread](metalRenderThread.md).  For any other backend, the render thread warns
+and drops the frame rather than publishing a handle to the live AOV, which
+would be read while the next frame overwrites it.
 
 ## Build requirements
 

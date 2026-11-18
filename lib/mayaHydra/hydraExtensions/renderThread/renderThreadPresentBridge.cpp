@@ -42,9 +42,10 @@ namespace MAYAHYDRA_NS_DEF
 
 // Composites the latest completed AOV into Maya's GL framebuffer via
 // HgiInterop::TransferToApp, which dispatches on the source Hgi's API: GL
-// sources composite same-API, and Vulkan sources go through HgiInteropVulkan,
-// which owns the cross-API semaphore and GL_EXT_memory_object protocol itself.
-// Vulkan frames are prepared on the render thread and only composited here.
+// sources composite same-API, Vulkan sources go through HgiInteropVulkan,
+// which owns the cross-API semaphore and GL_EXT_memory_object protocol itself,
+// and Metal sources through HgiInteropMetal's shared IOSurfaces. Vulkan and
+// Metal frames are prepared on the render thread and only composited here.
 class GlPresentBridge : public RenderThreadPresentBridge
 {
 public:
@@ -85,11 +86,15 @@ public:
         HgiTextureHandle const& srcColor,
         HgiTextureHandle const& srcDepth) override
     {
-        // Only Vulkan: its copy into the interop's GL-importable storage is
-        // the render thread's copy of the AOV, and moving it here keeps the
-        // queue submission and any wait off Maya's thread. A GL source has
-        // nothing to prepare, and keeps the render thread's own copy pairs.
-        if (!srcHgi || !srcColor || srcHgi->GetAPIName() != HgiTokens->Vulkan)
+        // Only Vulkan and Metal: the copy into the interop's GL-readable
+        // storage is the render thread's copy of the AOV, and moving it here
+        // keeps the submission off Maya's thread. For Metal that also keeps
+        // HgiMetal, which is not thread-safe, on the render thread alone. A
+        // GL source has nothing to prepare, and keeps the render thread's own
+        // copy pairs.
+        if (!srcHgi || !srcColor
+            || (srcHgi->GetAPIName() != HgiTokens->Vulkan
+                && !(srcHgi->GetAPIName() == HgiTokens->Metal && CanPrepareMetalFrames())))
         {
             return {};
         }
@@ -150,6 +155,15 @@ private:
 std::unique_ptr<RenderThreadPresentBridge> CreateGlPresentBridge()
 {
     return std::make_unique<GlPresentBridge>();
+}
+
+bool CanPrepareMetalFrames()
+{
+#if defined(HGIINTEROP_HAS_METAL_PREPARE_TRANSFER)
+    return true;
+#else
+    return false;
+#endif
 }
 
 } // namespace MAYAHYDRA_NS_DEF

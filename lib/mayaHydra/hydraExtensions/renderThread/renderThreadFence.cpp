@@ -32,10 +32,12 @@ namespace MAYAHYDRA_NS_DEF
 RenderThreadFencePtr
 RenderThreadFence::CreateAndSignal(Hgi* hgi)
 {
-    // A GL sync object is neither needed nor possible under Vulkan: no GL
-    // context is current on the Vulkan render thread, and HgiInteropVulkan's
-    // semaphore protocol already provides the ordering.
-    if (hgi && hgi->GetAPIName() == HgiTokens->Vulkan)
+    // A GL sync object is neither needed nor possible under Vulkan or Metal:
+    // no GL context is current on their render thread, and the interop
+    // (HgiInteropVulkan's semaphores, HgiInteropMetal's waits on the main
+    // thread) already provides the ordering.
+    if (hgi
+        && (hgi->GetAPIName() == HgiTokens->Vulkan || hgi->GetAPIName() == HgiTokens->Metal))
     {
         return RenderThreadFencePtr(new RenderThreadFence(nullptr, /*isNoop=*/true));
     }
@@ -75,7 +77,7 @@ RenderThreadFence::~RenderThreadFence()
 bool
 RenderThreadFence::WaitOnGpu() const
 {
-    // Vulkan: HgiInteropVulkan's semaphores already establish the ordering.
+    // Vulkan and Metal: the interop already establishes the ordering.
     if (_isNoop)
     {
         return true;
@@ -95,7 +97,7 @@ RenderThreadFence::WaitOnGpu() const
 bool
 RenderThreadFence::Wait(uint64_t timeoutNanos) const
 {
-    // Vulkan: HgiInteropVulkan's semaphores already establish the ordering.
+    // Vulkan and Metal: the interop already establishes the ordering.
     if (_isNoop)
     {
         return true;

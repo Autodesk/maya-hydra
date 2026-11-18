@@ -41,6 +41,10 @@ arena per GL context, for the container resources that cannot be shared.
 If the context cannot be made current on the thread, `Start()` returns false,
 the thread is joined immediately, and drawing stays on the main thread.
 
+The GL render-thread context exists only on Windows.  Under an OpenGL Hgi on
+Linux or macOS the thread does not start, and a warning says so.  Vulkan and
+Metal need no context.
+
 ## Handing frames across
 
 Work crosses to the render thread as a request carrying the frame id, the
@@ -68,7 +72,9 @@ passes because compositing goes through `HgiInterop`, whose GL calls belong to
 whichever context the presenting thread owns.  Under Vulkan the render thread
 does the GL-free half, copying the frame into the interop's storage, and the
 main thread only composites it; see [Vulkan on the render
-thread](vulkanRenderThread.md).
+thread](vulkanRenderThread.md).  Metal does the same, through IOSurfaces
+rather than imported memory; see [Metal on the render
+thread](metalRenderThread.md).
 
 Colour and depth are both blitted, so Maya's own viewport overlays
 depth-compose against the composited scene.
@@ -100,8 +106,10 @@ registered plugins' `Update()` calls, `FlushPendingUpdates()` and
 
 The wait has no timeout.  The first render of a heavy scene can take seconds,
 and writing to the scene index during that `SyncAll` is not a race that can be
-reported and survived.  After 500 ms it warns that it is still waiting and
-counts the frame in `idleWaitTimeouts`, then keeps waiting.
+reported and survived.  After 500 ms it counts the frame in
+`idleWaitTimeouts` and keeps waiting.  The wait is reported only with
+`TF_DEBUG=MAYAHYDRALIB_RENDER_THREAD`, because the first sync of any heavy
+scene takes that long and is not a fault.
 
 Maya callbacks run outside `Render()`, so they must not write to the scene index
 either, yet adapters dirty, add and remove prims from their callbacks (transform,

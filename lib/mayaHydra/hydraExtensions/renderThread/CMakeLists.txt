@@ -31,6 +31,8 @@ target_link_libraries(${TARGET_NAME}
         # The Vulkan AOV copy reaches hgiVulkan directly; the USD_HAS_HGI_VULKAN
         # definition that compiles it in is set on this target by its parent.
         $<$<BOOL:${USD_HAS_HGI_VULKAN}>:hgiVulkan>
+        # The render thread's autorelease pools call the Objective-C runtime.
+        $<$<PLATFORM_ID:Darwin>:objc>
 )
 
 # -----------------------------------------------------------------------------
