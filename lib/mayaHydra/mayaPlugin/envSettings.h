@@ -25,10 +25,6 @@ namespace MAYAHYDRA_NS_DEF {
     /// Returns true when MAYAHYDRA_PIPELINE_OVERLAP is set, in which case the render
     /// override draws each frame on a render thread.
     bool usePipelineOverlap();
-
-    /// Returns false when MAYAHYDRA_RENDER_THREAD_CAPTURE is 0, in which case the render
-    /// thread reads the live scene.
-    bool useRenderThreadCapture();
     bool hdArnoldUseV2RenderSettings();
     bool secondaryGraphicsUseActiveRenderer();
     bool useRenderItemOverride();

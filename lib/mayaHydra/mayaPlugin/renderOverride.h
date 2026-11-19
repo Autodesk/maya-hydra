@@ -636,10 +636,8 @@ private:
     std::string _renderThreadPanel;
     uint64_t    _renderThreadFrameId = 0;
 
-    // A frame from Maya's time-change callback, applied by Render() past the interlock
-    // because the callback cannot write to the scene index.
-    double            _pendingFrame = 0.0;
-    std::atomic<bool> _hasPendingFrame { false };
+    // Set by Maya's time-change callback, so a scrub composites its own frame.
+    bool       _timeChangedSinceRender = false;
     bool       _hasDefaultLighting = false;
     bool       _currentlyTextured = false;
 

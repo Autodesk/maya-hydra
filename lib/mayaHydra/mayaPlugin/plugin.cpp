@@ -352,7 +352,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     // Likewise before any render index: a render index takes its scene index
     // plugins when it is created.
-    if (MayaHydra::usePipelineOverlap() && MayaHydra::useRenderThreadCapture()) {
+    if (MayaHydra::usePipelineOverlap()) {
         MayaHydra::RegisterRenderThreadCaptureSceneIndexPlugin();
     }
   

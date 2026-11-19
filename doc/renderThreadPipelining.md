@@ -116,17 +116,15 @@ reported and survived.  After 500 ms it counts the frame in
 `TF_DEBUG=MAYAHYDRALIB_RENDER_THREAD`, because the first sync of any heavy
 scene takes that long and is not a fault.
 
-Maya callbacks run outside `Render()`, so they must not write to the scene index
-either, yet adapters dirty, add and remove prims from their callbacks (transform,
-visibility and attribute changes, lights, custom DAG nodes).  `MayaHydraSceneIndex`
-therefore queues `AddPrims`, `RemovePrims` and `DirtyPrims` from submitting a
-frame until the next interlock (`SetRenderThreadBusy`): in call order, with
-repeated dirties of a prim merged into one entry.  The interlock applies the
-queue right after the wait.  Queued changes are not visible to queries on the
-scene index until then.
+Maya callbacks run outside `Render()`, yet adapters dirty, add and remove prims
+from their callbacks (transform, visibility and attribute changes, lights,
+custom DAG nodes), and Maya's time-change callback sets the frame in the scene
+globals.  Those notices reach the render index only through the render thread
+capture, which holds them while the render thread may be syncing (see below).
 
 Notices are not the only hazard: an adapter destroyed while the render thread
-reads its data sources is one too.  The node-removed callback dropping a deleted
+reads its data sources is one too, since the capture keeps some of them by
+reference.  The node-removed callback dropping a deleted
 shape's render item override carriers therefore keeps the carriers alive while
 the render thread runs (`MayaHydraSceneIndex::SetDeferCallbackRemovals`), and
 the next `UpdateRenderItems` drops them.
@@ -145,7 +143,7 @@ translators read whatever they wrap.  Done on the render thread, each of those
 reads races the main thread.
 
 `RenderThreadCaptureSceneIndex` closes that gap without touching the render
-delegate, so it works with any renderer.  MayaHydra registers it, only when the
+delegate, so it works with any renderer.  MayaHydra registers it, whenever the
 flag is on, as a scene index plugin for every renderer at insertion phase 5000.
 That puts it after Storm's and hdsi's plugins and custom node translators, and
 before the render delegate's own observers (Flash's is at 9999).  It is a
@@ -194,30 +192,8 @@ adapter serves, in each spelling it accepts (`MayaHydraLightAdapter::
 GetLightParamNames()`); a dome light's `textureFile`, for example, used to be
 served without being listed.
 
-Setting `MAYAHYDRA_RENDER_THREAD_CAPTURE=0` leaves the capture out, so the
-render thread reads the live scene as before.  It is meant for comparing the
-two.
-
-`MayaHydraSceneIndex`'s notice queue, the deferred callback removals and the
-deferred time changes predate the capture and remain for now.
-
-## Deferred time changes
-
-Maya's time-change callback fires from the event loop and can land while the
-render thread is inside `SyncAll`.  Setting the frame invalidates the scene
-index, which Hydra refuses during a sync.
-
-While the render thread is running, the callback therefore records the new
-frame time instead of applying it, and `Render()` applies it past the
-interlock.  The camera refresh travels with that deferred apply: cameras are
-re-evaluated and dirtied at the same point, because the callback returned
-without touching the scene index.  Cameras need this explicitly, since Maya's
-per-node world-matrix callbacks do not fire reliably under the Evaluation
-Manager during playback.
-
-When the render thread is not running, the callback applies the time and
-refreshes cameras immediately, so behaviour with the feature disabled is
-unchanged.
+The capture is what keeps Maya callbacks from invalidating the scene index
+during the render thread's sync, so overlap always runs with it.
 
 ## Priming, discarding and compositing
 

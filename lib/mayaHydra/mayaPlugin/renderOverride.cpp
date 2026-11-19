@@ -172,6 +172,7 @@
 #include <limits>
 #include <set>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <pxr/base/tf/getenv.h>
@@ -1462,24 +1463,10 @@ MStatus MtohRenderOverride::Render(
         _renderThread->WaitForIdle();
         // Applies what changed upstream while the last frame was rendering.
         _ReleaseRenderThreadCapture();
-        // Applies what Maya callbacks changed while the last frame was syncing.
-        if (_mayaHydraSceneIndex) {
-            _mayaHydraSceneIndex->SetRenderThreadBusy(false);
-        }
     }
 
-    // Maya's time-change callback only records the frame, since it can fire while the
-    // render thread is in SyncAll. Past the interlock, mutating the scene index is safe.
-    bool timeChangedWhileStopped = false;
-    if (_hasPendingFrame.exchange(false)) {
-        timeChangedWhileStopped = !MAnimControl::isPlaying();
-        _SetCurrentFrameInHydraGlobalSceneIndex(_pendingFrame);
-        // The camera refresh travels with the deferred apply: the callback returned
-        // without touching the scene index, so this is the first safe point for it.
-        if (_mayaHydraSceneIndex) {
-            _mayaHydraSceneIndex->RefreshCamerasOnTimeChange();
-        }
-    }
+    const bool timeChangedWhileStopped
+        = std::exchange(_timeChangedSinceRender, false) && !MAnimControl::isPlaying();
 
     if (clearedForModeSwitch) {
         // The rebuild dropped all VP2 render-item adapters, and Maya only re-sends changed render
@@ -1926,9 +1913,6 @@ MStatus MtohRenderOverride::Render(
                     = MAYAHYDRA_NS_DEF::RenderThreadFence::CreateAndSignal(_hgi.get());
             }
 #endif
-            if (_mayaHydraSceneIndex) {
-                _mayaHydraSceneIndex->SetRenderThreadBusy(true);
-            }
             // Last, so the copy includes everything the push and pass preparation did.
             _HoldRenderThreadCapture(true);
             _renderThread->SubmitRequest(std::move(request));
@@ -2956,7 +2940,6 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         _firstFramePrimed = false;
         _renderThreadPanel.clear();
         if (_mayaHydraSceneIndex) {
-            _mayaHydraSceneIndex->SetRenderThreadBusy(false);
             _mayaHydraSceneIndex->SetDeferCallbackRemovals(false);
         }
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
@@ -3747,17 +3730,9 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
     const MTime currentTime = MAnimControl::currentTime();
     const double currentFrame = currentTime.value();
 
-    // This callback can land while the render thread is inside SyncAll, and setting the
-    // frame invalidates the scene index, which Hydra refuses during SyncAll. Record it
-    // instead; Render() applies it past the interlock.
-    if (instance->_renderThreadStarted) {
-        instance->_pendingFrame = currentFrame;
-        instance->_hasPendingFrame.store(true);
-        return;
-    }
-
     // Update frame in Hydra scene globals scene index
     instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+    instance->_timeChangedSinceRender = true;
 
     // A delegate bound to a camera prim is driven by that prim, and Maya's world-matrix
     // callbacks don't fire reliably under the Evaluation Manager during playback.
