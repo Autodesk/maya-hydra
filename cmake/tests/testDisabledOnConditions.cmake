@@ -15,8 +15,8 @@
 #
 
 # Unit test for the disable tag semantics in cmake/testConditions.cmake: the
-# disabledOn: conditions, covering exact and ranged Maya version predicates,
-# platform and renderer facts, the conjunction of several conditions, and
+# disabledOn: conditions, covering exact and ranged Maya and USD version
+# predicates, platform and renderer facts, the conjunction of several conditions, and
 # rejection of conditions that could never hold; the tracking issues a
 # disabled: group must name; and the shape of both groups.
 
@@ -33,7 +33,8 @@ function(expect_disabled_on condition_list expected)
     mayaHydra_disabled_on_group_matches(_matches "${_conditions}")
     if(NOT _matches STREQUAL expected)
         message(FATAL_ERROR
-            "disabledOn:${condition_list} with Maya ${MAYA_APP_VERSION} on "
+            "disabledOn:${condition_list} with Maya ${MAYA_APP_VERSION}, USD "
+            "${PXR_VERSION} on "
             "${IS_MACOSX}/${IS_WINDOWS}/${IS_LINUX} under "
             "${MAYAHYDRA_TEST_RENDERER} expected ${expected}, got ${_matches}")
     endif()
@@ -48,6 +49,7 @@ function(expect_rejected call_line marker description)
         "cmake_minimum_required(VERSION 3.21)\n"
         "include(\"${_conditions_module}\")\n"
         "set(MAYA_APP_VERSION 2027)\n"
+        "set(PXR_VERSION 2611)\n"
         "set(IS_WINDOWS TRUE)\n"
         "set(MAYAHYDRA_TEST_RENDERER HdStorm)\n"
         "${call_line}\n")
@@ -136,6 +138,7 @@ function(expect_disabled_group_rejected group_values description)
 endfunction()
 
 set(MAYA_APP_VERSION 2027)
+set(PXR_VERSION 2611)
 set(IS_WINDOWS TRUE)
 set(MAYAHYDRA_TEST_RENDERER HdStorm)
 
@@ -185,7 +188,31 @@ expect_disabled_on(mayaGt2027 TRUE)
 expect_disabled_on(mayaGe2027 TRUE)
 expect_disabled_on(maya2027 FALSE)
 
+# USD versions are spelled as PXR_VERSION encodes them: 0.26.11 is 2611.
 set(MAYA_APP_VERSION 2027)
+expect_disabled_on(usd2611 TRUE)
+expect_disabled_on(usd2608 FALSE)
+expect_disabled_on(usdGe2611 TRUE)
+expect_disabled_on(usdGe2705 FALSE)
+expect_disabled_on(usdGt2608 TRUE)
+expect_disabled_on(usdGt2611 FALSE)
+expect_disabled_on(usdLe2611 TRUE)
+expect_disabled_on(usdLe2608 FALSE)
+expect_disabled_on(usdLt2705 TRUE)
+expect_disabled_on(usdLt2611 FALSE)
+
+expect_disabled_on(maya2027,usdGe2605 TRUE)
+expect_disabled_on(maya2026,usdGe2605 FALSE)
+expect_disabled_on(usdGe2611,win,HdStorm TRUE)
+expect_disabled_on(usdGe2611,win,HdFlash FALSE)
+expect_disabled_on_group(maya2027,usdLt2705 HYDRA-1940 TRUE)
+
+# As with Maya, a USD condition may name a release that does not exist yet.
+set(PXR_VERSION 9999)
+expect_disabled_on(usdGt2611 TRUE)
+expect_disabled_on(usd2611 FALSE)
+set(PXR_VERSION 2611)
+
 set(IS_WINDOWS FALSE)
 set(IS_MACOSX TRUE)
 expect_disabled_on(osx TRUE)
@@ -205,6 +232,11 @@ expect_disabled_on_rejected(macos)
 expect_disabled_on_rejected(HdArnold)
 expect_disabled_on_rejected(mtoa)        # plugins belong to depOnPlugins:
 expect_disabled_on_rejected(maya2027,osxx)
+expect_disabled_on_rejected(usd26)
+expect_disabled_on_rejected(usdGE2611)
+expect_disabled_on_rejected(usd0.26.11)
+expect_disabled_on_rejected(usdGe26110)
+expect_disabled_on_rejected(USD2611)
 
 # An empty group would vacuously hold and disable the test everywhere.
 expect_disabled_on_rejected("")
@@ -215,6 +247,13 @@ expect_rejected(
     "unset(MAYAHYDRA_TEST_RENDERER)\nmayaHydra_disabled_on_group_matches(_m \"win\")"
     "MAYAHYDRA_TEST_RENDERER is not set"
     "disabledOn: evaluated with no test renderer")
+
+# Likewise, evaluating USD conditions before USD is found must not silently
+# make every one of them false.
+expect_rejected(
+    "unset(PXR_VERSION)\nmayaHydra_disabled_on_group_matches(_m \"usdGe2611\")"
+    "PXR_VERSION is not set"
+    "disabledOn: evaluated with no USD version")
 
 # A disabled: group must name the work of re-enabling the test.
 expect_tracking_issues_accepted(HYDRA-1940)
