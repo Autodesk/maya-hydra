@@ -696,11 +696,27 @@ void MayaHydraSceneIndex::UpdateRenderItems(
                 }
             }
         }
+        // A candidate wire that VP2 does not draw is not needed either while no panel draws
+        // wireframes: in a shaded panel, that is the dormant wire of a shape that is not selected.
+        // Without this, a wire skipped while its shape was selected stops being a highlight on the
+        // deselection and is translated then, hidden: a new prim with the shape's full topology for
+        // every deselected shape. A delta that enables the wire later, e.g. templating the shape,
+        // carries MVS_changedVisibility, so the wire is reconsidered then.
+        //
+        // Drawn means the delta's visibility, which is what the adapter would use: VP2 keeps the
+        // dormant wire of a deselected shape enabled, but sends it as not visible in a shaded panel.
+        // MRenderItem::isEnabled() is only the fallback for a delta without visibility bits.
+        const bool vp2DrawsItem = (flags & MVS::MVS_changedVisibility)
+            ? (flags & MVS::MVS_visible) != 0
+            : ri.isEnabled();
+        const bool isUndrawnCandidateWire = classifyHighlightWire && isNewRenderitem && !customData
+            && !isHighlightWire && isSelectionHighlightWireName(riName.asChar()) && !vp2DrawsItem;
+
         // A carrier wire is always translated, then hidden through the adapter: its payload's
         // geometry arrives only with a delta, so one skipped here and translated later by the
         // reconsider pass would be created without points.
-        const bool neededByAnyPanel
-            = !isHighlightWire || options.anyViewportDrawsWireframes || customData != nullptr;
+        const bool neededByAnyPanel = (!isHighlightWire && !isUndrawnCandidateWire)
+            || options.anyViewportDrawsWireframes || customData != nullptr;
         const bool visibleInThisPanel = !isHighlightWire || options.viewportDrawsWireframes;
 
         // Storm still syncs invisible rprims, so skip translating an unneeded wire instead of
@@ -718,9 +734,9 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             _skippedHighlightWires.erase(fastId);
 
             // A new adapter must be fully initialized, whatever the delta carried. A previously
-            // skipped wire is first translated on a later delta (a deselection, or the reconsider
-            // pass), which may omit the matrix and effect bits; without them the wire would draw
-            // at the origin.
+            // skipped wire is first translated on a later delta (one that makes it needed, or the
+            // reconsider pass), which may omit the matrix and effect bits; without them the wire
+            // would draw at the origin.
             flags |= MDataServerOperation::MViewportScene::MVS_changedMatrix
                 | MDataServerOperation::MViewportScene::MVS_changedEffect;
 
@@ -1321,6 +1337,12 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
             if (dag.isInstanced() && dag.instanceNumber() > 0) {
                 continue;
             }
+            // Plugin shapes with a registered shape adapter (e.g. aiGaussianSplat) are translated
+            // by it.
+            // Built-in shapes must not get one here: their render items already represent them.
+            if (MNodeClass(dagNode.typeName()).pluginName().length() > 0 && CreateShapeAdapter(dag)) {
+                continue;
+            }
             CreateCustomAdapter(dag);
         }
         _customNodesToAdd.clear();
@@ -1833,8 +1855,8 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         return;
     }
 
-    if (useMeshAdapter()
-        && _RemoveAdapter<MayaHydraAdapter>(
+    // Without the mesh adapter, _shapeAdapters only holds plugin shape adapters (e.g. aiGaussianSplat).
+    if (_RemoveAdapter<MayaHydraAdapter>(
             id,
             [](MayaHydraAdapter* a) {
                 a->RemoveCallbacks();

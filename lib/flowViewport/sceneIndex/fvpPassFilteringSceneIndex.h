@@ -20,6 +20,7 @@
 #include "flowViewport/fvpFramePassData.h"
 
 #include <pxr/base/tf/token.h>
+#include <pxr/usd/sdf/pathTable.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexObserver.h>
 
@@ -109,7 +110,15 @@ protected:
     Fvp::FramePassConstDataPtr _framePassData;
 
 private:
-    PXR_NS::TfHashSet<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash> _filteredPrims;
+    void _SetFilteredOut(const PXR_NS::SdfPath& primPath, bool filteredOut);
+
+    // Maps a path to whether its prim is filtered out. SdfPathTable keeps hashed
+    // lookups while allowing whole subtrees to be erased on prim removal; entries
+    // for unfiltered paths (e.g. implicitly inserted ancestors) hold false.
+    PXR_NS::SdfPathTable<bool> _filteredPrims;
+
+    // All the containers below are ordered by SdfPath::operator<, so the
+    // descendants of a path form a contiguous range starting at that path.
 
     // Used to track the materials required by the prims that will actually be rendered in the pass 
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _primsToMaterialPaths;

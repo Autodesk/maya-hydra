@@ -58,6 +58,8 @@ struct MayaHydraSceneIndexRegistration
     MayaHydraInterpretRprimPath interpretRprimPathFn = nullptr;
 
     virtual void Update() = 0;
+    // Whether the scene index may have unloaded prims.
+    virtual bool MayHaveUnloadedPrims() const = 0;
 #ifdef CODE_COVERAGE_WORKAROUND
     virtual void Destroy() = 0;
 #endif
@@ -97,6 +99,11 @@ public:
 
     MAYAHYDRALIB_API
     const Registrations& GetRegistrations() const;
+
+    // Whether the prim at primPath, or any of its descendants, may be an unloaded prim of a
+    // registered scene index.
+    MAYAHYDRALIB_API
+    bool MayHaveUnloadedPrims(const SdfPath& primPath) const;
 
     // When in a MayaUsd proxy shape node, some stages become invalid, we need to apply the updates.
     // it's not automatic as we are called from a compute function of a node and we may have recursion which are not allowed

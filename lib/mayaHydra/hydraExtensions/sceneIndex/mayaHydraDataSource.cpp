@@ -215,6 +215,15 @@ MayaHydraDataSource::GetNames()
         result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
+#if PXR_VERSION >= 2605
+    // Not a gprim to HdPrimTypeIsGprim(), but drawn like one.
+    if (_type == HdPrimTypeTokens->particleField) {
+        result.push_back(HdVisibilitySchemaTokens->visibility);
+        result.push_back(HdXformSchemaTokens->xform);
+        result.push_back(HdPurposeSchemaTokens->purpose);
+    }
+#endif
+
     if (HdPrimTypeIsLight(_type)) {
         result.push_back(HdMaterialSchemaTokens->material);
         result.push_back(HdXformSchemaTokens->xform);
