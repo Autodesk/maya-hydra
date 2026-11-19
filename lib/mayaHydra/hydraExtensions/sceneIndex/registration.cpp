@@ -340,7 +340,7 @@ void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
     _RegisterDefaultRenderDescriptionNode();
 }
 
-void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
+bool MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
 {
     // Collected first: a rebuild modifies _registrations.
     std::vector<MObjectHandle> nodesToRebuild;
@@ -349,10 +349,16 @@ void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
         if (registration->pluginSceneIndex) {
             MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex
                 = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(registration->pluginSceneIndex);
-            if (proxyShapeSceneIndex && proxyShapeSceneIndex->NeedsRebuild()) {
-                nodesToRebuild.push_back(registration->dagNode);
-            } else if (proxyShapeSceneIndex && proxyShapeSceneIndex->HasPendingUpdates()) {
+            if (!proxyShapeSceneIndex) {
+                continue;
+            }
+            if (!proxyShapeSceneIndex->NeedsRebuild()
+                && proxyShapeSceneIndex->HasPendingUpdates()) {
                 proxyShapeSceneIndex->PopulateAndApplyPendingChanges();
+            }
+            // Checked after the populate, which can itself ask for a rebuild.
+            if (proxyShapeSceneIndex->NeedsRebuild()) {
+                nodesToRebuild.push_back(registration->dagNode);
             }
         }
     }
@@ -363,6 +369,7 @@ void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
             _RebuildSceneIndexForNode(dagNode);
         }
     }
+    return !nodesToRebuild.empty();
 }
 
 void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)

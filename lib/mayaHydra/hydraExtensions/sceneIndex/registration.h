@@ -100,8 +100,10 @@ public:
 
     // When in a MayaUsd proxy shape node, some stages become invalid, we need to apply the updates.
     // it's not automatic as we are called from a compute function of a node and we may have recursion which are not allowed
+    // Returns true if a proxy shape's scene index chain was replaced: the caller must then
+    // replace the Hydra selection, as its paths were mapped against the previous stage.
     MAYAHYDRALIB_API
-    void ApplyPendingUpdates();
+    bool ApplyPendingUpdates();
 
     MAYAHYDRALIB_API
     static PXR_NS::SdfPath GetUsdDefaultRenderDescriptionPathPrefix();

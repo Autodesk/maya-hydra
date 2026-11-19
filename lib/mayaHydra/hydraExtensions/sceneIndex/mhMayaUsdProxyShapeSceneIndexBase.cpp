@@ -300,11 +300,12 @@ void MayaUsdProxyShapeSceneIndexBase::_ObjectsChanged(
 
 void MayaUsdProxyShapeSceneIndexBase::PopulateAndApplyPendingChanges() 
 { 
+    Populate();
     if (_needsRebuild) {
-        // The replacement is built from the current stage, edits included.
+        // Populate() can set it too. The replacement is built from the current stage, edits
+        // included.
         return;
     }
-    Populate();
     _usdImagingStageSceneIndex->ApplyPendingUpdates();
 }
 
@@ -315,14 +316,14 @@ void MayaUsdProxyShapeSceneIndexBase::Populate()
     }
     if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
+        if (_rebuildOnStageChange && _populatedStage && _populatedStage != get_pointer(stage)) {
+            // A new stage after the first population, even an empty or null one: see
+            // SetRebuildOnStageChange().
+            _needsRebuild = true;
+            return;
+        }
         // Check whether the pseudo-root has children
         if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
-            if (_rebuildOnStageChange && _populatedStage
-                && _populatedStage != get_pointer(stage)) {
-                // A new stage after the first population: see SetRebuildOnStageChange().
-                _needsRebuild = true;
-                return;
-            }
             ++_nbPopulateCalls;
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
             _usdImagingStageSceneIndex->SetStage(stage);

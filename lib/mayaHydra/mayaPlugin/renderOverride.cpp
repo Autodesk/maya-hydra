@@ -1189,10 +1189,6 @@ MStatus MtohRenderOverride::Render(
             _mayaHydraSceneIndex->UpdateLightsShadowCollection();
         }
 
-        // Apply pending MayaUsd proxy shape updates before the data producer updates below: a
-        // rebuilt chain's new data producer starts at identity and visible.
-        _sceneIndexRegistry->ApplyPendingUpdates();
-
         // Update plugin data producers
         for (auto& viewportData : Fvp::RenderViewDataManager::Get().GetAllViewData()) {
             for (auto& dataProducer : viewportData.GetDataProducerSceneIndicesData()) {
@@ -1476,6 +1472,17 @@ MStatus MtohRenderOverride::Render(
                 // inputs here to push the lead color this frame.
                 _outlineInputsDirty = true;
             }
+        }
+    }
+
+    // Apply pending MayaUsd proxy shape updates before the data producer updates in renderFrame:
+    // a rebuilt chain's new data producer starts at identity and visible. A rebuilt chain also
+    // needs the selection replaced: until now the path mapper answered from the previous stage,
+    // so a selection made since the stage change holds wrong paths.
+    if (_sceneIndexRegistry && _sceneIndexRegistry->ApplyPendingUpdates() && _selectionSceneIndex) {
+        _needToReplaceSelection = true;
+        if (_leadObjectPathTracker) {
+            _leadObjectPathTracker->updatePrimSelections();
         }
     }
 
