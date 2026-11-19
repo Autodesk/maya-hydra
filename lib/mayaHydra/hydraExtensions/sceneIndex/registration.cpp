@@ -46,6 +46,7 @@
 #include <ufeExtensions/Global.h>
 
 #include <optional>
+#include <vector>
 
 namespace {
 
@@ -251,6 +252,10 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         MayaUsdProxyShapeSceneIndexBase::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
     registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
     registration->interpretRprimPathFn = &(MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
+    // Replace the chain when the stage changes after its population, rather than re-populate
+    // it in place (HYDRA-2582). The replacement is done by ApplyPendingUpdates(), which only the
+    // interactive render override calls.
+    mayaUsdProxyShapeSceneIndex->SetRebuildOnStageChange(_interactive);
     mayaUsdProxyShapeSceneIndex->Populate();
 
     // This sets the required prefix just downstream (after) the
@@ -337,16 +342,48 @@ void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
 
 void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
 {
+    // Collected first: a rebuild modifies _registrations.
+    std::vector<MObjectHandle> nodesToRebuild;
     for (auto& reg : _registrations) {
         auto& registration = reg.second;
         if (registration->pluginSceneIndex) {
             MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex
                 = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(registration->pluginSceneIndex);
-            if (proxyShapeSceneIndex && proxyShapeSceneIndex->HasPendingUpdates()) {
+            if (proxyShapeSceneIndex && proxyShapeSceneIndex->NeedsRebuild()) {
+                nodesToRebuild.push_back(registration->dagNode);
+            } else if (proxyShapeSceneIndex && proxyShapeSceneIndex->HasPendingUpdates()) {
                 proxyShapeSceneIndex->PopulateAndApplyPendingChanges();
             }
         }
     }
+
+    for (const auto& nodeHandle : nodesToRebuild) {
+        if (nodeHandle.isValid()) {
+            MObject dagNode = nodeHandle.object();
+            _RebuildSceneIndexForNode(dagNode);
+        }
+    }
+}
+
+void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
+{
+    auto it = _registrationsByObjectHandle.find(MObjectHandle(dagNode));
+    if (it == _registrationsByObjectHandle.end()) {
+        return;
+    }
+
+    // Release the old scene index's path mapper and pick handler now: the new one registers its
+    // own for the same paths, and the old one may stay alive after its removal.
+    MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex
+        = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(it->second->pluginSceneIndex);
+    if (oldProxyShapeSceneIndex) {
+        oldProxyShapeSceneIndex->Detach();
+    }
+
+    // Removing the chain removes its prims from Hydra while it still holds the previous
+    // stage; the new chain is then populated once, from the current stage.
+    _RemoveSceneIndexForNode(dagNode);
+    _AddSceneIndexForNode(dagNode);
 }
 
 SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderDescriptionPathPrefix;

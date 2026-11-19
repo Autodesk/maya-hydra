@@ -55,8 +55,11 @@ void MayaUsdProxyShapeSceneIndex::_Destroy()
 
 void MayaUsdProxyShapeSceneIndex::_DestroyDerived()
 {
+    // Called by Detach() and again by the destructor: unregister once only, since the scene
+    // index that replaces this one registers a pick handler for the same prefix.
     if (_unregisterPickHandler) {
         TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_sceneIndexPathPrefix));
+        _unregisterPickHandler = false;
     }
 }
 

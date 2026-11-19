@@ -90,9 +90,28 @@ public:
 
     // When we receive a stage invalidate we remove the stage and set populate to false
     // We need to re-populate to see the changes
-    //HasPendingUpdates() is true when this is the case
+    //HasPendingUpdates() is true when this is the case, or when NeedsRebuild() is true.
     bool HasPendingUpdates() const;
     void PopulateAndApplyPendingChanges();
+
+    // With rebuild on stage change enabled, a stage invalidate or a new stage received after
+    // the stage scene index was populated does not call SetStage() on it again. Instead,
+    // NeedsRebuild() becomes true and the owner must replace this scene index and its UsdImaging
+    // chain by new ones built from the current stage (MayaHydraSceneIndexRegistry does it in
+    // ApplyPendingUpdates()). SetStage() on a populated UsdImagingStageSceneIndex sends "removed
+    // </>" while it still returns the prims of the previous stage, and the merging scene indices
+    // of the native instancing scene indices then re-add them: they are never removed, which
+    // shows up as extra instances and broken picking (OpenUSD #3967, HYDRA-2582).
+    void SetRebuildOnStageChange(bool rebuildOnStageChange)
+    {
+        _rebuildOnStageChange = rebuildOnStageChange;
+    }
+    bool NeedsRebuild() const { return _needsRebuild; }
+
+    // Releases the registrations made by this scene index (path mapper, pick handler) and stops
+    // observing the stage notices, so that a replacement scene index can register its own,
+    // even if this one outlives its removal from Hydra. Can be called more than once.
+    void Detach() { _Destroy(); }
 
     void Populate();
     void UpdateTime();
@@ -136,6 +155,12 @@ private:
     UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
     MAYAUSDAPI_NS::ProxyStage       _proxyStage;
     std::atomic<bool>               _populated { false };
+    // The stage given to _usdImagingStageSceneIndex, which keeps it alive; null if none (the
+    // scene index then returns no prims, and SetStage() sends no removal). Only compared.
+    const UsdStage*                 _populatedStage{nullptr};
+    bool                            _rebuildOnStageChange{false};
+    std::atomic<bool>               _needsRebuild { false };
+    bool                            _destroyed{false};
     MObjectHandle                   _dagNodeHandle;
     Ufe::Path                       _sceneIndexAppPath;
     const Fvp::PathMapperConstPtr   _usdPathMapper{};
@@ -144,7 +169,8 @@ private:
     TfNotice::Key                   _stageSetNoticeKey;
     TfNotice::Key                   _stageInvalidateNoticeKey;
     TfNotice::Key                   _objectsChangedNoticeKey;
-    long int                        _nbPopulateCalls{0};
+    // For all instances: a rebuilt scene index continues the count of the one it replaces.
+    static long int                 _nbPopulateCalls;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

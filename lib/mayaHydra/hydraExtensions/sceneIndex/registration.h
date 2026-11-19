@@ -110,6 +110,9 @@ private:
     void
     _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
+    // Replaces the scene index chain of a proxy shape node by a new one built from its current
+    // stage (see MayaUsdProxyShapeSceneIndexBase::NeedsRebuild()).
+    void        _RebuildSceneIndexForNode(MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);
     static void _AfterOpenCallback (void *clientData);
