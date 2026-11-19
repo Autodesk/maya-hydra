@@ -256,6 +256,7 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
 
     _usdImagingStageSceneIndex->SetStage(nullptr);
     _stage = nullptr;
+    _InvalidateMayHaveUnloadedPrims();
     _populated = false;
     // Simply mark populate as dirty and do not call
     // Populate();
@@ -297,6 +298,7 @@ void MayaUsdProxyShapeSceneIndexBase::Populate()
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
             // Set _stage before calling SetStage(), as the latter's PrimsAdded handlers call MayHaveUnloadedPrims().
             _stage = stage;
+            _InvalidateMayHaveUnloadedPrims();
             _usdImagingStageSceneIndex->SetStage(stage);
             // Set the initial time
             UpdateTime();
@@ -318,8 +320,14 @@ bool MayaUsdProxyShapeSceneIndexBase::MayHaveUnloadedPrims() const
 {
     // UsdPrim::IsLoaded follows the load rules, so a stage whose rules load the pseudo-root with
     // all its descendants has no unloaded prims.
-    return _stage
-        && !_stage->GetLoadRules().IsLoadedWithAllDescendants(SdfPath::AbsoluteRootPath());
+    if (!_stage) {
+        return false;
+    }
+    if (!_mayHaveUnloadedPrimsCache.has_value()) {
+        _mayHaveUnloadedPrimsCache
+            = !_stage->GetLoadRules().IsLoadedWithAllDescendants(SdfPath::AbsoluteRootPath());
+    }
+    return _mayHaveUnloadedPrimsCache.value();
 }
 
 Ufe::Path MayaUsdProxyShapeSceneIndexBase::InterpretRprimPath(

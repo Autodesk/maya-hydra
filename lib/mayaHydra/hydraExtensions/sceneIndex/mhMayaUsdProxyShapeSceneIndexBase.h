@@ -41,6 +41,7 @@
 #include <ufe/path.h>
 
 #include <memory>
+#include <optional>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -107,9 +108,12 @@ public:
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const HdSceneIndexBase& sender, const HdSceneIndexObserver::AddedPrimEntries& entries) override{
+        // Loading or unloading payloads resyncs prims, so this is where the load rules may change.
+        _InvalidateMayHaveUnloadedPrims();
         _SendPrimsAdded(entries);
     }
     void _PrimsRemoved(const HdSceneIndexBase& sender, const HdSceneIndexObserver::RemovedPrimEntries& entries)override{
+        _InvalidateMayHaveUnloadedPrims();
         _SendPrimsRemoved(entries);
     }
     void _PrimsDirtied(const HdSceneIndexBase& sender, const HdSceneIndexObserver::DirtiedPrimEntries& entries)override{
@@ -143,6 +147,9 @@ private:
     UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
     // The stage set on _usdImagingStageSceneIndex, which does not give access to it.
     UsdStageRefPtr                  _stage;
+    // Querying the load rules can walk all of them, so the answer is cached until the imaged prims change.
+    void _InvalidateMayHaveUnloadedPrims() { _mayHaveUnloadedPrimsCache.reset(); }
+    mutable std::optional<bool>     _mayHaveUnloadedPrimsCache;
     MAYAUSDAPI_NS::ProxyStage       _proxyStage;
     std::atomic<bool>               _populated { false };
     MObjectHandle                   _dagNodeHandle;
