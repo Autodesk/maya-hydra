@@ -719,6 +719,8 @@ MStatus MhCustomShaders::initialize()
 
 MStatus registerCustomMaterialCallbackCmd(MFnPlugin& plugin);
 MStatus deregisterCustomMaterialCallbackCmd(MFnPlugin& plugin);
+MStatus registerCustomVertexBufferGenerator();
+MStatus deregisterCustomVertexBufferGenerator();
 
 MStatus initializePlugin( MObject obj )
 {
@@ -743,6 +745,12 @@ MStatus initializePlugin( MObject obj )
         return status;
     }
 
+    status = registerCustomVertexBufferGenerator();
+    if (!status) {
+        status.perror("registerVertexBufferGenerator");
+        return status;
+    }
+
     return status;
 }
 
@@ -750,6 +758,12 @@ MStatus uninitializePlugin( MObject obj)
 {
     MStatus   status;
     MFnPlugin plugin( obj );
+
+    status = deregisterCustomVertexBufferGenerator();
+    if (!status) {
+        status.perror("deregisterVertexBufferGenerator");
+        return status;
+    }
 
     status = deregisterCustomMaterialCallbackCmd(plugin);
     if (!status) {

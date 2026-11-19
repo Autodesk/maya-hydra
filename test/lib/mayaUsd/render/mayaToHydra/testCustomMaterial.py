@@ -24,7 +24,7 @@ class TestCustomMaterial(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    _requiredPlugins = ['glslShader', 'vertexBufferGenerator', 'mayaHydraCustomShadersNode']
+    _requiredPlugins = ['glslShader', 'mayaHydraCustomShadersNode']
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     # macOS GPUs can produce marginally more pixel variance than other platforms
@@ -55,7 +55,8 @@ class TestCustomMaterial(mtohUtils.MayaHydraBaseTestCase):
             cmds.connectAttr(shader + ".outColor", sg + ".surfaceShader")
             cmds.sets(sphere, edit=True, forceElement=sg)
             # myCustomShader.ogsfx maps TEXCOORD0 to the custom semantic "myCustomStreamB",
-            # so VP2 asks the vertexBufferGenerator plugin to fill that custom vertex buffer.
+            # so VP2 asks the vertex buffer generator registered by the mayaHydraCustomShadersNode
+            # plugin to fill that custom vertex buffer.
             # MayaHydra passes it to Hydra as the "myCustomStreamB" primvar, which the
             # FVP_CustomBufferShader replacement reads to compute the sphere color.
             cmds.setAttr(shader + ".shader", shaderPath, type="string")
