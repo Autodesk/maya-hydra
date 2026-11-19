@@ -135,7 +135,7 @@ computeCameraPrimProjection(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfP
 //   targetShiftX = (baseShiftX * dispW + w * 2 * offsetX) / dataW
 //   targetShiftY = (baseShiftY * dispH - w * 2 * offsetY) / dataH
 //
-// The inverse equations (w = +-1, so 1 / w = w):
+// The inverse equations:
 //   dispW = dataW * targetScaleX / baseScaleX
 //   dispH = dataH * targetScaleY / baseScaleY
 //   offsetX = 0.5 * w * (targetShiftX * dataW - baseShiftX * dispW)
