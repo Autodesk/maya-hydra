@@ -167,7 +167,7 @@ void UnloadedPayloadBoundsSceneIndex::SetEnabled(bool enabled)
 
 void UnloadedPayloadBoundsSceneIndex::DirtyWireframeColors(const SdfPathVector& primPaths)
 {
-    if (!_IsObserved()) {
+    if (!_IsObserved() || !_enabled || _unloadedPrims.empty()) {
         return;
     }
     HdSceneIndexObserver::DirtiedPrimEntries dirtied;
