@@ -34,11 +34,11 @@ namespace {
 TF_DEFINE_PRIVATE_TOKENS(_tokens, ((boundsPrimName, "__unloadedPayloadBounds")));
 
 // Prims that do not come from a USD stage have no loading status, so are considered loaded.
-bool isUnloaded(const HdContainerDataSourceHandle& primSource)
+bool isLoaded(const HdContainerDataSourceHandle& primSource)
 {
     const HdBoolDataSourceHandle isLoadedDs
         = UsdImagingUsdPrimInfoSchema::GetFromParent(primSource).GetIsLoaded();
-    return isLoadedDs && !isLoadedDs->GetTypedValue(0.0f);
+    return !isLoadedDs || isLoadedDs->GetTypedValue(0.0f);
 }
 
 bool hasValidExtent(const HdContainerDataSourceHandle& primSource)
@@ -194,22 +194,22 @@ void UnloadedPayloadBoundsSceneIndex::_StopTracking(const SdfPath& primPath)
 
 void UnloadedPayloadBoundsSceneIndex::_UpdateTracking(const SdfPath& primPath)
 {
-    // Default assumption : most prims are not unloaded, so should not be tracked.
-    // For the minority that are, we'll either add them, or at worst re-add them.
+    // Default assumption : most prims are loaded, so should not be tracked.
+    const HdSceneIndexPrim prim = primPath.IsPrimPath() ? GetInputSceneIndex()->GetPrim(primPath): HdSceneIndexPrim();
+    if (!prim.dataSource || isLoaded(prim.dataSource)) {
+        _StopTracking(primPath);
+        return;
+    }
+    
+    // Only the root of an unloaded subtree gets a box, so if the parent is also unloaded,
+    // don't track the prim. This parent GetPrim is only reached for unloaded prims.
+    if (!isLoaded(GetInputSceneIndex()->GetPrim(primPath.GetParentPath()).dataSource)) {
+        _StopTracking(primPath);
+        return;
+    }
+
+    // Re-add: the prim may already be tracked, possibly with a different extent state.
     _StopTracking(primPath);
-
-    if (!primPath.IsPrimPath()) {
-        return;
-    }
-    const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (!isUnloaded(prim.dataSource)) {
-        return;
-    }
-    // Only the root of an unloaded subtree gets a box.
-    if (isUnloaded(GetInputSceneIndex()->GetPrim(primPath.GetParentPath()).dataSource)) {
-        return;
-    }
-
     _unloadedPrims.insert(primPath);
     if (hasValidExtent(prim.dataSource)) {
         _unloadedPrimsWithExtents.insert(primPath);

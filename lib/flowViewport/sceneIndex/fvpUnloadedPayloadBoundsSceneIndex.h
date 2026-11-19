@@ -122,11 +122,12 @@ protected:
 private:
     bool _IsTracked(const PXR_NS::SdfPath& primPath) const
     {
-        return _unloadedPrims.find(primPath) != _unloadedPrims.end();
+        return !_unloadedPrims.empty() && _unloadedPrims.find(primPath) != _unloadedPrims.end();
     }
     bool _HasBox(const PXR_NS::SdfPath& primPath) const
     {
-        return _enabled && _unloadedPrimsWithExtents.find(primPath) != _unloadedPrimsWithExtents.end();
+        return _enabled && !_unloadedPrimsWithExtents.empty()
+            && _unloadedPrimsWithExtents.find(primPath) != _unloadedPrimsWithExtents.end();
     }
 
     // Starts or stops tracking primPath, depending on whether it is the root of an unloaded
