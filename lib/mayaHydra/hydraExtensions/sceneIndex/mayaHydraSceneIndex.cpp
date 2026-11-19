@@ -1337,6 +1337,12 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
             if (dag.isInstanced() && dag.instanceNumber() > 0) {
                 continue;
             }
+            // Plugin shapes with a registered shape adapter (e.g. aiGaussianSplat) are translated
+            // by it.
+            // Built-in shapes must not get one here: their render items already represent them.
+            if (MNodeClass(dagNode.typeName()).pluginName().length() > 0 && CreateShapeAdapter(dag)) {
+                continue;
+            }
             CreateCustomAdapter(dag);
         }
         _customNodesToAdd.clear();
@@ -1849,8 +1855,8 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         return;
     }
 
-    if (useMeshAdapter()
-        && _RemoveAdapter<MayaHydraAdapter>(
+    // Without the mesh adapter, _shapeAdapters only holds plugin shape adapters (e.g. aiGaussianSplat).
+    if (_RemoveAdapter<MayaHydraAdapter>(
             id,
             [](MayaHydraAdapter* a) {
                 a->RemoveCallbacks();
