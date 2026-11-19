@@ -37,6 +37,7 @@
 #include <maya/MNodeMessage.h>
 
 #include <algorithm>
+#include <cstring>
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
@@ -978,11 +979,13 @@ MayaHydraRenderItemAdapter::_GetStreamPresence(MGeometry* geom, int vertexBuffer
 
 TfToken MayaHydraRenderItemAdapter::_GetTexcoordPrimvarName(const MVertexBufferDescriptor& desc)
 {
+    // This code should run as fast as possible as it can be executed within the animation update
     const MString name = desc.semanticName();
-    if (name.length() == 0 || name == "uvcoord") {
+    const char* s = name.asChar();
+    if (!s || s[0] == '\0' || std::strncmp(s, "uv", 2) == 0 || std::strncmp(s, "mayauv", 6) == 0) {
         return MayaHydraAdapterTokens->st;
     }
-    return TfToken(name.asChar());
+    return TfToken(s);
 }
 
 void MayaHydraRenderItemAdapter::_ClearAbsentTexcoordStreams(
