@@ -537,13 +537,25 @@ private:
         }
     }
 
-    bool _IsGLSLShader() const
+    VtValue _GetCustomMaterialResource() const
     {
-        if (_surfaceShader.isNull()) {
-            return false;
+        // Support only GLSLShader mapping for now. This can be extended on a customer request.
+        if (_surfaceShader.isNull() || _surfaceShaderType != _tokens->GLSLShader) {
+            return {};
         }
 
-        return _surfaceShaderType == _tokens->GLSLShader;
+        static const MString shaderStr("shader");
+        MFnDependencyNode    surfaceNode(_surfaceShader);
+        MPlug                shaderPlug = surfaceNode.findPlug(shaderStr, true);
+        if (shaderPlug.isNull()) {
+            return {};
+        }
+
+        // Get the shader file name without extension and use the Flow Viewport API 
+        // to create a custom material.   
+        const std::string shaderName
+            = TfStringGetBeforeSuffix(TfGetBaseName(shaderPlug.asString().asChar()));
+        return Fvp::MaterialCreationInterface::Get().CreateMaterial(shaderName, GetID());
     }
 
     bool PopulateMaterialXNetworkMap(HdMaterialNetworkMap& networkMap)
@@ -735,19 +747,9 @@ private:
         
         MayaHydra::DgAccessLock dgLock;
 
-        if (_IsGLSLShader()) {
-            static const MString shaderStr("shader");
-            MFnDependencyNode    surfaceNode(_surfaceShader);
-            MPlug                shaderPlug = surfaceNode.findPlug(shaderStr, true);
-            if (!shaderPlug.isNull()) {
-                const std::string shaderName
-                    = TfStringGetBeforeSuffix(TfGetBaseName(shaderPlug.asString().asChar()));
-                VtValue customMaterial
-                    = Fvp::MaterialCreationInterface::Get().CreateMaterial(shaderName, GetID());
-                if (!customMaterial.IsEmpty()) {
-                    return customMaterial;
-                }
-            }
+        VtValue customMaterial = _GetCustomMaterialResource();
+        if (!customMaterial.IsEmpty()) {
+            return customMaterial;
         }
 
         HdMaterialNetworkMap materialXNetworkMap;

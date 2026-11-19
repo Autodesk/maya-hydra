@@ -16,8 +16,8 @@ def Shader "FVP_CustomBasicLightingShader"
     )
 }
 
-#FVP_CustomBufferShader is the identifier to use in a material node from a material network to use this shader
-#It colors the geometry from the custom vertex buffer supplied in the st primvar, see customBufferShader.glslfx
+#FVP_CustomBufferShader is the identifier to use in a material node from a material network to use this shader.
+#It colors the geometry from a custom vertex buffer.
 def Shader "FVP_CustomBufferShader" (
     sdrMetadata = {
         string primvars = "myCustomStreamB"

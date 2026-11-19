@@ -25,13 +25,6 @@
 // 
 //  createNode("MhCustomShaders")
 //
-// This plug-in also demonstrates the flow viewport MaterialCreationInterface : it can replace Maya GLSLShader materials
-// by the custom GLSLFX shader. To enable / disable this, please use the following python commands :
-//
-//  import maya.cmds as cmds
-//  cmds.mhRegisterCustomMaterialCallback()
-//  cmds.mhRegisterCustomMaterialCallback(unregister=True)
-//
 // To use the custom shader into a usd file, please add to your file :
 /*
 def Scope "mtl"
