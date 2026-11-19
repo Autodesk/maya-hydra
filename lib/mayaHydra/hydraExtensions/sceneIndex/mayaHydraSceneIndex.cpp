@@ -1458,7 +1458,10 @@ void MayaHydraSceneIndex::RemovePrim(const SdfPath& id)
 
 void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
 {
-    const auto& oldParams = GetParams();
+    // Set before dirtying: a consumer may read the prims while handling the
+    // notices, and must see them with the new parameters.
+    const MayaHydraParams oldParams = _params;
+    _params = params;
     if (oldParams.displaySmoothMeshes != params.displaySmoothMeshes) {
         // I couldn't find any other way to turn this on / off.
         // I can't convert HdRprim to HdMesh easily and no simple way
@@ -1529,8 +1532,6 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
             },
             _lightAdapters);
     }
-
-    _params = params;
 }
 
 SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)

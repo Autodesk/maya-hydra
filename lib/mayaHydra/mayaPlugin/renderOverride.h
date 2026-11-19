@@ -506,6 +506,15 @@ private:
     /// Runs on the render thread when overlap is enabled, so it must not call into Maya.
     void                     _DrawPasses(const std::vector<int>& orderedPassIndices);
 
+    /// Hold every frame pass's render thread capture (see
+    /// RenderThreadCaptureSceneIndex), first activating it if \p activate.
+    /// Main thread, after the scene push and before the draw.
+    void _HoldRenderThreadCapture(bool activate);
+
+    /// Release what _HoldRenderThreadCapture held. Main thread, and only while
+    /// no frame is rendering on the render thread.
+    void _ReleaseRenderThreadCapture();
+
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;
     const hvt::FramePassPtr& _GetFramePass(int passIndex)const;

@@ -235,6 +235,11 @@ MStatus MayaHydraTestingCommand::doIt(const MArgList& args)
         result.append(static_cast<int>(stats.aovCopyFailures));
         result.append(static_cast<int>(stats.compositeFenceSignalFailures));
         result.append(static_cast<int>(stats.sharedBufferFenceFailures));
+        result.append(static_cast<int>(stats.primsCaptured));
+        result.append(static_cast<int>(stats.mayaReadsOnRenderThread));
+        result.append(static_cast<int>(stats.captureHolds));
+        result.append(static_cast<int>(stats.captureHoldMicros));
+        result.append(static_cast<int>(stats.captureReleaseMicros));
         setResult(result);
     }
 

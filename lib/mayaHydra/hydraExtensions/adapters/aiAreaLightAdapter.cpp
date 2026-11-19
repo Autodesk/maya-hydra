@@ -74,6 +74,22 @@ public:
         return defaultLightType;
     }
 
+    TfTokenVector GetLightParamNames() const override
+    {
+        TfTokenVector names = MayaHydraLightAdapter::GetLightParamNames();
+        names.insert(
+            names.end(),
+            { HdLightTokens->width,
+              UsdLuxTokens->inputsWidth,
+              HdLightTokens->height,
+              UsdLuxTokens->inputsHeight,
+              HdLightTokens->radius,
+              UsdLuxTokens->inputsRadius,
+              HdLightTokens->length,
+              UsdLuxTokens->inputsLength });
+        return names;
+    }
+
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET_LIGHT_PARAM_VALUE)

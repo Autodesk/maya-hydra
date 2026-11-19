@@ -76,6 +76,11 @@ public:
     /// Return a specific Hydra light parameter value.
     virtual VtValue GetLightParamValue(const TfToken& paramName);
     MAYAHYDRALIB_API
+    /// Every name GetLightParamValue serves, in each spelling it accepts. The light's
+    /// data source lists these, and a consumer that copies the light (such as the render
+    /// thread capture) copies only what is listed. Overrides serving more append theirs.
+    virtual TfTokenVector GetLightParamNames() const;
+    MAYAHYDRALIB_API
     /// Return a value for the requested Hydra data source key.
     VtValue Get(const TfToken& key) override;
     MAYAHYDRALIB_API

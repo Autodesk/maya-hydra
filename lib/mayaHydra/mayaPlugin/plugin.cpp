@@ -35,6 +35,7 @@
 #include <mayaHydraLib/adapters/adapter.h>
 #include <mayaHydraLib/adapters/renderItemOverrideCreator.h>
 #include <mayaHydraLib/mhSceneModifiedGuard.h>
+#include <mayaHydraLib/renderThread/renderThreadCaptureSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <flowViewport/global.h>
@@ -348,6 +349,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // renderer plugin is discovered (mayaUsdPlugin registered the versioned ones) and
     // before any render index is created.
     MayaHydra::RegisterOptionalSceneIndexPlugins(Fvp::ReprSelectorSceneIndex::GetAuthoredReprs());
+
+    // Likewise before any render index: a render index takes its scene index
+    // plugins when it is created.
+    if (MayaHydra::usePipelineOverlap() && MayaHydra::useRenderThreadCapture()) {
+        MayaHydra::RegisterRenderThreadCaptureSceneIndexPlugin();
+    }
   
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {

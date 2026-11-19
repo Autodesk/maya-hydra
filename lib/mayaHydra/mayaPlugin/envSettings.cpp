@@ -48,6 +48,12 @@ TF_DEFINE_ENV_SETTING(
     "Render on a separate thread, overlapping the draw of one frame with the "
     "main thread's work on the next.");
 
+TF_DEFINE_ENV_SETTING(
+    MAYAHYDRA_RENDER_THREAD_CAPTURE,
+    true,
+    "With MAYAHYDRA_PIPELINE_OVERLAP, serve the render thread a copy of the scene "
+    "taken on the main thread. Set to 0 to let it read the live scene.");
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -64,6 +70,13 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _usePipelineOverlap
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYAHYDRA_PIPELINE_OVERLAP);
         return _usePipelineOverlap;
+    }
+
+    bool useRenderThreadCapture()
+    {
+        static const bool _useRenderThreadCapture
+            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYAHYDRA_RENDER_THREAD_CAPTURE);
+        return _useRenderThreadCapture;
     }
 
     bool hdArnoldUseV2RenderSettings()

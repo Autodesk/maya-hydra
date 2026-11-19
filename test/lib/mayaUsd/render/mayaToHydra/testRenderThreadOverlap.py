@@ -36,6 +36,11 @@ RENDER_THREAD_STAT_NAMES = [
     "aovCopyFailures",
     "compositeFenceSignalFailures",
     "sharedBufferFenceFailures",
+    "primsCaptured",
+    "mayaReadsOnRenderThread",
+    "captureHolds",
+    "captureHoldMicros",
+    "captureReleaseMicros",
 ]
 
 # Each of these still leaves a believable image on screen, so they are counted
@@ -49,6 +54,8 @@ FAILURE_STAT_NAMES = [
     "aovCopyFailures",
     "compositeFenceSignalFailures",
     "sharedBufferFenceFailures",
+    # A read of live Maya data the capture scene index should have served.
+    "mayaReadsOnRenderThread",
 ]
 
 
@@ -127,6 +134,48 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
                 stats[name], 0,
                 "%s is %d, expected 0. Stats: %s"
                 % (name, stats[name], dict(stats)))
+
+    def test_renderThreadReadsOnlyCapturedData(self):
+        """Lights, cameras, materials and DAG meshes read Maya when Hydra pulls
+        their data. With the render thread running, those pulls must reach
+        the capture scene index's copy, not Maya."""
+        cube = self.buildScene()
+        cmds.setAttr("defaultRenderGlobals.enableDefaultLight", 0)
+        pointLight = cmds.pointLight(intensity=1.0)
+        spotLight = cmds.spotLight(intensity=1.0)
+        cmds.xform(cmds.listRelatives(spotLight, parent=True)[0], translation=(0, 4, 0))
+        material = cmds.shadingNode("lambert", asShader=True)
+        cmds.select(cube)
+        cmds.hyperShade(assign=material)
+        cmds.select(clear=True)
+        camera = cmds.listRelatives(cmds.lookThru(query=True), shapes=True) or [
+            cmds.lookThru(query=True)]
+        cmds.refresh(force=True)
+
+        cmds.mayaHydraTesting(resetRenderThreadStats=True)
+        for i in range(6):
+            # Each edit dirties a prim whose data source reads Maya when
+            # pulled, and each refresh submits a frame that syncs it.
+            cmds.setAttr(pointLight + ".intensity", 1.0 + 0.1 * i)
+            cmds.setAttr(spotLight + ".coneAngle", 30 + i)
+            cmds.setAttr(material + ".color", 0.2 + 0.1 * i, 0.3, 0.4, type="double3")
+            cmds.setAttr(camera[0] + ".focalLength", 35 + i)
+            cmds.move(0, 0.05 * i, 0, cube + ".vtx[0]", relative=True)
+            cmds.refresh(force=True)
+        cmds.mayaHydraTesting(drainRenderThread=True)
+
+        stats = self.stats()
+        self.assertRenderThreadIsLive(stats)
+        self.assertGreater(
+            stats["primsCaptured"], 0,
+            "Frames were rendered off-thread but the capture scene index "
+            "copied nothing, so it is not in the render index's chain or was "
+            "never activated, and the render thread read the live scene. "
+            "Stats: %s" % dict(stats))
+        self.assertEqual(
+            stats["mayaReadsOnRenderThread"], 0,
+            "MayaHydra read Maya %d times while a frame rendered off the main "
+            "thread. Stats: %s" % (stats["mayaReadsOnRenderThread"], dict(stats)))
 
     def assertJumpLeavesNoGhost(self, what, fromFrame=1, toFrame=10, beforeJump=None):
         """Jump between frames 1 and 10, where `what` is at x=-2.5 and x=2.5.

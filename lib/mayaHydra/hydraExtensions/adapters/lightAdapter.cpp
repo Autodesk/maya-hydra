@@ -600,6 +600,40 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
     return {};
 }
 
+TfTokenVector MayaHydraLightAdapter::GetLightParamNames() const
+{
+    return {
+        HdLightTokens->color,
+        HdTokens->displayColor,
+        UsdLuxTokens->inputsColor,
+        HdLightTokens->intensity,
+        UsdLuxTokens->inputsIntensity,
+        HdLightTokens->exposure,
+        UsdLuxTokens->inputsExposure,
+        HdLightTokens->normalize,
+        UsdLuxTokens->inputsNormalize,
+        HdLightTokens->enableColorTemperature,
+        UsdLuxTokens->inputsEnableColorTemperature,
+        HdLightTokens->diffuse,
+        UsdLuxTokens->inputsDiffuse,
+        HdLightTokens->specular,
+        UsdLuxTokens->inputsSpecular,
+        HdLightTokens->colorTemperature,
+        UsdLuxTokens->inputsColorTemperature,
+        HdLightTokens->shadowColor,
+        UsdLuxTokens->inputsShadowColor,
+        HdLightTokens->shadowEnable,
+        HdLightTokens->hasShadow,
+        UsdLuxTokens->inputsShadowEnable,
+        kShadowResolutionToken,
+        kShadowResolutionInputToken,
+        kShadowBiasToken,
+        kShadowBiasInputToken,
+        kShadowBlurToken,
+        kShadowBlurInputToken,
+    };
+}
+
 // Is for PRMan and potentially other renderers that use material networks for lights.
 VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
 {

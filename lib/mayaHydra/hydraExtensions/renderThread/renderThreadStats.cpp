@@ -46,6 +46,11 @@ RenderThreadStats::Get() const
         = _compositeFenceSignalFailures.load(std::memory_order_relaxed);
     out.sharedBufferFenceFailures
         = _sharedBufferFenceFailures.load(std::memory_order_relaxed);
+    out.primsCaptured           = _primsCaptured.load(std::memory_order_relaxed);
+    out.mayaReadsOnRenderThread = _mayaReadsOnRenderThread.load(std::memory_order_relaxed);
+    out.captureHolds            = _captureHolds.load(std::memory_order_relaxed);
+    out.captureHoldMicros       = _captureHoldMicros.load(std::memory_order_relaxed);
+    out.captureReleaseMicros    = _captureReleaseMicros.load(std::memory_order_relaxed);
     return out;
 }
 
@@ -66,6 +71,11 @@ RenderThreadStats::Reset()
     _aovCopyFailures.store(0, std::memory_order_relaxed);
     _compositeFenceSignalFailures.store(0, std::memory_order_relaxed);
     _sharedBufferFenceFailures.store(0, std::memory_order_relaxed);
+    _primsCaptured.store(0, std::memory_order_relaxed);
+    _mayaReadsOnRenderThread.store(0, std::memory_order_relaxed);
+    _captureHolds.store(0, std::memory_order_relaxed);
+    _captureHoldMicros.store(0, std::memory_order_relaxed);
+    _captureReleaseMicros.store(0, std::memory_order_relaxed);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

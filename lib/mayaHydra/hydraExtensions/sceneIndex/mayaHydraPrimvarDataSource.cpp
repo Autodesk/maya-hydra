@@ -23,6 +23,7 @@
 
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
 #include <mayaHydraLib/adapters/mhExtGpuStreams.h>
+#include <mayaHydraLib/renderThread/renderThreadCaptureSceneIndex.h>
 
 #include <pxr/imaging/hd/extGpuBufferSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
@@ -41,9 +42,11 @@ namespace {
 
 /// CPU fallback paired with an extGpuBuffer primvar. Constructing the
 /// datasource does not touch the buffer; only GetValue() reads the shared GL
-/// buffer and materializes a VtArray.
+/// buffer and materializes a VtArray, so the render thread capture keeps it by
+/// reference rather than forcing that readback.
 class _ExtGpuBufferLazyValueDataSource final
     : public HdSampledDataSource
+    , public MAYAHYDRA_NS_DEF::RenderThreadCaptureByReference
 {
 public:
     HD_DECLARE_DATASOURCE(_ExtGpuBufferLazyValueDataSource);

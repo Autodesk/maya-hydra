@@ -24,9 +24,10 @@
 //
 // The main thread pushes scene state only while this thread is idle (see
 // WaitForIdle), and MayaHydraSceneIndex queues the notices Maya callbacks send
-// in between. This thread itself makes no Maya API calls, but Hydra's sync on
-// it pulls from the scene index's data sources, and some adapters read Maya
-// when pulled; see doc/renderThreadPipelining.md.
+// in between. This thread itself makes no Maya API calls. Hydra's sync on it
+// pulls prim data through the scene index chain, where
+// RenderThreadCaptureSceneIndex serves a copy taken on the main thread rather
+// than adapters that read Maya when pulled; see doc/renderThreadPipelining.md.
 
 #include "renderThreadContext.h"
 #include "renderThreadFence.h"
@@ -237,6 +238,7 @@ private:
     std::condition_variable        _contextCv;
     ContextState                   _contextState{ContextState::Pending};
     std::thread                    _thread;
+    std::thread::id                _mainThread;
     mutable std::mutex             _requestMutex;
     std::condition_variable        _requestCv;
     RenderThreadRequest            _pendingRequest;

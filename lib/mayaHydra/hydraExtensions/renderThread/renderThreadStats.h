@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <thread>
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -93,6 +94,20 @@ struct RenderThreadStatsSnapshot
     /// a render that may read a buffer before Maya's copy into it lands, or a
     /// copy that may overwrite a buffer the last render is still reading.
     uint64_t sharedBufferFenceFailures = 0;
+
+    /// Prims the capture scene index copied, whole or in part. Zero while the
+    /// render thread runs means the render thread reads the live scene.
+    uint64_t primsCaptured = 0;
+
+    /// MayaHydra's guarded Maya reads (DgAccessLock) made on the render thread.
+    /// Each is a read of live Maya data the capture should have served.
+    uint64_t mayaReadsOnRenderThread = 0;
+
+    /// Capture holds, and the main-thread time spent in them and in the
+    /// releases that follow, in microseconds.
+    uint64_t captureHolds = 0;
+    uint64_t captureHoldMicros = 0;
+    uint64_t captureReleaseMicros = 0;
 };
 
 /// Process-wide render-thread counters. A singleton because the reader is a
@@ -145,6 +160,34 @@ public:
     {
         _sharedBufferFenceFailures.fetch_add(1, std::memory_order_relaxed);
     }
+    void RecordPrimCaptured() { _primsCaptured.fetch_add(1, std::memory_order_relaxed); }
+    void RecordCaptureHold(uint64_t micros)
+    {
+        _captureHolds.fetch_add(1, std::memory_order_relaxed);
+        _captureHoldMicros.fetch_add(micros, std::memory_order_relaxed);
+    }
+    void RecordCaptureRelease(uint64_t micros)
+    {
+        _captureReleaseMicros.fetch_add(micros, std::memory_order_relaxed);
+    }
+
+    /// Render thread, around each request. Records the main thread's id, so that
+    /// reads from the render thread's worker threads count too.
+    void SetRendering(bool value, std::thread::id mainThread)
+    {
+        _mainThread = mainThread;
+        _rendering.store(value, std::memory_order_release);
+    }
+
+    /// Counts a guarded Maya read made while a request renders, on any thread
+    /// but the main one.
+    void RecordMayaRead()
+    {
+        if (_rendering.load(std::memory_order_acquire)
+            && std::this_thread::get_id() != _mainThread) {
+            _mayaReadsOnRenderThread.fetch_add(1, std::memory_order_relaxed);
+        }
+    }
 
 private:
     RenderThreadStats() = default;
@@ -168,6 +211,13 @@ private:
     std::atomic<uint64_t> _aovCopyFailures{0};
     std::atomic<uint64_t> _compositeFenceSignalFailures{0};
     std::atomic<uint64_t> _sharedBufferFenceFailures{0};
+    std::atomic<uint64_t> _primsCaptured{0};
+    std::atomic<uint64_t> _mayaReadsOnRenderThread{0};
+    std::atomic<uint64_t> _captureHolds{0};
+    std::atomic<uint64_t> _captureHoldMicros{0};
+    std::atomic<uint64_t> _captureReleaseMicros{0};
+    std::atomic<bool>     _rendering{false};
+    std::thread::id       _mainThread;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

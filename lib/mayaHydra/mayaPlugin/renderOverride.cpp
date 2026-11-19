@@ -49,6 +49,7 @@
 
 #include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/renderThread/renderThreadContext.h>
+#include <mayaHydraLib/renderThread/renderThreadCaptureSceneIndex.h>
 #include <mayaHydraLib/renderThread/renderThreadStats.h>
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
@@ -695,7 +696,9 @@ int MtohRenderOverride::DrainAllRenderThreads()
             continue;
         }
         if (instance->_renderThread && instance->_renderThread->IsRunning()) {
-            instance->_renderThread->WaitForQuiescence();
+            if (instance->_renderThread->WaitForQuiescence()) {
+                instance->_ReleaseRenderThreadCapture();
+            }
             ++drained;
         }
     }
@@ -1342,7 +1345,15 @@ MStatus MtohRenderOverride::Render(
 
         pushSceneState();
         const std::vector<int> orderedPassIndices = preparePasses();
+        // An active capture locks around reads unless held, which would serialize
+        // Hydra's parallel sync on this thread.
+        if (_renderThreadStarted) {
+            _HoldRenderThreadCapture(false);
+        }
         _DrawPasses(orderedPassIndices);
+        if (_renderThreadStarted) {
+            _ReleaseRenderThreadCapture();
+        }
 
         const auto fileName = Fvp::ImageBufferWriter::GetFileName();
         if (!fileName.empty()) {
@@ -1449,6 +1460,8 @@ MStatus MtohRenderOverride::Render(
     // invalidation while a SyncAll is in progress and that SyncAll is on the other thread.
     if (_renderThreadStarted && _renderThread) {
         _renderThread->WaitForIdle();
+        // Applies what changed upstream while the last frame was rendering.
+        _ReleaseRenderThreadCapture();
         // Applies what Maya callbacks changed while the last frame was syncing.
         if (_mayaHydraSceneIndex) {
             _mayaHydraSceneIndex->SetRenderThreadBusy(false);
@@ -1819,6 +1832,7 @@ MStatus MtohRenderOverride::Render(
         // again at the new size.
         if (_renderThreadStarted && _renderThread) {
             _renderThread->DiscardInFlight();
+            _ReleaseRenderThreadCapture();
             _firstFramePrimed = false;
         }
     }
@@ -1915,6 +1929,8 @@ MStatus MtohRenderOverride::Render(
             if (_mayaHydraSceneIndex) {
                 _mayaHydraSceneIndex->SetRenderThreadBusy(true);
             }
+            // Last, so the copy includes everything the push and pass preparation did.
+            _HoldRenderThreadCapture(true);
             _renderThread->SubmitRequest(std::move(request));
             submittedToRenderThread = true;
         } else {
@@ -1940,6 +1956,7 @@ MStatus MtohRenderOverride::Render(
         panelChanged = panelNameStr != _renderThreadPanel;
         if (panelChanged) {
             _renderThread->DiscardInFlight();
+            _ReleaseRenderThreadCapture();
             _renderThreadPanel = panelNameStr;
         }
     }
@@ -2933,6 +2950,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
             _renderThread->Stop();
             _renderThread.reset();
         }
+        _ReleaseRenderThreadCapture();
         _presentBridge.reset();
         _renderThreadStarted = false;
         _firstFramePrimed = false;
@@ -3550,6 +3568,7 @@ bool MtohRenderOverride::select(
     // shows a pre-pick image without the new selection.
     if (_renderThreadStarted && _renderThread) {
         _renderThread->DiscardInFlight();
+        _ReleaseRenderThreadCapture();
     }
 
     MStatus status = MStatus::kFailure;
@@ -4206,7 +4225,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
             .Msg("  isolate select disabled for panel=%s\n", viewName.asChar());
         // Set state to Off BEFORE notifying.  DisableIsolateSelection triggers
         // _SendPrimsDirtied, which can synchronously re-enter this callback via
-        // Hydra→Maya observers (more likely with larger dirty sets, i.e. when
+        // Hydra?Maya observers (more likely with larger dirty sets, i.e. when
         // numViewSelectedObjects > 1).  If the re-entrant call reads state==On
         // it falls through to the "stay on, notify" branch and rebuilds the
         // isolate set from the still-stale view-selected list, leaving the
@@ -4389,6 +4408,37 @@ hvt::FramePassPtr& MtohRenderOverride::_GetFramePass(int passIndex)
 int MtohRenderOverride::_GetNumFramePasses()const
 {
     return static_cast<int>(_framePassesData.size());
+}
+
+void MtohRenderOverride::_HoldRenderThreadCapture(bool activate)
+{
+    const int numFramePasses = _GetNumFramePasses();
+    for (int i = 0; i < numFramePasses; ++i) {
+        const hvt::FramePassPtr& pass = _GetFramePass(i);
+        auto*                    capture = pass
+            ? MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::Find(pass->GetRenderIndex())
+            : nullptr;
+        if (!capture) {
+            continue;
+        }
+        if (activate) {
+            capture->Activate();
+        }
+        capture->Hold();
+    }
+}
+
+void MtohRenderOverride::_ReleaseRenderThreadCapture()
+{
+    const int numFramePasses = _GetNumFramePasses();
+    for (int i = 0; i < numFramePasses; ++i) {
+        const hvt::FramePassPtr& pass = _GetFramePass(i);
+        if (auto* capture = pass
+                ? MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::Find(pass->GetRenderIndex())
+                : nullptr) {
+            capture->Release();
+        }
+    }
 }
 
 void MtohRenderOverride::_DrawPasses(const std::vector<int>& orderedPassIndices)

@@ -133,8 +133,73 @@ the next `UpdateRenderItems` drops them.
 
 Overlap therefore covers the part of the draw after sync rather than the whole
 draw, and the interlock, not the frame handoff, is what bounds the speedup.
-Removing it would require the render thread to read an immutable per-frame copy
-of the scene instead of the live scene index.
+
+## The render thread capture
+
+Holding back notices is not enough on its own: Hydra's sync and the render
+delegate pull prim data through the scene index chain, and much of that chain
+reads live data when pulled.  MayaHydra's camera, light, material, DAG mesh,
+NURBS curve, custom DAG and image plane adapters read Maya, mayaUsd reads its
+USD stage, and Flow Viewport data producers and filters and custom node
+translators read whatever they wrap.  Done on the render thread, each of those
+reads races the main thread.
+
+`RenderThreadCaptureSceneIndex` closes that gap without touching the render
+delegate, so it works with any renderer.  MayaHydra registers it, only when the
+flag is on, as a scene index plugin for every renderer at insertion phase 5000.
+That puts it after Storm's and hdsi's plugins and custom node translators, and
+before the render delegate's own observers (Flash's is at 9999).  It is a
+callback registration rather than a plugin id, because the default hybrid
+ordering policy drops a plugin id that has no `loadWithRenderer` entry in
+`plugInfo.json`, and such an entry would load `mayaHydraLib` with every renderer
+in every session.  `mayaHydraLib` is loaded through Plug, which never unloads a
+library, so the callback stays valid after the mayaHydra plugin is unloaded.
+
+The capture passes everything straight through until it is activated, which
+happens on the first frame submitted to the render thread.  From then on it:
+
+- keeps a copy of every prim, built from retained data sources.  A dirtied
+  prim is re-copied only under its dirty locators; the rest of the previous
+  copy is reused.  Multisampled values, such as transforms and points under
+  motion blur, are copied as samples over the shutter interval [-1, 1] plus
+  the frame itself.  Values of a type Vt does not know, such as `HdTupleType`
+  or external GPU buffer handles, and data sources marked
+  `RenderThreadCaptureByReference`, such as the lazy readback of a shared GPU
+  buffer, are kept by reference;
+- is held right before each frame is submitted, after the scene push and pass
+  preparation.  Holding copies everything dirtied since the last hold, then
+  queues notices from upstream instead of applying them, so the copy cannot
+  change while the render thread reads it;
+- is released, applying and forwarding the queued notices in order, once the
+  render thread is idle: after the interlock, after a discard (pick, resize,
+  change of panel), after `-drainRenderThread`, and when the thread stops.
+
+A synchronous main-thread frame holds and releases it around the draw, so that
+Hydra's parallel sync reads the copy without taking any lock.
+
+Between a release and the next hold, a prim read through the capture is copied
+on the spot if it is pending.  Flash's observer reads every dirtied prim from
+TBB workers while it handles the notice, so those reads take the table lock
+shared and only serialize per prim, through a small array of copy locks keyed
+by path.  Notices take the table lock exclusively.
+
+The copy is taken on the main thread, so the main thread now does the data
+reads that sync used to do on the render thread, for every dirtied prim
+whether or not the renderer pulls it.
+
+A container is copied by its `GetNames()`: a name its `Get()` answers but does
+not list is missing from the copy, and the renderer silently gets nothing for
+it.  MayaHydra's light data sources therefore list every parameter their
+adapter serves, in each spelling it accepts (`MayaHydraLightAdapter::
+GetLightParamNames()`); a dome light's `textureFile`, for example, used to be
+served without being listed.
+
+Setting `MAYAHYDRA_RENDER_THREAD_CAPTURE=0` leaves the capture out, so the
+render thread reads the live scene as before.  It is meant for comparing the
+two.
+
+`MayaHydraSceneIndex`'s notice queue, the deferred callback removals and the
+deferred time changes predate the capture and remain for now.
 
 ## Deferred time changes
 
@@ -212,6 +277,13 @@ mode: fence signal failures, fence wait timeouts, drain timeouts, presents
 skipped or without depth, AOV copy failures, composite fence failures and
 shared buffer fence failures.
 
+Two more cover the capture: `primsCaptured`, the prims it copied, and
+`mayaReadsOnRenderThread`, the reads MayaHydra guards with `DgAccessLock` that
+ran on any thread but the main one while a frame was rendering.  Each of those
+is a read of live Maya data the capture should have served.  `captureHolds`,
+`captureHoldMicros` and `captureReleaseMicros` give the main-thread cost of
+the holds and of the releases that follow them.
+
 They are readable from a test through `mayaHydraTesting -renderThreadStats`,
 with `-resetRenderThreadStats` to zero them and `-drainRenderThread` to force
 quiescence.
@@ -226,7 +298,11 @@ feature did nothing.
 `testRenderThreadOverlap.py` runs only with the flag on.  It asserts that the
 thread started, that frames were drawn off the main thread and composited,
 that the first frame was drawn synchronously, and that every failure counter
-is zero.
+is zero, `mayaReadsOnRenderThread` included.
+
+Another edits a point light, a spot light, a material, the camera and mesh
+points between frames, and asserts that the capture copied prims and that no
+Maya read ran while a frame rendered.
 
 Three tests jump the time while stopped (a transform-animated cube, the same
 right after playback, and a GPU-deformed skinned mesh under cached playback)
@@ -244,15 +320,25 @@ stops happening.
 
 - Overlap covers only the portion of the draw after `SyncAll`, as described
   under the interlock above.
-- Only `MayaHydraSceneIndex` queues its notices.  Other scene indices that
-  change from a Maya callback rather than from `Render()` are not covered.
-- An adapter that changes its cached data from a callback, rather than only
-  sending a notice, can still be read mid-change by a sync on the render thread
-  (for example a sync that pulls some attributes from the old data and some from
-  the new).  Such adapters need a commit step that runs behind the interlock.
-- The render thread makes no Maya API calls itself, but Hydra's sync pulls from
-  data sources, and some of those read Maya's dependency graph lazily.  Such a
-  read runs on the render thread while the main thread may be evaluating.
+- The capture covers only the scene indices before it in the chain.  A render
+  delegate's own scene indices after phase 5000, and anything a delegate reads
+  outside the scene index, are not covered.
+- Upstream containers must list every name they serve.  An unlisted name is
+  dropped from the copy without any warning.
+- A typed sampled data source must answer `GetValue` with a value of its type.
+  An empty value is copied untyped, and a typed read of the copy returns null.
+- A producer must update its state before sending the notice for it.  A prim
+  read while a notice is handled is copied then, and kept until the next one.
+- The copy reads whole prims, so the flattening scene index caches more
+  inherited transforms than it would otherwise, and moving an ancestor dirties
+  the transform of more descendants, materials included.  A consumer should
+  rebuild a prim only for the locators it reads.
+- Data sources kept by reference are read live on the render thread.  The lazy
+  GPU buffer readback reads a buffer Maya's copy has already landed in (see
+  shared vertex buffers above); a value of a type Vt does not know comes from a
+  retained schema builder in practice, but nothing enforces that.
+- A renderer that asks for samples outside the shutter interval [-1, 1] gets
+  the nearest captured sample.
 - Composited overlays sort against the scene as of the last completed frame,
   which is one frame behind the main thread's current state.
 - Time changes outside playback and changes of panel composite their own

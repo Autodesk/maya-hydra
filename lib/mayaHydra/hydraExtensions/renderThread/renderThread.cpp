@@ -105,6 +105,7 @@ RenderThread::Start(RenderCallback renderCallback,
     _context = std::move(context);
     _hgi = hgi;
     _presentBridge = presentBridge;
+    _mainThread = std::this_thread::get_id();
     _stop.store(false, std::memory_order_release);
 
     {
@@ -261,7 +262,9 @@ RenderThread::_ThreadLoop()
 
             {
                 ScopedAutoreleasePool pool;
+                RenderThreadStats::instance().SetRendering(true, _mainThread);
                 _ExecuteRequest(request);
+                RenderThreadStats::instance().SetRendering(false, _mainThread);
             }
 
             {

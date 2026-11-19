@@ -39,10 +39,12 @@ using DgAccessMutexType = std::recursive_mutex;
 MAYAHYDRALIB_API
 DgAccessMutexType& GetDgAccessMutex();
 
-class DgAccessLock
+class MAYAHYDRALIB_API DgAccessLock
 {
 public:
-    DgAccessLock() : _lock(GetDgAccessMutex()) { }
+    /// Counts a read made while the render thread renders (see
+    /// RenderThreadStats::mayaReadsOnRenderThread).
+    DgAccessLock();
 
     DgAccessLock(const DgAccessLock&) = delete;
     DgAccessLock& operator=(const DgAccessLock&) = delete;

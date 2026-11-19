@@ -95,6 +95,13 @@ public:
         return MayaHydraLightAdapter::Get(key);
     }
 
+    TfTokenVector GetLightParamNames() const override
+    {
+        TfTokenVector names = MayaHydraLightAdapter::GetLightParamNames();
+        names.insert(names.end(), { HdLightTokens->angle, UsdLuxTokens->inputsAngle });
+        return names;
+    }
+
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
         if ((paramName == HdLightTokens->angle) || (paramName == UsdLuxTokens->inputsAngle)) {

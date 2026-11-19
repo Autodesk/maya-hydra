@@ -22,9 +22,42 @@
 #include <pxr/imaging/hd/cameraSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 
+#include <algorithm>
+#include <iterator>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 // ----------------------------------------------------------------------------
+
+namespace {
+
+// The HdCameraSchema members typed float; a source of another type fails the
+// schema's typed accessor.
+bool _IsFloatMember(const TfToken& name)
+{
+    static const TfToken floatMembers[] = {
+        HdCameraSchemaTokens->horizontalAperture,
+        HdCameraSchemaTokens->verticalAperture,
+        HdCameraSchemaTokens->horizontalApertureOffset,
+        HdCameraSchemaTokens->verticalApertureOffset,
+        HdCameraSchemaTokens->focalLength,
+        HdCameraSchemaTokens->fStop,
+        HdCameraSchemaTokens->focusDistance,
+        HdCameraSchemaTokens->exposure,
+#if PXR_VERSION >= 2505
+        HdCameraSchemaTokens->exposureTime,
+        HdCameraSchemaTokens->exposureIso,
+        HdCameraSchemaTokens->exposureFStop,
+        HdCameraSchemaTokens->exposureResponsivity,
+        HdCameraSchemaTokens->linearExposureScale,
+        HdCameraSchemaTokens->dofAspect,
+#endif
+    };
+    return std::find(std::begin(floatMembers), std::end(floatMembers), name)
+        != std::end(floatMembers);
+}
+
+} // namespace
 
 template <typename T>
 class MayaHydraTypedCameraParamValueDataSource : public HdTypedSampledDataSource<T>
@@ -70,12 +103,10 @@ public:
         return T();
     }
 
+    // Always a T, as GetTypedValue: the adapter answers some parameters, such as an
+    // orthographic camera's aperture, with an empty value.
     VtValue GetValue(HdSampledDataSource::Time shutterOffset) override
     {
-        if (shutterOffset == 0.0f) {
-            return _adapter->GetCameraParamValue(_key);
-        }
-
         return VtValue(GetTypedValue(shutterOffset));
     }
 
@@ -228,11 +259,13 @@ MayaHydraCameraDataSource::Get(const TfToken& name)
         return MayaHydraTypedCameraParamValueDataSource<double>::New(
             _id, name, camAdapter);
     }
-    else if (std::find(HdCameraSchemaTokens->allTokens.begin(),
-        HdCameraSchemaTokens->allTokens.end(), name)
-        != HdCameraSchemaTokens->allTokens.end()) {
-        // all remaining HdCameraSchema members are floats and should
-        // be returned as a typed data source for schema conformance.
+#if PXR_VERSION >= 2505
+    else if (name == HdCameraSchemaTokens->focusOn) {
+        return MayaHydraTypedCameraParamValueDataSource<bool>::New(
+            _id, name, camAdapter);
+    }
+#endif
+    else if (_IsFloatMember(name)) {
         return MayaHydraTypedCameraParamValueDataSource<float>::New(
             _id, name, camAdapter);
     }
