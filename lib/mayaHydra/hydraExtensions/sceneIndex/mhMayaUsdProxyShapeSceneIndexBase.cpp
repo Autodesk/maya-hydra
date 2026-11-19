@@ -191,8 +191,8 @@ MayaUsdProxyShapeSceneIndexBase::~MayaUsdProxyShapeSceneIndexBase()
 
 void MayaUsdProxyShapeSceneIndexBase::_Destroy()
 {
-    // Called by Detach() and again by the destructor: a second unregistration would remove the
-    // path mapper of the scene index that replaced this one.
+    // Detach() and the destructor both call this: unregistering twice would remove the
+    // replacement's path mapper.
     if (_destroyed) {
         return;
     }
@@ -265,8 +265,8 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
     }
 
     if (_rebuildOnStageChange && _populatedStage) {
-        // Do not call SetStage() on the populated stage scene index: see
-        // SetRebuildOnStageChange(). The owner replaces this scene index at the next render.
+        // No SetStage() once populated (see SetRebuildOnStageChange()): the owner replaces
+        // this scene index at the next render.
         _needsRebuild = true;
         return;
     }
@@ -301,7 +301,7 @@ void MayaUsdProxyShapeSceneIndexBase::_ObjectsChanged(
 void MayaUsdProxyShapeSceneIndexBase::PopulateAndApplyPendingChanges() 
 { 
     if (_needsRebuild) {
-        // The replacement scene index is built from the current stage, edits included.
+        // The replacement is built from the current stage, edits included.
         return;
     }
     Populate();
@@ -365,7 +365,7 @@ SdfPathVector MayaUsdProxyShapeSceneIndexBase::GetChildPrimPaths(const SdfPath& 
 bool MayaUsdProxyShapeSceneIndexBase::HasPendingUpdates() const
 {
     //When we receive a stage invalidate we remove the stage and set populate to false
-    //We need to re-populate to see the changes, or to be replaced (NeedsRebuild())
+    //We need to re-populate to see the changes, or be replaced (NeedsRebuild())
     return (false == _populated) || _needsRebuild;
 }
 

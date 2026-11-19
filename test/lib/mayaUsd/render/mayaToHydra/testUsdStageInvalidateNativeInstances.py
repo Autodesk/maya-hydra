@@ -22,14 +22,11 @@ import usdUtils
 PROXY_SHAPE_PREFIX = '/MayaUsdProxyShape_PluginNode/'
 
 class TestUsdStageInvalidateNativeInstances(mtohUtils.MayaHydraBaseTestCase):
-    '''A stage invalidate of a proxy shape whose stage is already in Hydra must not leave stale
-    prims (HYDRA-2582).
+    '''Invalidating a stage already in Hydra must not leave stale prims (HYDRA-2582).
 
-    Creating a stage from a file into a running Hydra invalidates the stage just after its
-    first population (setting primPath after filePath), as does any later edit of primPath or
-    filePath. Before the fix, UsdImaging re-added the prims of the previous population, which
-    were never removed: nestedNativeInstances.usda then had 5 Storm rprims (duplicated ids and
-    a raw __Prototype_N prim) instead of 1.
+    Stage From File, and any edit of filePath or primPath, invalidate the stage after its first
+    population. Without the fix, test_stageInvalidate gets 5 Storm rprims for
+    nestedNativeInstances.usda (duplicated ids and a raw __Prototype_N prim) instead of 1.
     '''
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
@@ -75,10 +72,8 @@ class TestUsdStageInvalidateNativeInstances(mtohUtils.MayaHydraBaseTestCase):
         self.assertSingleCube('after a second stage invalidate')
 
     def test_stageInvalidateOfHiddenProxyShape(self):
-        # The replacement chain must get the proxy shape's visibility before its first draw: a
-        # single refresh after the invalidate must not show the hidden stage. This uses a stage
-        # without native instancing: the instancer hides native instances, and their prototype
-        # rprim stays visible in the render index.
+        # One refresh after the invalidate must not show the hidden stage. No native instancing
+        # here: their prototype rprims stay visible, the instancer hides them.
         usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cube.usda')
         shape = usdUtils.createStageFromFile(usdScenePath)
         cmds.select(clear=True)
@@ -93,8 +88,8 @@ class TestUsdStageInvalidateNativeInstances(mtohUtils.MayaHydraBaseTestCase):
         self.assertNotEqual(self.usdRprims(), [], 'after the stage invalidate')
 
     def test_stageInvalidateAfterRename(self):
-        # The replacement chain keeps the Hydra paths of the proxy shape, which the selection
-        # and isolate select hold, even if the node was renamed since its first chain.
+        # The replacement keeps the Hydra paths (held by selection and isolate select), even
+        # after a rename.
         self.loadStage()
         self.assertSingleCube('after loading the stage')
         rprimsBefore = self.usdRprims()

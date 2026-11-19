@@ -107,14 +107,14 @@ public:
     static PXR_NS::SdfPath GetUsdDefaultRenderDescriptionPathPrefix();
 
 private:
-    // dagNode is non-const because of callback registration. An empty prefix generates a new one
-    // from the node name.
+    // dagNode is non-const because of callback registration. With an empty prefix, one is
+    // generated from the node name.
     void _AddSceneIndexForNode(
         MObject&               dagNode,
         const PXR_NS::SdfPath& prefix = PXR_NS::SdfPath());
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
-    // Replaces the scene index chain of a proxy shape node by a new one built from its current
-    // stage (see MayaUsdProxyShapeSceneIndexBase::NeedsRebuild()).
+    // Replaces a proxy shape's chain by one built from its current stage (see
+    // MayaUsdProxyShapeSceneIndexBase::NeedsRebuild()).
     void        _RebuildSceneIndexForNode(MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);

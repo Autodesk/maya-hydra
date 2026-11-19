@@ -253,9 +253,8 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode, const 
         MayaUsdProxyShapeSceneIndexBase::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
     registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
     registration->interpretRprimPathFn = &(MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
-    // Replace the chain when the stage changes after its population, rather than re-populate
-    // it in place (HYDRA-2582). The replacement is done by ApplyPendingUpdates(), which only the
-    // interactive render override calls.
+    // Replace the chain on a stage change after population instead of re-staging it
+    // (HYDRA-2582). Interactive only: the batch renderer never calls ApplyPendingUpdates().
     mayaUsdProxyShapeSceneIndex->SetRebuildOnStageChange(_interactive);
     mayaUsdProxyShapeSceneIndex->Populate();
 
@@ -373,22 +372,20 @@ void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
         return;
     }
 
-    // Keep the node's Hydra paths. The prefix is generated from the node name only when the
-    // chain is first added, and the selection and isolate select hold paths under it, so a
-    // rename since then must not move the prims. The old chain is removed first, so the prefix
-    // is free again when the new chain is added.
+    // Reuse the prefix: selection and isolate select hold paths under it, and a regenerated
+    // one would follow a rename of the node. Removing the old chain first frees it.
     const SdfPath prefix = it->second->sceneIndexPathPrefix;
 
-    // Release the old scene index's path mapper and pick handler now: the new one registers its
-    // own for the same paths, and the old one may stay alive after its removal.
+    // Release the old path mapper and pick handler first: the new scene index registers its
+    // own for the same paths, and the old one may outlive its removal.
     MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex
         = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(it->second->pluginSceneIndex);
     if (oldProxyShapeSceneIndex) {
         oldProxyShapeSceneIndex->Detach();
     }
 
-    // Removing the chain removes its prims from Hydra while it still holds the previous
-    // stage; the new chain is then populated once, from the current stage.
+    // The old chain still holds the previous stage, so removing it removes all its prims;
+    // the new chain is populated once, from the current stage.
     _RemoveSceneIndexForNode(dagNode);
     _AddSceneIndexForNode(dagNode, prefix);
 }
