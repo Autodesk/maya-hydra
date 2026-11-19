@@ -15,6 +15,7 @@
 
 #include "fvpUnloadedPayloadBoundsSceneIndex.h"
 
+#include "flowViewport/fvpUtils.h"
 #include "flowViewport/sceneIndex/fvpBoundsCurvesDataSource.h"
 
 #include <pxr/base/gf/range3d.h>
@@ -275,13 +276,8 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsRemoved(
     // needs updating.
     if (!_unloadedPrims.empty()) {
         for (const auto& entry : entries) {
-            auto first = _unloadedPrims.lower_bound(entry.primPath);
-            auto last = first;
-            while (last != _unloadedPrims.end() && last->HasPrefix(entry.primPath)) {
-                _unloadedPrimsWithExtents.erase(*last);
-                ++last;
-            }
-            _unloadedPrims.erase(first, last);
+            EraseSelfAndDescendants(entry.primPath, _unloadedPrimsWithExtents);
+            EraseSelfAndDescendants(entry.primPath, _unloadedPrims);
         }
     }
 
@@ -322,6 +318,8 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsDirtied(
 
         const bool extentDirtied = entry.dirtyLocators.Intersects(extentLocator);
         const bool hadBox = _HasBox(entry.primPath);
+        // A prim that becomes loaded gets a type, so will go through PrimsAdded.
+        // We only need to handle extent updates here.
         if (extentDirtied) {
             _UpdateTracking(entry.primPath);
         }
