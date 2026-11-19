@@ -258,11 +258,11 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsAdded(
     if (!_IsObserved()) {
         return;
     }
-    if (!added.empty()) {
-        _SendPrimsAdded(added);
-    }
     if (!removed.empty()) {
         _SendPrimsRemoved(removed);
+    }
+    if (!added.empty()) {
+        _SendPrimsAdded(added);
     }
     _SendPrimsAdded(entries);
 }
@@ -348,13 +348,13 @@ void UnloadedPayloadBoundsSceneIndex::_PrimsDirtied(
     if (!removed.empty()) {
         _SendPrimsRemoved(removed);
     }
-    _SendPrimsDirtied(entries);
     if (!added.empty()) {
         _SendPrimsAdded(added);
     }
     if (!dirtied.empty()) {
         _SendPrimsDirtied(dirtied);
     }
+    _SendPrimsDirtied(entries);
 }
 
 } // namespace FVP_NS_DEF
