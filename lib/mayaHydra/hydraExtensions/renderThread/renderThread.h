@@ -180,12 +180,22 @@ public:
     /// usable fence.
     bool OrderAfterLastRender();
 
+    /// Run \p job on the render thread, with its context and HgiGL arena
+    /// current, and return once it has run. Waits first for pending and
+    /// running renders to finish. The caller must keep Maya data out of the
+    /// job's reach, as for a render. Runs \p job on the calling thread if the
+    /// render thread is not running.
+    void RunOnRenderThread(const std::function<void()>& job);
+
     bool IsRunning() const { return _thread.joinable(); }
 
 private:
     void _ThreadLoop();
 
     void _ExecuteRequest(const RenderThreadRequest& request);
+
+    /// Runs \p fn with this thread's HgiGL arena selected, when there is one.
+    void _WithContextArena(const std::function<void()>& fn);
 
     /// Publish \p fence, created after a render's GPU work, to
     /// OrderAfterLastRender.
@@ -249,6 +259,10 @@ private:
     /// the result. Guarded by _requestMutex on both edges; this is what makes a
     /// drain wait for completion, since _hasPending goes false at pickup.
     std::atomic<bool>              _inFlight{false};
+
+    /// Set by RunOnRenderThread, and cleared by the render thread once the job
+    /// has run. Guarded by _requestMutex.
+    const std::function<void()>*   _pendingJob{nullptr};
 
     /// Signalled when the thread goes idle, so a drain need not poll.
     std::condition_variable        _idleCv;

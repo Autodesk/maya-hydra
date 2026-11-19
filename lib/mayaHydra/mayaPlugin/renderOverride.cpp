@@ -1315,7 +1315,7 @@ MStatus MtohRenderOverride::Render(
             // running the draw must not present: HgiInterop makes GL calls belonging to
             // the presenting thread's context, so the main thread composites instead.
             currentPass->params().enablePresentation =
-                isLastVisiblePass && !(_renderThreadStarted && _firstFramePrimed);
+                isLastVisiblePass && !_SubmitsToRenderThread();
             // Set the AOV to visualize
             // Per HVT, the AOV to visualize must be set on the last visible pass, and HdAovTokens->color must be set on other passes
             TfToken visualizeAOV = HdAovTokens->color;
@@ -1349,6 +1349,7 @@ MStatus MtohRenderOverride::Render(
         // An active capture locks around reads unless held, which would serialize
         // Hydra's parallel sync on this thread.
         if (_renderThreadStarted) {
+            _PrepareRenderTasks(orderedPassIndices);
             _HoldRenderThreadCapture(false);
         }
         _DrawPasses(orderedPassIndices);
@@ -1898,7 +1899,7 @@ MStatus MtohRenderOverride::Render(
     // already waited for the render thread to finish the previous one.
     bool submittedToRenderThread = false;
     auto submitOrDrawFrame = [&]() {
-        if (_renderThreadStarted && _firstFramePrimed) {
+        if (_SubmitsToRenderThread()) {
             MAYAHYDRA_NS_DEF::RenderThreadRequest request;
             request.frameId       = ++_renderThreadFrameId;
             request.colorAovToken = HdAovTokens->color;
@@ -1906,6 +1907,7 @@ MStatus MtohRenderOverride::Render(
             request.dstRegion     = GfVec4i(0, 0, width, height);
             pushSceneState();
             request.passIndices = preparePasses();
+            _PrepareRenderTasks(request.passIndices);
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
             // Covers the shared buffer copies the push just issued on Maya's context.
             if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext()) {
@@ -1917,6 +1919,7 @@ MStatus MtohRenderOverride::Render(
             _HoldRenderThreadCapture(true);
             _renderThread->SubmitRequest(std::move(request));
             submittedToRenderThread = true;
+            _firstFramePrimed = true;
         } else {
             renderFrame(true);
             MAYAHYDRA_NS_DEF::RenderThreadStats::instance().RecordFrameRenderedSynchronously();
@@ -1948,10 +1951,14 @@ MStatus MtohRenderOverride::Render(
     // Maya follows a time change outside playback (the start and end frame buttons, a
     // single time slider step) with exactly one redraw. Compositing the previous
     // frame's image here would leave the viewport a frame behind with nothing to
-    // correct it, so this render op composites its own frame once it completes.
-    // Maya's framebuffer and viewport are captured now, while they are still bound.
+    // correct it, so this render op composites its own frame once it completes. So
+    // does a first frame drawn on the render thread, which has nothing earlier to
+    // composite. Maya's framebuffer and viewport are captured now, while they are
+    // still bound.
+    const bool primingOnRenderThread = !_firstFramePrimed && _RenderThreadDrawsAll();
     const bool compositeOwnFrame
-        = (timeChangedWhileStopped || panelChanged) && _renderThreadStarted;
+        = (timeChangedWhileStopped || panelChanged || primingOnRenderThread)
+        && _renderThreadStarted;
     GLint      mayaFramebuffer = 0;
     GLint      mayaViewport[4] = { 0, 0, 0, 0 };
     if (compositeOwnFrame) {
@@ -2376,7 +2383,7 @@ void MtohRenderOverride::_PickHoverHit(
 
     HdxPickHitVector hits;
     pickParams.outHits = &hits;
-    outlinePass->Pick(pickParams);
+    _RunPick([&] { outlinePass->Pick(pickParams); });
 
     if (hits.empty()) {
         return; // background / no prim under the cursor
@@ -3515,7 +3522,7 @@ void MtohRenderOverride::_PickByRegion(
         // in order to accumulate the pick hits from multiple passes.
         HdxPickHitVector tempHits;
         pickParams.outHits = &tempHits;
-        pass->Pick(pickParams);
+        _RunPick([&] { pass->Pick(pickParams); });
     
         //Combine the 2 PickHitVector
         if (!tempHits.empty()) {
@@ -4416,48 +4423,84 @@ void MtohRenderOverride::_ReleaseRenderThreadCapture()
     }
 }
 
+bool MtohRenderOverride::_RenderThreadDrawsAll() const
+{
+    return _renderThreadStarted && _renderThread && _hgi
+        && _hgi->GetAPIName() == HgiTokens->OpenGL;
+}
+
+bool MtohRenderOverride::_SubmitsToRenderThread() const
+{
+    return _renderThreadStarted && (_firstFramePrimed || _RenderThreadDrawsAll());
+}
+
+void MtohRenderOverride::_RunPick(const std::function<void()>& pick)
+{
+    if (!_RenderThreadDrawsAll()) {
+        pick();
+        return;
+    }
+    _HoldRenderThreadCapture(true);
+    _renderThread->RunOnRenderThread(pick);
+    _ReleaseRenderThreadCapture();
+}
+
+bool MtohRenderOverride::_GetPassRenderTasks(
+    const std::vector<int>& orderedPassIndices,
+    int                     idx,
+    HdTaskSharedPtrVector&  outTasks)
+{
+    const int                passIndex   = orderedPassIndices[idx];
+    const hvt::FramePassPtr& currentPass = _GetFramePass(passIndex);
+    if (!currentPass) {
+        return false;
+    }
+
+    if (passIndex == 0) {
+        // Do not share the AOVs, for the first pass only
+        outTasks = currentPass->GetRenderTasks();
+    } else {
+        // Share AOVs from the previous drawn pass, or pass0 as a fallback
+        const int          previousPassIndex = (idx > 0) ? orderedPassIndices[idx - 1] : 0;
+        hvt::FramePassPtr& previousPass      = _GetFramePass(previousPassIndex);
+        if (!previousPass) {
+            return false;
+        }
+        const hvt::RenderBufferBindings inputAOVs
+            = previousPass->GetRenderBufferBindingsForNextPass(
+                { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth });
+        outTasks = currentPass->GetRenderTasks(inputAOVs);
+    }
+#if PXR_VERSION >= 2605
+    if (_sceneGlobalsSceneIndex) {
+        const SdfPath& cameraPath = currentPass->params().renderParams.camera;
+        if (!cameraPath.IsEmpty()) {
+            _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+        }
+    }
+#endif
+    return true;
+}
+
+void MtohRenderOverride::_PrepareRenderTasks(const std::vector<int>& orderedPassIndices)
+{
+    const int numPasses = static_cast<int>(orderedPassIndices.size());
+    for (int idx = 0; idx < numPasses; ++idx) {
+        HdTaskSharedPtrVector tasks;
+        _GetPassRenderTasks(orderedPassIndices, idx, tasks);
+    }
+}
+
 void MtohRenderOverride::_DrawPasses(const std::vector<int>& orderedPassIndices)
 {
     const int numPasses = static_cast<int>(orderedPassIndices.size());
     for (int idx = 0; idx < numPasses; ++idx) {
         MH_PROFILE_SCOPE("MayaHydra frame pass");
-        const int                passIndex   = orderedPassIndices[idx];
-        const hvt::FramePassPtr& currentPass = _GetFramePass(passIndex);
-        if (!currentPass) {
-            continue;
-        }
-
-        if (passIndex == 0) {
-            // Do not share the AOVs, for the first pass only
-            HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
-#if PXR_VERSION >= 2605
-            if (_sceneGlobalsSceneIndex) {
-                const SdfPath& cameraPath = currentPass->params().renderParams.camera;
-                if (!cameraPath.IsEmpty()) {
-                    _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
-                }
-            }
-#endif
-            currentPass->Render(passTasks);
-        } else {
-            // Share AOVs from the previous drawn pass, or pass0 as a fallback
-            const int          previousPassIndex = (idx > 0) ? orderedPassIndices[idx - 1] : 0;
-            hvt::FramePassPtr& previousPass      = _GetFramePass(previousPassIndex);
-            if (previousPass) {
-                const hvt::RenderBufferBindings inputAOVs
-                    = previousPass->GetRenderBufferBindingsForNextPass(
-                        { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth });
-                HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
-#if PXR_VERSION >= 2605
-                if (_sceneGlobalsSceneIndex) {
-                    const SdfPath& cameraPath = currentPass->params().renderParams.camera;
-                    if (!cameraPath.IsEmpty()) {
-                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
-                    }
-                }
-#endif
-                currentPass->Render(passTasks);
-            }
+        // Taken again right before each pass renders: a pass reads the AOVs of the
+        // one before it, which are known only once that one has rendered.
+        HdTaskSharedPtrVector passTasks;
+        if (_GetPassRenderTasks(orderedPassIndices, idx, passTasks)) {
+            _GetFramePass(orderedPassIndices[idx])->Render(passTasks);
         }
     }
 }

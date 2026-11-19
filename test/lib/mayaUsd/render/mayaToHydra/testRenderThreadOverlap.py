@@ -106,11 +106,11 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             % dict(stats))
 
     def test_overlapRuns(self):
-        """The first frame is drawn synchronously, the rest on the render
-        thread, and what it draws reaches the screen without any of the
-        failures that would still leave a believable image."""
+        """The first frame leaves an image behind, the rest are drawn on the
+        render thread, and what it draws reaches the screen without any of
+        the failures that would still leave a believable image."""
         # Reset before building, because building the scene re-initializes
-        # Hydra and so triggers the synchronous first frame.
+        # Hydra and so triggers the first frame.
         cmds.mayaHydraTesting(resetRenderThreadStats=True)
         self.buildScene()
         for _ in range(6):
@@ -119,11 +119,13 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
 
         stats = self.stats()
         self.assertRenderThreadIsLive(stats)
+        # Under OpenGL the first frame is drawn on the render thread and
+        # composited as its own frame instead.
         self.assertGreater(
-            stats["framesRenderedSynchronously"], 0,
-            "No frame was drawn synchronously after Hydra was re-initialized, "
-            "so the first render op had no image to leave behind. Stats: %s"
-            % dict(stats))
+            stats["framesRenderedSynchronously"] + stats["ownFramesComposited"], 0,
+            "The first frame after Hydra was re-initialized was neither drawn "
+            "synchronously nor composited as its own frame, so the first "
+            "render op had no image to leave behind. Stats: %s" % dict(stats))
         self.assertGreater(
             stats["framesComposited"], 0,
             "Frames were rendered off-thread but none were composited, so "

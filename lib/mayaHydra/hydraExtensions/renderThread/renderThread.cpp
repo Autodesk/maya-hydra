@@ -227,22 +227,29 @@ RenderThread::_ThreadLoop()
     {
         RenderThreadRequest request;
         bool hasRequest = false;
+        const std::function<void()>* job = nullptr;
         {
             std::unique_lock<std::mutex> lock(_requestMutex);
             _requestCv.wait(lock, [this] {
                 return _stop.load(std::memory_order_acquire)
-                    || _hasPending.load(std::memory_order_acquire);
+                    || _hasPending.load(std::memory_order_acquire)
+                    || _pendingJob;
             });
 
             // A pending request is rendered even when stopping, for the same
             // reason SubmitRequest never replaces one.
             if (_stop.load(std::memory_order_acquire)
-                && !_hasPending.load(std::memory_order_acquire))
+                && !_hasPending.load(std::memory_order_acquire) && !_pendingJob)
             {
                 break;
             }
 
-            if (_hasPending.load(std::memory_order_acquire))
+            if (_pendingJob)
+            {
+                job = _pendingJob;
+                _inFlight.store(true, std::memory_order_release);
+            }
+            else if (_hasPending.load(std::memory_order_acquire))
             {
                 request = std::move(_pendingRequest);
                 _hasPending.store(false, std::memory_order_release);
@@ -269,6 +276,22 @@ RenderThread::_ThreadLoop()
 
             {
                 std::lock_guard<std::mutex> lock(_requestMutex);
+                _inFlight.store(false, std::memory_order_release);
+            }
+            _idleCv.notify_all();
+        }
+        else if (job)
+        {
+            {
+                ScopedAutoreleasePool pool;
+                RenderThreadStats::instance().SetRendering(true, _mainThread);
+                _WithContextArena(*job);
+                RenderThreadStats::instance().SetRendering(false, _mainThread);
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(_requestMutex);
+                _pendingJob = nullptr;
                 _inFlight.store(false, std::memory_order_release);
             }
             _idleCv.notify_all();
@@ -526,6 +549,31 @@ RenderThread::_ReleaseContextArena()
 }
 
 void
+RenderThread::_WithContextArena(const std::function<void()>& fn)
+{
+    // Select this thread's arena, so Hydra's framebuffers are created in and
+    // looked up from this context. Scoped rather than set once, because the
+    // arena is state on the shared Hgi instance.
+    //
+    // Safe against the concurrent composite only because the composite reads
+    // the AOV's GL id through HgiInterop rather than submitting Hgi commands.
+    // If that changes, the arenas have to become per thread, not per render.
+    HgiGL* hgiGl = dynamic_cast<HgiGL*>(_hgi);
+    const bool useArena = (hgiGl != nullptr) && bool(_contextArena);
+    if (useArena)
+    {
+        hgiGl->SetContextArena(_contextArena);
+    }
+
+    fn();
+
+    if (useArena)
+    {
+        hgiGl->SetContextArena(HgiGLContextArenaHandle());
+    }
+}
+
+void
 RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
 {
     if (!_renderCallback)
@@ -549,26 +597,8 @@ RenderThread::_ExecuteRequest(const RenderThreadRequest& request)
                 static_cast<unsigned long long>(request.frameId));
     }
 
-    // Select this thread's arena for the render, so Hydra's framebuffers are
-    // created in and looked up from this context. Scoped rather than set once,
-    // because the arena is state on the shared Hgi instance.
-    //
-    // Safe against the concurrent composite only because the composite reads
-    // the AOV's GL id through HgiInterop rather than submitting Hgi commands.
-    // If that changes, the arenas have to become per thread, not per render.
-    HgiGL* hgiGl = dynamic_cast<HgiGL*>(_hgi);
-    const bool useArena = (hgiGl != nullptr) && bool(_contextArena);
-    if (useArena)
-    {
-        hgiGl->SetContextArena(_contextArena);
-    }
-
-    RenderResult result = _renderCallback(request);
-
-    if (useArena)
-    {
-        hgiGl->SetContextArena(HgiGLContextArenaHandle());
-    }
+    RenderResult result;
+    _WithContextArena([&] { result = _renderCallback(request); });
 
     // Take a copy of the AOV before anything else can render into it. Ordered
     // before the fence deliberately: the copy is what gets published, so the
@@ -795,6 +825,31 @@ RenderThread::CompositeLatest(
     _lastComposited = frame;
     RenderThreadStats::instance().RecordFrameComposited();
     return true;
+}
+
+void
+RenderThread::RunOnRenderThread(const std::function<void()>& job)
+{
+    if (!_thread.joinable())
+    {
+        job();
+        return;
+    }
+
+    MH_PROFILE_SCOPE("RenderThread_RunOnRenderThread");
+
+    {
+        std::unique_lock<std::mutex> lock(_requestMutex);
+        _idleCv.wait(lock, [this] {
+            return !_inFlight.load(std::memory_order_acquire)
+                && !_hasPending.load(std::memory_order_acquire) && !_pendingJob;
+        });
+        _pendingJob = &job;
+    }
+    _requestCv.notify_one();
+
+    std::unique_lock<std::mutex> lock(_requestMutex);
+    _idleCv.wait(lock, [this] { return !_pendingJob; });
 }
 
 bool

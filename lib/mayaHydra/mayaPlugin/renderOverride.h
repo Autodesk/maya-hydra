@@ -89,6 +89,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -504,7 +505,20 @@ private:
     /// pass list rather than recomputing it, so the caller controls when each half runs.
     ///
     /// Runs on the render thread when overlap is enabled, so it must not call into Maya.
-    void                     _DrawPasses(const std::vector<int>& orderedPassIndices);
+    void _DrawPasses(const std::vector<int>& orderedPassIndices);
+
+    /// Runs FramePass::GetRenderTasks for each of the given passes without drawing.
+    /// On the main thread before the capture is held, because it changes the scene the
+    /// draw reads (render buffers, camera, task parameters), and the capture holds back
+    /// changes made once it is held.
+    void _PrepareRenderTasks(const std::vector<int>& orderedPassIndices);
+
+    /// FramePass::GetRenderTasks for the pass at \p idx in \p orderedPassIndices, with
+    /// the AOVs of the pass before it. Returns false if there is nothing to draw.
+    bool _GetPassRenderTasks(
+        const std::vector<int>&         orderedPassIndices,
+        int                             idx,
+        PXR_NS::HdTaskSharedPtrVector&  outTasks);
 
     /// Hold every frame pass's render thread capture (see
     /// RenderThreadCaptureSceneIndex), first activating it if \p activate.
@@ -514,6 +528,21 @@ private:
     /// Release what _HoldRenderThreadCapture held. Main thread, and only while
     /// no frame is rendering on the render thread.
     void _ReleaseRenderThreadCapture();
+
+    /// Under OpenGL, once the render thread runs, it draws everything, picks
+    /// and the first frame included. HgiGLGraphicsPipeline deletes and
+    /// recreates its vertex array object on whichever context binds it, and
+    /// vertex array objects are not shared between contexts. A draw on Maya's
+    /// context with a pipeline the render thread used last would delete a
+    /// name that, on Maya's context, may belong to Maya or another plug-in.
+    bool _RenderThreadDrawsAll() const;
+
+    /// Whether this frame goes to the render thread rather than being drawn here.
+    bool _SubmitsToRenderThread() const;
+
+    /// Runs \p pick on the render thread when _RenderThreadDrawsAll(), holding
+    /// the capture around it as for a frame, and here otherwise.
+    void _RunPick(const std::function<void()>& pick);
 
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;
@@ -630,7 +659,8 @@ private:
     std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadPresentBridge> _presentBridge;
     bool _renderThreadStarted = false;
     // The first frame is drawn synchronously so a render op always leaves an image
-    // behind; overlap starts once this is true.
+    // behind, or under OpenGL, composited as its own frame; overlap starts once
+    // this is true.
     bool _firstFramePrimed = false;
     // The panel the render thread's frames are drawn for.
     std::string _renderThreadPanel;

@@ -35,6 +35,15 @@ The share group shares textures, buffers, programs and sync objects, but not
 framebuffers or vertex array objects; those belong to the context that created
 them.
 
+HgiGL deletes and recreates a pipeline's vertex array object on whichever
+context is current when the pipeline binds.  A pipeline bound on both contexts
+would delete, on Maya's context, a name it created on the render thread's, which
+on Maya's context may belong to Maya or another plug-in.  So under OpenGL, once
+the thread has started, every Hydra draw runs on it: picks run there through
+`RunOnRenderThread`, which blocks the main thread until the pick is done, and
+the first frame is drawn there and composited as its own frame (see Priming,
+below).
+
 `hgi/hgi.h` requires command submission on the "main thread", which for OpenGL
 it defines as the thread the context is bound on, so a thread owning its own
 context satisfies that contract.  `hgiGL` additionally requires one context
@@ -165,7 +174,12 @@ happens on the first frame submitted to the render thread.  From then on it:
   `RenderThreadCaptureByReference`, such as the lazy readback of a shared GPU
   buffer, are kept by reference;
 - is held right before each frame is submitted, after the scene push and pass
-  preparation.  Holding copies everything dirtied since the last hold, then
+  preparation.  Pass preparation runs `FramePass::GetRenderTasks` for every
+  pass, which adds and resizes the passes' render buffers and sets their camera
+  and task parameters; done only after the hold, the draw would not see those
+  changes until the next frame.  The draw runs it again right before each pass,
+  because a pass reads the AOVs the pass before it has just rendered.  Holding
+  copies everything dirtied since the last hold, then
   queues notices from upstream instead of applying them, so the copy cannot
   change while the render thread reads it;
 - is released, applying and forwarding the queued notices in order, once the
@@ -173,7 +187,8 @@ happens on the first frame submitted to the render thread.  From then on it:
   change of panel), after `-drainRenderThread`, and when the thread stops.
 
 A synchronous main-thread frame holds and releases it around the draw, so that
-Hydra's parallel sync reads the copy without taking any lock.
+Hydra's parallel sync reads the copy without taking any lock.  A pick run on the
+render thread is held the same way.
 
 Between a release and the next hold, a prim read through the capture is copied
 on the spot if it is pending.  Flash's observer reads every dirtied prim from
@@ -197,9 +212,11 @@ during the render thread's sync, so overlap always runs with it.
 
 ## Priming, discarding and compositing
 
-**The first frame is drawn synchronously.**  There is nothing to composite
-before a frame has been produced, so the first frame after resources are
-initialised takes the main-thread path, and overlap begins with the second.
+**The first frame does not overlap.**  There is nothing to composite before a
+frame has been produced, so the first frame after resources are initialised
+takes the main-thread path, and overlap begins with the second.  Under OpenGL
+the first frame is instead drawn on the render thread and composited as its own
+frame, as below, so that pipelines bind on one context only.
 
 **Each render op composites the previous op's frame.**  The interlock waits
 for that frame before the composite, so the composite never shows anything
@@ -212,7 +229,7 @@ picking, where a frame rendered before the pick would otherwise be composited
 after it and show a pre-pick image; and when the render op is for a different
 panel or destination than the last frame was drawn for.  The discard waits,
 with no time limit, for any render still running.  After a resize the next
-frame primes synchronously again.
+frame is primed again.
 
 **A change of panel composites its own frame.**  One render override draws
 every Hydra panel, but the handoff holds a single frame, so a frame drawn for
@@ -273,8 +290,9 @@ feature did nothing.
 
 `testRenderThreadOverlap.py` runs only with the flag on.  It asserts that the
 thread started, that frames were drawn off the main thread and composited,
-that the first frame was drawn synchronously, and that every failure counter
-is zero, `mayaReadsOnRenderThread` included.
+that the first frame left an image (drawn synchronously, or under OpenGL
+composited as its own frame), and that every failure counter is zero,
+`mayaReadsOnRenderThread` included.
 
 Another edits a point light, a spot light, a material, the camera and mesh
 points between frames, and asserts that the capture copied prims and that no
@@ -320,7 +338,3 @@ stops happening.
 - Time changes outside playback and changes of panel composite their own
   frame; other single-redraw changes (for example a scripted attribute edit
   with no further redraw) still show the previous frame until the next redraw.
-- HgiGL deletes and recreates a pipeline's vertex array object on whichever
-  context is current when the pipeline binds.  A synchronous main-thread frame
-  (a pick, or the prime after a resize) that binds a pipeline the render thread
-  last used deletes a VAO name on Maya's context that it never created there.
