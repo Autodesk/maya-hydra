@@ -1189,6 +1189,12 @@ MStatus MtohRenderOverride::Render(
             _mayaHydraSceneIndex->UpdateLightsShadowCollection();
         }
 
+        // Apply any pending update from MayaUsd proxy shape nodes. This must come before the data
+        // producer updates below: a proxy shape whose scene index chain is replaced here gets a
+        // new data producer, which starts with an identity transform and visible, and needs the
+        // node's transform and visibility before this frame draws.
+        _sceneIndexRegistry->ApplyPendingUpdates();
+
         // Update plugin data producers
         for (auto& viewportData : Fvp::RenderViewDataManager::Get().GetAllViewData()) {
             for (auto& dataProducer : viewportData.GetDataProducerSceneIndicesData()) {
@@ -1196,9 +1202,6 @@ MStatus MtohRenderOverride::Render(
                 dataProducer->UpdateTransform();
             }
         }
-
-        //Apply any pending update from MayaUsd proxy shape nodes
-        _sceneIndexRegistry->ApplyPendingUpdates();
 
         // Update plugin filtering scene indices
         std::string rendererNamesToUpdate;

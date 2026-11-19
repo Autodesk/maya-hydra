@@ -47,9 +47,10 @@ class TestUsdStageInvalidateNativeInstances(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         cmds.refresh(force=True)
 
-    def usdRprims(self):
+    def usdRprims(self, visibleOnly=False):
         cmds.refresh(force=True)
-        rprims = cmds.mayaHydra(renderer='HdStormRendererPlugin', listRenderIndex=True) or []
+        rprims = cmds.mayaHydra(renderer='HdStormRendererPlugin', listRenderIndex=True,
+                                visibleOnly=visibleOnly) or []
         return [rprim for rprim in rprims if rprim.startswith(PROXY_SHAPE_PREFIX)]
 
     def assertSingleCube(self, when):
@@ -72,6 +73,35 @@ class TestUsdStageInvalidateNativeInstances(mtohUtils.MayaHydraBaseTestCase):
         # The scene index chain that replaced the first one must handle an invalidate too.
         cmds.setAttr(self.STAGE_SHAPE + '.primPath', '', type='string')
         self.assertSingleCube('after a second stage invalidate')
+
+    def test_stageInvalidateOfHiddenProxyShape(self):
+        # The replacement chain must get the proxy shape's visibility before its first draw: a
+        # single refresh after the invalidate must not show the hidden stage. This uses a stage
+        # without native instancing: the instancer hides native instances, and their prototype
+        # rprim stays visible in the render index.
+        usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cube.usda')
+        shape = usdUtils.createStageFromFile(usdScenePath)
+        cmds.select(clear=True)
+        self.assertNotEqual(self.usdRprims(visibleOnly=True), [], 'after loading the stage')
+        transform = cmds.listRelatives(shape, parent=True, fullPath=True)[0]
+        cmds.setAttr(transform + '.visibility', False)
+        self.assertEqual(self.usdRprims(visibleOnly=True), [], 'after hiding the proxy shape')
+
+        cmds.setAttr(shape + '.primPath', '', type='string')
+        self.assertEqual(self.usdRprims(visibleOnly=True), [], 'after the stage invalidate')
+        # The stage is still in Hydra, only hidden.
+        self.assertNotEqual(self.usdRprims(), [], 'after the stage invalidate')
+
+    def test_stageInvalidateAfterRename(self):
+        # The replacement chain keeps the Hydra paths of the proxy shape, which the selection
+        # and isolate select hold, even if the node was renamed since its first chain.
+        self.loadStage()
+        self.assertSingleCube('after loading the stage')
+        rprimsBefore = self.usdRprims()
+
+        renamedShape = cmds.rename(self.STAGE_SHAPE, 'renamedStageShape')
+        cmds.setAttr(renamedShape + '.primPath', '', type='string')
+        self.assertEqual(self.usdRprims(), rprimsBefore, 'after a rename and a stage invalidate')
 
     def test_reloadAfterFileNew(self):
         self.loadStage()

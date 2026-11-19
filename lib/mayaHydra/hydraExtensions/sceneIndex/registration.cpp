@@ -189,7 +189,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
     return false;
 }
 
-void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
+void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode, const SdfPath& prefix)
 {
     const MayaHydraSceneIndexRegistrationPtr registration(new MayaUsdSceneIndexRegistration());
 
@@ -201,8 +201,9 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     }
 
     registration->dagNode = MObjectHandle(dagNode);
-    registration->sceneIndexPathPrefix = sceneIndexPathPrefix(
-        _dataProducerMergingSceneIndex, dagNode);
+    registration->sceneIndexPathPrefix = prefix.IsEmpty()
+        ? sceneIndexPathPrefix(_dataProducerMergingSceneIndex, dagNode)
+        : prefix;
         
     //We receive only dag nodes of type MayaUsdProxyShapeNode
     MAYAUSDAPI_NS::ProxyStage proxyStage(dagNode);
@@ -372,6 +373,12 @@ void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
         return;
     }
 
+    // Keep the node's Hydra paths. The prefix is generated from the node name only when the
+    // chain is first added, and the selection and isolate select hold paths under it, so a
+    // rename since then must not move the prims. The old chain is removed first, so the prefix
+    // is free again when the new chain is added.
+    const SdfPath prefix = it->second->sceneIndexPathPrefix;
+
     // Release the old scene index's path mapper and pick handler now: the new one registers its
     // own for the same paths, and the old one may stay alive after its removal.
     MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex
@@ -383,7 +390,7 @@ void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
     // Removing the chain removes its prims from Hydra while it still holds the previous
     // stage; the new chain is then populated once, from the current stage.
     _RemoveSceneIndexForNode(dagNode);
-    _AddSceneIndexForNode(dagNode);
+    _AddSceneIndexForNode(dagNode, prefix);
 }
 
 SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderDescriptionPathPrefix;
