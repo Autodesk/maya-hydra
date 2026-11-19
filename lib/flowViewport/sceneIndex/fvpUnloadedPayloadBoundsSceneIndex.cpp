@@ -182,8 +182,14 @@ void UnloadedPayloadBoundsSceneIndex::DirtyWireframeColors(const SdfPathVector& 
 
 void UnloadedPayloadBoundsSceneIndex::_StopTracking(const SdfPath& primPath)
 {
-    _unloadedPrims.erase(primPath);
-    _unloadedPrimsWithExtents.erase(primPath);
+    // Fast path: most scenes track nothing, so skip the erase.
+    if (_unloadedPrims.empty()) {
+        return;
+    }
+    if (_unloadedPrims.erase(primPath)) {
+        // _unloadedPrimsWithExtents is a subset of _unloadedPrims.
+        _unloadedPrimsWithExtents.erase(primPath);
+    }
 }
 
 void UnloadedPayloadBoundsSceneIndex::_UpdateTracking(const SdfPath& primPath)
