@@ -33,10 +33,8 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     : ParentClass(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle,
                   sceneIndexPathPrefix, sceneIndexAppPath)
 {
-    // Share the USD pick handler with the proxy shape scene indices of the other
-    // live render overrides, which can use the same prefix: it stays registered
-    // until the last of them is destroyed. The handler resolves hits through the
-    // pick context, so any one of them serves all.
+    // Shared with the other live render overrides' proxy shape scene indices, which
+    // can use the same prefix: the handler resolves hits through the pick context.
     _unregisterPickHandler = TF_VERIFY(MayaHydra::PickHandlerRegistry::Instance().RegisterShared(
         sceneIndexPathPrefix, std::make_shared<UsdPickHandler>()));
 }

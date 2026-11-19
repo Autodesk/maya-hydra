@@ -114,10 +114,8 @@ namespace MAYAHYDRA_NS_DEF {
 // interface, and the Maya scene index builds the Maya pick handler), they are
 // both defined here in the same implementation file.
 //
-// Every render override registers its Maya data under the same rprim path, so one
-// handler serves all of them: it resolves the hit in the scene index of the
-// override that picks, given by the pick context, as each override has its own
-// render item adapters.
+// All render overrides share the Maya rprim path, so one handler serves them all: it
+// resolves hits in the picking override's scene index, given by the pick context.
 class MayaViewportSceneIndex::MayaPickHandler : public MayaHydra::PickHandler
 {
 public:
@@ -186,8 +184,7 @@ MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inp
         _mayaDataSceneIndex->CreateMaterial(_defaultMaterialPath, defaultMaterialShadingGroupObj);
     }
 
-    // Share the Maya pick handler with the other live render overrides: it stays
-    // registered until the last Maya viewport scene index is destroyed.
+    // Shared with the other live render overrides, unregistered with the last one.
     _hasPickHandlerRegistered = TF_VERIFY(MayaHydra::PickHandlerRegistry::Instance().RegisterShared(
         mayaDataSceneIndex->GetRprimPath(), std::make_shared<MayaPickHandler>()));
 
@@ -204,8 +201,7 @@ MayaViewportSceneIndex::~MayaViewportSceneIndex()
 
 void MayaViewportSceneIndex::Destroy()
 {
-    // Release our share of the Maya pick handler. Destroy() runs twice: explicitly from
-    // ClearHydraResources() and again from the destructor, so release only once.
+    // Destroy() runs twice (ClearHydraResources(), then the destructor): release once.
     if (_hasPickHandlerRegistered) {
         auto& phr = MayaHydra::PickHandlerRegistry::Instance();
         TF_VERIFY(phr.UnregisterShared(_mayaDataSceneIndex->GetRprimPath()));

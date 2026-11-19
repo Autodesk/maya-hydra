@@ -3357,7 +3357,6 @@ bool MtohRenderOverride::select(
     const unsigned int mayaSnLengthBefore = selectionList.length();
     {
         // Pick handlers resolve the hits in this override's render index and scene indices.
-        // Another override can be live at the same time, in another viewport (HYDRA-2726).
         const PickContextScope pickContextScope(this);
         _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
     }

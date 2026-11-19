@@ -138,13 +138,10 @@ private:
     MayaUsdProxyShapeSceneIndexBase& _psSi;
 };
 
-// Instances not destroyed yet, oldest first. Each Hydra render override builds its own proxy
-// shape scene index for a proxy shape node, so several can be live for the same node (one per
-// viewport renderer), but only one can register its path mapper under the node's UFE path.
-// When that one is destroyed, the newest remaining instance for the same node registers its own
-// mapper, so the other viewports keep mapping USD paths (HYDRA-2726). Their mappers are
-// interchangeable: each maps the same stage under its scene index path prefix, which is built
-// from the node name. Main thread only.
+// Instances not destroyed yet, oldest first. Each render override has its own instance per
+// proxy shape node, but only one can register its path mapper under the node's UFE path; the
+// mappers are interchangeable, so another instance takes over when it is destroyed. Main thread
+// only.
 std::vector<MayaUsdProxyShapeSceneIndexBase*> liveProxyShapeSceneIndices;
 
 } // namespace
@@ -201,8 +198,7 @@ void MayaUsdProxyShapeSceneIndexBase::SetSceneIndexAppPath(const Ufe::Path& scen
     const Ufe::Path oldPath = _sceneIndexAppPath;
     _sceneIndexAppPath = sceneIndexAppPath;
 
-    // Every live instance for the renamed node observes the rename, but only the owner of the
-    // registration moves it: a second Update() of the old path would fail.
+    // Every instance for the node observes the rename: only the registration owner moves it.
     if (_unregisterPathMapper) {
         TF_AXIOM(Fvp::PathMapperRegistry::Instance().Update(oldPath, sceneIndexAppPath));
     }

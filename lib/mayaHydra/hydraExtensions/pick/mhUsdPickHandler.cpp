@@ -418,8 +418,7 @@ bool UsdPickHandler::resolvePickHit(
     const PickHit& pickHit, bool isSolePickHit, Ufe::SceneItemList& sceneItems
 ) const
 {
-    // Not fatal: picking without a context or a render index is a coding error, but
-    // must not take Maya down (HYDRA-2726).
+    // Coding errors, but not fatal: they must not take Maya down.
     const auto registry = sceneIndexRegistry();
     if (!registry) {
         TF_CODING_ERROR("Picking called while no scene index registry exists");

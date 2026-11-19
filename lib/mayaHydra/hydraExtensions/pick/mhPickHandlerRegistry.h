@@ -66,12 +66,10 @@ public:
     MAYAHYDRALIB_API
     PickHandlerConstPtr GetHandler(const PXR_NS::SdfPath& path) const;
 
-    //! Register a pick handler shared by several owners under prefix. Each Hydra
-    //! render override builds its own scene indices, and several overrides can be
-    //! live at once (one per viewport renderer), each wanting a handler under the
-    //! same prefix. The first call registers pickHandler; later calls for the same
-    //! prefix only count an owner, so the handlers passed for one prefix must be
-    //! interchangeable (resolve through the pick context, not a captured owner).
+    //! Register a pick handler under prefix, shared by several owners (e.g. one
+    //! per live render override). The first call registers pickHandler, later
+    //! calls only add an owner, so the handlers for one prefix must be
+    //! interchangeable.
     /*!
       \return False if the first registration fails (see Register()), true otherwise.
     */
@@ -105,11 +103,8 @@ private:
 /// \class PickContextScope
 ///
 /// Sets the pick context for the lifetime of the scope, and restores the
-/// previous one on exit. Several Hydra render overrides can be live at once (one
-/// per viewport renderer), each its own pick context, so the override that picks
-/// sets it for the duration of the pick: a context set at initialization would
-/// belong to whichever override initialized last, and could be cleared by the
-/// teardown of another one while the remaining override still picks.
+/// previous one on exit. Several render overrides can be live at once, so the
+/// override that picks sets itself as the context for the duration of the pick.
 class PickContextScope
 {
 public:

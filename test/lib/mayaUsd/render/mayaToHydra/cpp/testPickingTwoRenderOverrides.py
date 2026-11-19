@@ -13,15 +13,11 @@
 # limitations under the License.
 #
 
-# HYDRA-2726 : two Hydra render overrides live at once, Storm and Flash, one per viewport. When
-# one of them loses its last viewport, it tears its Hydra resources down, and picking must keep
-# working in the other one. The pick context, the pick handlers and the path mappers are
-# process-wide, and used to belong to whichever override registered them first or last, so the
-# teardown of one override took them away from the other:
-# - Storm initialized first, then Flash: hovering or clicking a USD prim crashed on a null pick
-#   context, and Maya objects lost their Hydra selection (no Maya path mapper).
-# - Flash initialized first, then Storm: neither Maya objects nor USD prims could be picked (no
-#   pick handler), and USD prims lost their Hydra selection (no USD path mapper).
+# HYDRA-2726 : with Storm and Flash live in two viewports, tearing Flash down must not break
+# picking in Storm. The pick context, pick handlers and path mappers are process-wide, and used
+# to belong to a single override. Before the fix:
+# - Storm first: hovering or clicking a USD prim crashed (null pick context).
+# - Flash first: neither Maya objects nor USD prims could be picked (no pick handler).
 
 import maya.cmds as cmds
 import maya.mel as mel
@@ -123,8 +119,7 @@ class TestPickingTwoRenderOverrides(mtohUtils.MayaHydraBaseTestCase):
         for panel in self._panels:
             cmds.modelEditor(panel, edit=True, rendererOverrideName=first)
         if mtohUtils.mayaHasHydraMode():
-            # Every panel is already on Hydra, so this only does the 'ogs -reset' the render item
-            # override needs on a Use Hydra change.
+            # Panels are all on Hydra: this only does the 'ogs -reset' a Use Hydra change needs.
             mel.eval("applyUseHydraToModelPanels")
         cmds.refresh(force=True)
 
@@ -143,8 +138,8 @@ class TestPickingTwoRenderOverrides(mtohUtils.MayaHydraBaseTestCase):
                 cmds.modelEditor(panel, query=True, rendererOverrideName=True), STORM)
 
     def disableHover(self):
-        # The attribute is dynamic: a File New (PluginLoaded's exit does one) recreates
-        # defaultRenderGlobals without it, so this must run before.
+        # Must run before a File New (PluginLoaded's exit does one), which drops this dynamic
+        # attribute.
         if self._hoverEnabled and cmds.objExists(HOVER_ATTR):
             cmds.setAttr(HOVER_ATTR, False)
             cmds.mayaHydra(updateRenderGlobals=HOVER_ATTR_NAME)
@@ -207,8 +202,7 @@ class TestPickingTwoRenderOverrides(mtohUtils.MayaHydraBaseTestCase):
 
                     self.hoverUsdCube(panel)
 
-                    # TestPicking.pickObject clicks the prim in the active viewport, then checks
-                    # that it is selected in Hydra, which needs its path mapper.
+                    # Clicks the prim in the active viewport, then checks its Hydra selection.
                     for objectName in (self.MAYA_CUBE, self.USD_CUBE):
                         cmds.select(clear=True)
                         ufe.GlobalSelection.get().clear()

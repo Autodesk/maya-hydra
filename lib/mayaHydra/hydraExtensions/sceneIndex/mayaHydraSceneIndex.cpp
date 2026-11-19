@@ -499,12 +499,9 @@ private:
     const MayaHydraSceneIndex& _piSi;
 };
 
-// Instances not torn down yet, oldest first. Several can be live at once (one per Hydra
-// render override, plus batch renders). Their path mappers are interchangeable: the mapping
-// depends only on the DAG path and on the rprim and sprim roots, which all instances build
-// from the same delegate ID. When the one whose mapper is the fallback is torn down, the
-// newest remaining instance takes over, so the other viewports keep mapping Maya paths
-// (HYDRA-2726). Main thread only.
+// Instances not torn down yet, oldest first: one per render override, plus batch renders.
+// Their path mappers are interchangeable (same delegate ID, so same rprim and sprim roots).
+// Main thread only.
 std::vector<const MayaHydraSceneIndex*> liveSceneIndices;
 
 } // namespace
@@ -579,9 +576,8 @@ void MayaHydraSceneIndex::_Destroy()
     // Render item override carriers need no teardown of their own: they are
     // MayaHydraRenderItemOverrideAdapters living in _renderItemsAdapters, cleared above.
 
-    // Hand the fallback path mapper over, but only if it is still ours: a replacement scene
-    // index may already have registered its own. Another live instance, for example the
-    // render override of another viewport, still needs Maya paths mapped.
+    // If the fallback path mapper is still ours, hand it to the newest live instance: another
+    // viewport's render override may still need Maya paths mapped.
     liveSceneIndices.erase(
         std::remove(liveSceneIndices.begin(), liveSceneIndices.end(), this),
         liveSceneIndices.end());
