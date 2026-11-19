@@ -49,7 +49,7 @@ TfTokenVector _Concat(const TfTokenVector& a, const TfTokenVector& b)
 /// Base class for container data sources providing primvars.
 ///
 /// Provides primvars common to bounding boxes display:
-/// - displayColor (the given wireframe color).
+/// - displayColor (the wireframe color, only computed when read).
 ///
 class _PrimvarsDataSource : public HdContainerDataSource
 {
@@ -59,9 +59,10 @@ public:
     HdDataSourceBaseHandle Get(const TfToken& name) override
     {
         if (name == HdTokens->displayColor) {
+            const GfVec4f wireframeColor = _wireframeColorInterface->getWireframeColor(_colorPrimPath);
             return Fvp::PrimvarDataSource::New(
                 HdRetainedTypedSampledDataSource<VtVec3fArray>::New(VtVec3fArray {
-                    { _wireframeColor[0], _wireframeColor[1], _wireframeColor[2] } }),
+                    { wireframeColor[0], wireframeColor[1], wireframeColor[2] } }),
                 HdPrimvarSchemaTokens->constant,
                 HdPrimvarSchemaTokens->color);
         }
@@ -69,14 +70,19 @@ public:
     }
 
 protected:
-    _PrimvarsDataSource(const HdContainerDataSourceHandle& primSource, const GfVec4f& wireframeColor)
+    _PrimvarsDataSource(
+        const HdContainerDataSourceHandle&                   primSource,
+        const std::shared_ptr<Fvp::WireframeColorInterface>& wireframeColorInterface,
+        const SdfPath&                                       colorPrimPath)
         : _primSource(primSource)
-        , _wireframeColor(wireframeColor)
+        , _wireframeColorInterface(wireframeColorInterface)
+        , _colorPrimPath(colorPrimPath)
     {
     }
 
-    HdContainerDataSourceHandle _primSource;
-    GfVec4f                     _wireframeColor;
+    HdContainerDataSourceHandle                   _primSource;
+    std::shared_ptr<Fvp::WireframeColorInterface> _wireframeColorInterface;
+    SdfPath                                       _colorPrimPath;
 };
 
 /// Base class for prim data sources.
@@ -245,9 +251,10 @@ public:
 
 private:
     _BoundsPrimvarsDataSource(
-        const HdContainerDataSourceHandle& primSource,
-        const GfVec4f&                     wireframeColor)
-        : _PrimvarsDataSource(primSource, wireframeColor)
+        const HdContainerDataSourceHandle&                   primSource,
+        const std::shared_ptr<Fvp::WireframeColorInterface>& wireframeColorInterface,
+        const SdfPath&                                       colorPrimPath)
+        : _PrimvarsDataSource(primSource, wireframeColorInterface, colorPrimPath)
     {
     }
 };
@@ -301,7 +308,7 @@ public:
             return basisCurvesSrc;
         }
         if (name == HdPrimvarsSchemaTokens->primvars) {
-            return _BoundsPrimvarsDataSource::New(_primSource, _wireframeColor);
+            return _BoundsPrimvarsDataSource::New(_primSource, _wireframeColorInterface, _colorPrimPath);
         }
         if (name == HdExtentSchemaTokens->extent) {
             if (_primSource) {
@@ -314,13 +321,18 @@ public:
     }
 
 private:
-    _BoundsPrimDataSource(const HdContainerDataSourceHandle& primSource, const GfVec4f& wireframeColor)
+    _BoundsPrimDataSource(
+        const HdContainerDataSourceHandle&                   primSource,
+        const std::shared_ptr<Fvp::WireframeColorInterface>& wireframeColorInterface,
+        const SdfPath&                                       colorPrimPath)
         : _PrimDataSource(primSource)
-        , _wireframeColor(wireframeColor)
+        , _wireframeColorInterface(wireframeColorInterface)
+        , _colorPrimPath(colorPrimPath)
     {
     }
 
-    GfVec4f _wireframeColor;
+    std::shared_ptr<Fvp::WireframeColorInterface> _wireframeColorInterface;
+    SdfPath                                       _colorPrimPath;
 };
 
 } // namespace
@@ -328,10 +340,11 @@ private:
 namespace FVP_NS_DEF {
 
 HdContainerDataSourceHandle CreateBoundsCurvesPrimDataSource(
-    const HdContainerDataSourceHandle& primSource,
-    const GfVec4f&                     wireframeColor)
+    const HdContainerDataSourceHandle&              primSource,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
+    const SdfPath&                                  colorPrimPath)
 {
-    return _BoundsPrimDataSource::New(primSource, wireframeColor);
+    return _BoundsPrimDataSource::New(primSource, wireframeColorInterface, colorPrimPath);
 }
 
 const HdDataSourceLocator& GetBoundsCurvesPointsLocator()

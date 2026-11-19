@@ -178,10 +178,8 @@ HdContainerDataSourceHandle BboxSceneIndex::_CreateBoundingBoxDataSource(
         return nullptr;
     }
 
-    // Get the wireframe color for this prim
-    const GfVec4f wireframeColor = _wireframeColorInterface->getWireframeColor(primPath);
-
-    return CreateBoundsCurvesPrimDataSource(prim.dataSource, wireframeColor);
+    // The wireframe color of this prim is only computed when read.
+    return CreateBoundsCurvesPrimDataSource(prim.dataSource, _wireframeColorInterface, primPath);
 }
 
 // Update the calling functions

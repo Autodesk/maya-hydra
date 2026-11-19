@@ -115,10 +115,12 @@ HdSceneIndexPrim UnloadedPayloadBoundsSceneIndex::GetPrim(const SdfPath& primPat
     if (!_unloadedPrims.empty() && primPath.IsPrimPath() && primPath.GetNameToken() == _tokens->boundsPrimName) {
         const SdfPath unloadedPrimPath = primPath.GetParentPath();
         if (_HasBox(unloadedPrimPath)) {
+            // The wireframe color of the box is only computed when read.
             return { HdPrimTypeTokens->basisCurves,
                      CreateBoundsCurvesPrimDataSource(
                          GetInputSceneIndex()->GetPrim(unloadedPrimPath).dataSource,
-                         _wireframeColorInterface->getWireframeColor(primPath)) };
+                         _wireframeColorInterface,
+                         primPath) };
         }
     }
     return GetInputSceneIndex()->GetPrim(primPath);

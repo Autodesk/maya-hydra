@@ -16,22 +16,30 @@
 #define FVP_BOUNDS_CURVES_DATA_SOURCE_H
 
 #include "flowViewport/api.h"
+#include "flowViewport/fvpWireframeColorInterface.h"
 
-#include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/dataSourceLocator.h>
+#include <pxr/usd/sdf/path.h>
+
+#include <memory>
 
 namespace FVP_NS_DEF {
 
 /// Returns the data source of a basisCurves prim drawing the edges of the box given by the extent
-/// of \p primSource, in \p wireframeColor, in the secondary graphics pass and without culling.
+/// of \p primSource, in the secondary graphics pass and without culling.
+///
+/// The box is drawn in the wireframe color of \p colorPrimPath, which \p wireframeColorInterface
+/// only computes when the displayColor primvar is read, as the prim data source is created on
+/// every GetPrim() call while the color is read much less often.
 ///
 /// The xform, visibility, instancedBy, primOrigin and extent data sources are those of
 /// \p primSource, so the box is placed, shown and picked like the prim it stands for.
 FVP_API
 PXR_NS::HdContainerDataSourceHandle CreateBoundsCurvesPrimDataSource(
-    const PXR_NS::HdContainerDataSourceHandle& primSource,
-    const PXR_NS::GfVec4f&                     wireframeColor);
+    const PXR_NS::HdContainerDataSourceHandle&      primSource,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface,
+    const PXR_NS::SdfPath&                          colorPrimPath);
 
 /// Locator of the box points, which depend on the extent of the source prim.
 FVP_API
