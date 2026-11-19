@@ -36,6 +36,12 @@ bool isPerspective(const GfMatrix4d& proj)
     return w > 0.0 && std::abs(proj[3][3]) <= kRelativeEpsilon * w;
 }
 
+bool isOrthographic(const GfMatrix4d& proj)
+{
+    const double w = std::abs(proj[3][3]);
+    return w > 0.0 && std::abs(proj[2][3]) <= kRelativeEpsilon * w;
+}
+
 float readFloat(const HdFloatDataSourceHandle& ds)
 {
     return ds ? ds->GetTypedValue(0.0f) : 0.0f;
@@ -65,22 +71,22 @@ computeCameraPrimProjection(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfP
         return std::nullopt;
     }
 
+    bool orthographic = false;
     if (const HdTokenDataSourceHandle projDs = schema.GetProjection()) {
-        if (projDs->GetTypedValue(0.0f) == HdCameraSchemaTokens->orthographic) {
-            return std::nullopt;
-        }
+        orthographic = projDs->GetTypedValue(0.0f) == HdCameraSchemaTokens->orthographic;
     }
 
     const float horizontalAperture = readFloat(schema.GetHorizontalAperture());
     const float verticalAperture = readFloat(schema.GetVerticalAperture());
-    const float focalLength = readFloat(schema.GetFocalLength());
+    // An orthographic projection does not depend on the focal length.
+    const float focalLength = orthographic ? 1.0f : readFloat(schema.GetFocalLength());
     if (!(horizontalAperture > 0.0f) || !(verticalAperture > 0.0f) || !(focalLength > 0.0f)) {
         return std::nullopt;
     }
 
     // Same conversion as HdCamera::ComputeProjectionMatrix().
     GfCamera camera;
-    camera.SetProjection(GfCamera::Perspective);
+    camera.SetProjection(orthographic ? GfCamera::Orthographic : GfCamera::Perspective);
     camera.SetHorizontalAperture(horizontalAperture / GfCamera::APERTURE_UNIT);
     camera.SetVerticalAperture(verticalAperture / GfCamera::APERTURE_UNIT);
     camera.SetHorizontalApertureOffset(
@@ -108,32 +114,37 @@ computeCameraPrimProjection(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfP
 // the target matrix (processed projection matrix from Maya which includes overscan,
 // 2D pan/zoom, film transforms, etc.). We can simply invert the equations.
 //
-// A perspective projection in row-vector has the following form:
-//   [ scx   0     0     0 ]
-//   [ 0    scy    0     0 ]
-//   [ stx  sty    A    -1 ]
-//   [ 0     0     B     0 ]
+// We have the following perspective and orthographic projection matrices
+// in row-vector form, respectively:
+//   [ scx   0     0     0 ]        [ scx   0     0     0 ]
+//   [ 0    scy    0     0 ]        [ 0    scy    0     0 ]
+//   [ stx  sty    A    -1 ]        [ 0     0     A     0 ]
+//   [ 0     0     B     0 ]        [ stx  sty    B     1 ]
 //
 // where:
 // scx/scy are influenced by the scale factors and
 // stx/sty are influenced by both the scale and translation factors
 // in CameraUtilFraming::ApplyToProjectionMatrix().
-// 
-// In ApplyToProjectionMatrix(), we have the following equations for each term:
+//
+// The shift (stx, sty) sits in the row with a non-zero w term:
+//   row 2 with w = -1 for perspective,
+//   row 3 with w = 1 for orthographic.
+// Then, in ApplyToProjectionMatrix(), we have the following equations for each term:
 //   targetScaleX = baseScaleX * dispW / dataW
 //   targetScaleY = baseScaleY * dispH / dataH
-//   targetShiftX = (baseShiftX * dispW - 2 * offsetX) / dataW
-//   targetShiftY = (baseShiftY * dispH + 2 * offsetY) / dataH
+//   targetShiftX = (baseShiftX * dispW + w * 2 * offsetX) / dataW
+//   targetShiftY = (baseShiftY * dispH - w * 2 * offsetY) / dataH
 //
-// where offset = center(displayWindow) - center(dataWindow), in pixels.
-// For offsetY, the sign differs because the windows are y-down while eye space is y-up.
-//
-// The inverse equations:
+// The inverse equations (w = +-1, so 1 / w = w):
 //   dispW = dataW * targetScaleX / baseScaleX
 //   dispH = dataH * targetScaleY / baseScaleY
-//   offsetX = 0.5 * (baseShiftX * dispW - targetShiftX * dataW)
-//   offsetY = 0.5 * (targetShiftY * dataH - baseShiftY * dispH)
+//   offsetX = 0.5 * w * (targetShiftX * dataW - baseShiftX * dispW)
+//   offsetY = 0.5 * w * (baseShiftY * dispH - targetShiftY * dataH)
 //
+// For offsets, we multiply by w instead of division because w = +-1 => x / w = x * w,
+// for optimization purposes.
+// Note that the depth terms (A, B) are not part of the solve, depth is defined on the prim
+// clippingRange.
 std::optional<GfRange2f> solveDisplayWindow(
     const GfMatrix4d& targetProj,
     const GfMatrix4d& baseProj,
@@ -142,22 +153,35 @@ std::optional<GfRange2f> solveDisplayWindow(
     if (dataWindow[0] <= 0 || dataWindow[1] <= 0) {
         return std::nullopt;
     }
-    if (!isPerspective(targetProj) || !isPerspective(baseProj)) {
+
+    // Sanity check: a display window cannot change the projection type,
+    // so both matrices must have the same.
+    int shiftRow = 0;
+    int nonShiftOrScaleRow = 0;
+    if (isPerspective(targetProj) && isPerspective(baseProj)) {
+        shiftRow = 2;
+        nonShiftOrScaleRow = 3;
+    } else if (isOrthographic(targetProj) && isOrthographic(baseProj)) {
+        shiftRow = 3;
+        nonShiftOrScaleRow = 2;
+    } else {
         return std::nullopt;
     }
 
-    // Projection matrices are homogeneous, bring the target to the same w scale as the base.
-    const double     wScale = baseProj[2][3] / targetProj[2][3];
-    const GfMatrix4d target = targetProj * wScale;
+    // Projection matrices are homogeneous, normalize them to w = +-1.
+    const GfMatrix4d base = baseProj * (1.0 / std::abs(baseProj[shiftRow][3]));
+    const double     w = baseProj[shiftRow][3] > 0.0 ? 1.0 : -1.0;
+    const GfMatrix4d target = targetProj * (w / targetProj[shiftRow][3]);
 
-    // A display window can only scale and move the image. Nonzero [0][1] or [1][0] terms mean
-    // rotation (i.e. film roll) or shear, and nonzero [0][3], [1][3], [3][0] or [3][1] terms
-    // cannot be expressed by a display window. The caller warns on nullopt.
+    // A display window can only scale and move the image. Non-zero [0][1] or [1][0] terms mean
+    // rotation (i.e. film roll), and non-zero [0][3], [1][3] or x/y terms in the
+    // nonShiftOrScaleRow cannot be expressed by a display window. The caller warns on nullopt.
     const double scale = std::max(std::abs(target[0][0]), std::abs(target[1][1]));
     const double tolerance = kRelativeEpsilon * scale;
     if (std::abs(target[0][1]) > tolerance || std::abs(target[1][0]) > tolerance
         || std::abs(target[0][3]) > tolerance || std::abs(target[1][3]) > tolerance
-        || std::abs(target[3][0]) > tolerance || std::abs(target[3][1]) > tolerance) {
+        || std::abs(target[nonShiftOrScaleRow][0]) > tolerance
+        || std::abs(target[nonShiftOrScaleRow][1]) > tolerance) {
         return std::nullopt;
     }
 
@@ -165,19 +189,19 @@ std::optional<GfRange2f> solveDisplayWindow(
     const double dataH = dataWindow[1];
 
     // Avoid division by zero.
-    if (baseProj[0][0] == 0.0 || baseProj[1][1] == 0.0) {
+    if (base[0][0] == 0.0 || base[1][1] == 0.0) {
         return std::nullopt;
     }
 
-    const double dispW = dataW * target[0][0] / baseProj[0][0];
-    const double dispH = dataH * target[1][1] / baseProj[1][1];
+    const double dispW = dataW * target[0][0] / base[0][0];
+    const double dispH = dataH * target[1][1] / base[1][1];
 
     // We need to return the bottom-left and top-right corners of the display window
     // in GfRange2f. We can do so by computing the center and the size of the display window.
     // To compute the center, we need to find the offset and add it to the center of the data
     // window.
-    const double offsetX = 0.5 * (baseProj[2][0] * dispW - target[2][0] * dataW);
-    const double offsetY = 0.5 * (target[2][1] * dataH - baseProj[2][1] * dispH);
+    const double offsetX = 0.5 * w * (target[shiftRow][0] * dataW - base[shiftRow][0] * dispW);
+    const double offsetY = 0.5 * w * (base[shiftRow][1] * dispH - target[shiftRow][1] * dataH);
 
     const double centerX = 0.5 * dataW + offsetX;
     const double centerY = 0.5 * dataH + offsetY;

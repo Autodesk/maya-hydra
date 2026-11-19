@@ -106,7 +106,7 @@ const char* const kCameraParamAttributeNames[] = {
     "fStop", "cameraAperture", "horizontalFilmAperture", "verticalFilmAperture",
     "lensSqueezeRatio", "shakeEnabled", "filmOffset", "horizontalFilmOffset",
     "verticalFilmOffset", "shake", "horizontalShake", "verticalShake", "filmFit",
-    "depthOfField", "aiEnableDOF", "aiFocusDistance", "orthographic",
+    "depthOfField", "aiEnableDOF", "aiFocusDistance", "orthographic", "orthographicWidth",
 #if PXR_VERSION >= 2505
     "exposure",
 #endif
@@ -319,7 +319,7 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             "Error in MayaHydraCameraAdapter::GetCameraParamValue(%s): %s",
             paramName.GetText(),
             status.errorString().asChar());
-        return false;
+        return true;
     };
 
 #if PXR_VERSION >= 2505
@@ -362,8 +362,43 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return VtValue(double(interval.GetMin() + interval.GetSize() * shutterClose));
     }
 
-    // Don't bother with anything else for orthographic cameras
+    if (paramName == HdCameraTokens->projection) {
+        return VtValue(isOrtho ? HdCamera::Orthographic : HdCamera::Perspective);
+    }
+    if (paramName == HdCameraTokens->windowPolicy) {
+        const auto windowPolicy = convertFit(camera);
+        if (hadError(status))
+            return {};
+        return VtValue(windowPolicy);
+    }
+
     if (isOrtho) {
+        // Maya's orthographic film is a square of orthographicWidth world units (cm), and only
+        // shake moves it: Maya ignores the film aperture, film offset and lens squeeze.
+        // The render override solves the remaining Maya settings (film fit, overscan,
+        // pan/zoom...) into the display window.
+        if (paramName == HdCameraTokens->horizontalAperture
+            || paramName == HdCameraTokens->verticalAperture) {
+            const double orthoWidth = camera.orthoWidth(&status);
+            if (hadError(status))
+                return {};
+            return VtValue(float(orthoWidth));
+        }
+        if (paramName == HdCameraTokens->horizontalApertureOffset
+            || paramName == HdCameraTokens->verticalApertureOffset) {
+            const bool   horizontal = paramName == HdCameraTokens->horizontalApertureOffset;
+            double shake;
+            if (!camera.shakeEnabled(&status)) {
+                shake = 0.0;
+            } else if (horizontal) {
+                shake = camera.horizontalShake(&status);
+            } else {
+                shake = camera.verticalShake(&status);
+            }
+            if (hadError(status))
+                return {};
+            return VtValue(float(shake));
+        }
         return {};
     }
     if (paramName == HdCameraTokens->focusDistance) {
@@ -419,19 +454,6 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         if (hadError(status))
             return {};
         return VtValue(float(verticalApertureOffset * inchToMM));
-    }
-    if (paramName == HdCameraTokens->windowPolicy) {
-        const auto windowPolicy = convertFit(camera);
-        if (hadError(status))
-            return {};
-        return VtValue(windowPolicy);
-    }
-    if (paramName == HdCameraTokens->projection) {
-        if (isOrtho) {
-            return VtValue(HdCamera::Orthographic);
-        } else {
-            return VtValue(HdCamera::Perspective);
-        }
     }
     if (paramName == _tokens->depthOfField) {
         const bool depthOfField = camera.isDepthOfField(&status);
