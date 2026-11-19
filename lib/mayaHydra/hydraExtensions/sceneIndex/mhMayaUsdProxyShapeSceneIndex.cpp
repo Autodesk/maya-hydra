@@ -29,9 +29,11 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
     const MObjectHandle&                   dagNodeHandle,
     const SdfPath&                         sceneIndexPathPrefix,
-    const Ufe::Path&                       sceneIndexAppPath)
+    const Ufe::Path&                       sceneIndexAppPath,
+    const std::shared_ptr<UsdStageRefPtr>& sharedStage,
+    const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex)
     : ParentClass(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle,
-                  sceneIndexPathPrefix, sceneIndexAppPath)
+                  sceneIndexPathPrefix, sceneIndexAppPath, sharedStage, extentsHintSceneIndex)
 {
     // Add our pick handler to the pick handler registry if there is none.
     auto& phr = MayaHydra::PickHandlerRegistry::Instance();
@@ -66,7 +68,9 @@ MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(
     const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
     const MObjectHandle&                   dagNodeHandle,
     const SdfPath&                         sceneIndexPathPrefix,
-    const Ufe::Path&                       sceneIndexAppPath)
+    const Ufe::Path&                       sceneIndexAppPath,
+    const std::shared_ptr<UsdStageRefPtr>& sharedStage,
+    const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex)
 {
     return TfCreateRefPtr(new MayaUsdProxyShapeSceneIndex(
         proxyStage,
@@ -74,7 +78,9 @@ MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(
         usdImagingStageSceneIndex,
         dagNodeHandle,
         sceneIndexPathPrefix,
-        sceneIndexAppPath));
+        sceneIndexAppPath,
+        sharedStage,
+        extentsHintSceneIndex));
 }
 
 } // namespace MAYAHYDRA_NS_DEF

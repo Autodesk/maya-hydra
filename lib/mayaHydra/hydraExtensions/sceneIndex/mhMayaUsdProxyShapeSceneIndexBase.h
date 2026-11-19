@@ -25,6 +25,7 @@
 
 // Flow Viewport Toolkit headers.
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/sceneIndex/fvpBBoxSceneIndex.h"
 #include <flowViewport/selection/fvpPathMapperFwd.h>
 #include <flowViewport/selection/fvpSelectionTypes.h>
 
@@ -33,6 +34,7 @@
 #include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
 #include <pxr/usdImaging/usdImaging/sceneIndices.h>// In USD 23.11+
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/usd/usd/stage.h>
 
 //Maya headers
 #include <maya/MObjectHandle.h>
@@ -70,7 +72,9 @@ public:
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-        const Ufe::Path&                       sceneIndexAppPath
+        const Ufe::Path&                       sceneIndexAppPath,
+        const std::shared_ptr<UsdStageRefPtr>& sharedStage = {},
+        const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex = {}
     );
 
     // From HdSceneIndexBase
@@ -96,6 +100,8 @@ public:
 
     void Populate();
     void UpdateTime();
+    MAYAHYDRALIB_API
+    bool IsModelWithAuthoredExtentsHint(const SdfPath& primPath) const;
     static Ufe::Path InterpretRprimPath(const HdSceneIndexBaseRefPtr& sceneIndex,const SdfPath& path);
 
     //From HdSingleInputFilteringSceneIndexBase
@@ -122,7 +128,9 @@ protected:
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-        const Ufe::Path&                       sceneIndexAppPath
+        const Ufe::Path&                       sceneIndexAppPath,
+        const std::shared_ptr<UsdStageRefPtr>& sharedStage,
+        const Fvp::BboxSceneIndexRefPtr&       extentsHintSceneIndex
     );
 
     const SdfPath                   _sceneIndexPathPrefix;
@@ -135,6 +143,9 @@ private:
 
     UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
     MAYAUSDAPI_NS::ProxyStage       _proxyStage;
+    UsdStageRefPtr                  _stage;
+    std::shared_ptr<UsdStageRefPtr> _sharedStage;
+    Fvp::BboxSceneIndexRefPtr       _extentsHintSceneIndex;
     std::atomic<bool>               _populated { false };
     MObjectHandle                   _dagNodeHandle;
     Ufe::Path                       _sceneIndexAppPath;

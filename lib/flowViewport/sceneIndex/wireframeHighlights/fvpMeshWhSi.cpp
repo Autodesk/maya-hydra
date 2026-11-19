@@ -24,6 +24,15 @@ namespace FVP_NS_DEF {
 
 DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
 
+namespace {
+const TfToken extentsHintBoundsToken("extentsHintBounds");
+
+bool _IsExtentsHintBounds(const HdSceneIndexPrim& prim)
+{
+    return prim.dataSource && prim.dataSource->Get(extentsHintBoundsToken);
+}
+} // namespace
+
 MeshWhSiRefPtr MeshWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
@@ -71,7 +80,7 @@ MeshWhSi::MeshWhSi(
         if (IsExcludedPath(primPath)) {
             return false;
         }
-        if (prim.primType == HdPrimTypeTokens->mesh) {
+        if (prim.primType == HdPrimTypeTokens->mesh && !_IsExtentsHintBounds(prim)) {
             HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
             if (!instancedBy.IsDefined()) {
                 _meshPaths.emplace(primPath);
@@ -92,7 +101,7 @@ void MeshWhSi::ProcessAddedPrims(
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-        if (entry.primType == HdPrimTypeTokens->mesh) {
+        if (entry.primType == HdPrimTypeTokens->mesh && !_IsExtentsHintBounds(prim)) {
             HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
             if (!instancedBy.IsDefined()) {
                 _meshPaths.emplace(entry.primPath);
