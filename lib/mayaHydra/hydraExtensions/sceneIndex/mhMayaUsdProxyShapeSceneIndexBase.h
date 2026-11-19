@@ -81,10 +81,8 @@ public:
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    void             SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
-    {
-        _sceneIndexAppPath = sceneIndexAppPath;
-    }
+    // Also moves the path mapper registration to the new path, if this scene index owns it.
+    void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath);
 
     virtual ~MayaUsdProxyShapeSceneIndexBase();
 

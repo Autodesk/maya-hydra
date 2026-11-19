@@ -2259,6 +2259,9 @@ MtohRenderOverride::_ResolveHoverHighlight(const PickHit& hit) const
 {
     HoverHighlight highlight;
 
+    // Pick handlers resolve the hit in this override's render index and scene indices.
+    const PickContextScope pickContextScope(this);
+
     // What a click on the hit would select, resolved by the same pick handler, so that the hover
     // follows the pick modes and the selection kind. A Maya pick handler does not support it:
     // Maya prims are not instanced, so the picked prim itself is hovered, as before.
@@ -2539,10 +2542,6 @@ void MtohRenderOverride::_InitHydraResources(
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex()));
     }
 
-    // We provide the pick context for pick handlers, so set the pick handler
-    // registry accordingly.
-    PickHandlerRegistry::Instance().SetPickContext(this);
-
     // Create internal scene indices chain
     _inputSceneIndexOfFilteringSceneIndicesChain = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
@@ -2803,9 +2802,6 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     
     _initializationSucceeded = false;
     _initializationAttempted = false;
-
-    // Remove the pick context from pick handlers.
-    PickHandlerRegistry::Instance().SetPickContext(nullptr);
 }
 
 HdSceneIndexBaseRefPtr MtohRenderOverride::_CreatePassFilteringSceneIndex(
@@ -3359,7 +3355,12 @@ bool MtohRenderOverride::select(
     bool isOneMayaNodeInComponentsPickingMode = false;
     const unsigned int ufeSnSizeBefore = _ufeSn ? _ufeSn->size() : 0;
     const unsigned int mayaSnLengthBefore = selectionList.length();
-    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    {
+        // Pick handlers resolve the hits in this override's render index and scene indices.
+        // Another override can be live at the same time, in another viewport (HYDRA-2726).
+        const PickContextScope pickContextScope(this);
+        _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    }
     if (isOneMayaNodeInComponentsPickingMode){
         return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
     }
@@ -4079,6 +4080,11 @@ HdRenderIndex* MtohRenderOverride::renderIndex(int passIndex /*= 0*/) const
     return (_framePassesData[passIndex] && _framePassesData[passIndex]->HasRenderIndexProxy())
         ? _framePassesData[passIndex]->GetRenderIndexProxy()->RenderIndex()
         : nullptr;
+}
+
+MAYAHYDRA_NS::MayaViewportSceneIndex* MtohRenderOverride::mayaViewportSceneIndex() const
+{
+    return get_pointer(_mayaViewportSceneIndex);
 }
 
 const hvt::FramePassPtr&

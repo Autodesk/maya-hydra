@@ -116,6 +116,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdNestedNativeInstancePicking.py
     cpp/testUsdPickKind.py
+    cpp/testPickingTwoRenderOverrides.py # Skips itself unless both Storm and Flash are registered
     cpp/testNurbsSurfaces.py
     cpp/testGeomSubsetsPicking.py|disabledOn:HdFlash:HYDRA-2672 # HYDRA-2672 : Geom subset picking doesn't update UFE selection
     cpp/testSinglePicking.py

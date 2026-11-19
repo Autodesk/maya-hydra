@@ -33,13 +33,12 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     : ParentClass(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle,
                   sceneIndexPathPrefix, sceneIndexAppPath)
 {
-    // Add our pick handler to the pick handler registry if there is none.
-    auto& phr = MayaHydra::PickHandlerRegistry::Instance();
-    _unregisterPickHandler = (phr.RegisteredHandler(sceneIndexPathPrefix) == nullptr);
-    if (_unregisterPickHandler) {
-        auto pickHandler = std::make_shared<UsdPickHandler>();
-        TF_AXIOM(phr.Register(sceneIndexPathPrefix, pickHandler));
-    }
+    // Share the USD pick handler with the proxy shape scene indices of the other
+    // live render overrides, which can use the same prefix: it stays registered
+    // until the last of them is destroyed. The handler resolves hits through the
+    // pick context, so any one of them serves all.
+    _unregisterPickHandler = TF_VERIFY(MayaHydra::PickHandlerRegistry::Instance().RegisterShared(
+        sceneIndexPathPrefix, std::make_shared<UsdPickHandler>()));
 }
 
 MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
@@ -55,8 +54,10 @@ void MayaUsdProxyShapeSceneIndex::_Destroy()
 
 void MayaUsdProxyShapeSceneIndex::_DestroyDerived()
 {
+    // Runs from _Destroy() and from the destructor: release only once.
     if (_unregisterPickHandler) {
-        TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_sceneIndexPathPrefix));
+        TF_VERIFY(PickHandlerRegistry::Instance().UnregisterShared(_sceneIndexPathPrefix));
+        _unregisterPickHandler = false;
     }
 }
 

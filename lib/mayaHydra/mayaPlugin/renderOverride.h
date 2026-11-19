@@ -219,6 +219,7 @@ public:
     std::string renderIndexName(int passIndex = 0) const;
 
     HdRenderIndex* renderIndex(int passIndex = 0) const override;
+    MAYAHYDRA_NS::MayaViewportSceneIndex* mayaViewportSceneIndex() const override;
     int            getNumFramePasses() const { return _GetNumFramePasses(); }
 
 private:

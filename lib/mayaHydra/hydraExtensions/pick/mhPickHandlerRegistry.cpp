@@ -28,6 +28,8 @@ using namespace MayaHydra;
 namespace {
 
 std::map<PXR_NS::SdfPath, PickHandlerConstPtr> pickHandlers;
+// Number of owners of each shared registration (RegisterShared()).
+std::map<PXR_NS::SdfPath, int> sharedOwnerCounts;
 PickContextConstPtr pickContext = nullptr;
 
 }
@@ -152,6 +154,35 @@ PickHandlerConstPtr PickHandlerRegistry::GetHandler(const SdfPath& path) const
     // descendant, return handler, else fail.
     it = std::prev(it);
     return (path.HasPrefix(it->first)) ? it->second : nullptr;
+}
+
+bool PickHandlerRegistry::RegisterShared(
+    const SdfPath&             prefix,
+    const PickHandlerConstPtr& pickHandler)
+{
+    auto found = sharedOwnerCounts.find(prefix);
+    if (found != sharedOwnerCounts.end()) {
+        ++found->second;
+        return true;
+    }
+    if (!Register(prefix, pickHandler)) {
+        return false;
+    }
+    sharedOwnerCounts.emplace(prefix, 1);
+    return true;
+}
+
+bool PickHandlerRegistry::UnregisterShared(const SdfPath& prefix)
+{
+    auto found = sharedOwnerCounts.find(prefix);
+    if (found == sharedOwnerCounts.end()) {
+        return false;
+    }
+    if (--found->second > 0) {
+        return true;
+    }
+    sharedOwnerCounts.erase(found);
+    return Unregister(prefix);
 }
 
 void PickHandlerRegistry::SetPickContext(const PickContextConstPtr& context)

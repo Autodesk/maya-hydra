@@ -17,6 +17,7 @@
 #include "mayaViewportSceneIndex.h"
 
 #include <mayaHydraLib/mayaUtils.h>
+#include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
@@ -112,16 +113,14 @@ namespace MAYAHYDRA_NS_DEF {
 // MayaViewportSceneIndex::AddPickHitToSelectionList() in the Maya scene index
 // interface, and the Maya scene index builds the Maya pick handler), they are
 // both defined here in the same implementation file.
+//
+// Every render override registers its Maya data under the same rprim path, so one
+// handler serves all of them: it resolves the hit in the scene index of the
+// override that picks, given by the pick context, as each override has its own
+// render item adapters.
 class MayaViewportSceneIndex::MayaPickHandler : public MayaHydra::PickHandler
 {
-    MayaViewportSceneIndex& _mayaViewportSceneIndex;
-
 public:
-    MayaPickHandler(MayaViewportSceneIndex& mayaViewportSceneIndex)
-        : _mayaViewportSceneIndex(mayaViewportSceneIndex)
-    {
-    }
-
     bool handlePickHit(const Input& pickInput, Output& pickOutput) const override
     {
         // Maya does not create Hydra instances, so if the pick hit instancer
@@ -130,7 +129,12 @@ public:
             return false;
         }
 
-        return _mayaViewportSceneIndex.AddPickHitToSelectionList(
+        MayaViewportSceneIndex* mayaViewportSceneIndex = _PickingSceneIndex();
+        if (!mayaViewportSceneIndex) {
+            return false;
+        }
+
+        return mayaViewportSceneIndex->AddPickHitToSelectionList(
             pickInput.pickHit,
             pickInput.pickInfo,
             pickOutput.mayaSelection,
@@ -139,7 +143,20 @@ public:
 
     bool inSingleNodeComponentsPick(const MayaHydra::PickHit& hit) const override
     {
-        return _mayaViewportSceneIndex.IsPickedNodeInComponentsPickingMode(hit);
+        const MayaViewportSceneIndex* mayaViewportSceneIndex = _PickingSceneIndex();
+        return mayaViewportSceneIndex
+            && mayaViewportSceneIndex->IsPickedNodeInComponentsPickingMode(hit);
+    }
+
+private:
+    static MayaViewportSceneIndex* _PickingSceneIndex()
+    {
+        const auto pickContext = MayaHydra::PickHandlerRegistry::Instance().GetPickContext();
+        if (!pickContext) {
+            TF_CODING_ERROR("Maya pick handler called without a pick context.");
+            return nullptr;
+        }
+        return pickContext->mayaViewportSceneIndex();
     }
 };
 
@@ -169,13 +186,10 @@ MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inp
         _mayaDataSceneIndex->CreateMaterial(_defaultMaterialPath, defaultMaterialShadingGroupObj);
     }
 
-    // Add our pick handler to the pick handler registry if there is none.
-    auto& phr = MayaHydra::PickHandlerRegistry::Instance();
-    if (phr.RegisteredHandler(mayaDataSceneIndex->GetRprimPath()) == nullptr) {
-      auto pickHandler = std::make_shared<MayaPickHandler>(*this);
-      TF_AXIOM(phr.Register(mayaDataSceneIndex->GetRprimPath(), pickHandler));
-      _hasPickHandlerRegistered = true;
-    }
+    // Share the Maya pick handler with the other live render overrides: it stays
+    // registered until the last Maya viewport scene index is destroyed.
+    _hasPickHandlerRegistered = TF_VERIFY(MayaHydra::PickHandlerRegistry::Instance().RegisterShared(
+        mayaDataSceneIndex->GetRprimPath(), std::make_shared<MayaPickHandler>()));
 
     // Setup the combined scene
     _mergingSceneIndex->AddInputScene(_inputSceneIndex, SdfPath::AbsoluteRootPath());
@@ -190,13 +204,11 @@ MayaViewportSceneIndex::~MayaViewportSceneIndex()
 
 void MayaViewportSceneIndex::Destroy()
 {
-    // Remove our pick handler from the pick handler registry. Destroy() runs twice:
-    // explicitly from ClearHydraResources() and again from the destructor, possibly after a
-    // new instance has registered its own handler under the same rprim path, which must not
-    // be removed.
+    // Release our share of the Maya pick handler. Destroy() runs twice: explicitly from
+    // ClearHydraResources() and again from the destructor, so release only once.
     if (_hasPickHandlerRegistered) {
         auto& phr = MayaHydra::PickHandlerRegistry::Instance();
-        TF_AXIOM(phr.Unregister(_mayaDataSceneIndex->GetRprimPath()));
+        TF_VERIFY(phr.UnregisterShared(_mayaDataSceneIndex->GetRprimPath()));
         _hasPickHandlerRegistered = false;
     }
 

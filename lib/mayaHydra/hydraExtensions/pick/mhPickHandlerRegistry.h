@@ -66,7 +66,27 @@ public:
     MAYAHYDRALIB_API
     PickHandlerConstPtr GetHandler(const PXR_NS::SdfPath& path) const;
 
-    //! Set and get the pick context object for pick handlers to use.
+    //! Register a pick handler shared by several owners under prefix. Each Hydra
+    //! render override builds its own scene indices, and several overrides can be
+    //! live at once (one per viewport renderer), each wanting a handler under the
+    //! same prefix. The first call registers pickHandler; later calls for the same
+    //! prefix only count an owner, so the handlers passed for one prefix must be
+    //! interchangeable (resolve through the pick context, not a captured owner).
+    /*!
+      \return False if the first registration fails (see Register()), true otherwise.
+    */
+    MAYAHYDRALIB_API
+    bool RegisterShared(const PXR_NS::SdfPath& prefix, const PickHandlerConstPtr& pickHandler);
+    //! Release one owner of a shared registration. The handler is unregistered
+    //! when the last owner releases it.
+    /*!
+      \return False if prefix has no shared registration, true otherwise.
+    */
+    MAYAHYDRALIB_API
+    bool UnregisterShared(const PXR_NS::SdfPath& prefix);
+
+    //! Set and get the pick context object for pick handlers to use. Prefer
+    //! PickContextScope, which restores the previous context.
     MAYAHYDRALIB_API
     void SetPickContext(const PickContextConstPtr& context);
     MAYAHYDRALIB_API
@@ -81,7 +101,33 @@ private:
 
     friend class PXR_NS::TfSingleton<PickHandlerRegistry>;
 };
-    
+
+/// \class PickContextScope
+///
+/// Sets the pick context for the lifetime of the scope, and restores the
+/// previous one on exit. Several Hydra render overrides can be live at once (one
+/// per viewport renderer), each its own pick context, so the override that picks
+/// sets it for the duration of the pick: a context set at initialization would
+/// belong to whichever override initialized last, and could be cleared by the
+/// teardown of another one while the remaining override still picks.
+class PickContextScope
+{
+public:
+    explicit PickContextScope(const PickContextConstPtr& context)
+        : _previous(PickHandlerRegistry::Instance().GetPickContext())
+    {
+        PickHandlerRegistry::Instance().SetPickContext(context);
+    }
+
+    ~PickContextScope() { PickHandlerRegistry::Instance().SetPickContext(_previous); }
+
+    PickContextScope(const PickContextScope&) = delete;
+    PickContextScope& operator=(const PickContextScope&) = delete;
+
+private:
+    const PickContextConstPtr _previous;
+};
+
 }
 
 #endif
