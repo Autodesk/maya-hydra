@@ -3368,6 +3368,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
             _lastFilteringSceneIndexBeforeCustomFiltering,
             _wireframeColorInterfaceImp,
             [sceneIndexRegistry](const SdfPath& primPath) {
+                // Maya native prims never have unloaded payloads.
+                if (primPath.HasPrefix(MAYA_NATIVE_ROOT)) {
+                    return false;
+                }
                 const auto registry = sceneIndexRegistry.lock();
                 return registry && registry->MayHaveUnloadedPrims(primPath);
             },
