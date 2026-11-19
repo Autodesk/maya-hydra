@@ -106,6 +106,34 @@ class TestUnloadedPayloadBounds(mtohUtils.MayaHydraBaseTestCase):
         self.assertBoundsHidden("/A")
         self.assertImageClose("unloadedPayloadLoaded.png")
 
+    def test_TimeSampledExtentsHint(self):
+        # The box must follow a time-sampled extentsHint as Maya time changes.
+        self.addCleanup(cmds.currentTime, cmds.currentTime(query=True))
+
+        # Small box at frame 1, twice as large at frame 10.
+        prim = self.definePayloadPrim("/A")
+        modelAPI = UsdGeom.ModelAPI.Apply(prim)
+        modelAPI.SetExtentsHint(EXTENTS_HINT, 1)
+        modelAPI.SetExtentsHint(
+            [Gf.Vec3f(-2, -2, -2), Gf.Vec3f(2, 2, 2)], 10)
+        prim.Unload()
+        self.assertFalse(prim.IsLoaded())
+
+        # Frame 1: same box as a non-animated hint of EXTENTS_HINT.
+        cmds.currentTime(1)
+        self.assertBoundsShown("/A")
+        self.assertImageClose("unloadedPayloadBoundingBox.png")
+
+        # Frame 10: larger box.
+        cmds.currentTime(10)
+        self.assertBoundsShown("/A")
+        self.assertImageClose("unloadedPayloadBoundingBox_timeSampled_frame10.png")
+
+        # Back to frame 1: the box shrinks back.
+        cmds.currentTime(1)
+        self.assertBoundsShown("/A")
+        self.assertImageClose("unloadedPayloadBoundingBox.png")
+
     def test_ShowMenuToggle(self):
         # The "USD Payload Bounding Boxes" toggle of the viewport Show menu is a plugin
         # object display filter registered by MayaUsd, set per model panel.
