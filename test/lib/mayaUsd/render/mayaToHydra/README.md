@@ -190,6 +190,7 @@ the test to be disabled, and the issues track the work of re-enabling it:
 ```
 testMyTestFile.py|disabledOn:maya2027,osx:HYDRA-2709              # disabled on Maya 2027, on macOS only
 testMyTestFile.py|disabledOn:mayaGe2026,HdFlash:AGP-1034,AGP-1035 # disabled on Maya 2026 and later, under Flash only
+testMyTestFile.py|disabledOn:usdGe2611:HYDRA-1234                # disabled with USD 0.26.11 and later
 ```
 
 Both halves are required, and the issues take the same form as in `disabled`,
@@ -209,6 +210,11 @@ The supported conditions are:
 | `mayaGt2026` | Maya is later than that version |
 | `mayaLe2026` | Maya is that version or earlier |
 | `mayaLt2026` | Maya is earlier than that version |
+| `usd2611` | USD is exactly that version |
+| `usdGe2611` | USD is that version or later |
+| `usdGt2611` | USD is later than that version |
+| `usdLe2611` | USD is that version or earlier |
+| `usdLt2611` | USD is earlier than that version |
 | `osx`, `win`, `lin` | the tests are configured for that platform |
 | `HdStorm`, `HdFlash` | the tests are configured for that renderer |
 
@@ -217,8 +223,13 @@ against and is never checked against a list of known releases, so a condition
 may name a version that has not shipped yet: `mayaGt2027` stays false until
 someone configures against a later Maya.
 
+The same holds for `usd...` conditions, compared against the USD being built
+against. Their version is spelled as USD's `PXR_VERSION` encodes it, major
+times 10000 plus minor times 100 plus patch, so USD 0.26.11 is `usd2611` and
+USD 0.25.05 is `usd2505`.
+
 Anything else is a configure error, including a misspelling such as `mayaGE2026`
-and a plugin name such as `mtoa`. Plugin availability is not known at configure
+or `usd0.26.11`, and a plugin name such as `mtoa`. Plugin availability is not known at configure
 time, so it stays with `depOnPlugins` and the JSON file.
 
 The name differs from `skipOnPlatform` and `skipOnRenderer` because the

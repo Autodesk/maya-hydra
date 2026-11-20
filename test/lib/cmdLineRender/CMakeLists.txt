@@ -41,18 +41,19 @@ function(_mayaHydra_renderer_for_folder folder out_renderer out_suffix)
     endif()
 endfunction()
 
-# Tag prman tests with a ctest label ("prman") so a pipeline can select or
-# deselect the whole PRMan group in one place via tests-to-run.json, which
-# build.py turns into "ctest -L prman" / "-LE prman".  This is a group-selection
-# handle, not a check for whether the plugin is installed (PRMan is expected to
-# be present on the Windows preflight).  The other renderers are a baseline part
-# of the suite and never need to be selected as a group, so they get an empty
-# label.  Deriving the label here with a single conditional (instead of carrying
-# an extra column through parallel lists) is what lets us avoid the "CMake
-# list() drops empty elements" placeholder.
+# Tag prman and arnold tests with the ctest label of the plugin they depend on
+# ("prman", "mtoa") so a pipeline can select or deselect each group in one place
+# via tests-to-run.json, which build.py turns into e.g. "ctest -L prman" /
+# "-LE mtoa".  This is a group-selection handle, not a check for whether the
+# plugin is installed.  Storm ships with USD and is a baseline part of the
+# suite, so it gets an empty label.  Deriving the label here with a single
+# conditional (instead of carrying an extra column through parallel lists) is
+# what lets us avoid the "CMake list() drops empty elements" placeholder.
 function(_mayaHydra_dep_label_for_folder folder out_label)
     if(folder STREQUAL "prman")
         set(${out_label} "|depOnPlugins:prman" PARENT_SCOPE)
+    elseif(folder STREQUAL "arnold")
+        set(${out_label} "|depOnPlugins:mtoa" PARENT_SCOPE)
     else()
         set(${out_label} "" PARENT_SCOPE)
     endif()
@@ -346,7 +347,7 @@ if(IS_WINDOWS)
 endif()
 
 # Test that HdArnold can render a basic render pass.
-mayaHydra_add_cmd_line_render_test(renderSettings/arnold/arnoldSimpleRenderPass.ma
+mayaHydra_add_cmd_line_render_test(renderSettings/arnold/arnoldSimpleRenderPass.ma|depOnPlugins:mtoa
     COPY_SCENE
     RENDERER HdArnoldRendererPlugin
     RENDERED_IMAGE_SUBDIR projects/default/images
@@ -354,8 +355,8 @@ mayaHydra_add_cmd_line_render_test(renderSettings/arnold/arnoldSimpleRenderPass.
 )
 
 set(ARNOLD_MAYABATCH_RENDER_SCENES
-    basic/renderCurrentFrame.ma
-    basic/renderFrame.ma
+    basic/renderCurrentFrame.ma|depOnPlugins:mtoa
+    basic/renderFrame.ma|depOnPlugins:mtoa
 )
 
 foreach(scene ${ARNOLD_MAYABATCH_RENDER_SCENES})
@@ -396,7 +397,7 @@ mayaHydra_add_cmd_line_render_test(${scene}
 # Hydra V2 render settings by default; same as testCurrentRendererSelection.py).
 # Baseline is a copy of renderCurrentFrame_UsdCurrentRendererHonored.png: same
 # scene geometry/lighting, same renderer, so identical expected pixels.
-mayaHydra_add_cmd_line_render_test(${scene}
+mayaHydra_add_cmd_line_render_test(${scene}|depOnPlugins:mtoa
     COPY_SCENE
     RENDERER HdArnoldRendererPlugin
     RENDERED_IMAGE_SUBDIR projects/default/images
@@ -436,11 +437,12 @@ set(scene basic/usdCamera.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 foreach(folder storm arnold)
     _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    _mayaHydra_dep_label_for_folder(${folder} dep_label)
     set(_usdCamera_fail_arg "")
     if(folder STREQUAL "storm")
         set(_usdCamera_fail_arg ${_hdStorm_fail_arg})
     endif()
-    mayaHydra_add_cmd_line_render_test(${scene}
+    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
@@ -457,7 +459,8 @@ set(scene basic/basicAnimRig.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 foreach(folder arnold)
     _mayaHydra_renderer_for_folder(${folder} renderer suffix)
-    mayaHydra_add_cmd_line_render_multi_image_test(${scene}
+    _mayaHydra_dep_label_for_folder(${folder} dep_label)
+    mayaHydra_add_cmd_line_render_multi_image_test(${scene}${dep_label}
         IMAGE_EXTENSION png
         EXPECTED_IMAGES_DIR basic/${folder}/images/basicAnimRig
         RENDERER ${renderer}
@@ -478,9 +481,10 @@ set(scene sessionLayer/defaultRenderDescriptionRenderSettings.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 foreach(folder arnold)
     _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    _mayaHydra_dep_label_for_folder(${folder} dep_label)
     # Default output resolution is (2048, 1080), session layer override
     # sets (720, 480).
-    mayaHydra_add_cmd_line_render_test(${scene}
+    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
@@ -494,9 +498,10 @@ set(scene sessionLayer/proxyShapeRenderSettings.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 foreach(folder arnold)
     _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    _mayaHydra_dep_label_for_folder(${folder} dep_label)
     # proxyShapeRenderSettings.usda specifies the output resolution to be
     # (1920, 1080), session layer override in proxyShape sets (720, 480).
-    mayaHydra_add_cmd_line_render_test(${scene}
+    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
@@ -511,7 +516,7 @@ endforeach()
 # not propagate the real exit code (see the framesSetInvalid comment above).
 if(NOT IS_MACOSX)
     # Path to session layer invalid: expect failure.
-    mayaHydra_add_cmd_line_render_test(${scene}
+    mayaHydra_add_cmd_line_render_test(${scene}|depOnPlugins:mtoa
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
@@ -523,7 +528,7 @@ if(NOT IS_MACOSX)
         PROPERTIES WILL_FAIL TRUE)
 
     # Session layer stage invalid: expect failure.
-    mayaHydra_add_cmd_line_render_test(${scene}
+    mayaHydra_add_cmd_line_render_test(${scene}|depOnPlugins:mtoa
         COPY_SCENE
         RENDERED_IMAGE_SUBDIR projects/default/images
         RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
@@ -595,7 +600,13 @@ function(_add_usdProxyShapeRenderSettings_test test_name renderer output_subdir 
     _mayaHydra_setup_test_common_path_vars()
     list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
     _mayaHydra_setup_test_common_defaults("${test_name}")
-    _mayaHydra_setup_test_plugins()
+    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
+    _mayaHydra_test_uses_prman(_uses_prman "${renderer}" "${parsed_labels}")
+    if(_uses_prman)
+        _mayaHydra_setup_test_plugins()
+    else()
+        _mayaHydra_setup_test_plugins(EXCLUDE_PRMAN)
+    endif()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
@@ -614,7 +625,6 @@ function(_add_usdProxyShapeRenderSettings_test test_name renderer output_subdir 
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "TF_FATAL_VERIFY=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
-    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
     apply_labels_to_test("${parsed_labels}" ${test_name})
 
 endfunction()
@@ -622,7 +632,7 @@ _add_usdProxyShapeRenderSettings_test(
     usdProxyShapeRenderSettings
     HdArnoldRendererPlugin
     usdProxyShapeRenderSettings
-    ""
+    "depOnPlugins:mtoa"
     "renderSettings/arnold/usdProxyShapeRenderSettings.ma")
 if(IS_WINDOWS)
     _add_usdProxyShapeRenderSettings_test(
@@ -790,7 +800,7 @@ endforeach()
 # child render process and fails without starting it. Interactive mode behaves the same on
 # all platforms.
 set(INTERACTIVE_TEST_SCRIPT_FILES_RENDER_SETUP
-    testCancelBatchRender.py
+    testCancelBatchRender.py|depOnPlugins:mtoa
 )
 
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_RENDER_SETUP})
@@ -841,7 +851,14 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
     _mayaHydra_setup_test_common_path_vars()
     list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
     _mayaHydra_setup_test_common_defaults("${test_name}")
-    _mayaHydra_setup_test_plugins()
+    # Always renders with HdArnold, so only the labels can call for PRMan.
+    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
+    _mayaHydra_test_uses_prman(_uses_prman "" "${parsed_labels}")
+    if(_uses_prman)
+        _mayaHydra_setup_test_plugins()
+    else()
+        _mayaHydra_setup_test_plugins(EXCLUDE_PRMAN)
+    endif()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
@@ -851,7 +868,6 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_IGNORE_DIALOGS=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
-    mayaHydra_parse_test_label_groups(parsed_labels "${test_labels}")
     apply_labels_to_test("${parsed_labels}" ${test_name})
 endfunction()
 
@@ -871,7 +887,7 @@ _add_scene_index_dump_test(
     "${_terminal_dump_file}"
     "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump.txt"
     11 # Compare first 11 lines
-    "" # No tag groups
+    "depOnPlugins:mtoa" # Always renders with HdArnold
 )
 
 set(_mayaHydra_dump_file
@@ -884,7 +900,7 @@ _add_scene_index_dump_test(
     "${_mayaHydra_dump_file}"
     "${CMAKE_CURRENT_SOURCE_DIR}/expected/mayaHydraSceneIndexDump.txt"
     4 # Compare first 4 lines
-    "" # No tag groups
+    "depOnPlugins:mtoa" # Always renders with HdArnold
 )
 
 # C++ unit tests

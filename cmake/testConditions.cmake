@@ -36,8 +36,8 @@ set(MAYAHYDRA_TEST_RENDERER_CHOICES HdStorm HdFlash)
 # skipOnPlatform: tag and as platforms_to_exclude in tests-to-run.json.
 set(MAYAHYDRA_TEST_PLATFORM_CHOICES osx win lin)
 
-# The platform and renderer this build configures its tests for. Maya versions
-# are deliberately absent: they are predicates rather than facts, see
+# The platform and renderer this build configures its tests for. Maya and USD
+# versions are deliberately absent: they are predicates rather than facts, see
 # mayaHydra_test_condition_holds.
 function(mayaHydra_current_test_facts out)
     if(NOT MAYAHYDRA_TEST_RENDERER)
@@ -55,6 +55,22 @@ function(mayaHydra_current_test_facts out)
     set(${out} ${platform} ${MAYAHYDRA_TEST_RENDERER} PARENT_SCOPE)
 endfunction()
 
+# Maps the operator of a version condition, one of Ge/Gt/Le/Lt or empty for an
+# exact match, to the if() version comparison it stands for.
+function(_mayaHydra_version_comparison out operator)
+    if(operator STREQUAL "")
+        set(${out} VERSION_EQUAL PARENT_SCOPE)
+    elseif(operator STREQUAL "Ge")
+        set(${out} VERSION_GREATER_EQUAL PARENT_SCOPE)
+    elseif(operator STREQUAL "Gt")
+        set(${out} VERSION_GREATER PARENT_SCOPE)
+    elseif(operator STREQUAL "Le")
+        set(${out} VERSION_LESS_EQUAL PARENT_SCOPE)
+    else()
+        set(${out} VERSION_LESS PARENT_SCOPE)
+    endif()
+endfunction()
+
 # Evaluates one disabledOn: condition.
 #
 # Maya version conditions are maya<op><year>, with op one of Ge/Gt/Le/Lt or
@@ -63,24 +79,35 @@ endfunction()
 # version that does not exist yet: mayaGt2027 simply holds the first time
 # someone configures against a later version.
 #
+# USD version conditions are usd<op><version>, with the same operators. The
+# version is spelled as PXR_VERSION encodes it, major * 10000 + minor * 100 +
+# patch, so USD 0.26.11 is usd2611, and is compared against PXR_VERSION with
+# the same freedom to name a release that does not exist yet.
+#
 # Every other condition names a platform or a renderer, and holds when it is
 # what this build configures its tests for.
 function(mayaHydra_test_condition_holds out condition)
     if(condition MATCHES "^maya(Ge|Gt|Le|Lt)?([0-9][0-9][0-9][0-9])$")
-        set(operator "${CMAKE_MATCH_1}")
         set(year "${CMAKE_MATCH_2}")
-        if(operator STREQUAL "")
-            set(comparison VERSION_EQUAL)
-        elseif(operator STREQUAL "Ge")
-            set(comparison VERSION_GREATER_EQUAL)
-        elseif(operator STREQUAL "Gt")
-            set(comparison VERSION_GREATER)
-        elseif(operator STREQUAL "Le")
-            set(comparison VERSION_LESS_EQUAL)
-        else()
-            set(comparison VERSION_LESS)
-        endif()
+        _mayaHydra_version_comparison(comparison "${CMAKE_MATCH_1}")
         if(MAYA_APP_VERSION ${comparison} ${year})
+            set(${out} TRUE PARENT_SCOPE)
+        else()
+            set(${out} FALSE PARENT_SCOPE)
+        endif()
+        return()
+    endif()
+
+    if(condition MATCHES "^usd(Ge|Gt|Le|Lt)?([0-9][0-9][0-9][0-9])$")
+        # Unset, every USD condition would silently be false.
+        if(NOT DEFINED PXR_VERSION)
+            message(FATAL_ERROR
+                "PXR_VERSION is not set: disabledOn: USD conditions cannot be "
+                "evaluated before USD is found.")
+        endif()
+        set(version "${CMAKE_MATCH_2}")
+        _mayaHydra_version_comparison(comparison "${CMAKE_MATCH_1}")
+        if(PXR_VERSION ${comparison} ${version})
             set(${out} TRUE PARENT_SCOPE)
         else()
             set(${out} FALSE PARENT_SCOPE)
@@ -94,8 +121,8 @@ function(mayaHydra_test_condition_holds out condition)
     if(NOT condition IN_LIST MAYAHYDRA_TEST_PLATFORM_CHOICES AND
        NOT condition IN_LIST MAYAHYDRA_TEST_RENDERER_CHOICES)
         message(FATAL_ERROR
-            "Unknown disabledOn: condition \"${condition}\". Expected maya<year>, "
-            "optionally prefixed with Ge/Gt/Le/Lt, or one of "
+            "Unknown disabledOn: condition \"${condition}\". Expected maya<year> "
+            "or usd<version>, either optionally prefixed with Ge/Gt/Le/Lt, or one of "
             "${MAYAHYDRA_TEST_PLATFORM_CHOICES} "
             "${MAYAHYDRA_TEST_RENDERER_CHOICES}.")
     endif()

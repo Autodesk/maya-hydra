@@ -197,7 +197,6 @@ if (CMAKE_WANT_MATERIALX_BUILD)
         message(WARNING "Disabling MaterialX VP2 rendering: it is not supported by this USD package.")
     endif()
 endif()
-include(cmake/usd.cmake)
 
 # Avoid re-invoking OpenUSD's pxrConfig.cmake from subprojects (e.g., hydra-viewport-toolbox)
 # which can lead to duplicate imported targets like TBB::tbb.
@@ -379,6 +378,9 @@ endif()
 #-----------------------------------------------------------------------------
 # Maya module files
 #-----------------------------------------------------------------------------
+# USD python bindings - variable "PXR_USD_PYTHON_LOCATION" is used in mod files.
+get_pxr_usd_python_module_location(PXR_USD_PYTHON_LOCATION)
+
 if (IS_WINDOWS)
     configure_file("modules/mayaHydra_Win.mod.template" ${PROJECT_BINARY_DIR}/mayaHydra.mod)
 else()
