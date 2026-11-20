@@ -72,6 +72,8 @@ struct MayaHydraSceneIndexRegistration
     MayaHydraNodePrefixReservationPtr prefixReservation;
 
     virtual void Update() = 0;
+    // Whether the scene index may have unloaded prims.
+    virtual bool MayHaveUnloadedPrims() const = 0;
 #ifdef CODE_COVERAGE_WORKAROUND
     virtual void Destroy() = 0;
 #endif
@@ -112,15 +114,26 @@ public:
     MAYAHYDRALIB_API
     const Registrations& GetRegistrations() const;
 
+    // Whether the prim at primPath, or any of its descendants, may be an unloaded prim of a
+    // registered scene index.
+    MAYAHYDRALIB_API
+    bool MayHaveUnloadedPrims(const SdfPath& primPath) const;
+
     // When in a MayaUsd proxy shape node, some stages become invalid, we need to apply the updates.
     // it's not automatic as we are called from a compute function of a node and we may have recursion which are not allowed
+    // Returns true if a proxy shape's scene index chain was replaced: the caller must then
+    // replace the Hydra selection, as its paths were mapped against the previous stage.
     MAYAHYDRALIB_API
-    void ApplyPendingUpdates();
+    bool ApplyPendingUpdates();
 
 private:
-    void
-    _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration
+    // dagNode is non-const because of callback registration. The prefix is the node's
+    // reservation (MayaHydraNodePrefixReservation), shared with the other registries.
+    void _AddSceneIndexForNode(MObject& dagNode);
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
+    // Replaces a proxy shape's chain by one built from its current stage (see
+    // MayaUsdProxyShapeSceneIndexBase::NeedsRebuild()).
+    void        _RebuildSceneIndexForNode(MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);
     static void _AfterOpenCallback (void *clientData);

@@ -143,12 +143,15 @@ private:
 // path. All the instances for a node share its scene index path prefix
 // (MayaHydraNodePrefixReservation) and their chains are in every view, so their mappers are
 // interchangeable: when the owner is destroyed, its chain leaves the views and another instance
-// takes over. Main thread only.
+// takes over. An instance waiting for a rebuild (NeedsRebuild()) maps against the previous stage,
+// so it never takes over, and a new instance takes the registration from it. Main thread only.
 std::vector<MayaUsdProxyShapeSceneIndexBase*> liveProxyShapeSceneIndices;
 
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
+
+long int MayaUsdProxyShapeSceneIndexBase::_nbPopulateCalls = 0;
 
 MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
     const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
@@ -183,8 +186,23 @@ MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
 
     // Register a mapper in the path mapper registry, if there is none
     // for this path.
-    _unregisterPathMapper = Fvp::PathMapperRegistry::Instance().Register(
-        _sceneIndexAppPath, _usdPathMapper);
+    auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
+    _unregisterPathMapper = pathMapperRegistry.Register(_sceneIndexAppPath, _usdPathMapper);
+    if (!_unregisterPathMapper) {
+        // Take over from an owner waiting for a rebuild (NeedsRebuild()), such as another
+        // render override's chain for the previous stage: this one maps against the current one.
+        for (MayaUsdProxyShapeSceneIndexBase* other : liveProxyShapeSceneIndices) {
+            if (other->_unregisterPathMapper && other->_sceneIndexAppPath == _sceneIndexAppPath) {
+                if (other->_needsRebuild) {
+                    pathMapperRegistry.Unregister(_sceneIndexAppPath);
+                    other->_unregisterPathMapper = false;
+                    _unregisterPathMapper
+                        = pathMapperRegistry.Register(_sceneIndexAppPath, _usdPathMapper);
+                }
+                break;
+            }
+        }
+    }
     liveProxyShapeSceneIndices.push_back(this);
 
     Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
@@ -208,20 +226,28 @@ void MayaUsdProxyShapeSceneIndexBase::SetSceneIndexAppPath(const Ufe::Path& scen
 
 void MayaUsdProxyShapeSceneIndexBase::_Destroy()
 {
+    // Detach() and the destructor both call this: unregistering twice would remove the
+    // replacement's path mapper.
+    if (_destroyed) {
+        return;
+    }
+    _destroyed = true;
+
     liveProxyShapeSceneIndices.erase(
         std::remove(liveProxyShapeSceneIndices.begin(), liveProxyShapeSceneIndices.end(), this),
         liveProxyShapeSceneIndices.end());
 
-    // Can run twice (explicitly, then from the destructor): unregister only once.
     if (_unregisterPathMapper) {
         auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
         pathMapperRegistry.Unregister(_sceneIndexAppPath);
         _unregisterPathMapper = false;
 
-        // Hand the registration over to the newest remaining instance for the same node.
+        // Hand the registration over to the newest remaining instance for the same node. Not to
+        // one waiting for a rebuild (NeedsRebuild()): it maps against the previous stage, and the
+        // render override that rebuilds first would replace its selection with its paths.
         for (auto it = liveProxyShapeSceneIndices.rbegin(); it != liveProxyShapeSceneIndices.rend(); ++it) {
             MayaUsdProxyShapeSceneIndexBase* other = *it;
-            if (other->_sceneIndexAppPath == _sceneIndexAppPath) {
+            if (other->_sceneIndexAppPath == _sceneIndexAppPath && !other->_needsRebuild) {
                 other->_unregisterPathMapper
                     = pathMapperRegistry.Register(other->_sceneIndexAppPath, other->_usdPathMapper);
                 break;
@@ -290,7 +316,16 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
         return;
     }
 
+    if (_rebuildOnStageChange && _stage) {
+        // No SetStage() once populated (see SetRebuildOnStageChange()): the owner replaces
+        // this scene index at the next render.
+        _needsRebuild = true;
+        return;
+    }
+
     _usdImagingStageSceneIndex->SetStage(nullptr);
+    _stage = nullptr;
+    _InvalidateMayHaveUnloadedPrims();
     _populated = false;
     // Simply mark populate as dirty and do not call
     // Populate();
@@ -319,23 +354,63 @@ void MayaUsdProxyShapeSceneIndexBase::_ObjectsChanged(
 void MayaUsdProxyShapeSceneIndexBase::PopulateAndApplyPendingChanges() 
 { 
     Populate();
+    if (_needsRebuild) {
+        // Populate() can set it too. The replacement is built from the current stage, edits
+        // included.
+        return;
+    }
     _usdImagingStageSceneIndex->ApplyPendingUpdates();
 }
 
 void MayaUsdProxyShapeSceneIndexBase::Populate()
 {
+    if (_needsRebuild) {
+        return;
+    }
     if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
+        if (_rebuildOnStageChange && _stage && _stage != stage) {
+            // A new stage after the first population, even an empty or null one: see
+            // SetRebuildOnStageChange().
+            _needsRebuild = true;
+            return;
+        }
         // Check whether the pseudo-root has children
-        if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+        if (HasRootPrims(stage)) {
             ++_nbPopulateCalls;
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
+            // Set _stage before calling SetStage(), as the latter's PrimsAdded handlers call MayHaveUnloadedPrims().
+            _stage = stage;
+            _InvalidateMayHaveUnloadedPrims();
             _usdImagingStageSceneIndex->SetStage(stage);
             // Set the initial time
             UpdateTime();
             _populated = true;
         }
     }
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::HasRootPrims(const UsdStageRefPtr& stage)
+{
+    // Unlike GetChildren(), which uses UsdPrimDefaultPredicate, don't skip unloaded prims.
+    return stage
+        && !stage->GetPseudoRoot()
+                .GetFilteredChildren(UsdPrimIsActive && UsdPrimIsDefined && !UsdPrimIsAbstract)
+                .empty();
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::MayHaveUnloadedPrims() const
+{
+    // UsdPrim::IsLoaded follows the load rules, so a stage whose rules load the pseudo-root with
+    // all its descendants has no unloaded prims.
+    if (!_stage) {
+        return false;
+    }
+    if (!_mayHaveUnloadedPrimsCache.has_value()) {
+        _mayHaveUnloadedPrimsCache
+            = !_stage->GetLoadRules().IsLoadedWithAllDescendants(SdfPath::AbsoluteRootPath());
+    }
+    return _mayHaveUnloadedPrimsCache.value();
 }
 
 Ufe::Path MayaUsdProxyShapeSceneIndexBase::InterpretRprimPath(
@@ -369,8 +444,8 @@ SdfPathVector MayaUsdProxyShapeSceneIndexBase::GetChildPrimPaths(const SdfPath& 
 bool MayaUsdProxyShapeSceneIndexBase::HasPendingUpdates() const
 {
     //When we receive a stage invalidate we remove the stage and set populate to false
-    //We need to re-populate to see the changes
-    return (false == _populated);
+    //We need to re-populate to see the changes, or be replaced (NeedsRebuild())
+    return (false == _populated) || _needsRebuild;
 }
 
 Fvp::PrimSelections

@@ -33,6 +33,8 @@
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -48,6 +50,7 @@
 #include <ufeExtensions/Global.h>
 
 #include <optional>
+#include <vector>
 
 namespace {
 
@@ -69,6 +72,12 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
         auto proxyShapeSceneIndex
             = TfDynamic_cast<::MayaHydra::MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->UpdateTime();
+    }
+
+    bool MayHaveUnloadedPrims() const override {
+        auto proxyShapeSceneIndex
+            = TfDynamic_cast<::MayaHydra::MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
+        return proxyShapeSceneIndex->MayHaveUnloadedPrims();
     }
 
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -262,6 +271,21 @@ MayaHydraSceneIndexRegistry::GetRegistrations() const
     return _registrations;
 }
 
+bool MayaHydraSceneIndexRegistry::MayHaveUnloadedPrims(const SdfPath& primPath) const
+{
+    for (const auto& reg : _registrations) {
+        const SdfPath& prefix = reg.first;
+        if (primPath.HasPrefix(prefix)) {
+            return reg.second->MayHaveUnloadedPrims();
+        }
+        // Ancestors of the scene index have its prims as descendants.
+        if (prefix.HasPrefix(primPath) && reg.second->MayHaveUnloadedPrims()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
 {
     MDGMessage::removeCallbacks(_DGCallbackIds);
@@ -338,10 +362,21 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     createInfo.overridesSceneIndexCallback = [](HdSceneIndexBaseRefPtr const& inputSi) {
         return MayaHydra::MhExternalCameraOverrideSceneIndex::New(inputSi);
     };
+    // Report unloaded prims, with their loading status, so that Fvp::UnloadedPayloadBoundsSceneIndex
+    // can draw unloaded payloads as bounding boxes. Batch renders do not draw them, so don't need
+    // them. UsdImaging's built-in displayUnloadedPrimsWithBounds is not used, see
+    // fvpUnloadedPayloadBoundsSceneIndex.h as to why.
+    if (_interactive) {
+        static const HdContainerDataSourceHandle stageSceneIndexInputArgs
+            = HdRetainedContainerDataSource::New(
+                UsdImagingStageSceneIndexTokens->includeUnloadedPrims,
+                HdRetainedTypedSampledDataSource<bool>::New(true));
+        createInfo.stageSceneIndexInputArgs = stageSceneIndexInputArgs;
+    }
 
     auto stage = proxyStage.getUsdStage();
     // Check whether the pseudo-root has children
-    if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+    if (MayaUsdProxyShapeSceneIndexBase::HasRootPrims(stage)) {
         createInfo.stage = stage;//Add the stage to the creation parameters
     }
             
@@ -377,6 +412,9 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         TF_VERIFY(registration->pickRegistration, "USD pick handler registration failed for %s.",
             registration->sceneIndexPathPrefix.GetText());
     }
+    // Replace the chain on a stage change after population instead of re-staging it
+    // (HYDRA-2582). Interactive only: the batch renderer never calls ApplyPendingUpdates().
+    mayaUsdProxyShapeSceneIndex->SetRebuildOnStageChange(_interactive);
     mayaUsdProxyShapeSceneIndex->Populate();
 
     // This sets the required prefix just downstream (after) the
@@ -403,15 +441,17 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);
     dataProducerSceneIndexData->SetDataProducerLastSceneIndexChain(registration->rootSceneIndex);
 
+    // Add the registration record before adding the scene index to the views, as the prims added
+    // to the views query the registry, e.g. Fvp::UnloadedPayloadBoundsSceneIndex calls
+    // MayHaveUnloadedPrims(), which would otherwise not find this stage on its initial load.
+    _registrations.insert({ registration->sceneIndexPathPrefix, registration });
+    _registrationsByObjectHandle.insert({ registration->dagNode, registration });
+
     //Add this chain scene index to the render index proxy from all views
     const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSceneIndexData);
     if (false == bRes){
         TF_CODING_ERROR("Fvp::DataProducerSceneIndexInterfaceImp::get().addDataProducerSceneIndex returned false !");
     }
-
-    // Add registration record if everything succeeded
-    _registrations.insert({ registration->sceneIndexPathPrefix, registration });
-    _registrationsByObjectHandle.insert({ registration->dagNode, registration });
 }
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeAddedCallback(MObject& dagNode, void* clientData)
@@ -461,18 +501,65 @@ void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
     _RegisterDefaultRenderDescriptionNode();
 }
 
-void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
+bool MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
 {
+    // Collected first: a rebuild modifies _registrations.
+    std::vector<MObjectHandle> nodesToRebuild;
     for (auto& reg : _registrations) {
         auto& registration = reg.second;
         if (registration->pluginSceneIndex) {
             MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex
                 = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(registration->pluginSceneIndex);
-            if (proxyShapeSceneIndex && proxyShapeSceneIndex->HasPendingUpdates()) {
+            if (!proxyShapeSceneIndex) {
+                continue;
+            }
+            if (!proxyShapeSceneIndex->NeedsRebuild()
+                && proxyShapeSceneIndex->HasPendingUpdates()) {
                 proxyShapeSceneIndex->PopulateAndApplyPendingChanges();
+            }
+            // Checked after the populate, which can itself ask for a rebuild.
+            if (proxyShapeSceneIndex->NeedsRebuild()) {
+                nodesToRebuild.push_back(registration->dagNode);
             }
         }
     }
+
+    for (const auto& nodeHandle : nodesToRebuild) {
+        if (nodeHandle.isValid()) {
+            MObject dagNode = nodeHandle.object();
+            _RebuildSceneIndexForNode(dagNode);
+        }
+    }
+    return !nodesToRebuild.empty();
+}
+
+void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
+{
+    auto it = _registrationsByObjectHandle.find(MObjectHandle(dagNode));
+    if (it == _registrationsByObjectHandle.end()) {
+        return;
+    }
+
+    // Keep the prefix: selection and isolate select hold paths under it, and a regenerated
+    // one would follow a rename of the node. Holding the reservation while the old chain is
+    // removed makes _AddSceneIndexForNode() get it back, even if no other registry holds it.
+    const MayaHydraNodePrefixReservationPtr prefixReservation = it->second->prefixReservation;
+
+    // Release the old path mapper first: the new scene index registers its own for the
+    // same paths, and the old one may outlive its removal. Scoped, so that this
+    // reference does not keep the old stage alive while _AddSceneIndexForNode() opens the new one.
+    {
+        MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex
+            = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(it->second->pluginSceneIndex);
+        if (oldProxyShapeSceneIndex) {
+            oldProxyShapeSceneIndex->Detach();
+        }
+    }
+
+    // The old chain still holds the previous stage, so removing it removes all its prims;
+    // the new chain is populated once, from the current stage.
+    _RemoveSceneIndexForNode(dagNode);
+    _AddSceneIndexForNode(dagNode);
 }
 
 void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
