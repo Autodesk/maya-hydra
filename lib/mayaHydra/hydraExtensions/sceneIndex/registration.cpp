@@ -420,11 +420,14 @@ void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
     const SdfPath prefix = it->second->sceneIndexPathPrefix;
 
     // Release the old path mapper and pick handler first: the new scene index registers its
-    // own for the same paths, and the old one may outlive its removal.
-    MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex
-        = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(it->second->pluginSceneIndex);
-    if (oldProxyShapeSceneIndex) {
-        oldProxyShapeSceneIndex->Detach();
+    // own for the same paths, and the old one may outlive its removal. Scoped, so that this
+    // reference does not keep the old stage alive while _AddSceneIndexForNode() opens the new one.
+    {
+        MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex
+            = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(it->second->pluginSceneIndex);
+        if (oldProxyShapeSceneIndex) {
+            oldProxyShapeSceneIndex->Detach();
+        }
     }
 
     // The old chain still holds the previous stage, so removing it removes all its prims;
