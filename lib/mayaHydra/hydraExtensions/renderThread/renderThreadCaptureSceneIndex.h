@@ -143,6 +143,9 @@ private:
         PXR_NS::HdDataSourceLocatorSet dirty;
         bool                           copied = false;
         bool                           pending = false;
+        // Created only as the ancestor of an added prim. The input may stop
+        // listing it once it has no descendants left, so neither does this.
+        bool implicit = false;
     };
     using _Table = PXR_NS::SdfPathTable<_Entry>;
 

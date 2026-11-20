@@ -794,6 +794,21 @@ void RenderThreadCaptureSceneIndex::_Apply(const HdSceneIndexObserver::RemovedPr
 {
     for (const auto& entry : entries) {
         _table.erase(entry.primPath);
+        for (SdfPath ancestor = entry.primPath.GetParentPath();
+             !ancestor.IsEmpty() && !ancestor.IsAbsoluteRootPath();
+             ancestor = ancestor.GetParentPath()) {
+            const auto it = _table.find(ancestor);
+            if (it == _table.end() || !it->second.implicit) {
+                break;
+            }
+            // Depth first, so the next entry is the first child, if any.
+            auto next = it;
+            ++next;
+            if (next != _table.end() && next->first.GetParentPath() == ancestor) {
+                break;
+            }
+            _table.erase(it);
+        }
     }
 }
 
@@ -846,8 +861,11 @@ void RenderThreadCaptureSceneIndex::_Insert(const SdfPath& path)
         missing.push_back(ancestor);
     }
     for (const SdfPath& p : missing) {
-        _MarkPending(_table[p], p);
+        _Entry& entry = _table[p];
+        entry.implicit = p != path;
+        _MarkPending(entry, p);
     }
+    _table[path].implicit = false;
 }
 
 void RenderThreadCaptureSceneIndex::_MarkPending(_Entry& entry, const SdfPath& path)
