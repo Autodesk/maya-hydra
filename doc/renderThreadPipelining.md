@@ -186,6 +186,36 @@ happens on the first frame submitted to the render thread.  From then on it:
   render thread is idle: after the interlock, after a discard (pick, resize,
   change of panel), after `-drainRenderThread`, and when the thread stops.
 
+The renderer's own tasks and render buffers are never held, which HVT keeps for
+the frame passes in a retained scene index merged directly into the render index,
+under `/Pass0`, `/Pass1` and so on.  The passes' camera and lights there are held
+like any other prim, since plugins between the two (light linking, flattening)
+change them.  When the draw
+runs `GetRenderTasks` again and a pass's inputs have changed, as on the first
+frames, on a resize or on an offscreen playblast, the pass removes or adds render
+buffers, looks them up in the render index right away, and passes the result to
+its tasks as parameters.  Held, the render index would still return a removed
+buffer, the task would keep its pointer, and the release would delete the buffer
+under it.  So notices for those prims go through at once, and the capture keeps
+their data sources by reference, since HVT changes them in place.
+
+The capture finds those retained scene indices and their top-level paths on
+activation, and takes the prims from them rather than through its input: there
+the read would also go through the Flow Viewport scene indices, merged at the
+root, while the main thread changes them.  HVT writes its prims on the thread
+that draws, between draws, or on the main thread while the render thread is idle,
+and the notices come from the thread that wrote them, so this is safe.  No plugin
+between the merging scene index and the capture changes task or render buffer
+data.  The draw's task parameter changes apply in the same frame, not the next.
+
+A prim's selections are not held either.  The capture serves each copied prim
+through a container that reads `selections` from a slot it changes in place
+when a notice dirties them, so, as with Flow Viewport's selection scene index, a
+prim handed out before a pick shows the new selection right after it.  The rest
+of the copy stays fixed, and the notice itself is still held while the render
+thread may be syncing, since forwarding it would change the render index's dirty
+state under that sync.
+
 A synchronous main-thread frame holds and releases it around the draw, so that
 Hydra's parallel sync reads the copy without taking any lock.  A pick run on the
 render thread is held the same way.

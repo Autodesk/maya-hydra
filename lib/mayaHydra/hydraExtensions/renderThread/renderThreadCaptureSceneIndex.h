@@ -28,16 +28,32 @@
 // it keeps a copy of every prim built from retained data sources, reads its
 // input only on the main thread, and holds back notices while the render thread
 // may be reading, so the copy cannot change underneath it.
+//
+// The renderer's own tasks and render buffers are the exception, which HVT keeps for
+// its frame passes in a retained scene index merged directly into the render index.
+// HVT changes them while it draws, between passes, and looks them up in the render
+// index right after, so their notices go through at once, even while holding. The capture keeps their data sources by reference, as
+// HVT changes them in place, taken from that retained scene index rather than
+// through its input, which would also reach the scene indices the main thread is
+// changing.
+//
+// A prim's selections are not held either: like Flow Viewport's selection scene
+// index, every prim it has handed out shows a selection change at once. The rest
+// of the copy stays fixed, and the notice is still held.
 
 #include <mayaHydraLib/api.h>
 
 #include <pxr/base/tf/declarePtrs.h>
+#include <pxr/base/tf/weakPtr.h>
 #include <pxr/imaging/hd/dataSourceLocator.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexObserver.h>
+#include <pxr/usd/sdf/path.h>
 #include <pxr/usd/sdf/pathTable.h>
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <variant>
@@ -113,9 +129,16 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
 private:
+    // The prim's selections, changed in place, and the copy that serves them.
+    struct _Selections;
+    class _PrimSource;
+
     struct _Entry
     {
-        PXR_NS::HdSceneIndexPrim prim;
+        // The copy behind a _PrimSource, or the renderer's own prim.
+        PXR_NS::HdSceneIndexPrim            prim;
+        PXR_NS::HdContainerDataSourceHandle copy;
+        std::shared_ptr<_Selections>        selections;
         // What changed since the copy was taken. Ignored until the first copy.
         PXR_NS::HdDataSourceLocatorSet dirty;
         bool                           copied = false;
@@ -141,6 +164,38 @@ private:
     std::mutex& _CopyLock(const PXR_NS::SdfPath& path) const;
 
     void _Forward(const _Notice& notice);
+
+    // Under an exclusive lock, on the main thread: give copied prims their new
+    // selections at once, even while holding.
+    void _UpdateSelections(const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries);
+
+    // Sends the entries for the renderer's own prims on at once, after
+    // storeRenderer(those entries) under an exclusive lock, and holds or applies
+    // the others.
+    template <class Entries, class StoreRenderer, class Send>
+    void _Receive(const Entries& entries, StoreRenderer storeRenderer, Send send);
+
+    // Whether an entry is for one of the renderer's own tasks or render buffers,
+    // which are under one of _rendererRoots. Under an exclusive lock.
+    bool _IsRendererPrim(const PXR_NS::SdfPath& path, const PXR_NS::TfToken& primType) const;
+    bool _IsRendererPrim(const PXR_NS::HdSceneIndexObserver::AddedPrimEntry& entry) const;
+    bool _IsRendererPrim(const PXR_NS::HdSceneIndexObserver::RemovedPrimEntry& entry) const;
+    bool _IsRendererPrim(const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry& entry) const;
+    // The prim at \p path in the renderer's retained scene indices, if under one of
+    // _rendererRoots. The renderer writes its prims on the thread that draws,
+    // between draws, or on the main thread while that thread is idle, and its
+    // notices come from the thread that wrote them, so reading them then is safe.
+    PXR_NS::HdSceneIndexPrim _RendererSourcePrim(const PXR_NS::SdfPath& path) const;
+    // Under an exclusive lock: keep the renderer's prim by reference.
+    void _StoreRendererPrim(const PXR_NS::SdfPath& path);
+    // Main thread, while the render thread is idle.
+    void _FindRendererSources();
+
+    // The retained scene indices merged directly into the render index, where HVT
+    // keeps the renderer's prims, and their top-level paths. Not those merged
+    // further upstream, which the main thread writes.
+    std::vector<PXR_NS::TfWeakPtr<PXR_NS::HdRetainedSceneIndex>> _rendererSources;
+    PXR_NS::SdfPathVector                                        _rendererRoots;
 
     std::atomic<bool> _active { false };
     std::atomic<bool> _holding { false };

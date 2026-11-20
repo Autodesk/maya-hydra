@@ -36,6 +36,7 @@
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primOriginSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
@@ -43,6 +44,8 @@
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/usd/sdf/assetPath.h>
@@ -54,6 +57,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -373,9 +377,93 @@ void _WarnUnlistedNames(const SdfPath& primPath, const HdSceneIndexPrim& prim)
     }
 }
 
+const HdDataSourceLocator& _SelectionsLocator()
+{
+    static const HdDataSourceLocator locator = HdSelectionsSchema::GetDefaultLocator();
+    return locator;
+}
+
+// Whether \p locators name the selections or something in them. An ancestor,
+// such as the whole prim, does not count: that recopies the prim instead.
+bool _NamesSelections(const HdDataSourceLocatorSet& locators)
+{
+    return std::any_of(locators.begin(), locators.end(), [](const HdDataSourceLocator& l) {
+        return l.HasPrefix(_SelectionsLocator());
+    });
+}
+
+HdDataSourceLocatorSet _WithoutSelections(const HdDataSourceLocatorSet& locators)
+{
+    HdDataSourceLocatorSet result;
+    for (const HdDataSourceLocator& l : locators) {
+        if (!l.HasPrefix(_SelectionsLocator())) {
+            result.insert(l);
+        }
+    }
+    return result;
+}
+
+HdDataSourceBaseHandle _CopySelections(const HdContainerDataSourceHandle& live)
+{
+    return live ? _CopyDataSource(live->Get(HdSelectionsSchemaTokens->selections)) : nullptr;
+}
+
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
+
+struct RenderThreadCaptureSceneIndex::_Selections
+{
+    HdDataSourceBaseHandle Get() const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        return value;
+    }
+    void Set(HdDataSourceBaseHandle selections)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        value = std::move(selections);
+    }
+
+    mutable std::mutex     mutex;
+    HdDataSourceBaseHandle value;
+};
+
+class RenderThreadCaptureSceneIndex::_PrimSource : public HdContainerDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_PrimSource);
+
+    _PrimSource(HdContainerDataSourceHandle copy, std::shared_ptr<_Selections> selections)
+        : _copy(std::move(copy))
+        , _selections(std::move(selections))
+    {
+    }
+
+    TfTokenVector GetNames() override
+    {
+        TfTokenVector names = _copy ? _copy->GetNames() : TfTokenVector();
+        names.erase(
+            std::remove(names.begin(), names.end(), HdSelectionsSchemaTokens->selections),
+            names.end());
+        if (_selections->Get()) {
+            names.push_back(HdSelectionsSchemaTokens->selections);
+        }
+        return names;
+    }
+
+    HdDataSourceBaseHandle Get(const TfToken& name) override
+    {
+        if (name == HdSelectionsSchemaTokens->selections) {
+            return _selections->Get();
+        }
+        return _copy ? _copy->Get(name) : nullptr;
+    }
+
+private:
+    const HdContainerDataSourceHandle  _copy;
+    const std::shared_ptr<_Selections> _selections;
+};
 
 RenderThreadCaptureByReference::~RenderThreadCaptureByReference() = default;
 
@@ -449,13 +537,18 @@ void RenderThreadCaptureSceneIndex::Activate()
     if (IsActive()) {
         return;
     }
+    _FindRendererSources();
     // Everything already in the input, since notices that came before this
     // went straight through.
     std::vector<SdfPath> toVisit { SdfPath::AbsoluteRootPath() };
     while (!toVisit.empty()) {
         const SdfPath path = toVisit.back();
         toVisit.pop_back();
-        _Insert(path);
+        if (_IsRendererPrim(path, _RendererSourcePrim(path).primType)) {
+            _StoreRendererPrim(path);
+        } else {
+            _Insert(path);
+        }
         for (const SdfPath& child : _GetInputSceneIndex()->GetChildPrimPaths(path)) {
             toVisit.push_back(child);
         }
@@ -544,61 +637,86 @@ SdfPathVector RenderThreadCaptureSceneIndex::GetChildPrimPaths(const SdfPath& pr
     return result;
 }
 
+template <class Entries, class StoreRenderer, class Send>
+void RenderThreadCaptureSceneIndex::_Receive(
+    const Entries& entries,
+    StoreRenderer  storeRenderer,
+    Send           send)
+{
+    if (!IsActive()) {
+        send(entries);
+        return;
+    }
+    Entries renderer;
+    Entries others;
+    bool    anyRenderer = false;
+    bool    held = false;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if constexpr (std::is_same_v<Entries, HdSceneIndexObserver::DirtiedPrimEntries>) {
+            _UpdateSelections(entries);
+        }
+        anyRenderer = std::any_of(entries.begin(), entries.end(), [this](const auto& entry) {
+            return _IsRendererPrim(entry);
+        });
+        if (anyRenderer) {
+            for (const auto& entry : entries) {
+                (_IsRendererPrim(entry) ? renderer : others).push_back(entry);
+            }
+            storeRenderer(renderer);
+        }
+        const Entries& rest = anyRenderer ? others : entries;
+        if (!rest.empty()) {
+            held = _holding.load(std::memory_order_acquire);
+            if (held) {
+                _held.emplace_back(rest);
+            } else {
+                _Apply(rest);
+            }
+        }
+    }
+    const Entries& rest = anyRenderer ? others : entries;
+    if (!renderer.empty()) {
+        send(renderer);
+    }
+    if (!rest.empty() && !held) {
+        send(rest);
+    }
+}
+
 void RenderThreadCaptureSceneIndex::_PrimsAdded(
     const HdSceneIndexBase&                       sender,
     const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
-    if (!IsActive()) {
-        _SendPrimsAdded(entries);
-        return;
-    }
-    {
-        std::unique_lock<std::shared_mutex> lock(_mutex);
-        if (_holding.load(std::memory_order_acquire)) {
-            _held.emplace_back(entries);
-            return;
-        }
-        _Apply(entries);
-    }
-    _SendPrimsAdded(entries);
+    _Receive(
+        entries,
+        [this](const HdSceneIndexObserver::AddedPrimEntries& renderer) {
+            for (const auto& entry : renderer) {
+                _StoreRendererPrim(entry.primPath);
+            }
+        },
+        [this](const HdSceneIndexObserver::AddedPrimEntries& toSend) { _SendPrimsAdded(toSend); });
 }
 
 void RenderThreadCaptureSceneIndex::_PrimsRemoved(
     const HdSceneIndexBase&                         sender,
     const HdSceneIndexObserver::RemovedPrimEntries& entries)
 {
-    if (!IsActive()) {
-        _SendPrimsRemoved(entries);
-        return;
-    }
-    {
-        std::unique_lock<std::shared_mutex> lock(_mutex);
-        if (_holding.load(std::memory_order_acquire)) {
-            _held.emplace_back(entries);
-            return;
-        }
-        _Apply(entries);
-    }
-    _SendPrimsRemoved(entries);
+    _Receive(
+        entries,
+        [this](const HdSceneIndexObserver::RemovedPrimEntries& renderer) { _Apply(renderer); },
+        [this](const HdSceneIndexObserver::RemovedPrimEntries& toSend) { _SendPrimsRemoved(toSend); });
 }
 
 void RenderThreadCaptureSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase&                         sender,
     const HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {
-    if (!IsActive()) {
-        _SendPrimsDirtied(entries);
-        return;
-    }
-    {
-        std::unique_lock<std::shared_mutex> lock(_mutex);
-        if (_holding.load(std::memory_order_acquire)) {
-            _held.emplace_back(entries);
-            return;
-        }
-        _Apply(entries);
-    }
-    _SendPrimsDirtied(entries);
+    // The renderer's prims are held by reference, so they already serve the change.
+    _Receive(
+        entries,
+        [](const HdSceneIndexObserver::DirtiedPrimEntries&) {},
+        [this](const HdSceneIndexObserver::DirtiedPrimEntries& toSend) { _SendPrimsDirtied(toSend); });
 }
 
 void RenderThreadCaptureSceneIndex::_Apply(const HdSceneIndexObserver::AddedPrimEntries& entries)
@@ -624,8 +742,32 @@ void RenderThreadCaptureSceneIndex::_Apply(const HdSceneIndexObserver::DirtiedPr
         if (it == _table.end()) {
             continue;
         }
-        it->second.dirty.insert(entry.dirtyLocators);
+        // _UpdateSelections already gave a copied prim its selections.
+        const HdDataSourceLocatorSet dirty = it->second.copied && it->second.selections
+            ? _WithoutSelections(entry.dirtyLocators)
+            : entry.dirtyLocators;
+        if (dirty.IsEmpty()) {
+            continue;
+        }
+        it->second.dirty.insert(dirty);
         _MarkPending(it->second, entry.primPath);
+    }
+}
+
+void RenderThreadCaptureSceneIndex::_UpdateSelections(
+    const HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    for (const auto& entry : entries) {
+        if (!_NamesSelections(entry.dirtyLocators)) {
+            continue;
+        }
+        const auto it = _table.find(entry.primPath);
+        // Not copied yet, the copy will read them.
+        if (it == _table.end() || !it->second.copied || !it->second.selections) {
+            continue;
+        }
+        it->second.selections->Set(
+            _CopySelections(_GetInputSceneIndex()->GetPrim(entry.primPath).dataSource));
     }
 }
 
@@ -657,16 +799,121 @@ void RenderThreadCaptureSceneIndex::_MarkPending(_Entry& entry, const SdfPath& p
 void RenderThreadCaptureSceneIndex::_Copy(const SdfPath& path, _Entry& entry) const
 {
     const HdSceneIndexPrim live = _GetInputSceneIndex()->GetPrim(path);
+    if (!entry.selections) {
+        entry.selections = std::make_shared<_Selections>();
+    }
     if (!entry.copied || entry.prim.primType != live.primType) {
-        entry.prim = { live.primType, _CopyContainer(live.dataSource) };
+        entry.copy = _CopyContainer(live.dataSource);
+        entry.selections->Set(_CopySelections(live.dataSource));
         _WarnUnlistedNames(path, live);
     } else if (!entry.dirty.IsEmpty()) {
-        entry.prim.dataSource = _Recopy(entry.prim.dataSource, live.dataSource, entry.dirty);
+        entry.copy = _Recopy(entry.copy, live.dataSource, entry.dirty);
     }
+    entry.prim.primType = live.primType;
+    entry.prim.dataSource = entry.copy || entry.selections->Get()
+        ? _PrimSource::New(entry.copy, entry.selections)
+        : nullptr;
     entry.dirty = HdDataSourceLocatorSet();
     entry.copied = true;
     entry.pending = false;
     RenderThreadStats::instance().RecordPrimCaptured();
+}
+
+bool RenderThreadCaptureSceneIndex::_IsRendererPrim(const SdfPath& path, const TfToken& primType) const
+{
+    if (primType != HdPrimTypeTokens->task && primType != HdPrimTypeTokens->renderBuffer) {
+        return false;
+    }
+    return std::any_of(_rendererRoots.begin(), _rendererRoots.end(), [&path](const SdfPath& root) {
+        return path.HasPrefix(root);
+    });
+}
+
+bool RenderThreadCaptureSceneIndex::_IsRendererPrim(
+    const HdSceneIndexObserver::AddedPrimEntry& entry) const
+{
+    return _IsRendererPrim(entry.primPath, entry.primType);
+}
+
+bool RenderThreadCaptureSceneIndex::_IsRendererPrim(
+    const HdSceneIndexObserver::RemovedPrimEntry& entry) const
+{
+    if (_rendererRoots.empty()) {
+        return false;
+    }
+    const auto it = _table.find(entry.primPath);
+    return it != _table.end() && _IsRendererPrim(entry.primPath, it->second.prim.primType);
+}
+
+bool RenderThreadCaptureSceneIndex::_IsRendererPrim(
+    const HdSceneIndexObserver::DirtiedPrimEntry& entry) const
+{
+    if (_rendererRoots.empty()) {
+        return false;
+    }
+    const auto it = _table.find(entry.primPath);
+    return it != _table.end() && _IsRendererPrim(entry.primPath, it->second.prim.primType);
+}
+
+HdSceneIndexPrim RenderThreadCaptureSceneIndex::_RendererSourcePrim(const SdfPath& path) const
+{
+    const bool underRoot = std::any_of(_rendererRoots.begin(), _rendererRoots.end(),
+        [&path](const SdfPath& root) { return path.HasPrefix(root); });
+    if (!underRoot) {
+        return HdSceneIndexPrim();
+    }
+    for (const TfWeakPtr<HdRetainedSceneIndex>& source : _rendererSources) {
+        if (!source) {
+            continue;
+        }
+        HdSceneIndexPrim prim = source->GetPrim(path);
+        if (prim.dataSource || !prim.primType.IsEmpty()) {
+            return prim;
+        }
+    }
+    return HdSceneIndexPrim();
+}
+
+void RenderThreadCaptureSceneIndex::_StoreRendererPrim(const SdfPath& path)
+{
+    _Insert(path);
+    _Entry& entry = _table[path];
+    entry.prim = _RendererSourcePrim(path);
+    entry.copy = nullptr;
+    entry.selections = nullptr;
+    entry.dirty = HdDataSourceLocatorSet();
+    entry.copied = true;
+    entry.pending = false;
+}
+
+void RenderThreadCaptureSceneIndex::_FindRendererSources()
+{
+    _rendererSources.clear();
+    _rendererRoots.clear();
+    std::vector<HdSceneIndexBaseRefPtr> toVisit { _GetInputSceneIndex() };
+    while (!toVisit.empty()) {
+        HdSceneIndexBaseRefPtr sceneIndex = toVisit.back();
+        toVisit.pop_back();
+        auto* filtering = dynamic_cast<HdFilteringSceneIndexBase*>(get_pointer(sceneIndex));
+        if (!filtering) {
+            continue;
+        }
+        const std::vector<HdSceneIndexBaseRefPtr> inputs = filtering->GetInputScenes();
+        if (!dynamic_cast<HdMergingSceneIndex*>(filtering)) {
+            toVisit.insert(toVisit.end(), inputs.begin(), inputs.end());
+            continue;
+        }
+        for (const HdSceneIndexBaseRefPtr& input : inputs) {
+            if (HdRetainedSceneIndexRefPtr retained
+                = TfDynamic_cast<HdRetainedSceneIndexRefPtr>(input)) {
+                _rendererSources.emplace_back(retained);
+                const SdfPathVector roots
+                    = retained->GetChildPrimPaths(SdfPath::AbsoluteRootPath());
+                _rendererRoots.insert(_rendererRoots.end(), roots.begin(), roots.end());
+            }
+        }
+        return;
+    }
 }
 
 std::mutex& RenderThreadCaptureSceneIndex::_CopyLock(const SdfPath& path) const
