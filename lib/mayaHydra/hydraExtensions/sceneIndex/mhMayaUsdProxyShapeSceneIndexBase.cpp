@@ -31,6 +31,7 @@
 #include <ufe/scene.h>
 #include <ufe/sceneNotification.h>
 
+#include <algorithm>
 #include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -128,16 +129,23 @@ private:
             if (siPath.startsWith(op.path)) {
                 const auto oldPath = siPath;
                 auto       newPath = oldPath.reparent(op.path, op.item->path());
+                // Also updates our entry in the path mapper registry, if it is ours.
                 _psSi.SetSceneIndexAppPath(newPath);
-
-                // Update our entry in the path mapper registry.
-                TF_AXIOM(Fvp::PathMapperRegistry::Instance().Update(oldPath, newPath));
             }
         }
     }
 
     MayaUsdProxyShapeSceneIndexBase& _psSi;
 };
+
+// Instances not destroyed yet, oldest first. Each render override and batch render has its own
+// instance per proxy shape node, but only one can register its path mapper under the node's UFE
+// path. All the instances for a node share its scene index path prefix
+// (MayaHydraNodePrefixReservation) and their chains are in every view, so their mappers are
+// interchangeable: when the owner is destroyed, its chain leaves the views and another instance
+// takes over. An instance waiting for a rebuild (NeedsRebuild()) maps against the previous stage,
+// so it never takes over, and a new instance takes the registration from it. Main thread only.
+std::vector<MayaUsdProxyShapeSceneIndexBase*> liveProxyShapeSceneIndices;
 
 } // namespace
 
@@ -178,8 +186,24 @@ MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
 
     // Register a mapper in the path mapper registry, if there is none
     // for this path.
-    _unregisterPathMapper = Fvp::PathMapperRegistry::Instance().Register(
-        _sceneIndexAppPath, _usdPathMapper);
+    auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
+    _unregisterPathMapper = pathMapperRegistry.Register(_sceneIndexAppPath, _usdPathMapper);
+    if (!_unregisterPathMapper) {
+        // Take over from an owner waiting for a rebuild (NeedsRebuild()), such as another
+        // render override's chain for the previous stage: this one maps against the current one.
+        for (MayaUsdProxyShapeSceneIndexBase* other : liveProxyShapeSceneIndices) {
+            if (other->_unregisterPathMapper && other->_sceneIndexAppPath == _sceneIndexAppPath) {
+                if (other->_needsRebuild) {
+                    pathMapperRegistry.Unregister(_sceneIndexAppPath);
+                    other->_unregisterPathMapper = false;
+                    _unregisterPathMapper
+                        = pathMapperRegistry.Register(_sceneIndexAppPath, _usdPathMapper);
+                }
+                break;
+            }
+        }
+    }
+    liveProxyShapeSceneIndices.push_back(this);
 
     Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
 }
@@ -187,6 +211,17 @@ MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
 MayaUsdProxyShapeSceneIndexBase::~MayaUsdProxyShapeSceneIndexBase()
 {
     _Destroy();                 // In a destructor calls are not virtual
+}
+
+void MayaUsdProxyShapeSceneIndexBase::SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
+{
+    const Ufe::Path oldPath = _sceneIndexAppPath;
+    _sceneIndexAppPath = sceneIndexAppPath;
+
+    // Every instance for the node observes the rename: only the registration owner moves it.
+    if (_unregisterPathMapper) {
+        TF_AXIOM(Fvp::PathMapperRegistry::Instance().Update(oldPath, sceneIndexAppPath));
+    }
 }
 
 void MayaUsdProxyShapeSceneIndexBase::_Destroy()
@@ -198,9 +233,26 @@ void MayaUsdProxyShapeSceneIndexBase::_Destroy()
     }
     _destroyed = true;
 
+    liveProxyShapeSceneIndices.erase(
+        std::remove(liveProxyShapeSceneIndices.begin(), liveProxyShapeSceneIndices.end(), this),
+        liveProxyShapeSceneIndices.end());
+
     if (_unregisterPathMapper) {
-        Fvp::PathMapperRegistry::Instance().Unregister(_sceneIndexAppPath);
+        auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
+        pathMapperRegistry.Unregister(_sceneIndexAppPath);
         _unregisterPathMapper = false;
+
+        // Hand the registration over to the newest remaining instance for the same node. Not to
+        // one waiting for a rebuild (NeedsRebuild()): it maps against the previous stage, and the
+        // render override that rebuilds first would replace its selection with its paths.
+        for (auto it = liveProxyShapeSceneIndices.rbegin(); it != liveProxyShapeSceneIndices.rend(); ++it) {
+            MayaUsdProxyShapeSceneIndexBase* other = *it;
+            if (other->_sceneIndexAppPath == _sceneIndexAppPath && !other->_needsRebuild) {
+                other->_unregisterPathMapper
+                    = pathMapperRegistry.Register(other->_sceneIndexAppPath, other->_usdPathMapper);
+                break;
+            }
+        }
     }
 
     // Ufe::Subject has automatic cleanup of stale observers, but this can

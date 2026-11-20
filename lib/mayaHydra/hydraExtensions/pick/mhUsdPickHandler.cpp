@@ -418,17 +418,20 @@ bool UsdPickHandler::resolvePickHit(
     const PickHit& pickHit, bool isSolePickHit, Ufe::SceneItemList& sceneItems
 ) const
 {
-    if (!sceneIndexRegistry()) {
-        TF_FATAL_ERROR("Picking called while no scene index registry exists");
+    // Coding errors, but not fatal: they must not take Maya down.
+    const auto registry = sceneIndexRegistry();
+    if (!registry) {
+        TF_CODING_ERROR("Picking called while no scene index registry exists");
         return false;
     }
 
-    if (!renderIndex()) {
-        TF_FATAL_ERROR("Picking called while no render index exists");
+    HdRenderIndex* const passRenderIndex = renderIndex(pickHit.passIndex);
+    if (!passRenderIndex) {
+        TF_CODING_ERROR("Picking called while no render index exists for pass %d", pickHit.passIndex);
         return false;
     }
 
-    auto registration = sceneIndexRegistry()->GetSceneIndexRegistrationForRprim(pickHit.hdxPickHit.objectId);
+    auto registration = registry->GetSceneIndexRegistrationForRprim(pickHit.hdxPickHit.objectId);
 
     if (!registration) {
         return false;
@@ -439,7 +442,7 @@ bool UsdPickHandler::resolvePickHit(
 #if PXR_VERSION >= 2405
     if (GetGeomSubsetsPickMode() == GeomSubsetsPickModeTokens->Faces) {
         auto geomSubsetsHitPaths = resolveGeomSubsetsPicking(
-            renderIndex(pickHit.passIndex)->GetTerminalSceneIndex(),
+            passRenderIndex->GetTerminalSceneIndex(),
             pickHit.hdxPickHit.objectId,
             HdGeomSubsetSchemaTokens->typeFaceSet,
             pickHit.hdxPickHit.elementIndex);
@@ -449,13 +452,13 @@ bool UsdPickHandler::resolvePickHit(
 
         // If we did not find any geomSubset and this is the only pick hit, then fallback to selecting the base prim/instance.
         if (hitPaths.empty() && isSolePickHit) {
-            hitPaths.push_back(resolveInstancePicking(*renderIndex(pickHit.passIndex), pickHit.hdxPickHit));
+            hitPaths.push_back(resolveInstancePicking(*passRenderIndex, pickHit.hdxPickHit));
         }
     } else {
-        hitPaths.push_back(resolveInstancePicking(*renderIndex(pickHit.passIndex), pickHit.hdxPickHit));
+        hitPaths.push_back(resolveInstancePicking(*passRenderIndex, pickHit.hdxPickHit));
     }
 #else
-    hitPaths.push_back(resolveInstancePicking(*renderIndex(pickHit.passIndex), pickHit.hdxPickHit));
+    hitPaths.push_back(resolveInstancePicking(*passRenderIndex, pickHit.hdxPickHit));
 #endif
 
     for (const auto& [pickedUsdPath, instanceNdx] : hitPaths) {
@@ -465,7 +468,7 @@ bool UsdPickHandler::resolvePickHit(
         // resolve to the GP procedural parent instead.
         if (effectiveUsdPath.IsEmpty()) {
             effectiveUsdPath = resolveGenerativeProceduralAncestorPath(
-                renderIndex(pickHit.passIndex)->GetTerminalSceneIndex(),
+                passRenderIndex->GetTerminalSceneIndex(),
                 pickHit.hdxPickHit.objectId);
             if (effectiveUsdPath.IsEmpty()) {
                 continue;
@@ -525,13 +528,23 @@ bool UsdPickHandler::resolvePickHit(
 
 HdRenderIndex* UsdPickHandler::renderIndex(int passIndex) const
 {
-    return PickHandlerRegistry::Instance().GetPickContext()->renderIndex(passIndex);
+    const auto pickContext = PickHandlerRegistry::Instance().GetPickContext();
+    if (!pickContext) {
+        TF_CODING_ERROR("USD pick handler called without a pick context.");
+        return nullptr;
+    }
+    return pickContext->renderIndex(passIndex);
 }
 
 std::shared_ptr<const MayaHydraSceneIndexRegistry>
 UsdPickHandler::sceneIndexRegistry() const
 {
-    return PickHandlerRegistry::Instance().GetPickContext()->sceneIndexRegistry();
+    const auto pickContext = PickHandlerRegistry::Instance().GetPickContext();
+    if (!pickContext) {
+        TF_CODING_ERROR("USD pick handler called without a pick context.");
+        return nullptr;
+    }
+    return pickContext->sceneIndexRegistry();
 }
 
 }

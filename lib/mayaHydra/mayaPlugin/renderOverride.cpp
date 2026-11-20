@@ -183,7 +183,7 @@ namespace {
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
+const SdfPath MAYA_NATIVE_ROOT = MayaHydraSceneIndex::GetMayaNativeRoot();
 
 inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
 {
@@ -2316,6 +2316,9 @@ MtohRenderOverride::_ResolveHoverHighlight(const PickHit& hit) const
 {
     HoverHighlight highlight;
 
+    // Pick handlers resolve the hit in this override's render index and scene indices.
+    const PickContextScope pickContextScope(this);
+
     // What a click on the hit would select, resolved by the same pick handler, so that the hover
     // follows the pick modes and the selection kind. A Maya pick handler does not support it:
     // Maya prims are not instanced, so the picked prim itself is hovered, as before.
@@ -2596,10 +2599,6 @@ void MtohRenderOverride::_InitHydraResources(
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex()));
     }
 
-    // We provide the pick context for pick handlers, so set the pick handler
-    // registry accordingly.
-    PickHandlerRegistry::Instance().SetPickContext(this);
-
     // Create internal scene indices chain
     _inputSceneIndexOfFilteringSceneIndicesChain = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
@@ -2612,6 +2611,10 @@ void MtohRenderOverride::_InitHydraResources(
     // as it is not designed around being in a specific place in the chain.
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
+
+    _mayaPickRegistration = PickHandlerRegistry::Instance().Register(
+        _mayaHydraSceneIndex->GetRprimPath(), MayaViewportSceneIndex::CreatePickHandler());
+    TF_VERIFY(_mayaPickRegistration, "Maya pick handler registration failed.");
 
     // Render globals are initialized after this method is called, so
     // included purposes attributes do not yet exist on the
@@ -2673,6 +2676,7 @@ void MtohRenderOverride::_InitHydraResources(
     // At time of writing we have a single selection scene index serving
     // all viewports.
     isolateSelectMgr.SetIsolateSelectSceneIndex(isSi);
+    _isolateSelectSceneIndex = isSi;
     _inputSceneIndexOfFilteringSceneIndicesChain = isSi;
 #endif
 
@@ -2756,8 +2760,30 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         }
     }
 
-    //We don't have any viewport using Hydra any more
-    Fvp::RenderViewDataManager::Get().RemoveAllRenderViewData();
+    // Remove this override's views only: another render override may still be drawing its own,
+    // and removing them would take its filtering chain out of its render index.
+    auto& renderViewDataManager = Fvp::RenderViewDataManager::Get();
+    std::vector<std::string> ownViewIds;
+    for (const auto& viewData : renderViewDataManager.GetAllViewData()) {
+        if (viewData.GetRenderIndex() == renderIndex()) {
+            ownViewIds.push_back(viewData.GetViewDesc()._viewId);
+        }
+    }
+    for (const auto& viewId : ownViewIds) {
+        renderViewDataManager.RemoveRenderViewData(viewId);
+    }
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    // The isolate select manager is process-wide: reset it only if it still holds this
+    // override's isolate select scene index.
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+    if (_isolateSelectSceneIndex
+        && HdSceneIndexBaseRefPtr(isolateSelectMgr.GetIsolateSelectSceneIndex())
+            == _isolateSelectSceneIndex) {
+        isolateSelectMgr.Reset();
+    }
+#endif
+    _isolateSelectSceneIndex = nullptr;
 
     if (fullReset){
         //Remove the data producer scene indices that apply to all views
@@ -2768,6 +2794,9 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _sceneIndexRegistry.reset();
 
     _ClearMayaHydraSceneIndex();
+
+    // Unregisters the Maya pick handler if no other render override uses it.
+    _mayaPickRegistration.reset();
 
     // Tear down explicitly rather than waiting for the destructor: the downstream filtering
     // scene indices still hold this one through their input until the next
@@ -2862,9 +2891,6 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     
     _initializationSucceeded = false;
     _initializationAttempted = false;
-
-    // Remove the pick context from pick handlers.
-    PickHandlerRegistry::Instance().SetPickContext(nullptr);
 }
 
 HdSceneIndexBaseRefPtr MtohRenderOverride::_CreatePassFilteringSceneIndex(
@@ -3434,7 +3460,11 @@ bool MtohRenderOverride::select(
     bool isOneMayaNodeInComponentsPickingMode = false;
     const unsigned int ufeSnSizeBefore = _ufeSn ? _ufeSn->size() : 0;
     const unsigned int mayaSnLengthBefore = selectionList.length();
-    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    {
+        // Pick handlers resolve the hits in this override's render index and scene indices.
+        const PickContextScope pickContextScope(this);
+        _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    }
     if (isOneMayaNodeInComponentsPickingMode){
         return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
     }
@@ -4154,6 +4184,11 @@ HdRenderIndex* MtohRenderOverride::renderIndex(int passIndex /*= 0*/) const
     return (_framePassesData[passIndex] && _framePassesData[passIndex]->HasRenderIndexProxy())
         ? _framePassesData[passIndex]->GetRenderIndexProxy()->RenderIndex()
         : nullptr;
+}
+
+MAYAHYDRA_NS::MayaViewportSceneIndex* MtohRenderOverride::mayaViewportSceneIndex() const
+{
+    return get_pointer(_mayaViewportSceneIndex);
 }
 
 const hvt::FramePassPtr&

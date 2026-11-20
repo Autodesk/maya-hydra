@@ -82,10 +82,8 @@ public:
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    void             SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
-    {
-        _sceneIndexAppPath = sceneIndexAppPath;
-    }
+    // Also moves the path mapper registration to the new path, if this scene index owns it.
+    void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath);
 
     virtual ~MayaUsdProxyShapeSceneIndexBase();
 
@@ -105,8 +103,8 @@ public:
     }
     bool NeedsRebuild() const { return _needsRebuild; }
 
-    // Releases the path mapper and pick handler and stops observing stage notices, so a
-    // replacement can register its own even if this one stays alive. Idempotent.
+    // Releases the path mapper and stops observing stage notices, so a replacement can
+    // register its own even if this one stays alive. Idempotent.
     void Detach() { _Destroy(); }
 
     void Populate();
