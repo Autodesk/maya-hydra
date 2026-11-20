@@ -1,0 +1,69 @@
+//**************************************************************************/
+// Copyright 2026 Autodesk, Inc. 
+// All rights reserved.
+// Use of this software is subject to the terms of the Autodesk license 
+// agreement provided at the time of installation or download, or which 
+// otherwise accompanies this software in either electronic or hard copy form. 
+//**************************************************************************/
+
+// World-view-projection transformation.
+uniform mat4 gWVPXf : WorldViewProjection < string UIWidget = "None"; >;
+
+// Vertex shader input structure.
+attribute VS_INPUT
+{
+    vec3 Pos : POSITION;
+	vec3 Norm : NORMAL;
+
+    // this is the custom stream
+    // the vertex buffer generator will fill in the stream
+    // when a matching custom semantic is found
+	vec4 CustomStream : TEXCOORD0;
+};
+
+// Vertex shader output structure.
+attribute VS_TO_PS
+{
+    vec4 Color : COLOR0;
+};
+
+// Pixel shader output structure.
+attribute pixelOut
+{
+    vec4 colorOut : COLOR0;
+}
+
+// Vertex shader.
+GLSLShader VS_ogsfxExample
+{
+	void main()
+	{
+		gl_Position = gWVPXf*vec4(Pos, 1.0);
+
+		vsOut.Color = vec4(Norm, 1.0);
+
+		// Here we use our custom stream data to affect the output.
+		vsOut.Color = vec4(CustomStream.xyz * -0.5 + vec3(0.5), 1.0);
+	}
+}
+
+GLSLShader PS_ogsfxExample
+{
+	void main()
+	{
+    	colorOut = psIn.Color;
+	}
+}
+
+// The main technique.
+technique Main
+<
+	string customSemantics = "TEXCOORD0=myCustomStreamB";
+>
+{
+    pass P0
+    {
+        VertexShader (in VS_INPUT, out VS_TO_PS vsOut) = VS_ogsfxExample;
+        PixelShader (in VS_TO_PS psIn, out pixelOut) = PS_ogsfxExample;
+    }
+}

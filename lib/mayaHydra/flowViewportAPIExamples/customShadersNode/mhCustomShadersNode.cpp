@@ -717,6 +717,11 @@ MStatus MhCustomShaders::initialize()
     return MS::kSuccess;
 }
 
+MStatus registerCustomMaterialCallbackCmd(MFnPlugin& plugin);
+MStatus deregisterCustomMaterialCallbackCmd(MFnPlugin& plugin);
+MStatus registerCustomVertexBufferGenerator();
+MStatus deregisterCustomVertexBufferGenerator();
+
 MStatus initializePlugin( MObject obj )
 {
     MFnPlugin plugin( obj, PLUGIN_COMPANY, "2025.0", "Any");
@@ -734,6 +739,18 @@ MStatus initializePlugin( MObject obj )
         return status;
     }
 
+    status = registerCustomMaterialCallbackCmd(plugin);
+    if (!status) {
+        status.perror("registerCommand");
+        return status;
+    }
+
+    status = registerCustomVertexBufferGenerator();
+    if (!status) {
+        status.perror("registerVertexBufferGenerator");
+        return status;
+    }
+
     return status;
 }
 
@@ -741,6 +758,18 @@ MStatus uninitializePlugin( MObject obj)
 {
     MStatus   status;
     MFnPlugin plugin( obj );
+
+    status = deregisterCustomVertexBufferGenerator();
+    if (!status) {
+        status.perror("deregisterVertexBufferGenerator");
+        return status;
+    }
+
+    status = deregisterCustomMaterialCallbackCmd(plugin);
+    if (!status) {
+        status.perror("deregisterCommand");
+        return status;
+    }
 
     status = plugin.deregisterNode( MhCustomShaders::id );
     if (!status) {
