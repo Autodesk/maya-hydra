@@ -60,6 +60,24 @@ class TestUsdStageFromFile(mtohUtils.MayaHydraBaseTestCase):
 
             cmds.mayaHydraCppTest(self.CONE_PATH, f="TestHydraPrim.fromAppPath")
 
+    def test_selectionBeforeRefreshAfterFilePathChange(self):
+        # A prim of the new stage selected after a filePath change, with no refresh in between,
+        # is mapped while Hydra still holds the previous stage. The Hydra selection must be
+        # that prim once the stage is drawn, not the whole proxy shape (HYDRA-2582).
+        with PluginLoaded('mayaHydraCppTests'):
+
+            usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cube.usda')
+            usdUtils.createStageFromFile(usdScenePath)
+            cmds.select(clear=True)
+            cmds.refresh()
+
+            usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cone.usda')
+            cmds.setAttr('cubeShape.filePath', usdScenePath, type="string")
+            cmds.select(self.CONE_PATH)
+            cmds.refresh()
+
+            cmds.mayaHydraCppTest(self.CONE_PATH, f="TestSelection.fullySelectedPaths")
+
     def test_getStage(self):
 
         # Any file will do.

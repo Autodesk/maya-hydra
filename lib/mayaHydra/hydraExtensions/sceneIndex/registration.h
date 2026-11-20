@@ -107,16 +107,24 @@ public:
 
     // When in a MayaUsd proxy shape node, some stages become invalid, we need to apply the updates.
     // it's not automatic as we are called from a compute function of a node and we may have recursion which are not allowed
+    // Returns true if a proxy shape's scene index chain was replaced: the caller must then
+    // replace the Hydra selection, as its paths were mapped against the previous stage.
     MAYAHYDRALIB_API
-    void ApplyPendingUpdates();
+    bool ApplyPendingUpdates();
 
     MAYAHYDRALIB_API
     static PXR_NS::SdfPath GetUsdDefaultRenderDescriptionPathPrefix();
 
 private:
-    void
-    _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration
+    // dagNode is non-const because of callback registration. With an empty prefix, one is
+    // generated from the node name.
+    void _AddSceneIndexForNode(
+        MObject&               dagNode,
+        const PXR_NS::SdfPath& prefix = PXR_NS::SdfPath());
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
+    // Replaces a proxy shape's chain by one built from its current stage (see
+    // MayaUsdProxyShapeSceneIndexBase::NeedsRebuild()).
+    void        _RebuildSceneIndexForNode(MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);
     static void _AfterOpenCallback (void *clientData);

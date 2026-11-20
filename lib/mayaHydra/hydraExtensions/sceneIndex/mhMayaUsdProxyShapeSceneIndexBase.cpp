@@ -143,6 +143,8 @@ private:
 
 namespace MAYAHYDRA_NS_DEF {
 
+long int MayaUsdProxyShapeSceneIndexBase::_nbPopulateCalls = 0;
+
 MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
     const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
     const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
@@ -189,8 +191,16 @@ MayaUsdProxyShapeSceneIndexBase::~MayaUsdProxyShapeSceneIndexBase()
 
 void MayaUsdProxyShapeSceneIndexBase::_Destroy()
 {
+    // Detach() and the destructor both call this: unregistering twice would remove the
+    // replacement's path mapper.
+    if (_destroyed) {
+        return;
+    }
+    _destroyed = true;
+
     if (_unregisterPathMapper) {
         Fvp::PathMapperRegistry::Instance().Unregister(_sceneIndexAppPath);
+        _unregisterPathMapper = false;
     }
 
     // Ufe::Subject has automatic cleanup of stale observers, but this can
@@ -254,6 +264,13 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
         return;
     }
 
+    if (_rebuildOnStageChange && _stage) {
+        // No SetStage() once populated (see SetRebuildOnStageChange()): the owner replaces
+        // this scene index at the next render.
+        _needsRebuild = true;
+        return;
+    }
+
     _usdImagingStageSceneIndex->SetStage(nullptr);
     _stage = nullptr;
     _InvalidateMayHaveUnloadedPrims();
@@ -285,13 +302,27 @@ void MayaUsdProxyShapeSceneIndexBase::_ObjectsChanged(
 void MayaUsdProxyShapeSceneIndexBase::PopulateAndApplyPendingChanges() 
 { 
     Populate();
+    if (_needsRebuild) {
+        // Populate() can set it too. The replacement is built from the current stage, edits
+        // included.
+        return;
+    }
     _usdImagingStageSceneIndex->ApplyPendingUpdates();
 }
 
 void MayaUsdProxyShapeSceneIndexBase::Populate()
 {
+    if (_needsRebuild) {
+        return;
+    }
     if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
+        if (_rebuildOnStageChange && _stage && _stage != stage) {
+            // A new stage after the first population, even an empty or null one: see
+            // SetRebuildOnStageChange().
+            _needsRebuild = true;
+            return;
+        }
         // Check whether the pseudo-root has children
         if (HasRootPrims(stage)) {
             ++_nbPopulateCalls;
@@ -361,8 +392,8 @@ SdfPathVector MayaUsdProxyShapeSceneIndexBase::GetChildPrimPaths(const SdfPath& 
 bool MayaUsdProxyShapeSceneIndexBase::HasPendingUpdates() const
 {
     //When we receive a stage invalidate we remove the stage and set populate to false
-    //We need to re-populate to see the changes
-    return (false == _populated);
+    //We need to re-populate to see the changes, or be replaced (NeedsRebuild())
+    return (false == _populated) || _needsRebuild;
 }
 
 Fvp::PrimSelections
