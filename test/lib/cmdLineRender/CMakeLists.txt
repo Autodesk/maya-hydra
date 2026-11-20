@@ -353,6 +353,14 @@ mayaHydra_add_cmd_line_render_test(renderSettings/arnold/arnoldSimpleRenderPass.
     RENDERER_ARGS "-x 160 -y 120"
 )
 
+# Test that HdArnold renders when the RenderVar prim name is not a Hydra AOV
+# name (HYDRA-2742).
+mayaHydra_add_cmd_line_render_test(renderSettings/arnold/arnoldRenderVarPrimName.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERER_ARGS "-x 720 -y 128 -im arnoldRenderVarPrimName"
+)
+
 set(ARNOLD_MAYABATCH_RENDER_SCENES
     basic/renderCurrentFrame.ma
     basic/renderFrame.ma
