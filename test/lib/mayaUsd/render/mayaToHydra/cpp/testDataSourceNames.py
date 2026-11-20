@@ -63,6 +63,32 @@ class TestDataSourceNames(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(
                 f="DataSourceNames.CameraContainerAdvertisesAndServesParams")
 
+    # What: the capture's probe reports a name served but not listed.
+    # How: run the C++ test on a hand-made container.
+    # Expect: the unlisted name is reported, an empty value is not.
+    def test_captureFindsUnlistedNames(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureFindsUnlistedNames")
+
+    # What: no MayaHydra prim serves a name it does not list.
+    # How: add a mesh with a material and more light types to the scene, then probe
+    #      every prim of MayaHydraSceneIndex.
+    # Expect: nothing reported.
+    def test_mayaHydraPrimsListEveryName(self):
+        self.setupScene()
+        cube = cmds.polyCube()[0]
+        material = cmds.shadingNode("lambert", asShader=True)
+        cmds.select(cube)
+        cmds.hyperShade(assign=material)
+        cmds.select(clear=True)
+        cmds.pointLight()
+        cmds.spotLight()
+        cmds.shadingNode("areaLight", asLight=True)
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.MayaHydraPrimsListEveryName")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

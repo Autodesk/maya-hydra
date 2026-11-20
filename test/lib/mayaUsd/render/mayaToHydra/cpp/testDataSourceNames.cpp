@@ -15,14 +15,19 @@
 
 #include "testUtils.h"
 
+#include <mayaHydraLib/renderThread/renderThreadCaptureSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/cameraSchema.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
+#include <pxr/imaging/hd/extentSchema.h>
 #include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hd/lightSchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
+#include <pxr/imaging/hd/xformSchema.h>
 
 #include <gtest/gtest.h>
 
@@ -48,7 +53,84 @@ GetChildContainer(const HdContainerDataSourceHandle& parent, const TfToken& key)
     return HdContainerDataSource::Cast(parent->Get(key));
 }
 
+// Lists only visibility, but also serves xform, and extent with an empty value.
+class PartlyListedContainer : public HdContainerDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(PartlyListedContainer);
+
+    TfTokenVector GetNames() override { return { HdVisibilitySchema::GetSchemaToken() }; }
+
+    HdDataSourceBaseHandle Get(const TfToken& name) override
+    {
+        if (name == HdVisibilitySchema::GetSchemaToken()) {
+            return HdVisibilitySchema::Builder()
+                .SetVisibility(HdRetainedTypedSampledDataSource<bool>::New(true))
+                .Build();
+        }
+        if (name == HdXformSchema::GetSchemaToken()) {
+            return HdXformSchema::Builder()
+                .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(GfMatrix4d(1.0)))
+                .Build();
+        }
+        if (name == HdExtentSchema::GetSchemaToken()) {
+            return HdRetainedSampledDataSource::New(VtValue());
+        }
+        return nullptr;
+    }
+};
+
+void CollectPrimPaths(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    const SdfPath&                path,
+    SdfPathVector&                out)
+{
+    out.push_back(path);
+    for (const SdfPath& child : sceneIndex->GetChildPrimPaths(path)) {
+        CollectPrimPaths(sceneIndex, child, out);
+    }
+}
+
 } // namespace
+
+// What: the capture's probe for names a container serves but does not list.
+// How: a container that lists visibility, serves xform unlisted, and serves extent
+//      with an empty value.
+// Expect: exactly xform is reported; the empty extent is not.
+TEST(DataSourceNames, CaptureFindsUnlistedNames)
+{
+    const std::vector<HdDataSourceLocator> unlisted
+        = MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::FindUnlistedNames(
+            PartlyListedContainer::New());
+    ASSERT_EQ(unlisted.size(), 1u);
+    EXPECT_EQ(unlisted.front(), HdXformSchema::GetDefaultLocator());
+}
+
+// What: every prim MayaHydraSceneIndex produces lists every name it serves, so the
+//       render thread's copy of the scene drops nothing.
+// How: walk all of its prims and probe each with the capture's FindUnlistedNames.
+// Expect: nothing reported.
+TEST(DataSourceNames, MayaHydraPrimsListEveryName)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndices.front());
+    ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
+
+    SdfPathVector paths;
+    CollectPrimPaths(mayaSceneIndex, SdfPath::AbsoluteRootPath(), paths);
+    ASSERT_GT(paths.size(), 1u);
+
+    for (const SdfPath& path : paths) {
+        const HdSceneIndexPrim prim = mayaSceneIndex->GetPrim(path);
+        for (const HdDataSourceLocator& locator :
+             MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::FindUnlistedNames(
+                 prim.dataSource)) {
+            ADD_FAILURE() << path.GetText() << " (" << prim.primType.GetText() << ") serves '"
+                          << locator.GetString() << "' but does not list it in GetNames()";
+        }
+    }
+}
 
 // What: the light container advertises its leaf params and serves each one.
 // How: create a directional light, reach its `light` container, walk GetNames().

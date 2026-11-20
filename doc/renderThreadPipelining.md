@@ -205,7 +205,20 @@ not list is missing from the copy, and the renderer silently gets nothing for
 it.  MayaHydra's light data sources therefore list every parameter their
 adapter serves, in each spelling it accepts (`MayaHydraLightAdapter::
 GetLightParamNames()`); a dome light's `textureFile`, for example, used to be
-served without being listed.
+served without being listed.  `MayaHydraDataSource` keeps one list of names per
+prim type, which `GetNames()` returns and `Get()` checks first, and the camera
+data source serves only the parameters the camera adapter answers.
+
+To catch this at the source, the capture probes each prim it copies in full
+(`RenderThreadCaptureSceneIndex::FindUnlistedNames()`): the prim's top level for
+the common prim-level schemas, and the containers of the schemas with fixed
+members (xform, mesh, basis curves, camera, light, visibility, purpose, extent,
+instancer topology, display style) for those members.  Each name served with a
+non-empty value but not listed is warned about once per prim type.  Names that
+vary per prim, such as primvars and material networks, are not probed, and
+neither are retained containers, which list exactly what they hold.  The test
+`DataSourceNames.MayaHydraPrimsListEveryName` runs the probe over every prim
+MayaHydra produces.
 
 The capture is what keeps Maya callbacks from invalidating the scene index
 during the render thread's sync, so overlap always runs with it.

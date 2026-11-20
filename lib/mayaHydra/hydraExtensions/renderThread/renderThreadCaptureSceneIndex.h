@@ -74,6 +74,15 @@ public:
     /// The capture scene index in \p renderIndex's chain, or null.
     static RenderThreadCaptureSceneIndex* Find(PXR_NS::HdRenderIndex* renderIndex);
 
+    /// The names \p primSource serves but does not list in GetNames(), relative to
+    /// the prim. The copy takes a container's names from GetNames(), so it would
+    /// drop each of these. Probes the top level for the common prim-level schemas,
+    /// and the containers of those with fixed members (xform, mesh, camera, light,
+    /// ...) for those members. A name served with an empty value does not count.
+    /// The capture warns about these when it first copies a prim.
+    static std::vector<PXR_NS::HdDataSourceLocator>
+    FindUnlistedNames(const PXR_NS::HdContainerDataSourceHandle& primSource);
+
     /// Main thread. Until this is called everything passes straight through, so
     /// render indices that never meet a render thread pay nothing.
     void Activate();

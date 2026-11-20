@@ -25,10 +25,26 @@
 #include <pxr/base/work/loops.h>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
+#include <pxr/imaging/hd/basisCurvesSchema.h>
+#include <pxr/imaging/hd/cameraSchema.h>
+#include <pxr/imaging/hd/categoriesSchema.h>
+#include <pxr/imaging/hd/extentSchema.h>
+#include <pxr/imaging/hd/instancedBySchema.h>
+#include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/light.h>
+#include <pxr/imaging/hd/lightSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primOriginSchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
+#include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/sdf/pathExpression.h>
 
@@ -37,6 +53,7 @@
 #include <cmath>
 #include <iterator>
 #include <memory>
+#include <string>
 #include <unordered_set>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -266,6 +283,96 @@ HdContainerDataSourceHandle _Recopy(
     return HdRetainedContainerDataSource::New(outNames.size(), outNames.data(), values.data());
 }
 
+// A prim-level schema FindUnlistedNames probes for, with the names its container
+// is expected to list, or null where they vary (primvars, material networks).
+struct _ProbedSchema
+{
+    TfToken              name;
+    const TfTokenVector* members;
+};
+
+const std::vector<_ProbedSchema>& _ProbedSchemas()
+{
+    static const std::vector<_ProbedSchema> schemas = {
+        { HdXformSchema::GetSchemaToken(), &HdXformSchemaTokens->allTokens },
+        { HdMeshSchema::GetSchemaToken(), &HdMeshSchemaTokens->allTokens },
+        { HdBasisCurvesSchema::GetSchemaToken(), &HdBasisCurvesSchemaTokens->allTokens },
+        { HdCameraSchema::GetSchemaToken(), &HdCameraSchemaTokens->allTokens },
+        { HdLightSchema::GetSchemaToken(), &HdLightTokens->allTokens },
+        { HdVisibilitySchema::GetSchemaToken(), &HdVisibilitySchemaTokens->allTokens },
+        { HdPurposeSchema::GetSchemaToken(), &HdPurposeSchemaTokens->allTokens },
+        { HdExtentSchema::GetSchemaToken(), &HdExtentSchemaTokens->allTokens },
+        { HdInstancerTopologySchema::GetSchemaToken(),
+          &HdInstancerTopologySchemaTokens->allTokens },
+        { HdInstancedBySchema::GetSchemaToken(), &HdInstancedBySchemaTokens->allTokens },
+        { HdLegacyDisplayStyleSchema::GetSchemaToken(),
+          &HdLegacyDisplayStyleSchemaTokens->allTokens },
+        { HdCategoriesSchema::GetSchemaToken(), nullptr },
+        { HdPrimvarsSchema::GetSchemaToken(), nullptr },
+        { HdMaterialSchema::GetSchemaToken(), nullptr },
+        { HdMaterialBindingsSchema::GetSchemaToken(), nullptr },
+    };
+    return schemas;
+}
+
+// Whether \p ds gives a reader anything: a container, a vector or a non-empty value.
+bool _Serves(const HdDataSourceBaseHandle& ds)
+{
+    if (!ds || std::dynamic_pointer_cast<HdBlockDataSource>(ds)) {
+        return false;
+    }
+    if (HdSampledDataSourceHandle sampled = HdSampledDataSource::Cast(ds)) {
+        return !sampled->GetValue(0.0f).IsEmpty();
+    }
+    return true;
+}
+
+void _FindUnlisted(
+    const HdContainerDataSourceHandle& container,
+    const TfTokenVector&               candidates,
+    const HdDataSourceLocator&         prefix,
+    std::vector<HdDataSourceLocator>&  out)
+{
+    // A retained container lists exactly what it holds.
+    if (dynamic_cast<HdRetainedContainerDataSource*>(container.get())) {
+        return;
+    }
+    const TfTokenVector names = container->GetNames();
+    for (const TfToken& candidate : candidates) {
+        if (std::find(names.begin(), names.end(), candidate) == names.end()
+            && _Serves(container->Get(candidate))) {
+            out.push_back(prefix.Append(candidate));
+        }
+    }
+}
+
+void _WarnUnlistedNames(const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    const std::vector<HdDataSourceLocator> unlisted
+        = MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::FindUnlistedNames(prim.dataSource);
+    if (unlisted.empty()) {
+        return;
+    }
+    // Once per prim type and name: the cause is a data source class, not a prim.
+    static std::mutex                      warnedMutex;
+    static std::unordered_set<std::string> warned;
+    for (const HdDataSourceLocator& locator : unlisted) {
+        const std::string key = prim.primType.GetString() + " " + locator.GetString();
+        {
+            std::lock_guard<std::mutex> lock(warnedMutex);
+            if (!warned.insert(key).second) {
+                continue;
+            }
+        }
+        TF_WARN(
+            "%s (%s) serves '%s' but its container does not list it in GetNames(), so "
+            "the render thread's copy of the scene drops it.",
+            primPath.GetText(),
+            prim.primType.GetText(),
+            locator.GetString().c_str());
+    }
+}
+
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
@@ -306,6 +413,34 @@ RenderThreadCaptureSceneIndex* RenderThreadCaptureSceneIndex::Find(HdRenderIndex
         }
     }
     return nullptr;
+}
+
+std::vector<HdDataSourceLocator>
+RenderThreadCaptureSceneIndex::FindUnlistedNames(const HdContainerDataSourceHandle& primSource)
+{
+    std::vector<HdDataSourceLocator> unlisted;
+    if (!primSource) {
+        return unlisted;
+    }
+    static const TfTokenVector topLevel = [] {
+        TfTokenVector names;
+        for (const _ProbedSchema& schema : _ProbedSchemas()) {
+            names.push_back(schema.name);
+        }
+        return names;
+    }();
+    _FindUnlisted(primSource, topLevel, HdDataSourceLocator(), unlisted);
+
+    for (const _ProbedSchema& schema : _ProbedSchemas()) {
+        if (!schema.members) {
+            continue;
+        }
+        if (HdContainerDataSourceHandle container
+            = HdContainerDataSource::Cast(primSource->Get(schema.name))) {
+            _FindUnlisted(container, *schema.members, HdDataSourceLocator(schema.name), unlisted);
+        }
+    }
+    return unlisted;
 }
 
 void RenderThreadCaptureSceneIndex::Activate()
@@ -524,6 +659,7 @@ void RenderThreadCaptureSceneIndex::_Copy(const SdfPath& path, _Entry& entry) co
     const HdSceneIndexPrim live = _GetInputSceneIndex()->GetPrim(path);
     if (!entry.copied || entry.prim.primType != live.primType) {
         entry.prim = { live.primType, _CopyContainer(live.dataSource) };
+        _WarnUnlistedNames(path, live);
     } else if (!entry.dirty.IsEmpty()) {
         entry.prim.dataSource = _Recopy(entry.prim.dataSource, live.dataSource, entry.dirty);
     }

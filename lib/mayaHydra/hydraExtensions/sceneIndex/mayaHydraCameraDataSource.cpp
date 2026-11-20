@@ -31,8 +31,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-// The HdCameraSchema members typed float; a source of another type fails the
-// schema's typed accessor.
+// The HdCameraSchema members typed float that the adapter answers; a source of
+// another type fails the schema's typed accessor. A typed source always holds a
+// value, so a member the adapter does not answer (exposure, dofAspect, ...) must
+// not be here: it would serve 0 rather than leave the renderer its default.
 bool _IsFloatMember(const TfToken& name)
 {
     static const TfToken floatMembers[] = {
@@ -43,14 +45,8 @@ bool _IsFloatMember(const TfToken& name)
         HdCameraSchemaTokens->focalLength,
         HdCameraSchemaTokens->fStop,
         HdCameraSchemaTokens->focusDistance,
-        HdCameraSchemaTokens->exposure,
 #if PXR_VERSION >= 2505
-        HdCameraSchemaTokens->exposureTime,
-        HdCameraSchemaTokens->exposureIso,
-        HdCameraSchemaTokens->exposureFStop,
-        HdCameraSchemaTokens->exposureResponsivity,
         HdCameraSchemaTokens->linearExposureScale,
-        HdCameraSchemaTokens->dofAspect,
 #endif
     };
     return std::find(std::begin(floatMembers), std::end(floatMembers), name)
@@ -259,12 +255,6 @@ MayaHydraCameraDataSource::Get(const TfToken& name)
         return MayaHydraTypedCameraParamValueDataSource<double>::New(
             _id, name, camAdapter);
     }
-#if PXR_VERSION >= 2505
-    else if (name == HdCameraSchemaTokens->focusOn) {
-        return MayaHydraTypedCameraParamValueDataSource<bool>::New(
-            _id, name, camAdapter);
-    }
-#endif
     else if (_IsFloatMember(name)) {
         return MayaHydraTypedCameraParamValueDataSource<float>::New(
             _id, name, camAdapter);
