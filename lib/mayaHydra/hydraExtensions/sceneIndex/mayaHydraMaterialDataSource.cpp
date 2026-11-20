@@ -20,8 +20,6 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 
 #include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/materialBindingSchema.h>
-#include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/materialConnectionSchema.h>
 #include <pxr/imaging/hd/materialNetworkSchema.h>
 #include <pxr/imaging/hd/materialNodeSchema.h>
@@ -57,34 +55,7 @@ MayaHydraMaterialDataSource::Get(const TfToken& name)
     if (name == HdMaterialSchemaTokens->material) {
        return _GetMaterialDataSource();
     }
-    else if (name ==
-             HdMaterialBindingsSchema::GetSchemaToken()
-             ) {
-       return _GetMaterialBindingDataSource();
-    }
     return nullptr;
-}
-
-HdDataSourceBaseHandle
-MayaHydraMaterialDataSource::_GetMaterialBindingDataSource()
-{
-    const SdfPath path = _sceneIndex->GetMaterialId(_id);
-    if (path.IsEmpty()) {
-        return nullptr;
-    }
-    static const TfToken purposes[] = {
-        HdMaterialBindingsSchemaTokens->allPurpose
-    };
-    HdDataSourceBaseHandle const materialBindingSources[] = {
-        HdMaterialBindingSchema::Builder()
-            .SetPath(
-                HdRetainedTypedSampledDataSource<SdfPath>::New(path))
-            .Build()
-    };
-
-    return
-        HdMaterialBindingsSchema::BuildRetained(
-            TfArraySize(purposes), purposes, materialBindingSources);
 }
 
 HdDataSourceBaseHandle

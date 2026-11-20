@@ -334,15 +334,13 @@ public:
     HdDataSourceBaseHandle Get(const TfToken& name) override{
         if (name == HdMaterialSchemaTokens->material) {
             return _GetMaterialDataSource();
-        } else if (name == HdMaterialBindingsSchema::GetSchemaToken()) {
-            return _GetMaterialBindingDataSource();
         }
         return nullptr;
     }
 
 private:
-    _MaterialDataSource(const SdfPath& id, VtValue materialContainer)
-        : _id(id), _materialContainer(materialContainer) {}
+    _MaterialDataSource(VtValue materialContainer)
+        : _materialContainer(materialContainer) {}
 
     HdDataSourceBaseHandle _GetMaterialDataSource(){
         if (!_materialContainer.IsHolding<HdMaterialNetworkMap>()) {
@@ -357,21 +355,6 @@ private:
         return materialDS;
     }
 
-    HdDataSourceBaseHandle _GetMaterialBindingDataSource(){
-        if (_id.IsEmpty()) {
-            return nullptr;
-        }
-        
-        HdDataSourceBaseHandle const materialBindingSources[]
-            = { HdMaterialBindingSchema::Builder()
-                    .SetPath(HdRetainedTypedSampledDataSource<SdfPath>::New(_id))
-                    .Build() };
-
-        return HdMaterialBindingsSchema::BuildRetained(
-            TfArraySize(purposes), purposes, materialBindingSources);
-    }
-
-    SdfPath             _id;
     VtValue             _materialContainer;
 };
 
@@ -562,7 +545,7 @@ void MhCustomShaders::_CreateAndAddMaterials()
     _materialContainer = _CreateHydraCustomBasicLightingMaterial(_networkMap, _materialPath, color);
 
     //Add the material to the retained scene index
-    auto customColorMaterialDataSource = _MaterialDataSource::New(_materialPath, _materialContainer);
+    auto customColorMaterialDataSource = _MaterialDataSource::New(_materialContainer);
     _retainedSceneIndex->AddPrims({ { _materialPath,
                  HdPrimTypeTokens->material,
                  customColorMaterialDataSource } });
@@ -677,7 +660,7 @@ void MhCustomShaders::UpdateColorInShader(const double3& color)
     //So, to update, remove the material prim and add it again
     _retainedSceneIndex->RemovePrims({ {_materialPath} });
     auto customColorMaterialDataSource
-        = _MaterialDataSource::New(_materialPath, _materialContainer);
+        = _MaterialDataSource::New(_materialContainer);
     _retainedSceneIndex->AddPrims(
         { { _materialPath, HdPrimTypeTokens->material, customColorMaterialDataSource } });
 }

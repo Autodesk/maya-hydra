@@ -46,7 +46,6 @@ private:
         MayaHydraSceneIndex* sceneIndex);
 
     HdDataSourceBaseHandle _GetMaterialDataSource();    
-    HdDataSourceBaseHandle _GetMaterialBindingDataSource();
 
     SdfPath _id;
     TfToken _type;

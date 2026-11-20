@@ -17,6 +17,7 @@
 #include "renderThreadStats.h"
 
 // VtVisitValue dispatches every Vt value type, so all of them must be complete.
+#include <pxr/base/arch/demangle.h>
 #include <pxr/base/vt/typeHeaders.h>
 #include <pxr/base/vt/visitValue.h>
 #if __has_include(<pxr/base/vt/arrayEdit.h>)
@@ -319,7 +320,9 @@ const std::vector<_ProbedSchema>& _ProbedSchemas()
     return schemas;
 }
 
-// Whether \p ds gives a reader anything: a container, a vector or a non-empty value.
+// Whether \p ds gives a reader anything: a container listing something, a vector or a
+// non-empty value. HdsiMaterialPrimvarTransferSceneIndex serves an empty primvars
+// container for every prim, listing it only when a material is bound.
 bool _Serves(const HdDataSourceBaseHandle& ds)
 {
     if (!ds || std::dynamic_pointer_cast<HdBlockDataSource>(ds)) {
@@ -328,7 +331,58 @@ bool _Serves(const HdDataSourceBaseHandle& ds)
     if (HdSampledDataSourceHandle sampled = HdSampledDataSource::Cast(ds)) {
         return !sampled->GetValue(0.0f).IsEmpty();
     }
+    if (HdContainerDataSourceHandle container = HdContainerDataSource::Cast(ds)) {
+        return !container->GetNames().empty();
+    }
     return true;
+}
+
+// UsdImaging's light container lists only a few of the params it serves; the others
+// are there for GetLightParamValue, which Storm reads. The copy keeps them too.
+HdContainerDataSourceHandle _CopyLight(const HdContainerDataSourceHandle& light)
+{
+    TfTokenVector names = light->GetNames();
+    for (const TfToken& name : HdLightTokens->allTokens) {
+        if (std::find(names.begin(), names.end(), name) == names.end()
+            && _Serves(light->Get(name))) {
+            names.push_back(name);
+        }
+    }
+    std::vector<HdDataSourceBaseHandle> values;
+    values.reserve(names.size());
+    for (const TfToken& name : names) {
+        values.push_back(_CopyDataSource(light->Get(name)));
+    }
+    return HdRetainedContainerDataSource::New(names.size(), names.data(), values.data());
+}
+
+// \p copy of \p live with its light container copied by _CopyLight.
+HdContainerDataSourceHandle
+_WithLightCopied(const HdContainerDataSourceHandle& copy, const HdContainerDataSourceHandle& live)
+{
+    const TfToken& lightName = HdLightSchema::GetSchemaToken();
+    const HdContainerDataSourceHandle liveLight
+        = live ? HdContainerDataSource::Cast(live->Get(lightName)) : nullptr;
+    if (!copy || !liveLight) {
+        return copy;
+    }
+    TfTokenVector                       names = copy->GetNames();
+    std::vector<HdDataSourceBaseHandle> values;
+    values.reserve(names.size() + 1);
+    bool hasLight = false;
+    for (const TfToken& name : names) {
+        if (name == lightName) {
+            hasLight = true;
+            values.push_back(_CopyLight(liveLight));
+        } else {
+            values.push_back(copy->Get(name));
+        }
+    }
+    if (!hasLight) {
+        names.push_back(lightName);
+        values.push_back(_CopyLight(liveLight));
+    }
+    return HdRetainedContainerDataSource::New(names.size(), names.data(), values.data());
 }
 
 void _FindUnlisted(
@@ -361,6 +415,9 @@ void _WarnUnlistedNames(const SdfPath& primPath, const HdSceneIndexPrim& prim)
     static std::mutex                      warnedMutex;
     static std::unordered_set<std::string> warned;
     for (const HdDataSourceLocator& locator : unlisted) {
+        if (locator.HasPrefix(HdLightSchema::GetDefaultLocator())) {
+            continue; // Kept by _CopyLight.
+        }
         const std::string key = prim.primType.GetString() + " " + locator.GetString();
         {
             std::lock_guard<std::mutex> lock(warnedMutex);
@@ -368,12 +425,17 @@ void _WarnUnlistedNames(const SdfPath& primPath, const HdSceneIndexPrim& prim)
                 continue;
             }
         }
+        HdContainerDataSourceHandle owner = prim.dataSource;
+        for (size_t i = 0; owner && i + 1 < locator.GetElementCount(); ++i) {
+            owner = HdContainerDataSource::Cast(owner->Get(locator.GetElement(i)));
+        }
         TF_WARN(
-            "%s (%s) serves '%s' but its container does not list it in GetNames(), so "
+            "%s (%s) serves '%s' but its container (%s) does not list it in GetNames(), so "
             "the render thread's copy of the scene drops it.",
             primPath.GetText(),
             prim.primType.GetText(),
-            locator.GetString().c_str());
+            locator.GetString().c_str(),
+            owner ? ArchGetDemangled(typeid(*owner)).c_str() : "null");
     }
 }
 
@@ -804,10 +866,17 @@ void RenderThreadCaptureSceneIndex::_Copy(const SdfPath& path, _Entry& entry) co
     }
     if (!entry.copied || entry.prim.primType != live.primType) {
         entry.copy = _CopyContainer(live.dataSource);
+        if (HdPrimTypeIsLight(live.primType)) {
+            entry.copy = _WithLightCopied(entry.copy, live.dataSource);
+        }
         entry.selections->Set(_CopySelections(live.dataSource));
         _WarnUnlistedNames(path, live);
     } else if (!entry.dirty.IsEmpty()) {
         entry.copy = _Recopy(entry.copy, live.dataSource, entry.dirty);
+        if (HdPrimTypeIsLight(live.primType)
+            && entry.dirty.Intersects(HdLightSchema::GetDefaultLocator())) {
+            entry.copy = _WithLightCopied(entry.copy, live.dataSource);
+        }
     }
     entry.prim.primType = live.primType;
     entry.prim.dataSource = entry.copy || entry.selections->Get()
