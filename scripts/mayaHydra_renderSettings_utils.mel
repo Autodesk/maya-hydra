@@ -78,7 +78,7 @@ global proc mayaHydraSetRenderCamera(string $cameraPath)
 global proc mayaHydraSetActiveRenderDescription(string $ufePath)
 {
     // MayaUSD detects support for the -activeRenderDescription flag by this proc name.
-    python("import mayaHydra.renderSettings.activeRenderDescription as mhActiveRenderDescription; mhActiveRenderDescription.setActiveRenderDescription(" + "\"" + $ufePath + "\")");
+    python("import mayaHydra.renderSettings.activeRenderDescription as mhActiveRenderDescription; mhActiveRenderDescription.setActiveRenderDescription(" + "\"" + encodeString($ufePath) + "\")");
 }
 
 global proc mayaHydraSceneDump(string $hydraSceneDumpPath)

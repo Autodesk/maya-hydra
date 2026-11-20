@@ -57,6 +57,13 @@ class TestActiveRenderDescriptionFlag(mtohUtils.MayaHydraBaseTestCase):
         self.assertEqual(cmds.getAttr(_ATTR), _OVERRIDE)
         self.assertEqual(str(getRenderSettingsPrim().GetPath()), "/Render/OverrideRender")
 
+    def test_QuotesAndBackslashesReachPythonVerbatim(self):
+        cmds.file(_SCENE, open=True, force=True)
+        value = 'a"b\\c\\'
+        melLiteral = value.replace('\\', '\\\\').replace('"', '\\"')
+        mel.eval('mayaHydraSetActiveRenderDescription("%s")' % melLiteral)
+        self.assertEqual(cmds.getAttr(_ATTR), value)
+
     def test_NoDefaultRenderDescriptionNode(self):
         cmds.file(new=True, force=True)
         if cmds.objExists(_NODE):
