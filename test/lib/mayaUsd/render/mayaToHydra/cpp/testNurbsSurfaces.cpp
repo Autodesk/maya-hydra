@@ -89,6 +89,14 @@ FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfTok
         return prim.primType == primType;
     };
 }
+
+// A prim's data source is not guaranteed to serve later changes (the render thread's
+// capture serves a copy), so each check reads the prim again.
+HdDataSourceBaseHandle
+currentData(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdDataSourceLocator& locator)
+{
+    return HdContainerDataSource::Get(sceneIndex->GetPrim(primPath).dataSource, locator);
+}
 #endif
 
 } // namespace
@@ -104,6 +112,8 @@ TEST(NurbsSurfaces, nurbsTorus)
     DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     HdSceneIndexPrim torusPrim; 
+    HdSceneIndexBaseRefPtr torusSceneIndex;
+    SdfPath                torusPath;
     bool testPassed = false;
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
         SceneIndexInspector inspector(sceneIndex);
@@ -112,6 +122,8 @@ TEST(NurbsSurfaces, nurbsTorus)
             = inspector.FindPrims(getNurbPrimPredicate("nurbsTorus1", HdPrimTypeTokens->mesh));
         if (foundPrims.size() == 1u) {
             torusPrim = foundPrims.front().prim;
+            torusSceneIndex = sceneIndex;
+            torusPath = foundPrims.front().primPath;
             EXPECT_EQ(torusPrim.primType, HdPrimTypeTokens->mesh);
             ASSERT_NE(torusPrim.dataSource, nullptr);
 
@@ -140,10 +152,10 @@ TEST(NurbsSurfaces, nurbsTorus)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
+        currentData(torusSceneIndex, torusPath, meshTopologyLocator),
         getPathToSample("torus_topology_modified.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
+        currentData(torusSceneIndex, torusPath, pointsLocator),
         getPathToSample("torus_points_modified.txt")));
 
     EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "useTolerance", true));
@@ -151,10 +163,10 @@ TEST(NurbsSurfaces, nurbsTorus)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
+        currentData(torusSceneIndex, torusPath, meshTopologyLocator),
         getPathToSample("torus_topology_tolerance.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
+        currentData(torusSceneIndex, torusPath, pointsLocator),
         getPathToSample("torus_points_tolerance.txt")));
 #endif
 }
@@ -170,6 +182,7 @@ TEST(NurbsSurfaces, nurbsCube)
     DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     PrimEntriesVector planePrims;
+    HdSceneIndexBaseRefPtr planesSceneIndex;
     bool testPassed = false;
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
         SceneIndexInspector inspector(sceneIndex);
@@ -177,23 +190,24 @@ TEST(NurbsSurfaces, nurbsCube)
         planePrims
             = inspector.FindPrims(getNurbPrimPredicate("nurbsCube1", HdPrimTypeTokens->mesh));
         if (planePrims.size() == 6u) {
+            planesSceneIndex = sceneIndex;
             testPassed = true;
             break;
         }
     }
     ASSERT_TRUE(testPassed);
 
-    auto testPlanePrims = [planePrims](std::string testSuffix) -> void {
+    auto testPlanePrims = [planePrims, planesSceneIndex](std::string testSuffix) -> void {
         for (PrimEntry planePrim : planePrims) {
             EXPECT_EQ(planePrim.prim.primType, HdPrimTypeTokens->mesh);
             ASSERT_NE(planePrim.prim.dataSource, nullptr);
             EXPECT_TRUE(dataSourceMatchesReference(
-                HdContainerDataSource::Get(planePrim.prim.dataSource, meshTopologyLocator),
+                currentData(planesSceneIndex, planePrim.primPath, meshTopologyLocator),
                 getPathToSample(
                     "cube_" + planePrim.primPath.GetParentPath().GetElementString() + "_topology_"
                     + testSuffix + ".txt")));
             EXPECT_TRUE(dataSourceMatchesReference(
-                HdContainerDataSource::Get(planePrim.prim.dataSource, pointsLocator),
+                currentData(planesSceneIndex, planePrim.primPath, pointsLocator),
                 getPathToSample(
                     "cube_" + planePrim.primPath.GetParentPath().GetElementString() + "_points_"
                     + testSuffix + ".txt")));
@@ -227,6 +241,8 @@ TEST(NurbsSurfaces, nurbsCircle)
     DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     HdSceneIndexPrim circlePrim;
+    HdSceneIndexBaseRefPtr circleSceneIndex;
+    SdfPath                circlePath;
     bool testPassed = false;
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
         SceneIndexInspector inspector(sceneIndex);
@@ -234,6 +250,8 @@ TEST(NurbsSurfaces, nurbsCircle)
             = inspector.FindPrims(getNurbPrimPredicate("nurbsCircle1", HdPrimTypeTokens->basisCurves));
         if (foundPrims.size() == 1u) {
             circlePrim = foundPrims.front().prim;
+            circleSceneIndex = sceneIndex;
+            circlePath = foundPrims.front().primPath;
             EXPECT_EQ(circlePrim.primType, HdPrimTypeTokens->basisCurves);
             ASSERT_NE(circlePrim.dataSource, nullptr);
             EXPECT_TRUE(dataSourceMatchesReference(
@@ -267,10 +285,10 @@ TEST(NurbsSurfaces, nurbsCircle)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        asSegmentedTopology(HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator)),
+        asSegmentedTopology(currentData(circleSceneIndex, circlePath, curvesTopologyLocator)),
         getPathToSample("circle_topology_modified.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+        currentData(circleSceneIndex, circlePath, pointsLocator),
         getPathToSample("circle_points_modified.txt")));
 
     EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "useTolerance", true));
@@ -278,20 +296,20 @@ TEST(NurbsSurfaces, nurbsCircle)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        asSegmentedTopology(HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator)),
+        asSegmentedTopology(currentData(circleSceneIndex, circlePath, curvesTopologyLocator)),
         getPathToSample("circle_topology_tolerance.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+        currentData(circleSceneIndex, circlePath, pointsLocator),
         getPathToSample("circle_points_tolerance.txt")));
 
     EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "fixCenter", false));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        asSegmentedTopology(HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator)),
+        asSegmentedTopology(currentData(circleSceneIndex, circlePath, curvesTopologyLocator)),
         getPathToSample("circle_topology_unfixedCenter.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+        currentData(circleSceneIndex, circlePath, pointsLocator),
         getPathToSample("circle_points_unfixedCenter.txt")));
 #endif
 }
@@ -308,29 +326,31 @@ TEST(NurbsSurfaces, nurbsSquare)
         { PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     PrimEntriesVector linePrims;
+    HdSceneIndexBaseRefPtr linesSceneIndex;
     bool testPassed = false;
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
         SceneIndexInspector inspector(sceneIndex);
         linePrims = inspector.FindPrims(
             getNurbPrimPredicate("nurbsSquare1", HdPrimTypeTokens->basisCurves));
         if (linePrims.size() == 4u) {
+            linesSceneIndex = sceneIndex;
             testPassed = true;
             break;
         }
     }
     ASSERT_TRUE(testPassed);
 
-    auto testLinePrims = [linePrims](std::string testSuffix) -> void {
+    auto testLinePrims = [linePrims, linesSceneIndex](std::string testSuffix) -> void {
         for (PrimEntry linePrim : linePrims) {
             EXPECT_EQ(linePrim.prim.primType, HdPrimTypeTokens->basisCurves);
             ASSERT_NE(linePrim.prim.dataSource, nullptr);
             EXPECT_TRUE(dataSourceMatchesReference(
-                asSegmentedTopology(HdContainerDataSource::Get(linePrim.prim.dataSource, curvesTopologyLocator)),
+                asSegmentedTopology(currentData(linesSceneIndex, linePrim.primPath, curvesTopologyLocator)),
                 getPathToSample(
                     "square_" + linePrim.primPath.GetParentPath().GetElementString() + "_topology_"
                     + testSuffix + ".txt")));
             EXPECT_TRUE(dataSourceMatchesReference(
-                HdContainerDataSource::Get(linePrim.prim.dataSource, pointsLocator),
+                currentData(linesSceneIndex, linePrim.primPath, pointsLocator),
                 getPathToSample(
                     "square_" + linePrim.primPath.GetParentPath().GetElementString() + "_points_"
                     + testSuffix + ".txt")));

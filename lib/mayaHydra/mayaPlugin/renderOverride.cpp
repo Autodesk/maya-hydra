@@ -737,6 +737,7 @@ int MtohRenderOverride::DrainAllRenderThreads()
         if (instance->_renderThread && instance->_renderThread->IsRunning()) {
             if (instance->_renderThread->WaitForQuiescence()) {
                 instance->_ReleaseRenderThreadCapture();
+                instance->_SetDeferCallbackRemovals(false);
             }
             ++drained;
         }
@@ -1443,6 +1444,7 @@ MStatus MtohRenderOverride::Render(
         _renderThread->WaitForIdle();
         // Applies what changed upstream while the last frame was rendering.
         _ReleaseRenderThreadCapture();
+        _SetDeferCallbackRemovals(false);
         if (!_renderThreadPassIndices.empty()) {
             _UpdateConvergence(_renderThreadPassIndices);
         }
@@ -1935,6 +1937,7 @@ MStatus MtohRenderOverride::Render(
             // Last, so the copy includes everything the push and pass preparation did.
             _HoldRenderThreadCapture(true);
             _renderThreadPassIndices = request.passIndices;
+            _SetDeferCallbackRemovals(true);
             _renderThread->SubmitRequest(std::move(request));
             submittedToRenderThread = true;
             _firstFramePrimed = true;
@@ -2176,6 +2179,7 @@ MStatus MtohRenderOverride::Render(
         // capture lets queries made after this redraw see the scene it drew.
         if (_renderThread->WaitForQuiescence()) {
             _ReleaseRenderThreadCapture();
+            _SetDeferCallbackRemovals(false);
             if (!_renderThreadPassIndices.empty()) {
                 _UpdateConvergence(_renderThreadPassIndices);
             }
@@ -2928,9 +2932,6 @@ void MtohRenderOverride::_InitHydraResources(
                 if (!started) {
                     _renderThread.reset();
                     _presentBridge.reset();
-                }
-                if (_mayaHydraSceneIndex) {
-                    _mayaHydraSceneIndex->SetDeferCallbackRemovals(started);
                 }
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
                 // Before the first scene push publishes anything. Storm on its own GL
@@ -4479,6 +4480,13 @@ void MtohRenderOverride::_ReleaseRenderThreadCapture()
                 : nullptr) {
             capture->Release();
         }
+    }
+}
+
+void MtohRenderOverride::_SetDeferCallbackRemovals(bool defer)
+{
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->SetDeferCallbackRemovals(defer);
     }
 }
 

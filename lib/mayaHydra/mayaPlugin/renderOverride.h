@@ -546,6 +546,12 @@ private:
     /// Whether this frame goes to the render thread rather than being drawn here.
     bool _SubmitsToRenderThread() const;
 
+    /// Defers the prim removals Maya callbacks ask for while a frame submitted to the
+    /// render thread may be inside Hydra sync. Turned off, with the queued removals
+    /// applied, wherever the render thread is known to be idle, so a query after a
+    /// redraw does not find deleted prims.
+    void _SetDeferCallbackRemovals(bool defer);
+
     /// Sets _isConverged from the passes \p orderedPassIndices last drew. Reads their
     /// tasks and render buffers, so the render thread must be idle.
     void _UpdateConvergence(const std::vector<int>& orderedPassIndices);
