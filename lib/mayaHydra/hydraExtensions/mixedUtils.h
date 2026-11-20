@@ -257,6 +257,14 @@ PXR_NS::SdfPath sceneIndexPathPrefix(
     MObject&                              mayaNode
 );
 
+//! Same prefix as above, but unique among existingPrefixes rather than among
+//! the children of a scene index, so that it does not depend on any one scene.
+MAYAHYDRALIB_API
+PXR_NS::SdfPath sceneIndexPathPrefix(
+    const PXR_NS::SdfPathVector& existingPrefixes,
+    MObject&                     mayaNode
+);
+
 /**
  * @brief Retrieves a color preference from Maya using the Flow Viewport Color Preferences API.
  *

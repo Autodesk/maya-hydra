@@ -48,6 +48,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using MayaHydraSelectionObserverPtr = std::shared_ptr<class MayaHydraSelectionObserver>;
 using MayaHydraSceneIndexRegistrationPtr = std::shared_ptr<struct MayaHydraSceneIndexRegistration>;
+// The scene index path prefix of a Maya node, shared by all the registries that have a scene
+// index for that node, so that they all use the same prefix.
+using MayaHydraNodePrefixReservationPtr
+    = std::shared_ptr<const struct MayaHydraNodePrefixReservation>;
+// The path mapper registration of the default render description node, shared by all the
+// registries.
+using MayaHydraRenderDescriptionPathMapperRegistrationPtr
+    = std::shared_ptr<const struct MayaHydraRenderDescriptionPathMapperRegistration>;
 typedef Ufe::Path (*MayaHydraInterpretRprimPath)(const HdSceneIndexBaseRefPtr&, const SdfPath&);
 
 struct MayaHydraSceneIndexRegistration
@@ -60,6 +68,8 @@ struct MayaHydraSceneIndexRegistration
     // Shared with the other render overrides' registries, which use the same prefix for the
     // node: the pick handler is unregistered with the last one. Null in batch renders.
     MAYAHYDRA_NS::PickRegistrationPtr pickRegistration;
+    // Holds sceneIndexPathPrefix for the node.
+    MayaHydraNodePrefixReservationPtr prefixReservation;
 
     virtual void Update() = 0;
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -107,9 +117,6 @@ public:
     MAYAHYDRALIB_API
     void ApplyPendingUpdates();
 
-    MAYAHYDRALIB_API
-    static PXR_NS::SdfPath GetUsdDefaultRenderDescriptionPathPrefix();
-
 private:
     void
     _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration
@@ -146,7 +153,8 @@ private:
     void _UnregisterDefaultRenderDescriptionNode();
 
     FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _defaultRenderDescriptionDataProducer;
-    static SdfPath _usdDefaultRenderDescriptionPathPrefix;
+    MayaHydraNodePrefixReservationPtr                 _defaultRenderDescriptionPrefixReservation;
+    MayaHydraRenderDescriptionPathMapperRegistrationPtr _defaultRenderDescriptionPathMapperRegistration;
 
     // Is rendering being done in an interactive or batch context?
     bool _interactive{true};

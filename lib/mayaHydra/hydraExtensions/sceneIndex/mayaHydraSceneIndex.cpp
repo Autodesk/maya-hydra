@@ -482,29 +482,49 @@ std::mutex _adaptersToRebuildMutex;
 class MayaPathMapper : public Fvp::PathMapper
 {
 public:
-    MayaPathMapper(const MayaHydraSceneIndex& piSi)
-        : _piSi(piSi)
-    {
-    }
-
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override
     {
-        return _piSi.UfePathToPrimSelections(appPath);
+        return MayaHydraSceneIndex::UfePathToPrimSelections(appPath);
     }
 
     std::string Name() const override { return "MayaPathMapper"; }
-
-private:
-    // Non-owning reference to prevent ownership cycle.
-    const MayaHydraSceneIndex& _piSi;
 };
 
-// Instances not torn down yet, oldest first: one per render override, plus batch renders.
-// Their path mappers are interchangeable (same delegate ID, so same rprim and sprim roots).
-// Main thread only.
-std::vector<const MayaHydraSceneIndex*> liveSceneIndices;
+// Not owning: the live instances own the registration. Main thread only.
+std::weak_ptr<MayaHydraFallbackPathMapperRegistration> fallbackPathMapperRegistration;
 
 } // namespace
+
+// Sets the Maya fallback path mapper for the lifetime of the registration. Non-Maya data models
+// have a Maya path segment prefix in their UFE path; Maya data does not, and is picked up by the
+// fallback mapper. The mapper is stateless, so all the live instances share one registration.
+struct MayaHydraFallbackPathMapperRegistration
+{
+    MayaHydraFallbackPathMapperRegistration()
+    {
+        Fvp::PathMapperRegistry::Instance().SetFallbackMapper(_mapper);
+    }
+
+    ~MayaHydraFallbackPathMapperRegistration()
+    {
+        auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
+        if (pathMapperRegistry.GetFallbackMapper() == _mapper) {
+            pathMapperRegistry.SetFallbackMapper(nullptr);
+        }
+    }
+
+    MayaHydraFallbackPathMapperRegistration(const MayaHydraFallbackPathMapperRegistration&) = delete;
+    MayaHydraFallbackPathMapperRegistration& operator=(const MayaHydraFallbackPathMapperRegistration&) = delete;
+
+private:
+    const Fvp::PathMapperConstPtr _mapper { std::make_shared<MayaPathMapper>() };
+};
+
+const SdfPath& MayaHydraSceneIndex::GetMayaNativeRoot()
+{
+    static const SdfPath root("/MayaHydraViewportRenderer");
+    return root;
+}
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(const MayaHydraInitData& initData, bool interactive)
     : _ID(initData.delegateID.AppendChild(
@@ -515,7 +535,6 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(const MayaHydraInitData& initData, bool
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
-    , _mayaPathMapper(std::make_shared<MayaPathMapper>(*this))
     , _interactive(interactive)
 {
     static std::once_flag once;
@@ -523,11 +542,17 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(const MayaHydraInitData& initData, bool
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
 
-    // Register a fallback path mapper in the path mapper registry.  Non-Maya
-    // data models will have a Maya path segment prefix in their UFE path.
-    // Maya data will not, and will be picked up by the fallback mapper.
-    Fvp::PathMapperRegistry::Instance().SetFallbackMapper(_mayaPathMapper);
-    liveSceneIndices.push_back(this);
+    // The shared fallback path mapper maps Maya objects under the Maya native root.
+    TF_VERIFY(
+        initData.delegateID == GetMayaNativeRoot(),
+        "Maya scene index delegate ID %s is not the Maya native root.",
+        initData.delegateID.GetText());
+
+    _fallbackPathMapperRegistration = fallbackPathMapperRegistration.lock();
+    if (!_fallbackPathMapperRegistration) {
+        _fallbackPathMapperRegistration = std::make_shared<MayaHydraFallbackPathMapperRegistration>();
+        fallbackPathMapperRegistration = _fallbackPathMapperRegistration;
+    }
 }
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex() { _Destroy(); }
@@ -576,16 +601,8 @@ void MayaHydraSceneIndex::_Destroy()
     // Render item override carriers need no teardown of their own: they are
     // MayaHydraRenderItemOverrideAdapters living in _renderItemsAdapters, cleared above.
 
-    // If the fallback path mapper is still ours, hand it to the newest live instance: another
-    // viewport's render override may still need Maya paths mapped.
-    liveSceneIndices.erase(
-        std::remove(liveSceneIndices.begin(), liveSceneIndices.end(), this),
-        liveSceneIndices.end());
-    auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
-    if (pathMapperRegistry.GetFallbackMapper() == _mayaPathMapper) {
-        pathMapperRegistry.SetFallbackMapper(
-            liveSceneIndices.empty() ? nullptr : liveSceneIndices.back()->_mayaPathMapper);
-    }
+    // Unsets the fallback path mapper if no other instance uses it.
+    _fallbackPathMapperRegistration.reset();
 }
 
 void MayaHydraSceneIndex::UpdateRenderItems(
@@ -1162,8 +1179,12 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
-Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
+/* static */
+Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath)
 {
+    static const SdfPath rprimPath = GetMayaNativeRoot().AppendPath(SdfPath(std::string("rprims")));
+    static const SdfPath sprimPath = GetMayaNativeRoot().AppendPath(SdfPath(std::string("sprims")));
+
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg(
             "MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n",
@@ -1205,7 +1226,9 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
         }
     }
 
-    const SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
+    // Same paths as GetPrimPath(), with the Maya native root as delegate ID.
+    const SdfPath primPath
+        = _GetPrimPath(isSprim ? sprimPath : rprimPath, (extendToShape) ? shapeDagPath : dagPath);
 
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());

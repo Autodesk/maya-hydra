@@ -103,6 +103,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testDataProducerMergingSceneIndex.py
     cpp/testUsdSelection.py
     cpp/testPathMapperRegistry.py
+    cpp/testRenderDescriptionPathMapper.py # Skips itself without the hydraRender command
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py

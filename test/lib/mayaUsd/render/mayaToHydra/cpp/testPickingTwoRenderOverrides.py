@@ -18,6 +18,7 @@
 # to belong to a single override. Before the fix:
 # - Storm first: hovering or clicking a USD prim crashed (null pick context).
 # - Flash first: neither Maya objects nor USD prims could be picked (no pick handler).
+# - Stage created with both live: each viewport drew the stage twice, at two prefixes.
 
 import maya.cmds as cmds
 import maya.mel as mel
@@ -96,9 +97,14 @@ class TestPickingTwoRenderOverrides(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh(force=True)
 
     def createScene(self):
+        self.createMayaCube()
+        self.createUsdStage()
+
+    def createMayaCube(self):
         cmds.polyCube(name=self.MAYA_CUBE)
         cmds.move(*self.MAYA_CUBE_POSITION)
 
+    def createUsdStage(self):
         import mayaUsd_createStageWithNewLayer
         import mayaUsd.lib
         from pxr import UsdGeom
@@ -211,6 +217,31 @@ class TestPickingTwoRenderOverrides(mtohUtils.MayaHydraBaseTestCase):
             finally:
                 # Before PluginLoaded's File New removes the attribute.
                 self.disableHover()
+
+    def assertOneProxyShapePrefix(self, renderer):
+        '''Every render override adds its copy of the stage to every viewport. The copies must
+        share one prefix: at two prefixes, each viewport would draw the stage twice.'''
+        proxyShapeRoot = "/MayaUsdProxyShape_PluginNode/"
+        rprims = cmds.mayaHydra(
+            renderer=rendererUtils.getRendererPluginName(renderer), listRenderIndex=True) or []
+        prefixes = {path[len(proxyShapeRoot):].split("/")[0]
+                    for path in rprims if path.startswith(proxyShapeRoot)}
+        self.assertEqual(len(prefixes), 1, "{}: proxy shape prefixes {}".format(renderer, prefixes))
+
+    def test_StageCreatedWithBothOverridesLive(self):
+        # The second override's registry used to find the prefix taken by the first one's copy
+        # of the stage, and put its own copy at another prefix.
+        self.setUpTwoViewports()
+        self.createMayaCube()
+        self.initializeOverrides(STORM, FLASH)
+        self.createUsdStage()
+        cmds.refresh(force=True)
+        self.assertOneProxyShapePrefix(rendererUtils.TEST_RENDERER_STORM)
+        self.assertOneProxyShapePrefix(rendererUtils.TEST_RENDERER_FLASH)
+
+        self.tearDownFlash()
+        self.assertOneProxyShapePrefix(rendererUtils.TEST_RENDERER_STORM)
+        self.pickInEachViewport()
 
     def test_StormThenFlash(self):
         self.setUpTwoViewports()

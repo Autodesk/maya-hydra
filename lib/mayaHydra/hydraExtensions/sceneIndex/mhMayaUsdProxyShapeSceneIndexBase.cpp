@@ -138,10 +138,12 @@ private:
     MayaUsdProxyShapeSceneIndexBase& _psSi;
 };
 
-// Instances not destroyed yet, oldest first. Each render override has its own instance per
-// proxy shape node, but only one can register its path mapper under the node's UFE path; the
-// mappers are interchangeable, so another instance takes over when it is destroyed. Main thread
-// only.
+// Instances not destroyed yet, oldest first. Each render override and batch render has its own
+// instance per proxy shape node, but only one can register its path mapper under the node's UFE
+// path. All the instances for a node share its scene index path prefix
+// (MayaHydraNodePrefixReservation) and their chains are in every view, so their mappers are
+// interchangeable: when the owner is destroyed, its chain leaves the views and another instance
+// takes over. Main thread only.
 std::vector<MayaUsdProxyShapeSceneIndexBase*> liveProxyShapeSceneIndices;
 
 } // namespace

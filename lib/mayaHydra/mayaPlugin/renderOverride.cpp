@@ -182,7 +182,7 @@ namespace {
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
+const SdfPath MAYA_NATIVE_ROOT = MayaHydraSceneIndex::GetMayaNativeRoot();
 
 inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
 {
@@ -2619,6 +2619,7 @@ void MtohRenderOverride::_InitHydraResources(
     // At time of writing we have a single selection scene index serving
     // all viewports.
     isolateSelectMgr.SetIsolateSelectSceneIndex(isSi);
+    _isolateSelectSceneIndex = isSi;
     _inputSceneIndexOfFilteringSceneIndicesChain = isSi;
 #endif
 
@@ -2702,8 +2703,30 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         }
     }
 
-    //We don't have any viewport using Hydra any more
-    Fvp::RenderViewDataManager::Get().RemoveAllRenderViewData();
+    // Remove this override's views only: another render override may still be drawing its own,
+    // and removing them would take its filtering chain out of its render index.
+    auto& renderViewDataManager = Fvp::RenderViewDataManager::Get();
+    std::vector<std::string> ownViewIds;
+    for (const auto& viewData : renderViewDataManager.GetAllViewData()) {
+        if (viewData.GetRenderIndex() == renderIndex()) {
+            ownViewIds.push_back(viewData.GetViewDesc()._viewId);
+        }
+    }
+    for (const auto& viewId : ownViewIds) {
+        renderViewDataManager.RemoveRenderViewData(viewId);
+    }
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    // The isolate select manager is process-wide: reset it only if it still holds this
+    // override's isolate select scene index.
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+    if (_isolateSelectSceneIndex
+        && HdSceneIndexBaseRefPtr(isolateSelectMgr.GetIsolateSelectSceneIndex())
+            == _isolateSelectSceneIndex) {
+        isolateSelectMgr.Reset();
+    }
+#endif
+    _isolateSelectSceneIndex = nullptr;
 
     if (fullReset){
         //Remove the data producer scene indices that apply to all views

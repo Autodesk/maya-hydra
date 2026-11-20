@@ -79,6 +79,119 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
 #endif
 };
 
+namespace {
+
+struct HashObjectHandle
+{
+    size_t operator()(const MObjectHandle& handle) const { return handle.hashCode(); }
+};
+
+// Not owning: the registrations own the reservations. Main thread only.
+std::unordered_map<MObjectHandle, std::weak_ptr<const MayaHydraNodePrefixReservation>, HashObjectHandle>
+    nodePrefixReservations;
+
+// Not owning: the registries own the registration. Main thread only.
+std::weak_ptr<const MayaHydraRenderDescriptionPathMapperRegistration>
+    renderDescriptionPathMapperRegistration;
+
+} // namespace
+
+// Every registry (one per render override, plus batch renders) adds its scene index chain for a
+// node to all views. Computing the prefix against one registry's scene would let the chains of
+// one node land at different prefixes, as the second registry finds the name taken by the first
+// one's chain. So the first registry reserves the prefix, and the others share it.
+struct MayaHydraNodePrefixReservation
+{
+    MayaHydraNodePrefixReservation(const MObjectHandle& nodeIn, const SdfPath& prefixIn)
+        : node(nodeIn)
+        , prefix(prefixIn)
+    {
+    }
+
+    ~MayaHydraNodePrefixReservation()
+    {
+        // The entry may already point to a replacement reservation for the node.
+        auto found = nodePrefixReservations.find(node);
+        if (found != nodePrefixReservations.end() && found->second.expired()) {
+            nodePrefixReservations.erase(found);
+        }
+    }
+
+    const MObjectHandle node;
+    const SdfPath       prefix;
+};
+
+// Maps the default render description node to its prefix, which all registries share, so the
+// registries can share one registration too: it is unregistered with the last one.
+struct MayaHydraRenderDescriptionPathMapperRegistration
+{
+    explicit MayaHydraRenderDescriptionPathMapperRegistration(const SdfPath& prefixIn)
+        : prefix(prefixIn)
+        , registered(Fvp::PathMapperRegistry::Instance().Register(
+              UsdDefaultRenderDescriptionNodePath(),
+              std::make_shared<Fvp::PrefixPathMapper>(UsdDefaultRenderDescriptionNodePath(), prefixIn)))
+    {
+    }
+
+    ~MayaHydraRenderDescriptionPathMapperRegistration()
+    {
+        // Another client may own the UFE path: then there is nothing of ours to unregister.
+        if (registered) {
+            Fvp::PathMapperRegistry::Instance().Unregister(UsdDefaultRenderDescriptionNodePath());
+        }
+    }
+
+    const SdfPath prefix;
+    const bool    registered;
+};
+
+namespace {
+
+// The prefix reserved for the node by another registry, or a new one unique among the reserved
+// prefixes.
+MayaHydraNodePrefixReservationPtr acquireNodePrefix(MObject& node)
+{
+    const MObjectHandle nodeHandle(node);
+    auto found = nodePrefixReservations.find(nodeHandle);
+    if (found != nodePrefixReservations.end()) {
+        if (auto reservation = found->second.lock()) {
+            return reservation;
+        }
+    }
+
+    SdfPathVector reservedPrefixes;
+    reservedPrefixes.reserve(nodePrefixReservations.size());
+    for (const auto& entry : nodePrefixReservations) {
+        if (auto reservation = entry.second.lock()) {
+            reservedPrefixes.push_back(reservation->prefix);
+        }
+    }
+
+    auto reservation = std::make_shared<const MayaHydraNodePrefixReservation>(
+        nodeHandle, sceneIndexPathPrefix(reservedPrefixes, node));
+    nodePrefixReservations[nodeHandle] = reservation;
+    return reservation;
+}
+
+MayaHydraRenderDescriptionPathMapperRegistrationPtr
+acquireRenderDescriptionPathMapper(const SdfPath& prefix)
+{
+    if (auto registration = renderDescriptionPathMapperRegistration.lock()) {
+        TF_VERIFY(
+            registration->prefix == prefix,
+            "Default render description prefix %s differs from the registered %s.",
+            prefix.GetText(),
+            registration->prefix.GetText());
+        return registration;
+    }
+
+    auto registration = std::make_shared<const MayaHydraRenderDescriptionPathMapperRegistration>(prefix);
+    renderDescriptionPathMapperRegistration = registration;
+    return registration;
+}
+
+} // namespace
+
 // MayaHydraSceneIndexRegistration is used to register a scene index for
 // mayaUsdPlugin proxy shape nodes.
     MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(
@@ -182,7 +295,9 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
         // Release now: a caller of GetSceneIndexRegistrationForRprim() may still hold the record.
+        // The chain is out of all views, so the prefix can be released too.
         registration->pickRegistration.reset();
+        registration->prefixReservation.reset();
 #ifdef CODE_COVERAGE_WORKAROUND
         registration->Destroy();
         Fvp::leakSceneIndex(registration->rootSceneIndex);
@@ -204,8 +319,8 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     }
 
     registration->dagNode = MObjectHandle(dagNode);
-    registration->sceneIndexPathPrefix = sceneIndexPathPrefix(
-        _dataProducerMergingSceneIndex, dagNode);
+    registration->prefixReservation = acquireNodePrefix(dagNode);
+    registration->sceneIndexPathPrefix = registration->prefixReservation->prefix;
         
     //We receive only dag nodes of type MayaUsdProxyShapeNode
     MAYAUSDAPI_NS::ProxyStage proxyStage(dagNode);
@@ -360,13 +475,6 @@ void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
     }
 }
 
-SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderDescriptionPathPrefix;
-
-SdfPath MayaHydraSceneIndexRegistry::GetUsdDefaultRenderDescriptionPathPrefix()
-{
-    return _usdDefaultRenderDescriptionPathPrefix;
-}
-
 void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
 {
     if (_defaultRenderDescriptionDataProducer) {
@@ -398,8 +506,9 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
         return MayaHydra::MhExternalCameraOverrideSceneIndex::New(inputSi);
     };
 
-    SdfPath prefix = sceneIndexPathPrefix(
-        _dataProducerMergingSceneIndex, nodeObj);
+    // Shared with the other registries, as for proxy shapes (see MayaHydraNodePrefixReservation).
+    auto prefixReservation = acquireNodePrefix(nodeObj);
+    const SdfPath& prefix = prefixReservation->prefix;
 
     HdSceneIndexBaseRefPtr finalSceneIndex = nullptr;
     UsdImagingStageSceneIndexRefPtr stageSceneIndex = nullptr;
@@ -422,15 +531,13 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
     Fvp::DataProducerSceneIndexInterfaceImp::get()
         .addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSIData);
 
-    _usdDefaultRenderDescriptionPathPrefix = prefix;
     _defaultRenderDescriptionDataProducer = dataProducerSIData;
+    _defaultRenderDescriptionPrefixReservation = prefixReservation;
 
-    // Hydra path mapping for the USD default render description is done
-    // through a simple prefix path mapper.
-    auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(
-        UsdDefaultRenderDescriptionNodePath(), prefix);
-    Fvp::PathMapperRegistry::Instance().Register(
-        UsdDefaultRenderDescriptionNodePath(), pathMapper);
+    // Hydra path mapping for the USD default render description is done through a simple
+    // prefix path mapper, shared with the other registries: when a render override or a batch
+    // render goes, the others keep the mapping.
+    _defaultRenderDescriptionPathMapperRegistration = acquireRenderDescriptionPathMapper(prefix);
 }
 
 void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderDescriptionNode()
@@ -439,8 +546,8 @@ void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderDescriptionNode()
         return;
     }
 
-    Fvp::PathMapperRegistry::Instance().Unregister(
-        UsdDefaultRenderDescriptionNodePath());
+    // Unregisters the path mapper if no other registry uses it.
+    _defaultRenderDescriptionPathMapperRegistration.reset();
 
     Fvp::DataProducerSceneIndexInterface::get()
         .removeDataProducerSceneIndex(
@@ -449,7 +556,7 @@ void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderDescriptionNode()
     Fvp::leakSceneIndex(_defaultRenderDescriptionDataProducer->GetDataProducerLastSceneIndexChain());
 #endif
     _defaultRenderDescriptionDataProducer = TfNullPtr;
-    _usdDefaultRenderDescriptionPathPrefix = SdfPath();
+    _defaultRenderDescriptionPrefixReservation.reset();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -1,6 +1,6 @@
 @ Prim :  --- Type : 
 |___# ContainerDataSource : 
-|___@ Prim : MayaData --- Type : 
+|___@ Prim : MayaHydraViewportRenderer --- Type : 
     |___# ContainerDataSource : 
     |___@ Prim : sprims --- Type : 
     |   |___# ContainerDataSource : 
@@ -12,7 +12,7 @@
     |               |___# ContainerDataSource : material
     |               |   |___# ContainerDataSource : 
     |               |       |___# ContainerDataSource : nodes
-    |               |       |   |___# ContainerDataSource : /MayaData/sprims/directionalLight1/directionalLightShape1
+    |               |       |   |___# ContainerDataSource : /MayaHydraViewportRenderer/sprims/directionalLight1/directionalLightShape1
     |               |       |       |___# ContainerDataSource : parameters
     |               |       |       |   |___# ContainerDataSource : angle
     |               |       |       |   |   |___SampledDataSource -> float : value
@@ -69,13 +69,13 @@
     |           |___# ContainerDataSource : material
     |               |___# ContainerDataSource : 
     |                   |___# ContainerDataSource : nodes
-    |                   |   |___# ContainerDataSource : /MayaData/materials/initialShadingGroup/place2dTexture1
+    |                   |   |___# ContainerDataSource : /MayaHydraViewportRenderer/materials/initialShadingGroup/place2dTexture1
     |                   |   |   |___# ContainerDataSource : parameters
     |                   |   |   |   |___# ContainerDataSource : varname
     |                   |   |   |       |___SampledDataSource -> TfToken : value
     |                   |   |   |___# ContainerDataSource : inputConnections
     |                   |   |   |___SampledDataSource -> TfToken : nodeIdentifier
-    |                   |   |___# ContainerDataSource : /MayaData/materials/initialShadingGroup/file1
+    |                   |   |___# ContainerDataSource : /MayaHydraViewportRenderer/materials/initialShadingGroup/file1
     |                   |   |   |___# ContainerDataSource : parameters
     |                   |   |   |   |___# ContainerDataSource : file
     |                   |   |   |   |   |___SampledDataSource -> SdfAssetPath : value
@@ -93,7 +93,7 @@
     |                   |   |   |           |___SampledDataSource -> TfToken : upstreamNodePath
     |                   |   |   |           |___SampledDataSource -> TfToken : upstreamNodeOutputName
     |                   |   |   |___SampledDataSource -> TfToken : nodeIdentifier
-    |                   |   |___# ContainerDataSource : /MayaData/materials/initialShadingGroup/openPBR_shader1
+    |                   |   |___# ContainerDataSource : /MayaHydraViewportRenderer/materials/initialShadingGroup/openPBR_shader1
     |                   |       |___# ContainerDataSource : parameters
     |                   |       |   |___# ContainerDataSource : clearcoat
     |                   |       |   |   |___SampledDataSource -> float : value
