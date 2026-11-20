@@ -177,7 +177,10 @@ happens on the first frame submitted to the render thread.  From then on it:
   preparation.  Pass preparation runs `FramePass::GetRenderTasks` for every
   pass, which adds and resizes the passes' render buffers and sets their camera
   and task parameters; done only after the hold, the draw would not see those
-  changes until the next frame.  The draw runs it again right before each pass,
+  changes until the next frame.  With OpenGL, pass preparation runs on the render
+  thread while the main thread waits: a pass that reads the previous pass's AOVs
+  can copy them into its own buffers, a draw that must not run on Maya's context,
+  where it would change GL state Maya tracks.  The draw runs it again right before each pass,
   because a pass reads the AOVs the pass before it has just rendered.  Holding
   copies everything dirtied since the last hold, then
   queues notices from upstream instead of applying them, so the copy cannot

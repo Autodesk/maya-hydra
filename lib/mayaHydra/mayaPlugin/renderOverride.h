@@ -513,9 +513,10 @@ private:
     void _DrawPasses(const std::vector<int>& orderedPassIndices);
 
     /// Runs FramePass::GetRenderTasks for each of the given passes without drawing.
-    /// On the main thread before the capture is held, because it changes the scene the
-    /// draw reads (render buffers, camera, task parameters), and the capture holds back
-    /// changes made once it is held.
+    /// Before the capture is held, because it changes the scene the draw reads (render
+    /// buffers, camera, task parameters), and the capture holds back changes made once
+    /// it is held. It can issue GPU copies, so when the render thread draws everything
+    /// it runs there, with the main thread waiting.
     void _PrepareRenderTasks(const std::vector<int>& orderedPassIndices);
 
     /// FramePass::GetRenderTasks for the pass at \p idx in \p orderedPassIndices, with

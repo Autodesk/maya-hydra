@@ -1942,10 +1942,10 @@ MStatus MtohRenderOverride::Render(
         _unsolvableFramingWarnedCameras.erase(cameraPath);
     }
 
-    // The scene push and pass preparation run on the main thread either way: they write
-    // to scene indices and pass parameters, which the render thread must not touch.
-    // The handoff is depth-1 and never replaces a request; the interlock above has
-    // already waited for the render thread to finish the previous one.
+    // The scene push and pass preparation complete before the request is submitted: they
+    // write to scene indices and pass parameters, which a running render must not see
+    // change. The handoff is depth-1 and never replaces a request; the interlock above
+    // has already waited for the render thread to finish the previous one.
     bool submittedToRenderThread = false;
     auto submitOrDrawFrame = [&]() {
         if (_SubmitsToRenderThread()) {
@@ -1956,7 +1956,17 @@ MStatus MtohRenderOverride::Render(
             request.dstRegion     = GfVec4i(0, 0, width, height);
             pushSceneState();
             request.passIndices = preparePasses();
-            _PrepareRenderTasks(request.passIndices);
+            if (_RenderThreadDrawsAll()) {
+                // Preparing a pass that reads the previous pass's AOVs can make HVT copy
+                // them into this pass's buffers. On Maya's GL context that draw would
+                // change state Maya tracks and use the render thread's textures without
+                // ordering against its GPU work. The render thread is idle here, so this
+                // still completes before the request is submitted.
+                _renderThread->RunOnRenderThread(
+                    [&]() { _PrepareRenderTasks(request.passIndices); });
+            } else {
+                _PrepareRenderTasks(request.passIndices);
+            }
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
             // Covers the shared buffer copies the push just issued on Maya's context.
             if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext()) {
