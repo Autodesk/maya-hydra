@@ -25,5 +25,9 @@ class TestPickHandlerRegistry(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="TestPickHandlerRegistry.testRegistry")
 
+    def test_sharedPickRegistration(self):
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="TestPickHandlerRegistry.testSharedRegistration")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

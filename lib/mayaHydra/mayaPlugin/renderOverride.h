@@ -557,6 +557,9 @@ private:
 
     MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
     MAYAHYDRA_NS::MayaViewportSceneIndexRefPtr _mayaViewportSceneIndex;
+    // Shared with the other render overrides: the Maya pick handler is unregistered with the
+    // last one.
+    MAYAHYDRA_NS::PickRegistrationPtr _mayaPickRegistration;
 
     //Lead object selection and wireframe color for selection highlight
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};

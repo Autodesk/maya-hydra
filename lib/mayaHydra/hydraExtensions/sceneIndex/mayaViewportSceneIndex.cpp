@@ -115,7 +115,8 @@ namespace MAYAHYDRA_NS_DEF {
 // both defined here in the same implementation file.
 //
 // All render overrides share the Maya rprim path, so one handler serves them all: it
-// resolves hits in the picking override's scene index, given by the pick context.
+// resolves hits in the picking override's scene index, given by the pick context. The
+// render overrides share its registration (MtohRenderOverride::_InitHydraResources()).
 class MayaViewportSceneIndex::MayaPickHandler : public MayaHydra::PickHandler
 {
 public:
@@ -158,6 +159,12 @@ private:
     }
 };
 
+/* static */
+MayaHydra::PickHandlerConstPtr MayaViewportSceneIndex::CreatePickHandler()
+{
+    return std::make_shared<MayaPickHandler>();
+}
+
 MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inputSceneIndex, MayaHydraSceneIndexRefPtr const& mayaDataSceneIndex)
     : HdFilteringSceneIndexBase()
     , HdEncapsulatingSceneIndexBase()
@@ -184,10 +191,6 @@ MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inp
         _mayaDataSceneIndex->CreateMaterial(_defaultMaterialPath, defaultMaterialShadingGroupObj);
     }
 
-    // Shared with the other live render overrides, unregistered with the last one.
-    _hasPickHandlerRegistered = TF_VERIFY(MayaHydra::PickHandlerRegistry::Instance().RegisterShared(
-        mayaDataSceneIndex->GetRprimPath(), std::make_shared<MayaPickHandler>()));
-
     // Setup the combined scene
     _mergingSceneIndex->AddInputScene(_inputSceneIndex, SdfPath::AbsoluteRootPath());
     _mergingSceneIndex->AddInputScene(_viewportDataSceneIndex, SdfPath::AbsoluteRootPath());
@@ -201,13 +204,6 @@ MayaViewportSceneIndex::~MayaViewportSceneIndex()
 
 void MayaViewportSceneIndex::Destroy()
 {
-    // Destroy() runs twice (ClearHydraResources(), then the destructor): release once.
-    if (_hasPickHandlerRegistered) {
-        auto& phr = MayaHydra::PickHandlerRegistry::Instance();
-        TF_VERIFY(phr.UnregisterShared(_mayaDataSceneIndex->GetRprimPath()));
-        _hasPickHandlerRegistered = false;
-    }
-
     // Stop receiving notifications, so a late upstream PrimsAdded cannot reach _PrimsAdded()
     // on a torn-down instance. _mergingSceneIndex is created in the constructor's initializer
     // list, and removing an observer that is already gone is a no-op.

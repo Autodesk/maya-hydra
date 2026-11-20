@@ -18,6 +18,7 @@
 #define MH_MAYA_VIEWPORT_SCENE_INDEX_H
 
 #include <mayaHydraLib/api.h>
+#include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
@@ -68,11 +69,16 @@ public:
     ~MayaViewportSceneIndex() override;
 
     // Deterministic teardown, called from MtohRenderOverride::ClearHydraResources() while the
-    // render index still exists: unregisters the pick handler and stops upstream notifications,
-    // even if something still holds this scene index. The destructor calls it again; the
-    // second call is a no-op (HYDRA-2019).
+    // render index still exists: stops upstream notifications, even if something still holds
+    // this scene index. The destructor calls it again; the second call is a no-op (HYDRA-2019).
     MAYAHYDRALIB_API
     void Destroy();
+
+    // The pick handler for Maya data, to register under the Maya scene index rprim path. It is
+    // stateless: it resolves hits in the scene index of the pick context's render override, so
+    // all render overrides can share it.
+    MAYAHYDRALIB_API
+    static MayaHydra::PickHandlerConstPtr CreatePickHandler();
 
     MAYAHYDRALIB_API
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override;
@@ -215,9 +221,6 @@ protected:
 
     // Default material
     PXR_NS::SdfPath _defaultMaterialPath;
-
-    // Pick handling
-    bool _hasPickHandlerRegistered{false};
 
     // Playback
     bool _isPlaybackRunning{false};

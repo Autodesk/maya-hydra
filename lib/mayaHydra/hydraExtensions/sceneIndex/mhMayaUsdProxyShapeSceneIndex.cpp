@@ -16,9 +16,6 @@
 
 #include "mhMayaUsdProxyShapeSceneIndex.h"
 
-#include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
-#include <mayaHydraLib/pick/mhUsdPickHandler.h>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -33,31 +30,9 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     : ParentClass(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle,
                   sceneIndexPathPrefix, sceneIndexAppPath)
 {
-    // Shared with the other live render overrides' proxy shape scene indices, which
-    // can use the same prefix: the handler resolves hits through the pick context.
-    _unregisterPickHandler = TF_VERIFY(MayaHydra::PickHandlerRegistry::Instance().RegisterShared(
-        sceneIndexPathPrefix, std::make_shared<UsdPickHandler>()));
 }
 
-MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
-{
-    _DestroyDerived(); // Base class will take care of its _Destroy()
-}
-
-void MayaUsdProxyShapeSceneIndex::_Destroy()
-{
-    _DestroyDerived();
-    ParentClass::_Destroy();
-}
-
-void MayaUsdProxyShapeSceneIndex::_DestroyDerived()
-{
-    // Runs from _Destroy() and from the destructor: release only once.
-    if (_unregisterPickHandler) {
-        TF_VERIFY(PickHandlerRegistry::Instance().UnregisterShared(_sceneIndexPathPrefix));
-        _unregisterPickHandler = false;
-    }
-}
+MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex() = default;
 
 MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(
     const MAYAUSDAPI_NS::ProxyStage&       proxyStage,

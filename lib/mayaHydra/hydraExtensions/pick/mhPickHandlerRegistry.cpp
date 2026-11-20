@@ -19,43 +19,31 @@
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/instantiateSingleton.h>
 
 #include <map>
+#include <typeinfo>
 
 using namespace MayaHydra;
 
 namespace {
 
-std::map<PXR_NS::SdfPath, PickHandlerConstPtr> pickHandlers;
-// Number of owners of each shared registration (RegisterShared()).
-std::map<PXR_NS::SdfPath, int> sharedOwnerCounts;
+struct Entry
+{
+    PickHandlerConstPtr handler;
+    // Not owning: the clients own the registration, and its destructor removes this entry.
+    std::weak_ptr<PickRegistration> registration;
+};
+
+std::map<PXR_NS::SdfPath, Entry> pickHandlers;
 PickContextConstPtr pickContext = nullptr;
 
-}
-
-PXR_NAMESPACE_OPEN_SCOPE
-TF_INSTANTIATE_SINGLETON(PickHandlerRegistry);
-PXR_NAMESPACE_CLOSE_SCOPE
-
-namespace MAYAHYDRA_NS_DEF {
-
-/* static */
-PickHandlerRegistry& PickHandlerRegistry::Instance()
+// Whether prefix can be added: neither it, an ancestor nor a descendant is in the map.
+bool canAdd(const PXR_NS::SdfPath& prefix)
 {
-    return PXR_NS::TfSingleton<PickHandlerRegistry>::GetInstance();
-}
-
-bool PickHandlerRegistry::Register(const SdfPath& prefix, const PickHandlerConstPtr& pickHandler)
-{
-    // Can't register an empty path, or an absolute root path prefix.
-    if (prefix.IsEmpty() || prefix.IsAbsoluteRootPath()) {
-        return false;
-    }
-
     // No entries yet?  Add.
     if (pickHandlers.empty()) {
-        pickHandlers.emplace(prefix, pickHandler);
         return true;
     }
 
@@ -67,12 +55,7 @@ bool PickHandlerRegistry::Register(const SdfPath& prefix, const PickHandlerConst
     // strictly smaller than.  If the last entry is a prefix to the one we're
     // trying to add, fail, else add.
     if (it == pickHandlers.end()) {
-        auto rit = pickHandlers.rbegin();
-        if (prefix.HasPrefix(rit->first)) {
-            return false;
-        }
-        pickHandlers.emplace_hint(it, prefix, pickHandler);
-        return true;
+        return !prefix.HasPrefix(pickHandlers.rbegin()->first);
     }
 
     // Already in the map or a descendant already in the map?  Fail.
@@ -82,23 +65,67 @@ bool PickHandlerRegistry::Register(const SdfPath& prefix, const PickHandlerConst
 
     // At the first entry and it's not a match or a descendant?  Add entry.
     if (it == pickHandlers.begin()) {
-        pickHandlers.emplace_hint(it, prefix, pickHandler);
         return true;
     }
 
     // Somewhere in the middle of the map.  Go back one entry.  Is it a match,
     // a descendant, or an ancestor?  Fail.
     it = std::prev(it);
-    if (it->first.HasPrefix(prefix) || prefix.HasPrefix(it->first)) {
-        return false;
-    }
-
-    // All checks pass: add entry.
-    pickHandlers.emplace_hint(it, prefix, pickHandler);
-    return true;
+    return !(it->first.HasPrefix(prefix) || prefix.HasPrefix(it->first));
 }
 
-bool PickHandlerRegistry::Unregister(const SdfPath& prefix)
+}
+
+PXR_NAMESPACE_OPEN_SCOPE
+TF_INSTANTIATE_SINGLETON(PickHandlerRegistry);
+PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace MAYAHYDRA_NS_DEF {
+
+PickRegistration::~PickRegistration()
+{
+    TF_VERIFY(PickHandlerRegistry::Instance()._Unregister(_prefix));
+}
+
+/* static */
+PickHandlerRegistry& PickHandlerRegistry::Instance()
+{
+    return PXR_NS::TfSingleton<PickHandlerRegistry>::GetInstance();
+}
+
+PickRegistrationPtr
+PickHandlerRegistry::Register(const SdfPath& prefix, const PickHandlerConstPtr& pickHandler)
+{
+    // Can't register an empty path, or an absolute root path prefix.
+    if (prefix.IsEmpty() || prefix.IsAbsoluteRootPath() || !pickHandler) {
+        return nullptr;
+    }
+
+    // Already registered?  Share the registration, if the handlers are interchangeable.
+    auto found = pickHandlers.find(prefix);
+    if (found != pickHandlers.end()) {
+        const PickHandler& registeredHandler = *found->second.handler;
+        if (typeid(registeredHandler) != typeid(*pickHandler)) {
+            TF_CODING_ERROR(
+                "A pick handler of another type is already registered for %s.", prefix.GetText());
+            return nullptr;
+        }
+        PickRegistrationPtr registration = found->second.registration.lock();
+        TF_VERIFY(registration, "Pick handler registered for %s without a registration.", prefix.GetText());
+        return registration;
+    }
+
+    if (!canAdd(prefix)) {
+        return nullptr;
+    }
+
+    // The constructor is private, so std::make_shared cannot be used.
+    PickRegistrationPtr registration(new PickRegistration(prefix));
+    pickHandlers.emplace(prefix, Entry { pickHandler, registration });
+    return registration;
+}
+
+bool PickHandlerRegistry::_Unregister(const SdfPath& prefix)
 {
     auto found = pickHandlers.find(prefix);
     if (found == pickHandlers.end()) {
@@ -113,7 +140,7 @@ PickHandlerConstPtr PickHandlerRegistry::RegisteredHandler(
 ) const
 {
     auto found = pickHandlers.find(path);
-    return (found == pickHandlers.end()) ? nullptr : found->second;
+    return (found == pickHandlers.end()) ? nullptr : found->second.handler;
 }
 
 PickHandlerConstPtr PickHandlerRegistry::GetHandler(const SdfPath& path) const
@@ -132,12 +159,12 @@ PickHandlerConstPtr PickHandlerRegistry::GetHandler(const SdfPath& path) const
     // return handler, else fail.
     if (it == pickHandlers.end()) {
         auto rit = pickHandlers.rbegin();
-        return (path.HasPrefix(rit->first)) ? rit->second : nullptr;
+        return (path.HasPrefix(rit->first)) ? rit->second.handler : nullptr;
     }
 
     // Not at the end.  Query is exactly in the map?  Return handler.
     if (it->first == path) {
-        return it->second;
+        return it->second.handler;
     }
 
     // Query path is a prefix to what's in the map?  Fail.
@@ -147,42 +174,13 @@ PickHandlerConstPtr PickHandlerRegistry::GetHandler(const SdfPath& path) const
 
     // At the first entry.  If query is a descendant, return handler, else fail.
     if (it == pickHandlers.begin()) {
-        return (path.HasPrefix(it->first)) ? it->second : nullptr;
+        return (path.HasPrefix(it->first)) ? it->second.handler : nullptr;
     }
 
     // Somewhere in the middle of the map.  Go back one entry.  If query is a
     // descendant, return handler, else fail.
     it = std::prev(it);
-    return (path.HasPrefix(it->first)) ? it->second : nullptr;
-}
-
-bool PickHandlerRegistry::RegisterShared(
-    const SdfPath&             prefix,
-    const PickHandlerConstPtr& pickHandler)
-{
-    auto found = sharedOwnerCounts.find(prefix);
-    if (found != sharedOwnerCounts.end()) {
-        ++found->second;
-        return true;
-    }
-    if (!Register(prefix, pickHandler)) {
-        return false;
-    }
-    sharedOwnerCounts.emplace(prefix, 1);
-    return true;
-}
-
-bool PickHandlerRegistry::UnregisterShared(const SdfPath& prefix)
-{
-    auto found = sharedOwnerCounts.find(prefix);
-    if (found == sharedOwnerCounts.end()) {
-        return false;
-    }
-    if (--found->second > 0) {
-        return true;
-    }
-    sharedOwnerCounts.erase(found);
-    return Unregister(prefix);
+    return (path.HasPrefix(it->first)) ? it->second.handler : nullptr;
 }
 
 void PickHandlerRegistry::SetPickContext(const PickContextConstPtr& context)

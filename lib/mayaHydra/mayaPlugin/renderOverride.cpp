@@ -2555,6 +2555,10 @@ void MtohRenderOverride::_InitHydraResources(
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 
+    _mayaPickRegistration = PickHandlerRegistry::Instance().Register(
+        _mayaHydraSceneIndex->GetRprimPath(), MayaViewportSceneIndex::CreatePickHandler());
+    TF_VERIFY(_mayaPickRegistration, "Maya pick handler registration failed.");
+
     // Render globals are initialized after this method is called, so
     // included purposes attributes do not yet exist on the
     // defaultRenderGlobals node.  Pass in an empty set of included
@@ -2710,6 +2714,9 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _sceneIndexRegistry.reset();
 
     _ClearMayaHydraSceneIndex();
+
+    // Unregisters the Maya pick handler if no other render override uses it.
+    _mayaPickRegistration.reset();
 
     // Tear down explicitly rather than waiting for the destructor: the downstream filtering
     // scene indices still hold this one through their input until the next

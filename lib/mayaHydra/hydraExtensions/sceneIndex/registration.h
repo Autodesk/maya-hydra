@@ -18,6 +18,7 @@
 #define MAYAHYDRALIB_SCENE_INDEX_REGISTRATION_H
 
 #include <mayaHydraLib/api.h>
+#include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 
 #include <flowViewport/flowViewport.h>
 #include <flowViewport/API/renderViewData/fvpDataProducerSceneIndexDataBase.h>
@@ -56,6 +57,9 @@ struct MayaHydraSceneIndexRegistration
     SdfPath                     sceneIndexPathPrefix;
     MObjectHandle               dagNode;
     MayaHydraInterpretRprimPath interpretRprimPathFn = nullptr;
+    // Shared with the other render overrides' registries, which use the same prefix for the
+    // node: the pick handler is unregistered with the last one. Null in batch renders.
+    MAYAHYDRA_NS::PickRegistrationPtr pickRegistration;
 
     virtual void Update() = 0;
 #ifdef CODE_COVERAGE_WORKAROUND

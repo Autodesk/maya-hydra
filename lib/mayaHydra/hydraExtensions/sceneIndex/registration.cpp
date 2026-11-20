@@ -21,6 +21,8 @@
 #include "mayaHydraLib/sceneIndex/mhExternalCameraOverrideSceneIndex.h"
 #include "mayaHydraLib/sceneIndex/mhExternalCameraResolvingSceneIndex.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
+#include "mayaHydraLib/pick/mhPickHandlerRegistry.h"
+#include "mayaHydraLib/pick/mhUsdPickHandler.h"
 
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/sceneIndex/fvpPrimRemovalEnforcingSceneIndex.h>
@@ -179,6 +181,8 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
         dataProducerSceneIndexInterface.removeDataProducerSceneIndex(registration->rootSceneIndex);
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
+        // Release now: a caller of GetSceneIndexRegistrationForRprim() may still hold the record.
+        registration->pickRegistration.reset();
 #ifdef CODE_COVERAGE_WORKAROUND
         registration->Destroy();
         Fvp::leakSceneIndex(registration->rootSceneIndex);
@@ -244,13 +248,20 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         
     // Create Maya USD proxy shape scene index.  Since this scene index
     // contains Maya data, it cannot be added by the Flow Viewport API.
-    // Pass in the scene index prefix for the proxy shape scene index, so it
-    // can register a pick handler.
     auto mayaUsdProxyShapeSceneIndex = _interactive ? 
         MayaUsdProxyShapeSceneIndexBaseRefPtr(MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)))) :
         MayaUsdProxyShapeSceneIndexBase::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
     registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
     registration->interpretRprimPathFn = &(MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
+
+    // Batch renders do not pick. The USD pick handler is stateless: it resolves hits through
+    // the pick context.
+    if (_interactive) {
+        registration->pickRegistration = PickHandlerRegistry::Instance().Register(
+            registration->sceneIndexPathPrefix, std::make_shared<UsdPickHandler>());
+        TF_VERIFY(registration->pickRegistration, "USD pick handler registration failed for %s.",
+            registration->sceneIndexPathPrefix.GetText());
+    }
     mayaUsdProxyShapeSceneIndex->Populate();
 
     // This sets the required prefix just downstream (after) the
