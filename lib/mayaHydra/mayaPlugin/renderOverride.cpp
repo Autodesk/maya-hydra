@@ -37,6 +37,8 @@
 
 #ifdef MAYAHYDRA_HAS_QT
 #include "hoverEventFilter.h"
+
+#include <QGuiApplication>
 #endif
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
@@ -243,6 +245,18 @@ namespace {
 // extra speed loss should be fine, and I'd rather be safe.
 std::mutex                       _allInstancesMutex;
 std::vector<MtohRenderOverride*> _allInstances;
+
+// Whether the user is dragging: moving a manipulator, moving the camera or scrubbing the
+// time slider. MFrameContext::inUserInteraction() cannot tell, as it is also true for a
+// refresh from a script.
+bool _UserIsDragging()
+{
+#ifdef MAYAHYDRA_HAS_QT
+    return QGuiApplication::mouseButtons() != Qt::NoButton;
+#else
+    return MHWRender::MFrameContext::userChangingViewContext();
+#endif
+}
 
 //! \brief  Replaces the Hydra selection with the UFE selection, minus the Maya nodes outside the
 //!         DAG (materials, sets, render globals).
@@ -1365,6 +1379,14 @@ MStatus MtohRenderOverride::Render(
         return orderedPassIndices;
     };
 
+    const std::string writeFileName = Fvp::ImageBufferWriter::GetFileName();
+    auto              writeRequestedFile = [&]() {
+        if (!writeFileName.empty()
+            && !Fvp::ImageBufferWriter::Write(_fileWriterArgs, writeFileName)) {
+            TF_RUNTIME_ERROR("Failed to write image to %s", writeFileName.c_str());
+        }
+    };
+
     auto renderFrame = [&](bool markTime = false) {
         MH_PROFILE_SCOPE("MtohRenderOverride::Render renderFrame lambda");
 
@@ -1381,75 +1403,8 @@ MStatus MtohRenderOverride::Render(
             _ReleaseRenderThreadCapture();
         }
 
-        const auto fileName = Fvp::ImageBufferWriter::GetFileName();
-        if (!fileName.empty()) {
-            if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
-                TF_RUNTIME_ERROR("Failed to write image to %s",
-                                 fileName.c_str());
-            }
-        }
-
-        // Check convergence from the tasks first
-        _isConverged = true;
-        for (int passIndex : orderedPassIndices) {
-            const hvt::FramePassPtr& currentPass = _GetFramePass(passIndex);
-            if (!currentPass) {
-                continue;
-            }
-
-            if (!currentPass->IsConverged()) {
-                _isConverged = false;
-                break;
-            }
-        }
-
-        if (!_isConverged) {
-            // Check with AOVs as a second step, as some renderers may not properly set convergence
-            // on the tasks
-            // Check if all AOVs are converged for each visible pass.
-            // Get the AOVs and check each render buffer's IsConverged().
-            // Note: For Arnold, _taskController->IsConverged() always returns false; we must check
-            // each AOV buffer directly.
-            auto isConverged = [this, &orderedPassIndices]() {
-                for (int i : orderedPassIndices) {
-                    const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-                    if (!currentPass) {
-                        continue;
-                    }
-
-                    const auto* bufferManager = currentPass->GetRenderBufferManager().get();
-                    if (!bufferManager) {
-                        return false;
-                    }
-
-                    TfTokenVector renderOutputs = bufferManager->GetRenderOutputs();
-                    if (renderOutputs.empty()) {
-                        renderOutputs = GetAvailableFramePassAovs(i);
-                    }
-                    if (renderOutputs.empty()) {
-                        TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
-                            .Msg("RenderOutputs list is empty; assuming not converged.\n");
-                        return false;
-                    }
-
-                    for (const TfToken& aovToken : renderOutputs) {
-                        HdRenderBuffer* buffer = currentPass->GetRenderBuffer(aovToken);
-                        if (!buffer) {
-                            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
-                                .Msg("Render output '%s' not found; assuming not converged.\n",
-                                     aovToken.GetText());
-                            return false;
-                        }
-                        if (!buffer->IsConverged()) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            };
-
-            _isConverged = isConverged();
-        }
+        writeRequestedFile();
+        _UpdateConvergence(orderedPassIndices);
 
         if (markTime) {
             std::lock_guard<std::mutex> lock(_lastRenderTimeMutex);
@@ -1488,6 +1443,9 @@ MStatus MtohRenderOverride::Render(
         _renderThread->WaitForIdle();
         // Applies what changed upstream while the last frame was rendering.
         _ReleaseRenderThreadCapture();
+        if (!_renderThreadPassIndices.empty()) {
+            _UpdateConvergence(_renderThreadPassIndices);
+        }
     }
 
     const bool timeChangedWhileStopped
@@ -1976,9 +1934,14 @@ MStatus MtohRenderOverride::Render(
 #endif
             // Last, so the copy includes everything the push and pass preparation did.
             _HoldRenderThreadCapture(true);
+            _renderThreadPassIndices = request.passIndices;
             _renderThread->SubmitRequest(std::move(request));
             submittedToRenderThread = true;
             _firstFramePrimed = true;
+            {
+                std::lock_guard<std::mutex> lock(_lastRenderTimeMutex);
+                _lastRenderTime = std::chrono::system_clock::now();
+            }
         } else {
             renderFrame(true);
             MAYAHYDRA_NS_DEF::RenderThreadStats::instance().RecordFrameRenderedSynchronously();
@@ -2007,16 +1970,19 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
-    // Maya follows a time change outside playback (the start and end frame buttons, a
-    // single time slider step) with exactly one redraw. Compositing the previous
-    // frame's image here would leave the viewport a frame behind with nothing to
-    // correct it, so this render op composites its own frame once it completes. So
-    // does a first frame drawn on the render thread, which has nothing earlier to
-    // composite. Maya's framebuffer and viewport are captured now, while they are
-    // still bound.
+    // Compositing the previous frame's image is only right while more frames follow:
+    // during playback and while the user drags in the viewport. Any other redraw, such
+    // as a refresh from a script, a playblast, a viewport capture or a time change
+    // outside playback, may be the last one, and showing the previous frame would leave
+    // the viewport, or the image taken from it, a frame behind. Such a render op
+    // composites its own frame once it completes. So does a first frame drawn on the
+    // render thread, which has nothing earlier to composite. Maya's framebuffer and
+    // viewport are captured now, while they are still bound.
+    const bool moreFramesFollow = MAnimControl::isPlaying() || _UserIsDragging();
     const bool primingOnRenderThread = !_firstFramePrimed && _RenderThreadDrawsAll();
     const bool compositeOwnFrame
-        = (timeChangedWhileStopped || panelChanged || primingOnRenderThread)
+        = (!moreFramesFollow || !writeFileName.empty() || timeChangedWhileStopped || panelChanged
+           || primingOnRenderThread)
         && _renderThreadStarted;
     GLint      mayaFramebuffer = 0;
     GLint      mayaViewport[4] = { 0, 0, 0, 0 };
@@ -2203,12 +2169,22 @@ MStatus MtohRenderOverride::Render(
     } else {
         submitOrDrawFrame();
     }
-
     if (compositeOwnFrame && submittedToRenderThread && _renderThread && _presentBridge) {
         // Composited even if the wait gives up: the previous frame is better than the
         // cleared framebuffer Maya would otherwise show. After a change of panel the
-        // handoff was cleared, so it never holds another panel's frame.
-        _renderThread->WaitForQuiescence();
+        // handoff was cleared, so it never holds another panel's frame. Releasing the
+        // capture lets queries made after this redraw see the scene it drew.
+        if (_renderThread->WaitForQuiescence()) {
+            _ReleaseRenderThreadCapture();
+            if (!_renderThreadPassIndices.empty()) {
+                _UpdateConvergence(_renderThreadPassIndices);
+            }
+            if (_RenderThreadDrawsAll()) {
+                _renderThread->RunOnRenderThread(writeRequestedFile);
+            } else {
+                writeRequestedFile();
+            }
+        }
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(mayaFramebuffer));
         glViewport(mayaViewport[0], mayaViewport[1], mayaViewport[2], mayaViewport[3]);
         const VtValue dstFramebuffer;
@@ -4506,6 +4482,71 @@ void MtohRenderOverride::_ReleaseRenderThreadCapture()
     }
 }
 
+void MtohRenderOverride::_UpdateConvergence(const std::vector<int>& orderedPassIndices)
+{
+    // Check convergence from the tasks first
+    _isConverged = true;
+    for (int passIndex : orderedPassIndices) {
+        const hvt::FramePassPtr& currentPass = _GetFramePass(passIndex);
+        if (!currentPass) {
+            continue;
+        }
+
+        if (!currentPass->IsConverged()) {
+            _isConverged = false;
+            break;
+        }
+    }
+
+    if (!_isConverged) {
+        // Check with AOVs as a second step, as some renderers may not properly set convergence
+        // on the tasks
+        // Check if all AOVs are converged for each visible pass.
+        // Get the AOVs and check each render buffer's IsConverged().
+        // Note: For Arnold, _taskController->IsConverged() always returns false; we must check
+        // each AOV buffer directly.
+        auto isConverged = [this, &orderedPassIndices]() {
+            for (int i : orderedPassIndices) {
+                const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+                if (!currentPass) {
+                    continue;
+                }
+
+                const auto* bufferManager = currentPass->GetRenderBufferManager().get();
+                if (!bufferManager) {
+                    return false;
+                }
+
+                TfTokenVector renderOutputs = bufferManager->GetRenderOutputs();
+                if (renderOutputs.empty()) {
+                    renderOutputs = GetAvailableFramePassAovs(i);
+                }
+                if (renderOutputs.empty()) {
+                    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
+                        .Msg("RenderOutputs list is empty; assuming not converged.\n");
+                    return false;
+                }
+
+                for (const TfToken& aovToken : renderOutputs) {
+                    HdRenderBuffer* buffer = currentPass->GetRenderBuffer(aovToken);
+                    if (!buffer) {
+                        TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
+                            .Msg("Render output '%s' not found; assuming not converged.\n",
+                                 aovToken.GetText());
+                        return false;
+                    }
+                    if (!buffer->IsConverged()) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        _isConverged = isConverged();
+    }
+}
+
 bool MtohRenderOverride::_RenderThreadDrawsAll() const
 {
     return _renderThreadStarted && _renderThread && _hgi
@@ -4599,6 +4640,7 @@ int MtohRenderOverride::_GetNumVisibleFramePasses() const
 void MtohRenderOverride::_ClearFramePassesData()
 {
     _framePassesData.clear();
+    _renderThreadPassIndices.clear();
 }
 
 void MtohRenderOverride::_CreateFramePass(

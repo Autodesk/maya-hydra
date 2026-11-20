@@ -546,6 +546,10 @@ private:
     /// Whether this frame goes to the render thread rather than being drawn here.
     bool _SubmitsToRenderThread() const;
 
+    /// Sets _isConverged from the passes \p orderedPassIndices last drew. Reads their
+    /// tasks and render buffers, so the render thread must be idle.
+    void _UpdateConvergence(const std::vector<int>& orderedPassIndices);
+
     /// Runs \p pick on the render thread when _RenderThreadDrawsAll(), holding
     /// the capture around it as for a frame, and here otherwise.
     void _RunPick(const std::function<void()>& pick);
@@ -671,6 +675,8 @@ private:
     bool _firstFramePrimed = false;
     // The panel the render thread's frames are drawn for.
     std::string _renderThreadPanel;
+    // The passes of the last frame submitted to the render thread.
+    std::vector<int> _renderThreadPassIndices;
     uint64_t    _renderThreadFrameId = 0;
 
     // Set by Maya's time-change callback, so a scrub composites its own frame.

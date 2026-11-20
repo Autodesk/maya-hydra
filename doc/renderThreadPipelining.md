@@ -284,19 +284,30 @@ panel than the last one discards the handoff and composites its own frame, as
 below.  With several Hydra panels visible, every render op does this, so they
 do not overlap.
 
-**A time change while stopped composites its own frame.**  Jumping to the
-start or end frame, or stepping the time slider, is followed by exactly one
-redraw, so compositing the previous frame's image would leave the viewport a
-frame behind with nothing to correct it.  When the render override applies a
-time change while Maya is not playing, that render op skips the usual
-composite, submits its frame, waits for it (`WaitForQuiescence`) and composites
-it into Maya's framebuffer, captured at the start of the op.  Such frames do
-not overlap, which costs the same as the flag-off path.  Requesting a
-catch-up redraw instead does not work reliably, because nothing guarantees
+**Overlap runs only while more frames follow.**  That is during playback and
+while the user drags with a mouse button held: moving a manipulator, moving
+the camera or scrubbing the time slider.  `MFrameContext::inUserInteraction()`
+cannot tell, as it is also true for a refresh from a script, so the button
+state comes from Qt (`QGuiApplication::mouseButtons()`); a build without Qt
+counts only camera moves (`MFrameContext::userChangingViewContext()`).  Any
+other redraw may be the last one: a refresh from a script, a playblast, a
+viewport capture, a time change while stopped, or an image the image buffer
+writer was asked to write.  Compositing the previous frame's image would leave
+the viewport, or the image taken from it, a frame behind with nothing to
+correct it.  Such a render op skips the usual composite, submits its frame,
+waits for it (`WaitForQuiescence`) and composites it into Maya's framebuffer,
+captured at the start of the op.  It then releases the capture, so a query
+made after the redraw sees the scene it drew, updates the convergence state
+and writes the requested image, on the render thread under OpenGL.  Such
+frames do not overlap, which costs the same as the flag-off path.  Requesting
+a catch-up redraw instead does not work reliably, because nothing guarantees
 Maya runs it promptly.  The `ownFramesComposited` counter records these
 frames.  Such a render op composites only its own frame: the composite is
 depth-tested and blended over Maya's framebuffer, so compositing the previous
 frame as well would show the animation at both its old and new positions.
+
+Frames that do overlap report convergence when the next render op finds the
+render thread idle.
 
 ## Enabling it
 
@@ -375,7 +386,10 @@ stops happening.
   delegate's own scene indices after phase 5000, and anything a delegate reads
   outside the scene index, are not covered.
 - Upstream containers must list every name they serve.  An unlisted name is
-  dropped from the copy without any warning.
+  dropped from the copy, with a warning for the names of the schemas the
+  capture probes.  Light params are kept: UsdImaging lists few of those it
+  serves, for `GetLightParamValue`, so the copy also takes every
+  `HdLightTokens` member a light container serves.
 - A typed sampled data source must answer `GetValue` with a value of its type.
   An empty value is copied untyped, and a typed read of the copy returns null.
 - A producer must update its state before sending the notice for it.  A prim
@@ -392,6 +406,5 @@ stops happening.
   the nearest captured sample.
 - Composited overlays sort against the scene as of the last completed frame,
   which is one frame behind the main thread's current state.
-- Time changes outside playback and changes of panel composite their own
-  frame; other single-redraw changes (for example a scripted attribute edit
-  with no further redraw) still show the previous frame until the next redraw.
+- A drag that ends without a further redraw, such as a manipulator released
+  without moving, leaves the previous frame on screen until the next redraw.
