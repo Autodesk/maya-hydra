@@ -2905,6 +2905,12 @@ void MtohRenderOverride::_InitHydraResources(
                             // and this thread's context does not share Maya's state.
                             MayaHydraSetRenderGLState state;
 #endif
+                            // A pass drawing into another pass's AOVs has Storm's OIT
+                            // resolve size its buffers from the GL viewport. Maya's
+                            // context has it at the target size; this context's is its
+                            // hidden window's, which leaves those buffers empty.
+                            glViewport(request.dstRegion[0], request.dstRegion[1],
+                                request.dstRegion[2], request.dstRegion[3]);
                             _DrawPasses(request.passIndices);
                         } else {
                             _DrawPasses(request.passIndices);

@@ -91,7 +91,10 @@ depth-compose against the composited scene.
 
 Under an OpenGL Hgi the render thread applies the same GL state around Storm's
 passes as the main thread does (`MayaHydraSetRenderGLState`), since its context
-does not inherit Maya's.
+does not inherit Maya's. It also sets the GL viewport to the frame size: the
+secondary graphics pass draws into the main pass's AOVs, which its render index
+does not hold, so Storm's OIT resolve sizes its buffers from the viewport, and
+without this translucent secondary graphics (face selection) would not draw.
 
 ## Shared vertex buffers
 
