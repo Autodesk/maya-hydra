@@ -268,7 +268,18 @@ frame as well would show the animation at both its old and new positions.
 ## Enabling it
 
 Pipelining is gated behind the `MAYAHYDRA_PIPELINE_OVERLAP` environment
-variable and is off by default.  It is read once per process.
+variable and is off by default.  It is read once per process.  Its default
+comes from `MAYAHYDRA_PIPELINE_OVERLAP_DEFAULT` in `envSettings.cpp`, which
+tests USD for `HGIINTEROP_HAS_PREPARE_TRANSFER`, so that it can be turned on
+for a USD that supports it without being turned on for an older one.  It is
+off for both for now.
+
+Under Vulkan (USD's `HGI_ENABLE_VULKAN`) the thread starts only if USD
+defines `HGIVULKAN_HAS_THREADED_SUBMISSION`, meaning HgiVulkan takes
+submissions from several threads, as well as `HGIINTEROP_HAS_PREPARE_TRANSFER`
+(`CanRunVulkanRenderThread()`); otherwise MayaHydra warns and renders
+synchronously.  Under Metal it needs `HGIINTEROP_HAS_METAL_PREPARE_TRANSFER`
+(`CanPrepareMetalFrames()`).
 
 Every overlap-sensitive site is guarded on the flag being set *and* the thread
 having actually started, so a failed startup degrades to the original

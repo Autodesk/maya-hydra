@@ -2817,8 +2817,14 @@ void MtohRenderOverride::_InitHydraResources(
             const bool    isVulkan = hgiApi == HgiTokens->Vulkan;
             const bool    isMetal = hgiApi == HgiTokens->Metal;
             std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadContext> context;
-            bool contextReady = isVulkan;
-            if (isMetal) {
+            bool contextReady = false;
+            if (isVulkan) {
+                contextReady = MAYAHYDRA_NS_DEF::CanRunVulkanRenderThread();
+                if (!contextReady) {
+                    TF_WARN("MayaHydra: this USD's HgiVulkan cannot take submissions from "
+                            "a render thread. Falling back to synchronous rendering.");
+                }
+            } else if (isMetal) {
                 // Without the interop's Metal copy every frame would be dropped, and
                 // HgiMetal, which is not thread-safe, would be driven from both threads.
                 contextReady = MAYAHYDRA_NS_DEF::CanPrepareMetalFrames();

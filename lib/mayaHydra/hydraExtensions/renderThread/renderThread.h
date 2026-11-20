@@ -293,6 +293,11 @@ private:
     RenderThreadHandoff            _handoff;
 };
 
+/// Whether this USD lets a render thread drive HgiVulkan: its Vulkan backend
+/// must accept submissions from several threads, and HgiInterop must prepare
+/// frames on the render thread for the main thread to composite.
+MAYAHYDRALIB_API bool CanRunVulkanRenderThread();
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRA_RENDER_THREAD_H

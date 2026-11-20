@@ -953,4 +953,14 @@ RenderThread::WaitForQuiescence()
     return true;
 }
 
+bool CanRunVulkanRenderThread()
+{
+#if defined(USD_HAS_HGI_VULKAN) && defined(HGIVULKAN_HAS_THREADED_SUBMISSION) \
+    && defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+    return true;
+#else
+    return false;
+#endif
+}
+
 } // namespace MAYAHYDRA_NS_DEF
