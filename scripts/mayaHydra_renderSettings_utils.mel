@@ -75,6 +75,12 @@ global proc mayaHydraSetRenderCamera(string $cameraPath)
     python("import mayaHydra.renderSettings.camera as mhCamera; mhCamera.setCamera(" + "\"" + $cameraPath + "\")");
 }
 
+global proc mayaHydraSetActiveRenderDescription(string $ufePath)
+{
+    // MayaUSD detects support for the -activeRenderDescription flag by this proc name.
+    python("import mayaHydra.renderSettings.activeRenderDescription as mhActiveRenderDescription; mhActiveRenderDescription.setActiveRenderDescription(" + "\"" + $ufePath + "\")");
+}
+
 global proc mayaHydraSceneDump(string $hydraSceneDumpPath)
 {
     // Use Python raw string to support Windows path backslashes.
