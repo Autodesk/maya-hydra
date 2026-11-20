@@ -218,6 +218,14 @@ const TfTokenVector& _NamesForType(const TfToken& type)
         HdVisibilitySchemaTokens->visibility, MayaHydraAdapterTokens->mayaNode,
         HdPurposeSchemaTokens->purpose,
     };
+#if PXR_VERSION >= 2605
+    static const TfTokenVector particleField = {
+        HdPrimvarsSchemaTokens->primvars,
+        HdVisibilitySchemaTokens->visibility,
+        HdXformSchemaTokens->xform,
+        HdPurposeSchemaTokens->purpose,
+    };
+#endif
     static const TfTokenVector other = { HdPrimvarsSchemaTokens->primvars };
 
     if (type == HdPrimTypeTokens->mesh) {
@@ -231,6 +239,12 @@ const TfTokenVector& _NamesForType(const TfToken& type)
     if (HdPrimTypeIsGprim(type)) {
         return gprim;
     }
+#if PXR_VERSION >= 2605
+    // Not a gprim to HdPrimTypeIsGprim(), but drawn like one.
+    if (type == HdPrimTypeTokens->particleField) {
+        return particleField;
+    }
+#endif
     if (HdPrimTypeIsLight(type)) {
         return light;
     }

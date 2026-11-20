@@ -143,6 +143,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testLegacyHighlightPassRouting.py
     cpp/testDeferredHighlightWireInit.py
     cpp/testRenderItemDirtyLocators.py
+    cpp/testUnloadedPayloadBounds.py
 )
 
 # These two test files are identical, except for disabled tests.  See

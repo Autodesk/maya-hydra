@@ -90,7 +90,20 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
 
 bool PassFilteringSceneIndex::_IsFilteredOut(const PXR_NS::SdfPath& primPath) const
 {
-    return _filteredPrims.find(primPath) != _filteredPrims.end();
+    const auto it = _filteredPrims.find(primPath);
+    return it != _filteredPrims.end() && it->second;
+}
+
+void PassFilteringSceneIndex::_SetFilteredOut(const SdfPath& primPath, bool filteredOut)
+{
+    if (filteredOut) {
+        _filteredPrims[primPath] = true;
+        return;
+    }
+    const auto it = _filteredPrims.find(primPath);
+    if (it != _filteredPrims.end()) {
+        it->second = false;
+    }
 }
 
 bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) const
@@ -185,10 +198,10 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFiltering
     bool shouldBeFilteredOut = _ShouldBeFilteredOut(primPath);
 
     if (!isFilteredOut && shouldBeFilteredOut) {
-        _filteredPrims.insert(primPath);
+        _SetFilteredOut(primPath, true);
         updatedPrims.emplace_back(primPath, TfToken());
     } else if (isFilteredOut && !shouldBeFilteredOut) {
-        _filteredPrims.erase(primPath);
+        _SetFilteredOut(primPath, false);
         updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
     } else if (!isFilteredOut && !shouldBeFilteredOut && resync) {
         updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
@@ -214,7 +227,7 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveMaterialE
             _materialUseCounts.erase(materialPath);
             // If no one's using the material and we should filter it out, do so.
             if (_ShouldBeFilteredOut(materialPath)) {
-                _filteredPrims.insert(materialPath);
+                _SetFilteredOut(materialPath, true);
                 return {{materialPath, TfToken()}};
             }
         }
@@ -262,7 +275,7 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateMaterialE
         if (_materialUseCounts[materialPath] == 1) {
             // If the material was previously filtered out, unfilter it
             if (_IsFilteredOut(materialPath)) {
-                _filteredPrims.erase(materialPath);
+                _SetFilteredOut(materialPath, false);
                 updatedPrims.emplace_back(materialPath, HdPrimTypeTokens->material);
             }
         }
@@ -325,33 +338,30 @@ void PassFilteringSceneIndex::_PrimsRemoved(
     // 1. Update the scene filtering
     HdSceneIndexObserver::AddedPrimEntries updatedEntries;
 
+    // Each removed entry only visits its own subtree in our containers, so the
+    // cost is proportional to the removed prims rather than to the scene size.
     for (const auto& removedEntry : entries) {
-        // Remove the prim and its children from our filtered prims data 
-        for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
-            if ((*it).HasPrefix(removedEntry.primPath)) {
-                _filteredPrims.erase(it++); // safe for TfHashSet
-            } else {
-                it++;
-            }
+        const SdfPath& removedPath = removedEntry.primPath;
+
+        // Remove material entries on the prim and its children. This is done before
+        // erasing from _filteredPrims, as _RemoveMaterialEntry can filter out materials.
+        for (auto it = _primsToMaterialPaths.lower_bound(removedPath);
+             it != _primsToMaterialPaths.end() && it->first.HasPrefix(removedPath);) {
+            // _RemoveMaterialEntry erases the current element, so advance first.
+            const SdfPath primPath = (it++)->first;
+            auto materialUpdates = _RemoveMaterialEntry(primPath);
+            updatedEntries.insert(updatedEntries.end(), materialUpdates.begin(), materialUpdates.end());
         }
 
-        // Remove material entries on the prim and its children
-        auto _primsToMaterialPathsCopy = _primsToMaterialPaths;
-        for (const auto& [primPath, materialPath] : _primsToMaterialPathsCopy) {
-            if (primPath.HasPrefix(removedEntry.primPath)) {
-                auto materialUpdates = _RemoveMaterialEntry(primPath);
-                updatedEntries.insert(updatedEntries.end(), materialUpdates.begin(), materialUpdates.end());
-            }
+        // Remove the prim and its children from our filtered prims data
+        if (removedPath.IsAbsoluteRootPath()) {
+            _filteredPrims.clear();
+        } else {
+            _filteredPrims.erase(removedPath);
         }
 
         // Remove generative procedural entries on the prim and its children
-        for (auto it = _generativeProceduralPaths.begin(); it != _generativeProceduralPaths.end();) {
-            if ((*it).HasPrefix(removedEntry.primPath)) {
-                it = _generativeProceduralPaths.erase(it);
-            } else {
-                ++it;
-            }
-        }
+        EraseSelfAndDescendants(removedPath, _generativeProceduralPaths);
     }
     if (!updatedEntries.empty()) {
         _SendPrimsAdded(updatedEntries);

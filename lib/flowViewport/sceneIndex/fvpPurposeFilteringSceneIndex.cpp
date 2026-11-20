@@ -109,13 +109,7 @@ void PurposeFilteringSceneIndex::_UpdateFilteringStatus(const PXR_NS::SdfPath& p
 
     if (_FilterOut(primPath)) {
         // Remove child paths so only root filtered prims are kept. When one is unfiltered, we recheck its children anyways
-        for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
-            if ((*it).HasPrefix(primPath)) {
-                it = _filteredPrims.erase(it);
-            } else {
-                ++it;
-            }
-        }
+        EraseSelfAndDescendants(primPath, _filteredPrims);
         _filteredPrims.insert(primPath);
     } else {
         _filteredPrims.erase(primPath);
@@ -233,14 +227,7 @@ void PurposeFilteringSceneIndex::_PrimsRemoved(
         if (!_IsAncestorFilteredOutInclusive(removedEntry.primPath)) {
             removedEntries.emplace_back(removedEntry);
         } else {
-            _filteredPrims.erase(removedEntry.primPath);
-            for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
-                if ((*it).HasPrefix(removedEntry.primPath)) {
-                    it = _filteredPrims.erase(it);
-                } else {
-                    ++it;
-                }
-            }
+            EraseSelfAndDescendants(removedEntry.primPath, _filteredPrims);
         }
     }
 

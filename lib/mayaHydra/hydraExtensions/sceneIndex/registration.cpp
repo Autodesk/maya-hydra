@@ -31,6 +31,14 @@
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
+#include <pxr/usdImaging/usdImaging/version.h>
+#if USD_IMAGING_API_VERSION >= 25
+#include <pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h>
+#elif USD_IMAGING_API_VERSION >= 24
+#include <pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h>
+#endif
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -67,6 +75,12 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
         auto proxyShapeSceneIndex
             = TfDynamic_cast<::MayaHydra::MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->UpdateTime();
+    }
+
+    bool MayHaveUnloadedPrims() const override {
+        auto proxyShapeSceneIndex
+            = TfDynamic_cast<::MayaHydra::MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
+        return proxyShapeSceneIndex->MayHaveUnloadedPrims();
     }
 
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -147,6 +161,21 @@ MayaHydraSceneIndexRegistry::GetRegistrations() const
     return _registrations;
 }
 
+bool MayaHydraSceneIndexRegistry::MayHaveUnloadedPrims(const SdfPath& primPath) const
+{
+    for (const auto& reg : _registrations) {
+        const SdfPath& prefix = reg.first;
+        if (primPath.HasPrefix(prefix)) {
+            return reg.second->MayHaveUnloadedPrims();
+        }
+        // Ancestors of the scene index have its prims as descendants.
+        if (prefix.HasPrefix(primPath) && reg.second->MayHaveUnloadedPrims()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
 {
     MDGMessage::removeCallbacks(_DGCallbackIds);
@@ -219,10 +248,39 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     createInfo.overridesSceneIndexCallback = [](HdSceneIndexBaseRefPtr const& inputSi) {
         return MayaHydra::MhExternalCameraOverrideSceneIndex::New(inputSi);
     };
+    // Report unloaded prims, with their loading status, so that Fvp::UnloadedPayloadBoundsSceneIndex
+    // can draw unloaded payloads as bounding boxes. Batch renders do not draw them, so don't need
+    // them. UsdImaging's built-in displayUnloadedPrimsWithBounds is not used, see
+    // fvpUnloadedPayloadBoundsSceneIndex.h as to why.
+    if (_interactive) {
+#if USD_IMAGING_API_VERSION >= 24
+        // The stage scene index reads its arguments from under the schema's token.
+#if USD_IMAGING_API_VERSION >= 25
+        using CreateArgsSchema = UsdImagingSceneIndexCreateArgsSchema;
+        const TfToken& includeUnloadedPrims
+            = UsdImagingSceneIndexCreateArgsSchemaTokens->includeUnloadedPrims;
+#else
+        using CreateArgsSchema = UsdImagingUsdSceneIndexInputArgsSchema;
+        const TfToken& includeUnloadedPrims
+            = UsdImagingUsdSceneIndexInputArgsSchemaTokens->includeUnloadedPrims;
+#endif
+        static const HdContainerDataSourceHandle stageSceneIndexInputArgs
+            = HdRetainedContainerDataSource::New(
+                CreateArgsSchema::GetSchemaToken(),
+                HdRetainedContainerDataSource::New(
+                    includeUnloadedPrims, HdRetainedTypedSampledDataSource<bool>::New(true)));
+#else
+        static const HdContainerDataSourceHandle stageSceneIndexInputArgs
+            = HdRetainedContainerDataSource::New(
+                UsdImagingStageSceneIndexTokens->includeUnloadedPrims,
+                HdRetainedTypedSampledDataSource<bool>::New(true));
+#endif
+        createInfo.stageSceneIndexInputArgs = stageSceneIndexInputArgs;
+    }
 
     auto stage = proxyStage.getUsdStage();
     // Check whether the pseudo-root has children
-    if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+    if (MayaUsdProxyShapeSceneIndexBase::HasRootPrims(stage)) {
         createInfo.stage = stage;//Add the stage to the creation parameters
     }
             
@@ -277,15 +335,17 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);
     dataProducerSceneIndexData->SetDataProducerLastSceneIndexChain(registration->rootSceneIndex);
 
+    // Add the registration record before adding the scene index to the views, as the prims added
+    // to the views query the registry, e.g. Fvp::UnloadedPayloadBoundsSceneIndex calls
+    // MayHaveUnloadedPrims(), which would otherwise not find this stage on its initial load.
+    _registrations.insert({ registration->sceneIndexPathPrefix, registration });
+    _registrationsByObjectHandle.insert({ registration->dagNode, registration });
+
     //Add this chain scene index to the render index proxy from all views
     const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSceneIndexData);
     if (false == bRes){
         TF_CODING_ERROR("Fvp::DataProducerSceneIndexInterfaceImp::get().addDataProducerSceneIndex returned false !");
     }
-
-    // Add registration record if everything succeeded
-    _registrations.insert({ registration->sceneIndexPathPrefix, registration });
-    _registrationsByObjectHandle.insert({ registration->dagNode, registration });
 }
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeAddedCallback(MObject& dagNode, void* clientData)

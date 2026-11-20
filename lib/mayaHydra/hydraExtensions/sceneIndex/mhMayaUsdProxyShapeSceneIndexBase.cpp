@@ -255,6 +255,8 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
     }
 
     _usdImagingStageSceneIndex->SetStage(nullptr);
+    _stage = nullptr;
+    _InvalidateMayHaveUnloadedPrims();
     _populated = false;
     // Simply mark populate as dirty and do not call
     // Populate();
@@ -291,15 +293,41 @@ void MayaUsdProxyShapeSceneIndexBase::Populate()
     if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
         // Check whether the pseudo-root has children
-        if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+        if (HasRootPrims(stage)) {
             ++_nbPopulateCalls;
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
+            // Set _stage before calling SetStage(), as the latter's PrimsAdded handlers call MayHaveUnloadedPrims().
+            _stage = stage;
+            _InvalidateMayHaveUnloadedPrims();
             _usdImagingStageSceneIndex->SetStage(stage);
             // Set the initial time
             UpdateTime();
             _populated = true;
         }
     }
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::HasRootPrims(const UsdStageRefPtr& stage)
+{
+    // Unlike GetChildren(), which uses UsdPrimDefaultPredicate, don't skip unloaded prims.
+    return stage
+        && !stage->GetPseudoRoot()
+                .GetFilteredChildren(UsdPrimIsActive && UsdPrimIsDefined && !UsdPrimIsAbstract)
+                .empty();
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::MayHaveUnloadedPrims() const
+{
+    // UsdPrim::IsLoaded follows the load rules, so a stage whose rules load the pseudo-root with
+    // all its descendants has no unloaded prims.
+    if (!_stage) {
+        return false;
+    }
+    if (!_mayHaveUnloadedPrimsCache.has_value()) {
+        _mayHaveUnloadedPrimsCache
+            = !_stage->GetLoadRules().IsLoadedWithAllDescendants(SdfPath::AbsoluteRootPath());
+    }
+    return _mayHaveUnloadedPrimsCache.value();
 }
 
 Ufe::Path MayaUsdProxyShapeSceneIndexBase::InterpretRprimPath(

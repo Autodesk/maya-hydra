@@ -69,6 +69,7 @@
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPurposeFilteringSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpUnloadedPayloadBoundsSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -454,6 +455,10 @@ private:
     // too. Kept sorted for std::set_symmetric_difference.
     PXR_NS::SdfPathVector                 _previouslySelectedPaths;
 
+    // Lead object paths at the last unloaded payload box color invalidation, so the boxes of the
+    // previous lead are dirtied too.
+    PXR_NS::SdfPathVector                 _previousLeadPaths;
+
     // A color preference changed: rebuild and push the OutlineManager style.
     std::atomic<bool>                     _outlineStyleDirty = { true };
 
@@ -565,6 +570,7 @@ private:
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
     Fvp::ReprSelectorSceneIndexRefPtr         _reprSelectorSceneIndex;
     Fvp::BboxSceneIndexRefPtr                 _bboxSceneIndex;
+    Fvp::UnloadedPayloadBoundsSceneIndexRefPtr _unloadedPayloadBoundsSceneIndex;
     Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

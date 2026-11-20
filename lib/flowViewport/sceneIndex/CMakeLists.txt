@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
     fvpPruneTexturesSceneIndex.cpp
     fvpPruningSceneIndex.cpp
     fvpBBoxSceneIndex.cpp
+    fvpBoundsCurvesDataSource.cpp
     fvpReprSelectorSceneIndex.cpp
     fvpBlockPrimRemovalPropagationSceneIndex.cpp
     fvpDefaultMaterialSceneIndex.cpp
@@ -20,6 +21,7 @@ target_sources(${TARGET_NAME}
     fvpDataProducerMergingSceneIndexProxy.cpp
     fvpPrimRemovalEnforcingSceneIndex.cpp
     fvpRenderingColorSpaceResolvingSceneIndex.cpp
+    fvpUnloadedPayloadBoundsSceneIndex.cpp
 )
 
 set(HEADERS
@@ -31,6 +33,7 @@ set(HEADERS
     fvpPruneTexturesSceneIndex.h
     fvpPruningSceneIndex.h
     fvpBBoxSceneIndex.h
+    fvpBoundsCurvesDataSource.h
     fvpReprSelectorSceneIndex.h
     fvpBlockPrimRemovalPropagationSceneIndex.h
     fvpDefaultMaterialSceneIndex.h
@@ -40,6 +43,7 @@ set(HEADERS
     fvpDataProducerMergingSceneIndexProxy.h
     fvpPrimRemovalEnforcingSceneIndex.h
     fvpRenderingColorSpaceResolvingSceneIndex.h
+    fvpUnloadedPayloadBoundsSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------
