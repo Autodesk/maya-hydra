@@ -740,10 +740,10 @@ int MtohRenderOverride::DrainAllRenderThreads()
             continue;
         }
         if (instance->_renderThread && instance->_renderThread->IsRunning()) {
-            if (instance->_renderThread->WaitForQuiescence()) {
-                instance->_ReleaseRenderThreadCapture();
-                instance->_SetDeferCallbackRemovals(false);
-            }
+            // False only when the GPU work overran its budget; the render thread is idle.
+            instance->_renderThread->WaitForQuiescence();
+            instance->_ReleaseRenderThreadCapture();
+            instance->_SetDeferCallbackRemovals(false);
             ++drained;
         }
     }
@@ -2178,21 +2178,21 @@ MStatus MtohRenderOverride::Render(
         submitOrDrawFrame();
     }
     if (compositeOwnFrame && submittedToRenderThread && _renderThread && _presentBridge) {
-        // Composited even if the wait gives up: the previous frame is better than the
-        // cleared framebuffer Maya would otherwise show. After a change of panel the
-        // handoff was cleared, so it never holds another panel's frame. Releasing the
-        // capture lets queries made after this redraw see the scene it drew.
-        if (_renderThread->WaitForQuiescence()) {
-            _ReleaseRenderThreadCapture();
-            _SetDeferCallbackRemovals(false);
-            if (!_renderThreadPassIndices.empty()) {
-                _UpdateConvergence(_renderThreadPassIndices);
-            }
-            if (_RenderThreadDrawsAll()) {
-                _renderThread->RunOnRenderThread(writeRequestedFile);
-            } else {
-                writeRequestedFile();
-            }
+        // The wait returns false only when the frame's GPU work overran its budget. The
+        // render thread is idle either way, so the rest still runs: the image write and the
+        // composite are ordered after that GPU work. After a change of panel the handoff was
+        // cleared, so it never holds another panel's frame. Releasing the capture lets
+        // queries made after this redraw see the scene it drew.
+        _renderThread->WaitForQuiescence();
+        _ReleaseRenderThreadCapture();
+        _SetDeferCallbackRemovals(false);
+        if (!_renderThreadPassIndices.empty()) {
+            _UpdateConvergence(_renderThreadPassIndices);
+        }
+        if (_RenderThreadDrawsAll()) {
+            _renderThread->RunOnRenderThread(writeRequestedFile);
+        } else {
+            writeRequestedFile();
         }
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(mayaFramebuffer));
         glViewport(mayaViewport[0], mayaViewport[1], mayaViewport[2], mayaViewport[3]);
