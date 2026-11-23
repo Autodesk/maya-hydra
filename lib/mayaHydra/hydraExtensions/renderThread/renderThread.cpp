@@ -153,8 +153,12 @@ RenderThread::Stop()
     }
 
     // Teardown order: stop accepting snapshots, join the thread, then free GPU
-    // resources on the owning context.
-    _stop.store(true, std::memory_order_release);
+    // resources on the owning context. Set under the lock the thread waits
+    // with, or the notify can land between its check and its sleep.
+    {
+        std::lock_guard<std::mutex> lock(_requestMutex);
+        _stop.store(true, std::memory_order_release);
+    }
     _requestCv.notify_all();
     _thread.join();
 
