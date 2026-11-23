@@ -1010,6 +1010,12 @@ std::mutex& RenderThreadCaptureSceneIndex::_CopyLock(const SdfPath& path) const
 
 void RenderThreadCaptureSceneIndex::_CopyPending()
 {
+    // A path can be listed twice: a lazy copy in GetPrim, or a remove and
+    // re-add, clears the entry's pending flag but leaves the path here, and
+    // the next dirty lists it again. Two tasks must not copy one entry.
+    std::sort(_pending.begin(), _pending.end());
+    _pending.erase(std::unique(_pending.begin(), _pending.end()), _pending.end());
+
     std::vector<std::pair<SdfPath, _Entry*>> work;
     work.reserve(_pending.size());
     for (const SdfPath& path : _pending) {
