@@ -1828,6 +1828,7 @@ MStatus MtohRenderOverride::Render(
             _renderThread->DiscardInFlight();
             _ReleaseRenderThreadCapture();
             _firstFramePrimed = false;
+            _compositeOwnFrameNext = true;
         }
     }
 
@@ -1976,13 +1977,15 @@ MStatus MtohRenderOverride::Render(
     // outside playback, may be the last one, and showing the previous frame would leave
     // the viewport, or the image taken from it, a frame behind. Such a render op
     // composites its own frame once it completes. So does a first frame drawn on the
-    // render thread, which has nothing earlier to composite. Maya's framebuffer and
-    // viewport are captured now, while they are still bound.
+    // render thread, or the first after a pick or a resize discarded the frame in flight:
+    // neither has anything earlier to composite. Maya's framebuffer and viewport are
+    // captured now, while they are still bound.
     const bool moreFramesFollow = MAnimControl::isPlaying() || _UserIsDragging();
     const bool primingOnRenderThread = !_firstFramePrimed && _RenderThreadDrawsAll();
+    const bool afterDiscard = std::exchange(_compositeOwnFrameNext, false);
     const bool compositeOwnFrame
         = (!moreFramesFollow || !writeFileName.empty() || timeChangedWhileStopped || panelChanged
-           || primingOnRenderThread)
+           || primingOnRenderThread || afterDiscard)
         && _renderThreadStarted;
     GLint      mayaFramebuffer = 0;
     GLint      mayaViewport[4] = { 0, 0, 0, 0 };
@@ -3646,6 +3649,8 @@ bool MtohRenderOverride::select(
     if (_renderThreadStarted && _renderThread) {
         _renderThread->DiscardInFlight();
         _ReleaseRenderThreadCapture();
+        _SetDeferCallbackRemovals(false);
+        _compositeOwnFrameNext = true;
     }
 
     MStatus status = MStatus::kFailure;

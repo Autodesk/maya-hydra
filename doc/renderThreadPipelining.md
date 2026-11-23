@@ -281,7 +281,9 @@ picking, where a frame rendered before the pick would otherwise be composited
 after it and show a pre-pick image; and when the render op is for a different
 panel or destination than the last frame was drawn for.  The discard waits,
 with no time limit, for any render still running.  After a resize the next
-frame is primed again.
+frame is primed again.  The discard leaves the handoff empty, so the render op
+after a pick or a resize composites its own frame, as below, even during
+playback or a drag: compositing the previous frame would show nothing.
 
 **A change of panel composites its own frame.**  One render override draws
 every Hydra panel, but the handoff holds a single frame, so a frame drawn for

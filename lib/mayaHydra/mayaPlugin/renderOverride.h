@@ -694,6 +694,9 @@ private:
     // behind, or under OpenGL, composited as its own frame; overlap starts once
     // this is true.
     bool _firstFramePrimed = false;
+    // Set when a pick or a resize discarded the frame in flight, leaving nothing to composite:
+    // the next render op composites its own frame instead.
+    bool _compositeOwnFrameNext = false;
     // The panel the render thread's frames are drawn for.
     std::string _renderThreadPanel;
     // The passes of the last frame submitted to the render thread.
