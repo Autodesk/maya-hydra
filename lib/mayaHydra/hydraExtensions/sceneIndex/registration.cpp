@@ -105,10 +105,15 @@ std::weak_ptr<const MayaHydraRenderDescriptionPathMapperRegistration>
 
 } // namespace
 
-// Every registry (one per render override, plus batch renders) adds its scene index chain for a
-// node to all views. Computing the prefix against one registry's scene would let the chains of
-// one node land at different prefixes, as the second registry finds the name taken by the first
-// one's chain. So the first registry reserves the prefix, and the others share it.
+// A Maya node is imaged under a chosen Hydra prefix, /MayaUsdProxyShape_PluginNode/<node name>,
+// with a numeric suffix if the name is taken. The node's path mapper and pick handler map the
+// Maya path to it.
+//
+// Each registry (one per render override, plus batch renders) builds its own data producer for
+// the node, and adds it to all views. If each registry picked the prefix itself, the second
+// would find the name taken by the first and pick another, so the node would be drawn twice.
+// So the first registry picks the prefix, the others share it, and the last one releases it.
+// The node's path mapper and pick handler registrations follow the same rule.
 struct MayaHydraNodePrefixReservation
 {
     MayaHydraNodePrefixReservation(const MObjectHandle& nodeIn, const SdfPath& prefixIn)
