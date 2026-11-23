@@ -1123,22 +1123,22 @@ SdfPath sceneIndexPathPrefix(
 }
 
 SdfPath sceneIndexPathPrefix(
-    const SdfPathVector& existingPrefixes,
+    const SdfPathVector& reservedPrefixes,
     MObject&             mayaNode
 )
 {
     MFnDependencyNode dependNodeFn(mayaNode);
     const auto pluginPath = sceneIndexPluginPath(dependNodeFn);
 
-    TfToken::HashSet existingNames;
-    for (const auto& prefix : existingPrefixes) {
+    TfToken::HashSet reservedNames;
+    for (const auto& prefix : reservedPrefixes) {
         if (prefix.GetParentPath() == pluginPath) {
-            existingNames.insert(prefix.GetNameToken());
+            reservedNames.insert(prefix.GetNameToken());
         }
     }
 
     return pluginPath.AppendChild(TfToken(
-        uniqueName(existingNames, SanitizeNameForSdfPath(dependNodeFn.name().asChar()))));
+        uniqueName(reservedNames, SanitizeNameForSdfPath(dependNodeFn.name().asChar()))));
 }
 
 // Read a color preference token into a GfVec4f.

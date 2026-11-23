@@ -257,11 +257,13 @@ PXR_NS::SdfPath sceneIndexPathPrefix(
     MObject&                              mayaNode
 );
 
-//! Same prefix as above, but unique among existingPrefixes rather than among
-//! the children of a scene index, so that it does not depend on any one scene.
+//! Same prefix as above, /<NodeType>_PluginNode/<node name>, but with a
+//! numerical suffix added only if the path is in reservedPrefixes. Use it when
+//! several scenes share a prefix: one of them may already hold this node's
+//! prims, which would make the name look taken.
 MAYAHYDRALIB_API
 PXR_NS::SdfPath sceneIndexPathPrefix(
-    const PXR_NS::SdfPathVector& existingPrefixes,
+    const PXR_NS::SdfPathVector& reservedPrefixes,
     MObject&                     mayaNode
 );
 
