@@ -645,6 +645,8 @@ void MtohRenderOverride::UpdateRenderGlobals(
                 continue;
             }
             if (auto* renderDelegate = instance->_GetRenderDelegate()) {
+                // The render thread reads the settings while it renders.
+                instance->_WaitForRenderThreadIdle();
                 instance->_globals.ApplySettings(
                     renderDelegate,
                     instance->_rendererDesc.rendererName,
@@ -695,6 +697,8 @@ void MtohRenderOverride::UpdateRenderGlobals(
             if (!purposeRenderTag.IsEmpty()) {
                 std::lock_guard<std::mutex> lock(_allInstancesMutex);
                 for (auto* instance : _allInstances) {
+                    // The render tags are task parameters the render thread reads.
+                    instance->_WaitForRenderThreadIdle();
                     Fvp::FramePassDataPtrVector& framePassDataArray
                         = instance->_framePassesData;
                     for (auto& framePassData : framePassDataArray) {
@@ -1441,15 +1445,7 @@ MStatus MtohRenderOverride::Render(
 
     // Must precede every scene-index-invalidating operation below, because Hydra refuses
     // invalidation while a SyncAll is in progress and that SyncAll is on the other thread.
-    if (_renderThreadStarted && _renderThread) {
-        _renderThread->WaitForIdle();
-        // Applies what changed upstream while the last frame was rendering.
-        _ReleaseRenderThreadCapture();
-        _SetDeferCallbackRemovals(false);
-        if (!_renderThreadPassIndices.empty()) {
-            _UpdateConvergence(_renderThreadPassIndices);
-        }
-    }
+    _WaitForRenderThreadIdle();
 
     const bool timeChangedWhileStopped
         = std::exchange(_timeChangedSinceRender, false) && !MAnimControl::isPlaying();
@@ -4511,6 +4507,20 @@ void MtohRenderOverride::_ReleaseRenderThreadCapture()
                 : nullptr) {
             capture->Release();
         }
+    }
+}
+
+void MtohRenderOverride::_WaitForRenderThreadIdle()
+{
+    if (!_renderThreadStarted || !_renderThread) {
+        return;
+    }
+    _renderThread->WaitForIdle();
+    // Applies what changed upstream while the last frame was rendering.
+    _ReleaseRenderThreadCapture();
+    _SetDeferCallbackRemovals(false);
+    if (!_renderThreadPassIndices.empty()) {
+        _UpdateConvergence(_renderThreadPassIndices);
     }
 }
 

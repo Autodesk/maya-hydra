@@ -190,7 +190,10 @@ happens on the first frame submitted to the render thread.  From then on it:
   change while the render thread reads it;
 - is released, applying and forwarding the queued notices in order, once the
   render thread is idle: after the interlock, after a discard (pick, resize,
-  change of panel), after `-drainRenderThread`, and when the thread stops.
+  change of panel), after `-drainRenderThread`, after a render setting or
+  purpose change (`mayaHydra -updateRenderGlobals` waits for the render thread
+  before it writes to the render delegate or the passes' render tags), and when
+  the thread stops.
 
 The renderer's own tasks and render buffers are never held, which HVT keeps for
 the frame passes in a retained scene index merged directly into the render index,

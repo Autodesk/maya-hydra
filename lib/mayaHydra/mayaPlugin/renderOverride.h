@@ -327,6 +327,10 @@ private:
     // Redraws \p panelName once the mouse buttons are released, so that the frame it rendered
     // while they were held gets composited.
     void _RedrawOnMouseRelease(const std::string& panelName);
+    // Waits for the render thread to finish its frame, then applies what changed upstream while
+    // it rendered. Required before anything writes to the render index, the render delegate or
+    // the frame passes.
+    void _WaitForRenderThreadIdle();
     // Hover resolution, in two steps, so that the way the prim under the cursor is found can
     // change without changing what the hover highlights:
     // - _PickHoverHit() finds the prim under the cursor pixel (HdxPickTask via the outline frame
