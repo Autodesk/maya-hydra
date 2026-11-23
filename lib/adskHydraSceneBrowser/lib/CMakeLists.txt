@@ -57,6 +57,14 @@ string(REGEX REPLACE "(\\.|^)([1-9])(\\.|$)" "\\10\\2\\3" USD_minor_patch_versio
 set(DOWNLOAD_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/src/download")
 set(PATCH_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/src/patch")
 
+# Starting with OpenUSD 26.11, some hdui files include their siblings as
+# "pxr/imaging/hdui/<file>", so the patched files must live in a matching subfolder.
+if(PXR_VERSION VERSION_GREATER_EQUAL 2611)
+    set(PATCH_SOURCE_DIR "${PATCH_LOCATION}/pxr/imaging/hdui")
+else()
+    set(PATCH_SOURCE_DIR "${PATCH_LOCATION}")
+endif()
+
 # Download a single hdui source/header file from OpenUSD, failing the configure
 # stage loudly if the transfer does not succeed. The upstream file(DOWNLOAD) call
 # used to run without any error handling, so a transient network failure or a
@@ -161,9 +169,6 @@ foreach(SOURCE IN ITEMS ${SOURCES})
     set(VTARRAY_GFVEC4F_TARGET_REPLACEMENT "return new Hdui_TypedArrayValueItemModel<GfVec3f>(value, parent);\n    }\n\n    if (value.IsHolding<VtArray<GfVec4f>>()) {\n        return new Hdui_TypedArrayValueItemModel<GfVec4f>(value, parent);\n    }")
     string(REGEX REPLACE "${VTARRAY_GFVEC4F_TARGET_REGEX}" "${VTARRAY_GFVEC4F_TARGET_REPLACEMENT}" FILE_CONTENTS "${FILE_CONTENTS}")
 
-    # Patched files live flat in PATCH_LOCATION, not under pxr/imaging/hdui/
-    string(REPLACE "#include \"pxr/imaging/hdui/" "#include \"" FILE_CONTENTS "${FILE_CONTENTS}")
-
     # Patch in '#include <QString>' to make sure we can use QLatin1StringView
     prepend_include(FILE_CONTENTS "#include <QString>")
 
@@ -172,7 +177,7 @@ foreach(SOURCE IN ITEMS ${SOURCES})
 		string(REGEX REPLACE "\(\\[this, menu\), menuTreeWidget\(\\]\\(QTreeWidgetItem \\*item, int column\\)\)" "\\1\\2" FILE_CONTENTS "${FILE_CONTENTS}")
 	endif()
     
-    file(WRITE "${PATCH_LOCATION}/${SOURCE}" "${FILE_CONTENTS}")
+    file(WRITE "${PATCH_SOURCE_DIR}/${SOURCE}" "${FILE_CONTENTS}")
 endforeach()
 
 # Download and patch header files
@@ -180,15 +185,6 @@ foreach(HEADER IN ITEMS ${HEADERS})
     download(${HEADER})
 
     file(READ "${DOWNLOAD_LOCATION}/${HEADER}" FILE_CONTENTS)
-
-    string(REPLACE "#include \"pxr/imaging/hdui/" "#include \"" FILE_CONTENTS "${FILE_CONTENTS}")
-
-    # Upstream declares TF_DEBUG_CODES outside the pxr namespace, which only
-    # compiles when USD is built without PXR_USE_NAMESPACES.
-    if(HEADER STREQUAL "debugCodes.h" AND NOT FILE_CONTENTS MATCHES "PXR_NAMESPACE_OPEN_SCOPE")
-        string(REGEX REPLACE "(TF_DEBUG_CODES\\([^)]*\\);?)"
-            "PXR_NAMESPACE_OPEN_SCOPE\n\n\\1\n\nPXR_NAMESPACE_CLOSE_SCOPE" FILE_CONTENTS "${FILE_CONTENTS}")
-    endif()
 
     # Add DLL import/export support for Windows 
     # Insert 'HDUI_API' symbols for class declarations
@@ -201,15 +197,22 @@ foreach(HEADER IN ITEMS ${HEADERS})
 		# Patch in '#include <adskHydraSceneBrowserApi.h>' to have HDUI_API defined
 		prepend_include(FILE_CONTENTS "#include <adskHydraSceneBrowserApi.h>")
     endif()
+
+    # debugCodes.h declares its TF_DEBUG_CODES outside of the pxr namespace, which
+    # fails to compile when USD is built with namespaces. Wrap the declaration in the
+    # pxr namespace scope, unless upstream already does so.
+    if(HEADER STREQUAL "debugCodes.h" AND NOT FILE_CONTENTS MATCHES "PXR_NAMESPACE_OPEN_SCOPE")
+        string(REGEX REPLACE "(TF_DEBUG_CODES\\([^;]*\\);)" "PXR_NAMESPACE_OPEN_SCOPE\n\n\\1\n\nPXR_NAMESPACE_CLOSE_SCOPE" FILE_CONTENTS "${FILE_CONTENTS}")
+    endif()
 	
-    file(WRITE "${PATCH_LOCATION}/${HEADER}" "${FILE_CONTENTS}")
+    file(WRITE "${PATCH_SOURCE_DIR}/${HEADER}" "${FILE_CONTENTS}")
 endforeach()
 
 # Prepend an absolute path to the downloaded source files, located in 
 # the CMAKE_CURRENT_BINARY_DIR.
 # Note: the sources are downloaded for PixarAnimationStudios/OpenUSD and 
 #       are not located in this repository's folder
-list(TRANSFORM SOURCES PREPEND "${PATCH_LOCATION}/")
+list(TRANSFORM SOURCES PREPEND "${PATCH_SOURCE_DIR}/")
 
 # Add CMAKE_CURRENT_BINARY_DIR downloaded sources to the adskHydraSceneBrowser target
 target_sources(${TARGET_NAME}
@@ -224,6 +227,7 @@ target_include_directories(${TARGET_NAME}
     PUBLIC
         ${PXR_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${PATCH_SOURCE_DIR}
         ${PATCH_LOCATION}
 )
 
@@ -243,6 +247,16 @@ target_compile_definitions(${TARGET_NAME}
 	PRIVATE 
         $<IF:$<VERSION_LESS:${PXR_VERSION},2408>,HDUI_EXPORT,HDUI_EXPORTS>
 )
+
+# debugCodes.cpp registers its debug codes with TF_REGISTRY_FUNCTION, which
+# requires a package name for this library.
+if(PXR_VERSION VERSION_GREATER_EQUAL 2611)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            MFB_PACKAGE_NAME=${TARGET_NAME}
+            MFB_ALT_PACKAGE_NAME=${TARGET_NAME}
+    )
+endif()
 
 mayaHydra_compile_config(${TARGET_NAME}) # TODO : This will have to be changed when moving to a standalone repo.
 
@@ -272,7 +286,7 @@ install(TARGETS ${TARGET_NAME}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
 )
 
-list(TRANSFORM HEADERS PREPEND "${PATCH_LOCATION}/")
+list(TRANSFORM HEADERS PREPEND "${PATCH_SOURCE_DIR}/")
 install(FILES ${HEADERS}
         DESTINATION 
             ${CMAKE_INSTALL_PREFIX}/include/adskHydraSceneBrowser

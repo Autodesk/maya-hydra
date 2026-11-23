@@ -70,6 +70,16 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.DepthOfFieldSchemaFieldsRoundTrip")
 
+    # What: an orthographic camera must publish its square film and shake on the camera prim.
+    # How: build the scene, then run the C++ test that makes the camera orthographic and edits
+    # orthographicWidth and shake.
+    # Expect: orthographic projection, apertures equal to orthographicWidth, offsets equal to
+    # the shake, and orthographicWidth changes reach the prim.
+    def test_orthographicSchemaFields(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CameraPrimvars.OrthographicSchemaFields")
+
     # What: the default exposure must not scale the image.
     # How: build the scene, then run the C++ test that reads linearExposureScale.
     # Expect: linearExposureScale is 1.0.

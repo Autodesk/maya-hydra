@@ -54,6 +54,7 @@
 #include <ufeExtensions/Global.h>
 
 #include <optional>
+#include <vector>
 
 namespace {
 
@@ -217,7 +218,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
     return false;
 }
 
-void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
+void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode, const SdfPath& prefix)
 {
     const MayaHydraSceneIndexRegistrationPtr registration(new MayaUsdSceneIndexRegistration());
 
@@ -229,8 +230,9 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     }
 
     registration->dagNode = MObjectHandle(dagNode);
-    registration->sceneIndexPathPrefix = sceneIndexPathPrefix(
-        _dataProducerMergingSceneIndex, dagNode);
+    registration->sceneIndexPathPrefix = prefix.IsEmpty()
+        ? sceneIndexPathPrefix(_dataProducerMergingSceneIndex, dagNode)
+        : prefix;
         
     //We receive only dag nodes of type MayaUsdProxyShapeNode
     MAYAUSDAPI_NS::ProxyStage proxyStage(dagNode);
@@ -309,6 +311,9 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         MayaUsdProxyShapeSceneIndexBase::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
     registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
     registration->interpretRprimPathFn = &(MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
+    // Replace the chain on a stage change after population instead of re-staging it
+    // (HYDRA-2582). Interactive only: the batch renderer never calls ApplyPendingUpdates().
+    mayaUsdProxyShapeSceneIndex->SetRebuildOnStageChange(_interactive);
     mayaUsdProxyShapeSceneIndex->Populate();
 
     // This sets the required prefix just downstream (after) the
@@ -395,18 +400,64 @@ void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
     _RegisterDefaultRenderDescriptionNode();
 }
 
-void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
+bool MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
 {
+    // Collected first: a rebuild modifies _registrations.
+    std::vector<MObjectHandle> nodesToRebuild;
     for (auto& reg : _registrations) {
         auto& registration = reg.second;
         if (registration->pluginSceneIndex) {
             MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex
                 = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(registration->pluginSceneIndex);
-            if (proxyShapeSceneIndex && proxyShapeSceneIndex->HasPendingUpdates()) {
+            if (!proxyShapeSceneIndex) {
+                continue;
+            }
+            if (!proxyShapeSceneIndex->NeedsRebuild()
+                && proxyShapeSceneIndex->HasPendingUpdates()) {
                 proxyShapeSceneIndex->PopulateAndApplyPendingChanges();
+            }
+            // Checked after the populate, which can itself ask for a rebuild.
+            if (proxyShapeSceneIndex->NeedsRebuild()) {
+                nodesToRebuild.push_back(registration->dagNode);
             }
         }
     }
+
+    for (const auto& nodeHandle : nodesToRebuild) {
+        if (nodeHandle.isValid()) {
+            MObject dagNode = nodeHandle.object();
+            _RebuildSceneIndexForNode(dagNode);
+        }
+    }
+    return !nodesToRebuild.empty();
+}
+
+void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
+{
+    auto it = _registrationsByObjectHandle.find(MObjectHandle(dagNode));
+    if (it == _registrationsByObjectHandle.end()) {
+        return;
+    }
+
+    // Reuse the prefix: selection and isolate select hold paths under it, and a regenerated
+    // one would follow a rename of the node. Removing the old chain first frees it.
+    const SdfPath prefix = it->second->sceneIndexPathPrefix;
+
+    // Release the old path mapper and pick handler first: the new scene index registers its
+    // own for the same paths, and the old one may outlive its removal. Scoped, so that this
+    // reference does not keep the old stage alive while _AddSceneIndexForNode() opens the new one.
+    {
+        MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex
+            = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(it->second->pluginSceneIndex);
+        if (oldProxyShapeSceneIndex) {
+            oldProxyShapeSceneIndex->Detach();
+        }
+    }
+
+    // The old chain still holds the previous stage, so removing it removes all its prims;
+    // the new chain is populated once, from the current stage.
+    _RemoveSceneIndexForNode(dagNode);
+    _AddSceneIndexForNode(dagNode, prefix);
 }
 
 SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderDescriptionPathPrefix;
