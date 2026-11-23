@@ -28,15 +28,19 @@
 
 namespace FVP_NS_DEF {
 
-/// Returns the projection matrix of the perspective camera prim at \p cameraPath, as
-/// HdCamera::ComputeProjectionMatrix() would compute it, without any window conforming or
-/// framing. Returns nullopt if the prim is not a camera, is orthographic, or has degenerate
+/// Returns the projection matrix of the perspective or orthographic camera prim at
+/// \p cameraPath, as HdCamera::ComputeProjectionMatrix() would compute it, without any window
+/// conforming or framing. Returns nullopt if the prim is not a camera or has degenerate
 /// parameters.
 FVP_API
 std::optional<PXR_NS::GfMatrix4d> computeCameraPrimProjection(
     const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
     const PXR_NS::SdfPath&                cameraPath);
 
+/// Returns the display window for which CameraUtilFraming::ApplyToProjectionMatrix(), with the
+/// CameraUtilDontConform policy, turns \p baseProj into \p targetProj. Both matrices must be
+/// perspective or both orthographic. Returns nullopt if they differ in projection type, or if
+/// \p targetProj cannot be reached by a display window (e.g. rotation from film roll).
 FVP_API
 std::optional<PXR_NS::GfRange2f> solveDisplayWindow(
     const PXR_NS::GfMatrix4d& targetProj,

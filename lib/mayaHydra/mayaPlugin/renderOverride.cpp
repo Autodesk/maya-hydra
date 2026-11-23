@@ -156,7 +156,6 @@
 #include <maya/MTimerMessage.h>
 
 #include <maya/MUiMessage.h>
-#include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
 #include <maya/MTypes.h>
 
@@ -1128,17 +1127,11 @@ SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
         if (!status || !_mayaHydraSceneIndex) {
             return {};
         }
-        MFnCamera camera(camPath, &status);
-        // TODO: Support orthographic cameras.
-        if (!status || camera.isOrtho()) {
-            return {};
-        }
         return _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
     }
 
     // Only runtimes that registered a path mapper (MayaUSD) publish camera prims. Checking first
-    // keeps the registry's no-mapping warning out of every draw. Orthographic USD cameras are
-    // rejected later, when the camera prim projection is computed.
+    // keeps the registry's no-mapping warning out of every draw.
     if (!Fvp::PathMapperRegistry::Instance().HasMapper(ufePath)) {
         return {};
     }
@@ -1843,8 +1836,13 @@ MStatus MtohRenderOverride::Render(
     renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
 
     // Every delegate renders through the camera prim translated from the Maya or USD camera, so
-    // that it gets the render parameters the free camera lacks. Orthographic cameras still use
-    // the free camera.
+    // that it gets the render parameters the free camera lacks. The free camera is only used when
+    // there is no camera prim to bind.
+    //
+    // For USD orthographic cameras, the solved display window reproduces Maya's projection
+    // matrix, so that Hydra matches VP2 picking. That matrix comes from the Maya proxy camera
+    // shape, which does not pick up the USD camera's orthographic width (EMSUSD-1393), so both
+    // differ from the USD camera's own framing until that is fixed.
     const SdfPath cameraPath = _ResolveCameraPrimPath();
 
     // The camera prim holds the raw camera attributes, shared by every panel looking through that
@@ -1873,7 +1871,8 @@ MStatus MtohRenderOverride::Render(
         }
         auto& params = currentPass->params();
 
-        if (!cameraPrimProjection) {
+        // Free camera path.
+        if (cameraPath.IsEmpty()) {
             params.viewInfo.framing = CameraUtilFraming(displayWindow, renderRegion);
             params.renderParams.camera = SdfPath();
             params.renderParams.overrideWindowPolicy
@@ -1888,13 +1887,21 @@ MStatus MtohRenderOverride::Render(
             = std::optional<CameraUtilConformWindowPolicy>(CameraUtilDontConform);
     }
 
-    if (cameraPrimProjection && !solvedWindow) {
+    if (!cameraPath.IsEmpty() && !solvedWindow) {
         // Warn once per camera. Panels looking through different cameras render in turn.
         if (_unsolvableFramingWarnedCameras.insert(cameraPath).second) {
-            TF_WARN(
-                "The projection of camera %s cannot be reproduced through its camera prim (for "
-                "example because of film roll). The viewport may not match Maya's framing.",
-                cameraPath.GetText());
+            if (cameraPrimProjection) {
+                TF_WARN(
+                    "The projection of camera %s cannot be reproduced through its camera prim "
+                    "(for example because of film roll). The viewport may not match Maya's "
+                    "framing.",
+                    cameraPath.GetText());
+            } else {
+                TF_WARN(
+                    "The projection of camera prim %s cannot be computed (for example because "
+                    "of a zero aperture). The viewport may not match Maya's framing.",
+                    cameraPath.GetText());
+            }
         }
     } else if (solvedWindow) {
         // The display window solves again (i.e., the film roll was removed).

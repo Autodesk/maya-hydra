@@ -125,5 +125,90 @@ class TestCameraPrimFraming(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose(
             'usdCamera.png', self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
+    def setupOrthoScene(self):
+        self.setupScene()
+        cmds.setAttr(self.cameraShape + '.orthographic', True)
+        cmds.setAttr(self.cameraShape + '.orthographicWidth', 14)
+
+    def test_OrthoTopCamera(self):
+        self.setupScene()
+        cmds.lookThru(mayaUtils.activeModelPanel(), 'top')
+        cmds.refresh()
+        self.verifySnapshot('ortho_top.png')
+
+    def test_OrthoCamera(self):
+        self.setupOrthoScene()
+        self.verifySnapshot('ortho_camera.png')
+
+    def test_OrthoWidth(self):
+        self.setupOrthoScene()
+        self.verifySnapshot('ortho_camera.png')
+        # Zooming an orthographic camera changes its width, which must reach the camera prim.
+        self.setCameraAttr('orthographicWidth', 9)
+        self.verifySnapshot('ortho_width.png')
+
+    def test_OrthoOverscan(self):
+        self.setupOrthoScene()
+        self.setCameraAttr('overscan', 1.3)
+        self.verifySnapshot('ortho_overscan.png')
+
+    def test_OrthoPanZoom(self):
+        self.setupOrthoScene()
+        self.setCameraAttr('panZoomEnabled', True)
+        self.setCameraAttr('horizontalPan', 2.0)
+        self.setCameraAttr('verticalPan', -1.0)
+        self.setCameraAttr('zoom', 0.6)
+        self.verifySnapshot('ortho_panZoom.png')
+
+    def test_OrthoShake(self):
+        self.setupOrthoScene()
+        self.setCameraAttr('shakeEnabled', True)
+        self.setCameraAttr('horizontalShake', 1.5)
+        self.setCameraAttr('verticalShake', -1.0)
+        # Maya ignores the film offset for orthographic cameras.
+        self.setCameraAttr('horizontalFilmOffset', 0.5)
+        self.verifySnapshot('ortho_shake.png')
+
+    def test_OrthoCameraScale(self):
+        self.setupOrthoScene()
+        self.setCameraAttr('cameraScale', 1.5)
+        self.verifySnapshot('ortho_cameraScale.png')
+
+    def test_OrthoRenderRegion(self):
+        self.setupOrthoScene()
+        self.setCameraAttr('overscan', 1.2)
+        self.setCameraAttr('panZoomEnabled', True)
+        self.setCameraAttr('horizontalPan', 1.0)
+        self.setCameraAttr('zoom', 0.8)
+
+        cmds.mayaHydraRenderRegion(edit=True, region=[50, 50, 300, 250])
+        try:
+            cmds.refresh()
+            self.assertSnapshotClose(
+                'ortho_renderRegion.png', self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        finally:
+            cmds.mayaHydraRenderRegion(edit=True, clear=True)
+
+    def test_UsdOrthoCamera(self):
+        import mayaUsd.lib
+        import mayaUsd_createStageWithNewLayer
+
+        self.setupOrthoScene()
+        # Maya frames USD orthographic cameras with the proxy camera shape's orthographic width,
+        # which does not follow the USD camera's aperture (EMSUSD-1393). Hydra follows Maya's
+        # matrix so that it matches VP2 picking, so this image changes once that is fixed.
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        usdCameraPaths = mayaUsd.lib.PrimUpdaterManager.duplicate(
+            cmds.ls(self.cameraTransform, long=True)[0], stagePath)
+        self.assertTrue(usdCameraPaths)
+        usdCameraPath = usdCameraPaths[0] if isinstance(usdCameraPaths, (list, tuple)) else usdCameraPaths
+
+        cmds.lookThru(mayaUtils.activeModelPanel(), usdCameraPath)
+        cmds.xform(self.cameraTransform, translation=[20, 20, 20])
+        cmds.select(clear=True)
+        cmds.refresh()
+        self.assertSnapshotClose(
+            'ortho_usdCamera.png', self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
