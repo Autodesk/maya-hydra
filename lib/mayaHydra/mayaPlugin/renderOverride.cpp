@@ -37,6 +37,7 @@
 
 #ifdef MAYAHYDRA_HAS_QT
 #include "hoverEventFilter.h"
+#include "mouseReleaseEventFilter.h"
 
 #include <QGuiApplication>
 #endif
@@ -2001,6 +2002,11 @@ MStatus MtohRenderOverride::Render(
         // framebuffer, which here is Maya's.
         const VtValue dstFramebuffer;
         _renderThread->CompositeLatest(*_presentBridge, dstFramebuffer);
+        // A held button is not always a drag: a click on a toolbar icon or a menu can trigger
+        // a single redraw before its release, and no other redraw follows to show this frame.
+        if (_UserIsDragging()) {
+            _RedrawOnMouseRelease(panelKey);
+        }
     }
 
     // The viewport shadow toggle is a global setting, so it is read for every render
@@ -2312,6 +2318,25 @@ void MtohRenderOverride::_RemoveHoverEventFilter(const MString& panelName)
 
 #ifdef MAYAHYDRA_HAS_QT
     _hoverEventFilters.erase(std::string(panelName.asChar()));
+#endif
+}
+
+void MtohRenderOverride::_RedrawOnMouseRelease(const std::string& panelName)
+{
+#ifdef MAYAHYDRA_HAS_QT
+    _panelsToRedrawOnMouseRelease.insert(panelName);
+    if (_mouseReleaseEventFilter) {
+        return;
+    }
+    _mouseReleaseEventFilter = std::make_unique<MayaHydra::MouseReleaseEventFilter>([this]() {
+        for (const std::string& panel : std::exchange(_panelsToRedrawOnMouseRelease, {})) {
+            M3dView view;
+            if (M3dView::getM3dViewFromModelPanel(MString(panel.c_str()), view)
+                == MStatus::kSuccess) {
+                view.scheduleRefresh();
+            }
+        }
+    });
 #endif
 }
 

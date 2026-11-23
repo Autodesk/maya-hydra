@@ -292,8 +292,14 @@ while the user drags with a mouse button held: moving a manipulator, moving
 the camera or scrubbing the time slider.  `MFrameContext::inUserInteraction()`
 cannot tell, as it is also true for a refresh from a script, so the button
 state comes from Qt (`QGuiApplication::mouseButtons()`); a build without Qt
-counts only camera moves (`MFrameContext::userChangingViewContext()`).  Any
-other redraw may be the last one: a refresh from a script, a playblast, a
+counts only camera moves (`MFrameContext::userChangingViewContext()`).  A held
+button is not always a drag: a click on a toolbar icon or a menu item, such as
+the default lighting toggle, can trigger a single redraw before the button is
+released.  So a render op that composited the previous frame while a button
+was held records its panel, and an event filter on the application
+(`MouseReleaseEventFilter`) schedules a redraw of it once the last button is
+released.  With no button held, that redraw composites its own frame, as
+below.  Any other redraw may be the last one: a refresh from a script, a playblast, a
 viewport capture, a time change while stopped, or an image the image buffer
 writer was asked to write.  Compositing the previous frame's image would leave
 the viewport, or the image taken from it, a frame behind with nothing to
@@ -410,4 +416,6 @@ stops happening.
 - Composited overlays sort against the scene as of the last completed frame,
   which is one frame behind the main thread's current state.
 - A drag that ends without a further redraw, such as a manipulator released
-  without moving, leaves the previous frame on screen until the next redraw.
+  without moving, leaves the previous frame on screen until the redraw
+  scheduled at the button release runs.  A build without Qt schedules none,
+  so the previous frame stays until the next redraw.

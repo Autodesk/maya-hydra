@@ -129,14 +129,16 @@ target_link_libraries(${TARGET_NAME}
 )
 
 # -----------------------------------------------------------------------------
-# hover highlighting (Qt)
+# hover highlighting and mouse release tracking (Qt)
 # -----------------------------------------------------------------------------
-# Hover highlighting reads the cursor through a Qt event filter. Qt6 is found
-# only when the Maya devkit ships it; without it, everything but hover works.
+# Hover highlighting reads the cursor through a Qt event filter, and the render
+# thread pipeline redraws once a click ends through another. Qt6 is found only
+# when the Maya devkit ships it; without it, everything but hover works.
 if(Qt6_FOUND)
     target_sources(${TARGET_NAME}
         PRIVATE
             hoverEventFilter.cpp
+            mouseReleaseEventFilter.cpp
     )
     target_link_libraries(${TARGET_NAME}
         PRIVATE

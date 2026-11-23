@@ -94,6 +94,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 #include <map>
@@ -109,6 +110,7 @@ class Selection;
 
 namespace MAYAHYDRA_NS_DEF {
 class HoverEventFilter;
+class MouseReleaseEventFilter;
 class NativeInstancerCache;
 }
 
@@ -322,6 +324,9 @@ private:
     // Called by the hover event filter (UI thread). Records the cursor position and schedules a
     // viewport refresh.
     void _SetHoverPosition(const std::string& panelName, int deviceX, int deviceY, bool active);
+    // Redraws \p panelName once the mouse buttons are released, so that the frame it rendered
+    // while they were held gets composited.
+    void _RedrawOnMouseRelease(const std::string& panelName);
     // Hover resolution, in two steps, so that the way the prim under the cursor is found can
     // change without changing what the hover highlights:
     // - _PickHoverHit() finds the prim under the cursor pixel (HdxPickTask via the outline frame
@@ -644,6 +649,12 @@ private:
     // One hover event filter per model panel, keyed by panel name.
     std::map<std::string, std::unique_ptr<MAYAHYDRA_NS_DEF::HoverEventFilter>>
         _hoverEventFilters;
+
+    // Panels whose last redraw composited the previous frame because a mouse button was held.
+    // Declared before _mouseReleaseEventFilter, whose callback reads it.
+    std::set<std::string> _panelsToRedrawOnMouseRelease;
+    // Installed on the first such redraw.
+    std::unique_ptr<MAYAHYDRA_NS_DEF::MouseReleaseEventFilter> _mouseReleaseEventFilter;
 #endif
 
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC
