@@ -269,10 +269,12 @@ Details that the implementation depends on:
   of every producer frame.
 - **Copy size versus allocation size.** See [Layout](#layout).
 - **GL error hygiene.** Pending GL errors left by Maya are drained before each
-  import, so a stale error does not fail a good one. Copies are not checked
-  unless `TF_DEBUG=MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING` is set: on a
-  threaded driver `glGetError` waits for the driver thread, and a deforming
-  scene copies every stream every frame. A rejected copy then leaves the
+  import, so a stale error does not fail a good one. The first copy into a new
+  buffer is always checked, and a rejected one falls back to the CPU path, so
+  a buffer is never published unwritten. Refreshes are not checked unless
+  `TF_DEBUG=MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING` is set: on a threaded
+  driver `glGetError` waits for the driver thread, and a deforming scene
+  refreshes every stream every frame. A rejected refresh then leaves the
   stream one frame stale instead of falling back to the CPU path.
 
 ## Publishing a stream

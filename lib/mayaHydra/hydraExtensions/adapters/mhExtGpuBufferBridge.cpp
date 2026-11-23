@@ -88,19 +88,23 @@ _DrainGlErrors()
 // owns, on Maya's context, so the copy lands after VP2's writes in the same
 // command stream.
 //
-// Unchecked unless debugging: on a threaded driver glGetError waits for the
-// driver thread to drain, and a deforming scene copies every stream every
-// frame, so two checks per copy stalled the main thread for longer than the
-// render. A copy the driver rejects then leaves the stream a frame stale
-// instead of falling back to the CPU path.
+// A refresh is unchecked unless debugging: on a threaded driver glGetError
+// waits for the driver thread to drain, and a deforming scene refreshes every
+// stream every frame, so two checks per copy stalled the main thread for
+// longer than the render. A refresh the driver rejects then leaves the stream
+// a frame stale instead of falling back to the CPU path. The first copy into a
+// new buffer is always checked, so a buffer is never published unwritten.
+enum class _CopyCheck { Always, WhenDebugging };
+
 bool
-_CopyFromMaya(GLuint mayaGlBuffer, GLuint ownedBuffer, size_t copyByteSize)
+_CopyFromMaya(
+    GLuint mayaGlBuffer, GLuint ownedBuffer, size_t copyByteSize, _CopyCheck check)
 {
     if (!glCopyNamedBufferSubData || !ownedBuffer || copyByteSize == 0) {
         return false;
     }
-    const bool checkCopy =
-        TfDebug::IsEnabled(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING);
+    const bool checkCopy = check == _CopyCheck::Always
+        || TfDebug::IsEnabled(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING);
     if (checkCopy) {
         _DrainGlErrors();
     }
@@ -664,7 +668,7 @@ MhExtGpuBufferBridge::Create(
             glDeleteBuffers(1, &owned);
             return nullptr;
         }
-        if (!_CopyFromMaya(mayaGlBuffer, owned, copyByteSize)) {
+        if (!_CopyFromMaya(mayaGlBuffer, owned, copyByteSize, _CopyCheck::Always)) {
             return nullptr;
         }
         return buffer;
@@ -729,7 +733,7 @@ MhExtGpuBufferBridge::Create(
             }));
         _RegisterLiveAlias(alias);
 
-        if (!_CopyFromMaya(mayaGlBuffer, alias.buffer, copyByteSize)) {
+        if (!_CopyFromMaya(mayaGlBuffer, alias.buffer, copyByteSize, _CopyCheck::Always)) {
             return nullptr;
         }
         return buffer;
@@ -759,7 +763,8 @@ MhExtGpuBufferBridge::Refresh(
     }
 
     if (_kind == _Kind::OpenGLCopy) {
-        return _CopyFromMaya(mayaGlBuffer, _OwnedGlBufferOf(buffer), copyByteSize);
+        return _CopyFromMaya(
+            mayaGlBuffer, _OwnedGlBufferOf(buffer), copyByteSize, _CopyCheck::WhenDebugging);
     }
 
 #if defined(USD_HAS_HGI_VULKAN)
@@ -768,7 +773,8 @@ MhExtGpuBufferBridge::Refresh(
         if (!alias) {
             return false;
         }
-        return _CopyFromMaya(mayaGlBuffer, alias->buffer, copyByteSize);
+        return _CopyFromMaya(
+            mayaGlBuffer, alias->buffer, copyByteSize, _CopyCheck::WhenDebugging);
     }
 #endif
 
