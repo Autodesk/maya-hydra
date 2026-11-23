@@ -33,6 +33,10 @@
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
+#include <pxr/usdImaging/usdImaging/version.h>
+#if USD_IMAGING_API_VERSION >= 25
+#include <pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h>
+#endif
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -249,10 +253,19 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode, const 
     // them. UsdImaging's built-in displayUnloadedPrimsWithBounds is not used, see
     // fvpUnloadedPayloadBoundsSceneIndex.h as to why.
     if (_interactive) {
+#if USD_IMAGING_API_VERSION >= 25
+        static const HdContainerDataSourceHandle stageSceneIndexInputArgs
+            = HdRetainedContainerDataSource::New(
+                UsdImagingSceneIndexCreateArgsSchema::GetSchemaToken(),
+                UsdImagingSceneIndexCreateArgsSchema::Builder()
+                    .SetIncludeUnloadedPrims(HdRetainedTypedSampledDataSource<bool>::New(true))
+                    .Build());
+#else
         static const HdContainerDataSourceHandle stageSceneIndexInputArgs
             = HdRetainedContainerDataSource::New(
                 UsdImagingStageSceneIndexTokens->includeUnloadedPrims,
                 HdRetainedTypedSampledDataSource<bool>::New(true));
+#endif
         createInfo.stageSceneIndexInputArgs = stageSceneIndexInputArgs;
     }
 
