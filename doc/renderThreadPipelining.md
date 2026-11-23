@@ -305,7 +305,11 @@ writer was asked to write.  Compositing the previous frame's image would leave
 the viewport, or the image taken from it, a frame behind with nothing to
 correct it.  Such a render op skips the usual composite, submits its frame,
 waits for it (`WaitForQuiescence`) and composites it into Maya's framebuffer,
-captured at the start of the op.  It then releases the capture, so a query
+captured at the start of the op.  The wait has no time limit, like the
+interlock: a frame that compiles shaders can take seconds, giving up would
+show the previous frame, and the next render op would wait for this frame
+anyway.  A wait past the reporting point is counted in `drainTimeouts` and
+reported under `TF_DEBUG=MAYAHYDRALIB_RENDER_THREAD`.  It then releases the capture, so a query
 made after the redraw sees the scene it drew, updates the convergence state
 and writes the requested image, on the render thread under OpenGL.  Such
 frames do not overlap, which costs the same as the flag-off path.  Requesting

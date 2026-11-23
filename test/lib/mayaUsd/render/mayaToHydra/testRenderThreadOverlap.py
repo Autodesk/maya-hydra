@@ -48,7 +48,6 @@ RENDER_THREAD_STAT_NAMES = [
 FAILURE_STAT_NAMES = [
     "fenceSignalFailures",
     "fenceWaitTimeouts",
-    "drainTimeouts",
     "presentsWithoutDepth",
     "presentsSkipped",
     "aovCopyFailures",

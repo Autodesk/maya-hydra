@@ -68,17 +68,14 @@ private:
 #endif
 };
 
-// The quiescence budgets are long enough that a heavy frame lands, and short
-// enough that a wedged render thread costs a visible hitch rather than a hung
-// Maya. A capture that races the frame it means to show is worse than a slow
-// one, so they are generous.
-constexpr auto     kQuiescenceBudget          = std::chrono::milliseconds(2000);
+// The GPU fence budget is long enough that a heavy frame lands, and short
+// enough that a wedged GPU costs a visible hitch rather than a hung Maya.
 constexpr uint64_t kQuiescenceFenceBudgetNanos = 250ull * 1000ull * 1000ull; // 250ms
 
 // How long the main thread waits for the render thread to leave the render
 // index before counting the wait as slow. Never a timeout: the first render of
-// a scene can take seconds, and pushing into a render index that is inside
-// SyncAll is not a recoverable race.
+// a scene, or one that compiles shaders, can take seconds, and pushing into a
+// render index that is inside SyncAll is not a recoverable race.
 constexpr auto kIdleInterlockWarnAfter = std::chrono::milliseconds(500);
 
 } // namespace
@@ -919,23 +916,30 @@ bool
 RenderThread::WaitForQuiescence()
 {
     // A barrier, not a cancellation: the frame in flight is the one the caller
-    // wants, so it is waited for and left in the handoff.
-    bool wentIdle = false;
+    // wants, so it is waited for and left in the handoff. Without a time limit,
+    // like WaitForIdle: giving up would only show the previous frame, and the
+    // next render op's WaitForIdle would wait for this one regardless.
+    auto isIdle = [this] {
+        return !_hasPending.load(std::memory_order_acquire)
+            && !_inFlight.load(std::memory_order_acquire);
+    };
     {
         std::unique_lock<std::mutex> lock(_requestMutex);
-        wentIdle = _idleCv.wait_for(lock, kQuiescenceBudget, [this] {
-            return !_hasPending.load(std::memory_order_acquire)
-                && !_inFlight.load(std::memory_order_acquire);
-        });
-    }
-
-    if (!wentIdle)
-    {
-        RenderThreadStats::instance().RecordDrainTimeout();
-        TF_WARN("RenderThread::WaitForQuiescence: the render thread was still "
-                "busy after the budget expired, so a capture taken now may be "
-                "a frame behind.");
-        return false;
+        if (!_idleCv.wait_for(lock, kIdleInterlockWarnAfter, isIdle))
+        {
+            // Counted, but reported only under a debug flag: a frame that
+            // compiles shaders gets here and is not a fault.
+            RenderThreadStats::instance().RecordDrainTimeout();
+            const auto slowStart = std::chrono::steady_clock::now();
+            _idleCv.wait(lock, isIdle);
+            TF_DEBUG(MAYAHYDRALIB_RENDER_THREAD)
+                .Msg("RenderThread::WaitForQuiescence: the render thread went "
+                     "idle after a further %lld ms.\n",
+                     static_cast<long long>(
+                         std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now() - slowStart)
+                             .count()));
+        }
     }
 
     // CPU-side idle is not enough for a capture: the frame is published but its

@@ -161,8 +161,9 @@ public:
 
     /// For an image capture, or a render op compositing its own frame: wait for
     /// the pending request to be rendered, published and its GPU work completed,
-    /// and keep it in the handoff so it can be composited. Returns false on
-    /// timeout.
+    /// and keep it in the handoff so it can be composited. The wait for the
+    /// render has no time limit, like WaitForIdle; returns false only if the
+    /// GPU work did not complete within its budget.
     bool WaitForQuiescence();
 
     /// Wait until the render thread is not touching the render index. The main

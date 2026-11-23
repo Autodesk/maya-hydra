@@ -63,6 +63,10 @@ struct RenderThreadStatsSnapshot
     /// frames rather than races.
     uint64_t idleWaitTimeouts = 0;
 
+    /// Quiescence waits (a render op compositing its own frame, an image
+    /// capture) that ran past the same reporting point. Also still waited out.
+    uint64_t drainTimeouts = 0;
+
     // Failure modes. Each still leaves a believable image on screen, so a
     // test asserts these are zero rather than comparing pixels.
 
@@ -72,9 +76,6 @@ struct RenderThreadStatsSnapshot
     /// Composites whose frame had no usable GPU fence, and quiescence waits
     /// whose frame's GPU work did not complete within the budget.
     uint64_t fenceWaitTimeouts = 0;
-
-    /// Quiescence waits that gave up before the thread went idle.
-    uint64_t drainTimeouts = 0;
 
     /// Composites with no depth AOV, so main-thread overlays sort against
     /// stale depth.
