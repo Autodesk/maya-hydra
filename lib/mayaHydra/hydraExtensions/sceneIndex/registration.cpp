@@ -545,8 +545,8 @@ void MayaHydraSceneIndexRegistry::_RebuildSceneIndexForNode(MObject& dagNode)
     // removed makes _AddSceneIndexForNode() get it back, even if no other registry holds it.
     const MayaHydraNodePrefixReservationPtr prefixReservation = it->second->prefixReservation;
 
-    // Release the old path mapper first: the new scene index registers its own for the
-    // same paths, and the old one may outlive its removal. Scoped, so that this
+    // Detach the old MayaUsdProxyShapeSceneIndexBase first, as it may outlive its removal: it
+    // stops mapping paths and observing the stage, and the new one takes over. Scoped, so that this
     // reference does not keep the old stage alive while _AddSceneIndexForNode() opens the new one.
     {
         MayaUsdProxyShapeSceneIndexBaseRefPtr oldProxyShapeSceneIndex

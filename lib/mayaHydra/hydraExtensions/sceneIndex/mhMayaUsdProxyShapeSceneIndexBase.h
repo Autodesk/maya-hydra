@@ -82,7 +82,7 @@ public:
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    // Also moves the path mapper registration to the new path, if this scene index owns it.
+    // Also moves the node's path mapper registration to the new path.
     void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath);
 
     virtual ~MayaUsdProxyShapeSceneIndexBase();
@@ -103,8 +103,8 @@ public:
     }
     bool NeedsRebuild() const { return _needsRebuild; }
 
-    // Releases the path mapper and stops observing stage notices, so a replacement can
-    // register its own even if this one stays alive. Idempotent.
+    // Stops mapping paths and observing stage notices, so that a replacement takes over even if
+    // this one stays alive. Idempotent.
     void Detach() { _Destroy(); }
 
     void Populate();
@@ -151,6 +151,9 @@ protected:
     const SdfPath                   _sceneIndexPathPrefix;
 
 private:
+    // The path mapper registration of the mayaUsdProxyShape node, shared with the node's
+    // instances in the other scene index registries (render overrides and batch renders).
+    class _PathMapperRegistration;
 
     void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
     void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
@@ -170,9 +173,9 @@ private:
     bool                            _destroyed{false};
     MObjectHandle                   _dagNodeHandle;
     Ufe::Path                       _sceneIndexAppPath;
-    const Fvp::PathMapperConstPtr   _usdPathMapper{};
     const Ufe::Observer::Ptr        _appSceneObserver{};
-    bool                            _unregisterPathMapper{false};
+    // Null once detached (Detach()).
+    std::shared_ptr<_PathMapperRegistration> _pathMapperRegistration;
     TfNotice::Key                   _stageSetNoticeKey;
     TfNotice::Key                   _stageInvalidateNoticeKey;
     TfNotice::Key                   _objectsChangedNoticeKey;

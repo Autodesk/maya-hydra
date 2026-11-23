@@ -109,6 +109,7 @@ class TestPickingTwoRenderOverrides(mtohUtils.MayaHydraBaseTestCase):
         import mayaUsd.lib
         from pxr import UsdGeom
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        self._proxyShapePath = stagePath
         stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
         xform = UsdGeom.Xform.Define(stage, "/" + self.USD_CUBE + "Xform")
         xform.AddTranslateOp().Set(value=self.USD_CUBE_POSITION)
@@ -254,6 +255,35 @@ class TestPickingTwoRenderOverrides(mtohUtils.MayaHydraBaseTestCase):
         self.setUpTwoViewports()
         self.createScene()
         self.initializeOverrides(FLASH, STORM)
+        self.tearDownFlash()
+        self.pickInEachViewport()
+
+    def test_FlashThenStormRenamedStage(self):
+        # The overrides' scene indices for the stage share its path mapper registration. Both
+        # observe the rename: the first one moves the registration, the second one finds it moved.
+        # Flash's scene index is the first one, and the registration must stay at the new path
+        # after Flash's teardown.
+        self.setUpTwoViewports()
+        self.createScene()
+        self.initializeOverrides(FLASH, STORM)
+        stageTransform = cmds.listRelatives(self._proxyShapePath, parent=True, fullPath=True)[0]
+        cmds.rename(stageTransform, "renamedStage")
+        cmds.refresh(force=True)
+        self.tearDownFlash()
+        self.pickInEachViewport()
+
+    def test_StageInvalidateWithBothOverridesLive(self):
+        # A stage invalidate makes each override replace its scene index for the stage
+        # (HYDRA-2582) on its next render. The path mapper must then go through a replacement,
+        # which maps against the current stage.
+        self.setUpTwoViewports()
+        self.createScene()
+        self.initializeOverrides(FLASH, STORM)
+        # Same value: MayaUSD still invalidates the stage.
+        cmds.setAttr(self._proxyShapePath + ".primPath", "", type="string")
+        cmds.refresh(force=True)
+        self.assertOneProxyShapePrefix(rendererUtils.TEST_RENDERER_STORM)
+        self.assertOneProxyShapePrefix(rendererUtils.TEST_RENDERER_FLASH)
         self.tearDownFlash()
         self.pickInEachViewport()
 
