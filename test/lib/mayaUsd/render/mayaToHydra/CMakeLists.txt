@@ -82,7 +82,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
 	#Disabled tests on OSX
-    testPointInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+    testPointInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127|disabledOn:usd2611:HYDRA-2757 # HYDRA-1127 : refinedWire not working on OSX | HYDRA-2757 : fails on USD 26.11
     testGeomSubsetsWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testNativeInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMeshWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
