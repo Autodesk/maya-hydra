@@ -34,10 +34,6 @@ namespace UFE_VERSIONED_NS {
 class Path;
 }
 
-PXR_NAMESPACE_OPEN_SCOPE
-class HdRenderIndex;
-PXR_NAMESPACE_CLOSE_SCOPE
-
 namespace MAYAHYDRA_NS_DEF {
 
 /*! \brief Determines how render settings are sourced for batch rendering.
@@ -104,10 +100,6 @@ Ufe::Path GetActiveRenderPassAppPath();
 
 // Get the Hydra path to the active render pass prim from the Maya scene.
 PXR_NS::SdfPath GetActiveRenderPassHydraPath();
-
-// Get render output tokens from the active Hydra render settings prim.
-PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
-    const PXR_NS::HdRenderIndex* renderIndex);
 
 struct RenderTimes
 {
