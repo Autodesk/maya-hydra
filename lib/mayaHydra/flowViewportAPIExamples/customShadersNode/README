@@ -7,4 +7,151 @@ This project is a Maya node that creates a Hydra primitive and applies to it the
 https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport/usdPlugins/shadersDiscoveryPlugin
 
 It also shows how to use the Flow viewport MaterialCreationInterface to replace Maya GLSLShader materials
-by a MayaHydra GLSL shader material.
+by a MayaHydra GLSL shader material :
+- [mhCustomVertexBufferGenerator.cpp](./mhCustomVertexBufferGenerator.cpp) registers a VP2 vertex buffer generator filling the *"myCustomStreamB"* custom stream requested by the *myCustomShader.ogsfx* shader.
+- [mhCustomMaterialCallbackCmd.cpp](./mhCustomMaterialCallbackCmd.cpp) adds the *mhRegisterCustomMaterialCallback* command, which registers a callback replacing the GLSLShader materials using *myCustomShader.ogsfx* by the *FVP_CustomBufferShader* GLSLFX shader, reading that stream.
+
+Python usage :
+
+    cmds.mhRegisterCustomMaterialCallback()
+    cmds.mhRegisterCustomMaterialCallback(unregister=True)
+
+## Replacing a Maya material by a custom Hydra material
+
+The interface to create custom Hydra materials is called *[MaterialCreationInterface](../../../flowViewport/API/fvpMaterialCreationInterface.h)*.
+To get an instance of the *MaterialCreationInterface* class, please use :
+
+    Fvp::MaterialCreationInterface& materialCreationInterface = Fvp::MaterialCreationInterface::Get();
+
+It lets you register a callback under a name. When MayaHydra translates a Maya material whose name matches, it calls your callback instead of doing its own conversion, and the Hydra material network you return is used as is.
+
+At the time of this writing, only Maya surface shaders of type **GLSLShader** are supported. The name used to find the callback is the file name of the GLSLShader *shader* attribute, without its directory and extension : *"C:/shaders/myCustomShader.ogsfx"* gives *"myCustomShader"*. So all the GLSLShader nodes pointing at that file, wherever it is located, use your callback.
+
+A typical use is a Maya OGSFX shader that reads a **custom vertex buffer**, created by a Maya *MPxVertexBufferGenerator*, which should also be drawn by Hydra Storm. MayaHydra passes such a buffer to Hydra as a primvar named after its custom semantic, so a GLSLFX shader can read it.
+
+### How it works
+
+```mermaid
+flowchart TB
+    ogsfx["GLSLShader node<br/>shader = myCustomShader.ogsfx"]
+    gen["MPxVertexBufferGenerator<br/>for semantic myCustomStreamB"]
+    vb["VP2 custom vertex buffer<br/>myCustomStreamB"]
+    cb["Your callback registered<br/>under myCustomShader"]
+    net["Hydra material network<br/>using FVP_CustomBufferShader"]
+    primvar["Hydra primvar<br/>myCustomStreamB"]
+    glslfx["GLSLFX shader reads<br/>HdGet_myCustomStreamB()"]
+    ogsfx -->|customSemantics annotation| gen
+    gen --> vb
+    vb -->|MayaHydra render item adapter| primvar
+    ogsfx -->|MayaHydra material adapter| cb
+    cb --> net
+    net --> glslfx
+    primvar --> glslfx
+```
+
+### Step by step
+
+This example and the [shadersDiscoveryPlugin](../../../flowViewport/usdPlugins/shadersDiscoveryPlugin) example implement every step below, the file names given in each step are where to look.
+
+**1. Write the Maya OGSFX shader and declare the custom semantic.**
+In the technique annotation, map a vertex input semantic to your custom semantic name, see [myCustomShader.ogsfx](../../../flowViewport/usdPlugins/shadersDiscoveryPlugin/shaders/myCustomShader.ogsfx) :
+
+    technique Main
+    <
+        string customSemantics = "TEXCOORD0=myCustomStreamB";
+    >
+
+The custom semantic name becomes the Hydra primvar name, so it must be a valid primvar name, and it must **not** start with *"uv"* or *"mayauv"* : these are treated as UV sets and published as the *st* primvar.
+
+**2. Register a vertex buffer generator for that semantic.**
+VP2 only creates the custom vertex buffer if an *MPxVertexBufferGenerator* is registered for the semantic, see [mhCustomVertexBufferGenerator.cpp](./mhCustomVertexBufferGenerator.cpp) :
+
+    MHWRender::MDrawRegistry::registerVertexBufferGenerator("myCustomStreamB", MyGenerator::creator);
+
+Fill the stream with **float** values of **2, 3 or 4 components**, one per vertex of the target indexing, like a UV set. Other data types are not translated to Hydra. Deregister the generator when your plugin unloads.
+
+**3. Write the GLSLFX shader for Hydra Storm.**
+Read the primvar with *HdGet_\<semantic name\>()*, and guard it with *HD_HAS_\<semantic name\>* so the shader still compiles on geometry that does not provide it, see [customBufferShader.glslfx](../../../flowViewport/usdPlugins/shadersDiscoveryPlugin/shaders/customBufferShader.glslfx) :
+
+    vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+    {
+    #ifdef HD_HAS_myCustomStreamB
+        vec4 customStream = HdGet_myCustomStreamB();
+    #else
+        vec4 customStream = vec4(0);
+    #endif
+        return vec4(customStream.xyz * -0.5 + vec3(0.5), 1.0);
+    }
+
+**4. Register the GLSLFX shader in USD and list the primvars it reads.**
+Add a *Shader* definition to a shaders discovery plugin, see [shaderDefs.usda](../../../flowViewport/usdPlugins/shadersDiscoveryPlugin/shaders/shaderDefs.usda) and the [shadersDiscoveryPlugin README](../../../flowViewport/usdPlugins/shadersDiscoveryPlugin/README) on how USD finds it :
+
+    def Shader "FVP_CustomBufferShader" (
+        sdrMetadata = {
+            string primvars = "myCustomStreamB"
+        }
+    )
+    {
+        uniform token info:implementationSource = "sourceAsset"
+        uniform asset info:glslfx:sourceAsset = @./customBufferShader.glslfx@
+        token outputs:displacement
+        token outputs:surface
+    }
+
+The *primvars* metadata is required : Hydra Storm only gives a material the primvars it asks for, so without it *HD_HAS_myCustomStreamB* is never defined. To read several primvars, separate their names with *|*.
+
+**5. Write the material creation callback.**
+It receives the Hydra path of the material prim and returns an *HdMaterialNetworkMap* in a *VtValue*, see [mhCustomMaterialCallbackCmd.cpp](./mhCustomMaterialCallbackCmd.cpp) :
+
+    VtValue CreateMyMaterial(const SdfPath& materialId)
+    {
+        HdMaterialNetworkMap networkMap;
+        HdMaterialNetwork&   network = networkMap.map[HdMaterialTerminalTokens->surface];
+
+        HdMaterialNode terminal;
+        terminal.identifier = TfToken("FVP_CustomBufferShader");
+        terminal.path = materialId.AppendChild(terminal.identifier);
+
+        networkMap.terminals.push_back(terminal.path);
+        network.nodes.emplace_back(std::move(terminal));
+        return VtValue(networkMap);
+    }
+
+- *identifier* is the name of the *Shader* definition from step 4.
+- Put the node paths under *materialId*, so the network stays inside the material prim.
+- The GLSLShader parameters are **not** translated. If your GLSLFX shader has inputs, set them yourself in *terminal.parameters*.
+- Return an empty *VtValue* to let MayaHydra use its default conversion for that material.
+
+**6. Register the callback, and unregister it before your plugin unloads.**
+Use the shader file name of step 1, without directory and extension :
+
+    Fvp::MaterialCreationInterface::Get().RegisterMaterialCreationCallback("myCustomShader", CreateMyMaterial);
+    ...
+    Fvp::MaterialCreationInterface::Get().UnregisterMaterialCreationCallback("myCustomShader");
+
+Registering again under the same name replaces the previous callback. The callback is code from your plugin, so **always unregister it in your plugin's *uninitializePlugin***, otherwise MayaHydra would call it after your plugin is unloaded.
+Register it before the Hydra viewport translates your materials. Materials which were already translated are not converted again when you register the callback.
+
+**7. Use it in Maya.**
+Assign a GLSLShader to a mesh and set its *shader* attribute to your OGSFX file, then switch the viewport to Hydra Storm. This example plugin does it with the *mhRegisterCustomMaterialCallback* command, see the [testCustomMaterial.py](../../../../test/lib/mayaUsd/render/mayaToHydra/testCustomMaterial.py) test :
+
+    cmds.loadPlugin("glslShader")
+    cmds.loadPlugin("mayaHydraCustomShadersNode")
+    cmds.mhRegisterCustomMaterialCallback()
+
+    sphere = cmds.polySphere()[0]
+    shader = cmds.shadingNode("GLSLShader", asShader=True)
+    sg = cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name=shader + "SG")
+    cmds.connectAttr(shader + ".outColor", sg + ".surfaceShader")
+    cmds.sets(sphere, edit=True, forceElement=sg)
+    cmds.setAttr(shader + ".shader", "<path to>/myCustomShader.ogsfx", type="string")
+
+### Limitations
+- Only GLSLShader surface shaders call the material creation callbacks.
+- Custom vertex buffers are translated on the default render item path only. When the render item override path is used, set the environment variable *MAYAHYDRA_RENDER_ITEM_OVERRIDE=0* before starting Maya to get them.
+- Only float custom vertex buffers of 2 to 4 components are translated, on meshes.
+
+### Troubleshooting
+- **The mesh is drawn with the default Maya conversion** : check that the callback name is the shader file name without directory and extension, and that it was registered before the material was translated.
+- **The mesh is drawn with your shader, but *HD_HAS_\<semantic name\>* is not defined** : check the *primvars* metadata of step 4, that a vertex buffer generator is registered for the semantic (step 2), and that the semantic name does not start with *"uv"* or *"mayauv"*. Setting the environment variable *TF_DEBUG=MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING* prints which vertex streams MayaHydra shares with Hydra on the GPU, custom ones included.
+- **A warning says a vertex buffer generator is already registered for the custom semantic** : another plugin, such as the Maya devkit *vertexBufferGenerator* plugin, registered a generator for the same semantic first, and that one fills the buffer.

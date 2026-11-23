@@ -10,6 +10,7 @@ The Flow viewport toolkit is an API for clients to customize the Hydra viewport.
 
  - Add  Hydra primitives which are neither related to a usd stage nor are DCC native data through what we call a **data producer scene index**.
  - Apply a **filtering scene index** to all primitives. Even if they are from another scene index including DCC native data, USD stages or a custom data producer scene index. 
+ - Replace the Hydra material of a DCC material by **your own Hydra material network**, for example to draw Maya GLSLShader materials with a custom GLSLFX shader for Hydra Storm, fed by custom vertex buffers.
  - Get information about the Hydra viewports and which render delegate they use
  - Get the version of the API
  
@@ -127,7 +128,7 @@ The API contains examples which are Maya projects on how to filter and add primi
 | Location      | Description                                                                                   |
 |-------------  |---------------------------------------------------------------------------------------------  |
 | [lib/flowViewport/usdPlugins/shadersDiscoveryPlugin](https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport/usdPlugins/shadersDiscoveryPlugin) | Is an example on how to develop a custom GLSL shader for Hydra Storm which you can apply later on USD / Hydra primitives |
-| [lib/mayaHydra/flowViewportAPIExamples/customShadersNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/customShadersNode) | Is a Maya node which creates an Hydra primitive and applies the custom GLSL shader for Hydra Storm |
+| [lib/mayaHydra/flowViewportAPIExamples/customShadersNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/customShadersNode) | Is a Maya node which creates an Hydra primitive and applies the custom GLSL shader for Hydra Storm.<BR>It also shows how to replace Maya GLSLShader materials by a custom Hydra material reading a custom vertex buffer, see [its README](../lib/mayaHydra/flowViewportAPIExamples/customShadersNode/README) |
 | [lib/mayaHydra/flowViewportAPIExamples/flowViewportAPILocator](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/flowViewportAPILocator) | Is a Maya node which creates Hydra primitives to display a grid of cubes and applies a filtering scene index to remove primitives with more than a certain number of vertices.<BR>This example shows how to create a Hydra mesh primitive, how to use Hydra instancing and deal with selection picking from MayaHydra|
 | [lib/mayaHydra/flowViewportAPIExamples/footPrintNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/footPrintNode) | Is a Maya node showing how to convert the Maya FootPrint node which is part of the samples from the Maya devkit. It shows how to create Hydra mesh primitives and deal with selection picking from MayaHydra|
 

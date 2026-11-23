@@ -15,6 +15,14 @@ separately (e.g. render delegates like HdArnold, HdPrman), which should be disco
 the MAYA_PXR_PLUGINPATH_NAME environment variable instead, so that MayaUSD can run its
 VersionCheck (Python/USD/MayaUsd) before registering them. See doc/build.md for details.
 
+Shaders in this project :
+- FVP_CustomBasicLightingShader (customBasicLightingShader.glslfx) : basic lighting with a custom color parameter.
+- FVP_CustomBufferShader (customBufferShader.glslfx) : colors the geometry from the "myCustomStreamB" primvar, a custom vertex
+  buffer. Its sdrMetadata "primvars" lists that primvar, Hydra Storm only gives a material the primvars it lists.
+- myCustomShader.ogsfx is not a Hydra shader : it is the Maya GLSLShader OGSFX shader that the customShadersNode example
+  replaces by FVP_CustomBufferShader, see the "Replacing a Maya material by a custom Hydra material" section of
+  https://github.com/Autodesk/maya-hydra/blob/dev/lib/mayaHydra/flowViewportAPIExamples/customShadersNode/README
+
 How to use this custom GLSL shader on usd primitives :
 ------------------------------------------------------
 

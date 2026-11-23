@@ -536,13 +536,15 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
         || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
 
-    // VP2 only supplies the streams the current shader requests, and a shader change can arrive
-    // as a topology-only update: read the streams then too when one appeared, otherwise it stays
-    // unadvertised until the next geometry change. Not on every topology-only update, which face
-    // component selection also raises, as nothing else needs re-reading there.
-    const bool texcoordStreamsAppeared = (present.texcoordStreams & ~_texcoordStreamBits) != 0;
-    const bool texcoordStreamsDisappeared = (_texcoordStreamBits & ~present.texcoordStreams) != 0;
-    _texcoordStreamBits = present.texcoordStreams;
+    // Presence is only known when the geometry was fetched: on any other update "present" is
+    // empty, and must neither count as every stream disappearing nor reset what the last fetch saw.
+    bool texcoordStreamsAppeared = false;
+    bool texcoordStreamsDisappeared = false;
+    if (geom) {
+        texcoordStreamsAppeared = (present.texcoordStreams & ~_texcoordStreamBits) != 0;
+        texcoordStreamsDisappeared = (_texcoordStreamBits & ~present.texcoordStreams) != 0;
+        _texcoordStreamBits = present.texcoordStreams;
+    }
 
     // Synthesized normals were not read from VP2, so for this purpose the real normals have not
     // been read yet and a real stream replacing them is picked up.
@@ -563,7 +565,10 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         published.normals = true;
     }
 
-    // Vertices
+    // VP2 only supplies the streams the current shader requests, and a shader change can arrive
+    // as a topology-only update: read the streams then too when one appeared, otherwise it stays
+    // unadvertised until the next geometry change. Not on every topology-only update, which face
+    // component selection also raises, as nothing else needs re-reading there.
     if ((geomChanged || (topoChanged && streamAppeared)) && vertexBuffercount) {
         //vertexBuffercount > 0 means geom is non null
         for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
