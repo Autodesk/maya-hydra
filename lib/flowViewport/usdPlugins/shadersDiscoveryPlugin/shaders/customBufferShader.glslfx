@@ -1,0 +1,55 @@
+-- glslfx version 0.1
+
+//
+// Copyright 2026 Autodesk, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+-- configuration
+{
+    "techniques": {
+        "default": {
+			"displacementShader": {
+                "source": [ "customBufferShader.Displacement" ]
+            },
+            "surfaceShader": {
+                "source": [ "customBufferShader.Surface" ]
+            }
+        }
+    }
+}
+
+--- --------------------------------------------------------------------------
+-- glsl customBufferShader.Displacement
+
+//Optional vertex displacement shader
+vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
+{
+    //Apply your custom vertex displacement on Peye or remove that function and its definition above for more performance
+    return Peye;
+}
+
+-- glsl customBufferShader.Surface
+
+vec4
+surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+#ifdef HD_HAS_myCustomStreamB
+    vec4 customStream = HdGet_myCustomStreamB();
+#else
+    vec4 customStream = vec4(0);
+#endif
+
+    return vec4(customStream.xyz * -0.5 + vec3(0.5), 1.0);
+}

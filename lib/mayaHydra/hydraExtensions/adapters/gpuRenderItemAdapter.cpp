@@ -166,12 +166,31 @@ void MayaHydraGpuRenderItemAdapter::_ReadVertexStream(
             return;
         }
         break;
-    case MGeometry::Semantic::kTexture:
-        if (isMesh && _extStreams.Share(mvb, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
-            _uvs.clear();
-            return;
+    case MGeometry::Semantic::kTexture: {
+        if (!isMesh) {
+            break;
+        }
+
+        const TfToken primvarName = _GetTexcoordPrimvarName(mvb->descriptor());
+        if (primvarName == MayaHydraAdapterTokens->st) {
+            if (_extStreams.Share(mvb, MayaHydraAdapterTokens->st, false, dirty.uvs)) {
+                _uvs.clear();
+                return;
+            }
+        } else {
+            bool customDirty = false;
+            const bool shared = _extStreams.Share(mvb, primvarName, false, customDirty);
+            if (customDirty) {
+                dirty.customPrimvars.insert(primvarName);
+            }
+            if (shared) {
+                // Kept empty so GetPrimvarDescriptors still advertises the primvar.
+                _customStreams[primvarName] = _CustomStream();
+                return;
+            }
         }
         break;
+    }
     case MGeometry::Semantic::kTangent:
         if (isMesh
             && _extStreams.Share(
@@ -220,7 +239,6 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
         };
         withdraw(HdTokens->points, present.positions, dirty.positions);
         withdraw(HdTokens->normals, present.normals, dirty.normals);
-        withdraw(MayaHydraAdapterTokens->st, present.uvs, dirty.uvs);
         withdraw(MayaHydraAdapterTokens->tangents, present.tangents, dirty.tangents);
     }
 
@@ -234,7 +252,17 @@ void MayaHydraGpuRenderItemAdapter::_EndGeometryUpdate(
             = dirty.tangents || !_extStreams.IsShared(MayaHydraAdapterTokens->tangents);
         dirty.normals
             = dirty.normals || (useMayaNormals && !_extStreams.IsShared(HdTokens->normals));
+        for (const auto& entry : _customStreams) {
+            if (!_extStreams.IsShared(entry.first)) {
+                dirty.customPrimvars.insert(entry.first);
+            }
+        }
     }
+}
+
+bool MayaHydraGpuRenderItemAdapter::_WithdrawStream(const TfToken& primvar)
+{
+    return _extStreams.Withdraw(primvar);
 }
 
 bool MayaHydraGpuRenderItemAdapter::_TopologyNeedsRebuild(

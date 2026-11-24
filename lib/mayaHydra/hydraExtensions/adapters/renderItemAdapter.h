@@ -25,6 +25,11 @@
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/tf/token.h>
+#include <pxr/base/vt/types.h>
+#include <cstdint>
+#include <set>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include <pxr/imaging/hd/basisCurvesTopology.h>
@@ -301,23 +306,31 @@ protected:
         bool normals = false;
         bool uvs = false;
         bool tangents = false;
+        std::set<TfToken> customPrimvars;
     };
 
     /// Vertex stream semantics supplied by a render item's geometry.
     struct StreamPresence
     {
         bool positions = false;
-        bool normals = false;
-        bool uvs = false;
+        bool normals = false; 
         bool tangents = false;
+        uint64_t texcoordStreams = 0; // kTexture stream bits in VP2 geometry.
     };
 
     /// Scan the vertex buffers of \p geom for the semantics they supply.
     static StreamPresence _GetStreamPresence(MGeometry* geom, int vertexBufferCount);
 
+    /// Returns a primvar name for a descriptor: st for UV coordinates, otherwise the
+    /// stream's semantic name.
+    static TfToken _GetTexcoordPrimvarName(const MVertexBufferDescriptor& desc);
+
     /// Number of values held from a previous update for the points, normals, st or
     /// tangents vertex stream.
     virtual size_t _StoredStreamCount(const TfToken& primvar) const;
+
+    /// Number of values held from a previous update for the st or a custom texcoord stream.
+    size_t _StoredTexcoordCount(const TfToken& primvar) const;
 
     /// Called once per UpdateFromDelta, before any vertex stream is read.
     virtual void _BeginGeometryUpdate(bool /*geomChanged*/, bool /*topoChanged*/) { }
@@ -350,6 +363,10 @@ protected:
         bool                   useMayaNormals,
         _StreamDirty&          dirty);
 
+    /// Withdraw the stream published outside the CPU arrays for \p primvar, which the geometry no
+    /// longer supplies. Returns true when there was one, so the renderer has to re-pull it.
+    virtual bool _WithdrawStream(const TfToken& /*primvar*/) { return false; }
+
     /// Whether the cached topology is rebuilt from freshly-read indices.
     virtual bool
     _TopologyNeedsRebuild(bool /*emitTopologyLocators*/, bool /*hasCachedTopology*/) const
@@ -366,6 +383,11 @@ protected:
     VtVec3fArray _normals = {};  //Are per vertex
     VtVec3fArray _tangents = {}; //Are face varying
     VtVec2fArray _uvs = {};      //Are face varying
+    // kTexture streams whose semantic name does not denote UV coordinates, published as a
+    // primvar of that name. Face varying, like _uvs, and of the stream's own dimension (2 to 4).
+    using _CustomStream = std::variant<VtVec2fArray, VtVec3fArray, VtVec4fArray>;
+    std::unordered_map<TfToken, _CustomStream, TfToken::HashFunctor> _customStreams;
+    uint64_t _texcoordStreamBits = 0;
 
 private:
     MAYAHYDRALIB_API
@@ -373,6 +395,13 @@ private:
 
     MAYAHYDRALIB_API
     void _InsertRprim(MayaHydraAdapter* adapter);
+
+    /// Drop the st and custom texcoord streams \p geom no longer supplies, flagging them in
+    /// \p dirty.
+    void _ClearAbsentTexcoordStreams(
+        MGeometry*            geom,
+        int                   vertexBufferCount,
+        _StreamDirty&         dirty);
 
 protected:
     // Remove and re-add this adapter's rprim under the same path, so the renderer
