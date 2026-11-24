@@ -501,15 +501,32 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
 
     // Tell the Viewport Toolbox where to find its resources.
     std::filesystem::path pluginPath = MtohGetMayaHydraPluginLocation();
-    // Go up 2 folders from plugin path and add /include/hvt/resources
+    // Prefer include/hvt/resources 2 folders up from the plugin folder, else the nearest ancestor
+    // of the plugin folder that has it.
     if (!pluginPath.empty()) {
-        const std::filesystem::path resourcePath = pluginPath.parent_path().parent_path() / "include" / "hvt" / "resources";
-        
-        // Check if the resource path exists and warn if it doesn't
+        const std::filesystem::path resourceSubPath
+            = std::filesystem::path("include") / "hvt" / "resources";
+        std::filesystem::path resourcePath
+            = pluginPath.parent_path().parent_path() / resourceSubPath;
+        for (std::filesystem::path dir = pluginPath;
+             !std::filesystem::exists(resourcePath);
+             dir = dir.parent_path()) {
+            resourcePath = dir / resourceSubPath;
+            if (dir == dir.parent_path()) {
+                break;
+            }
+        }
+
+        // Without the resources, Viewport Toolbox features that load shaders (such as outline
+        // selection highlighting) draw incorrectly.
         if (!std::filesystem::exists(resourcePath)) {
-            TF_WARN(
-                "MayaHydra: Viewport Toolbox resource directory does not exist: %s",
-                resourcePath.string().c_str());
+            MGlobal::displayError(
+                MString(
+                    "MayaHydra: Viewport Toolbox resources (include/hvt/resources) not found at or "
+                    "above the plugin folder: ")
+                + pluginPath.string().c_str()
+                + ". Outline selection highlighting and other Viewport Toolbox features will not "
+                  "work.");
         } else {
             hvt::SetResourceDirectory(resourcePath);
         }
