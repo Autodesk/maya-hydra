@@ -96,9 +96,10 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             "MAYAHYDRA_PIPELINE_OVERLAP is set for this process but the "
             "render override never saw it, so nothing under test ran.")
         if not stats["supported"]:
-            # Such as Metal against Pixar's USD, or Vulkan without threaded
-            # submission: MayaHydra draws on the main thread by design.
-            self.skipTest("This USD cannot run the render thread on the current Hgi.")
+            # Such as Metal against Pixar's USD, Vulkan without threaded
+            # submission, or OpenGL on Linux: MayaHydra draws on the main thread
+            # by design.
+            self.skipTest("The render thread cannot run on the current Hgi here.")
         self.assertEqual(
             stats["started"], 1,
             "Overlap was enabled but the render thread did not start, so "

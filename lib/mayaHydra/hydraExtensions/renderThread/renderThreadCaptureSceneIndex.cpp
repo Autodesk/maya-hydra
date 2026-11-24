@@ -38,6 +38,11 @@
 #include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
+// Some USD and TBB versions pull in windows.h, whose basetyps.h defines interface
+// as struct; HdMaterialNetworkSchema has a member of that name.
+#if defined(_WIN32) && defined(interface)
+#undef interface
+#endif
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/meshSchema.h>
@@ -1075,7 +1080,13 @@ void RenderThreadCaptureSceneIndex::_Copy(const SdfPath& path, _Entry& entry) co
 
 bool RenderThreadCaptureSceneIndex::_IsRendererPrim(const SdfPath& path, const TfToken& primType) const
 {
-    if (primType != HdPrimTypeTokens->task && primType != HdPrimTypeTokens->renderBuffer) {
+#if PXR_VERSION >= 2505
+    const bool isTask = primType == HdPrimTypeTokens->task;
+#else
+    // Tasks are not scene index prims before USD 25.05.
+    const bool isTask = false;
+#endif
+    if (!isTask && primType != HdPrimTypeTokens->renderBuffer) {
         return false;
     }
     return std::any_of(_rendererRoots.begin(), _rendererRoots.end(), [&path](const SdfPath& root) {

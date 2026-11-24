@@ -40,9 +40,11 @@ struct RenderThreadStatsSnapshot
     /// Thread running with its context current, not the silent fallback.
     bool started = false;
 
-    /// Whether this USD can run the render thread on the current Hgi at all:
+    /// Whether this build can run the render thread on the current Hgi at all:
     /// Vulkan needs threaded submission and frame preparation, Metal needs Metal
-    /// frame preparation. A thread that is supported but not started failed.
+    /// frame preparation, OpenGL needs a render thread context for the platform,
+    /// which Linux does not have yet. A thread that is supported but not started
+    /// failed.
     bool supported = false;
 
     uint64_t framesRenderedOffThread = 0;

@@ -2934,8 +2934,8 @@ void MtohRenderOverride::_InitHydraResources(
                             "on the render thread. Falling back to synchronous rendering.");
                 }
             } else {
-                MAYAHYDRA_NS_DEF::RenderThreadStats::instance().SetSupported(true);
                 context = MAYAHYDRA_NS_DEF::CreateGlRenderThreadContext();
+                MAYAHYDRA_NS_DEF::RenderThreadStats::instance().SetSupported(context != nullptr);
                 if (context) {
                     contextReady
                         = context->CreateShared(MAYAHYDRA_NS_DEF::CaptureCurrentHostContext());
