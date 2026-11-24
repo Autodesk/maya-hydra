@@ -178,6 +178,8 @@ private:
 
     SdfPath _pathPrefix;
     Ufe::Path _appPath{};
+    // Releasing it unregisters our pick handler.
+    MayaHydra::PickRegistrationPtr _pickRegistration;
 };
 
 namespace {
@@ -910,16 +912,13 @@ void MhFlowViewportAPILocator::addedToModelCb()
 
     _hydraViewportDataProducerSceneIndexExample.setContainerNode(&obj);
 
-    // Construct our scene below a prefix in the Hydra scene.  Would have liked
-    // to call
+    // Construct our scene below a prefix in the Hydra scene.  A descriptive
+    // prefix would have to be checked for uniqueness against the prefixes
+    // already in the Hydra scene, but during file read the scene indices are
+    // built later, and
     // GetMayaHydraLibInterface().GetTerminalSceneIndices();
-    // to compute a unique, descriptive scene index prefix while accounting for
-    // existing prefixes, using
-    // MayaHydra::sceneIndexPathPrefix()
-    // but during file read this is not possible, as scene indices are built
-    // later, and GetTerminalSceneIndices() returns an empty vector.  Use a
-    // pointer value to make the prefix unique, even if this is not very
-    // readable.
+    // returns an empty vector.  Use a pointer value to make the prefix unique,
+    // even if this is not very readable.
     _pathPrefix = SdfPath(TfStringPrintf("/cube_%p", this));
     _hydraViewportDataProducerSceneIndexExample.addDataProducerSceneIndex(
         _pathPrefix);
@@ -933,7 +932,8 @@ void MhFlowViewportAPILocator::addedToModelCb()
 
     // Register a pick handler for our prefix with the pick handler registry.
     auto pickHandler = std::make_shared<LocatorPickHandler>(obj);
-    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Register(_pathPrefix, pickHandler));
+    _pickRegistration = MayaHydra::PickHandlerRegistry::Instance().Register(_pathPrefix, pickHandler);
+    TF_AXIOM(_pickRegistration);
 
     // Register a path mapper to map application UFE paths to scene index paths,
     // for selection highlighting.
@@ -958,7 +958,7 @@ void MhFlowViewportAPILocator::removedFromModelCb()
     filteringSceneIndexInterface.unregisterFilteringSceneIndexClient(_hydraViewportFilteringSceneIndexClientExample);
 
     // Unregister our pick handler.
-    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_pathPrefix));
+    _pickRegistration.reset();
 
     // Unregister our path mapper.  Use stored UFE path, as at this point
     // our locator node is no longer in the Maya scene, so we cannot obtain

@@ -179,7 +179,7 @@ TEST(CameraPrimvars, ParamAttributesMatchGetLogic)
         "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
         "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
         "verticalShake", "filmFit", "depthOfField", "aiEnableDOF", "aiFocusDistance",
-        "orthographic",
+        "orthographic", "orthographicWidth",
 #if PXR_VERSION >= 2505
         "exposure",
 #endif
@@ -295,6 +295,75 @@ TEST(CameraPrimvars, DepthOfFieldSchemaFieldsRoundTrip)
 
     EXPECT_FLOAT_EQ(fStopDisabled, 0.0f);
     EXPECT_FALSE(depthOfFieldDisabled);
+}
+
+// What: an orthographic Maya camera publishes its square film and shake on HdCameraSchema.
+// How: make the camera orthographic, set orthographicWidth and shake, then change
+// orthographicWidth again.
+// Expect: projection is orthographic, both apertures equal orthographicWidth, the offsets equal
+// the shake, and changing orthographicWidth dirties the camera schema and updates the apertures.
+TEST(CameraPrimvars, OrthographicSchemaFields)
+{
+    const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(cameraShapeFull);
+
+    SdfPath cameraPrimPath;
+    HdSceneIndexBaseRefPtr sceneIndex = FindSceneIndexWithCamera(shapeNamePart, &cameraPrimPath);
+    ASSERT_TRUE(sceneIndex) << "Camera prim not found in scene index";
+    auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndex);
+    ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
+
+    const auto setAttr = [&cameraShapeFull](const std::string& attr, const std::string& value) {
+        MGlobal::executeCommand(
+            ("setAttr \"" + cameraShapeFull + "." + attr + "\" " + value).c_str());
+    };
+    setAttr("orthographic", "1");
+    setAttr("orthographicWidth", "25");
+    setAttr("shakeEnabled", "1");
+    setAttr("horizontalShake", "0.3");
+    setAttr("verticalShake", "-0.2");
+    MGlobal::executeCommand("refresh");
+
+    EXPECT_EQ(
+        ReadCameraSampledValue<TfToken>(sceneIndex, cameraPrimPath, HdCameraSchemaTokens->projection),
+        HdCameraSchemaTokens->orthographic);
+    EXPECT_NEAR(
+        ReadCameraSampledValue<float>(sceneIndex, cameraPrimPath, HdCameraSchemaTokens->horizontalAperture),
+        25.0f, 1e-4f);
+    EXPECT_NEAR(
+        ReadCameraSampledValue<float>(sceneIndex, cameraPrimPath, HdCameraSchemaTokens->verticalAperture),
+        25.0f, 1e-4f);
+    EXPECT_NEAR(
+        ReadCameraSampledValue<float>(
+            sceneIndex, cameraPrimPath, HdCameraSchemaTokens->horizontalApertureOffset),
+        0.3f, 1e-4f);
+    EXPECT_NEAR(
+        ReadCameraSampledValue<float>(
+            sceneIndex, cameraPrimPath, HdCameraSchemaTokens->verticalApertureOffset),
+        -0.2f, 1e-4f);
+
+    // Shake off: no offset. Maya ignores the film offset for orthographic cameras.
+    setAttr("shakeEnabled", "0");
+    setAttr("horizontalFilmOffset", "0.5");
+    MGlobal::executeCommand("refresh");
+    EXPECT_NEAR(
+        ReadCameraSampledValue<float>(
+            sceneIndex, cameraPrimPath, HdCameraSchemaTokens->horizontalApertureOffset),
+        0.0f, 1e-4f);
+
+    SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
+    const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
+    setAttr("orthographicWidth", "40");
+    MGlobal::executeCommand("refresh");
+
+    bool hadPrimvarsDirty = false;
+    bool hadCameraSchemaDirty = false;
+    CheckCameraDirtySince(
+        notifsAccumulator, startIndex, cameraPrimPath, hadPrimvarsDirty, hadCameraSchemaDirty);
+    EXPECT_TRUE(hadCameraSchemaDirty) << "Changing orthographicWidth should dirty the camera schema";
+    EXPECT_NEAR(
+        ReadCameraSampledValue<float>(sceneIndex, cameraPrimPath, HdCameraSchemaTokens->horizontalAperture),
+        40.0f, 1e-4f);
 }
 
 // Requires OpenUSD 25.05+ for HdCameraSchema::linearExposureScale. The Python wrappers skip these tests when

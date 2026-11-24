@@ -247,14 +247,16 @@ bool getIndexedColorPreferenceValue(
     const std::string& tableName,
     PXR_NS::GfVec4f&   outColor);
 
-//! Using a standard suffix and the depend node type, call uniqueChildName() to
-//! create a unique scene index path prefix based at the root of the scene
-//! index scene.  The mayaNode MObject is passed by non-const reference to
-//! satisfy MFnDependencyNode API requirements.
+//! The scene index path prefix of a Maya node, /<NodeType>_PluginNode/<node name>,
+//! with a numerical suffix added if that path is in reservedPrefixes. Uniqueness
+//! is checked against reservedPrefixes rather than against a scene: a scene may
+//! already hold this node's prims, which would make the name look taken. The
+//! mayaNode MObject is passed by non-const reference to satisfy
+//! MFnDependencyNode API requirements.
 MAYAHYDRALIB_API
 PXR_NS::SdfPath sceneIndexPathPrefix(
-    const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
-    MObject&                              mayaNode
+    const PXR_NS::SdfPathVector& reservedPrefixes,
+    MObject&                     mayaNode
 );
 
 /**

@@ -208,6 +208,10 @@ public:
     /// Return primvar descriptors for a given interpolation.
     virtual HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation);
     MAYAHYDRALIB_API
+    /// Return the color space of a primvar's values (a GfColorSpaceNames token), or an
+    /// empty token to leave it unspecified.
+    virtual TfToken GetPrimvarColorSpace(const TfToken& /*name*/) const { return TfToken(); }
+    MAYAHYDRALIB_API
     /// Return whether the prim should be treated as double-sided.
     virtual bool GetDoubleSided() const { return true; }
     MAYAHYDRALIB_API

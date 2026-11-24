@@ -138,6 +138,7 @@
 #include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <mayaUsdAPI/proxyStage.h>
+#include <mayaUsdAPI/utils.h>
 
 #include <maya/MDagPath.h>
 #include <maya/M3dView.h>
@@ -155,7 +156,6 @@
 #include <maya/MTimerMessage.h>
 
 #include <maya/MUiMessage.h>
-#include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
 #include <maya/MTypes.h>
 
@@ -182,7 +182,7 @@ namespace {
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
+const SdfPath MAYA_NATIVE_ROOT = MayaHydraSceneIndex::GetMayaNativeRoot();
 
 inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
 {
@@ -357,6 +357,29 @@ bool rendererDrawsSecondaryGraphics(const TfToken& rendererName)
     const auto      it = metadata.find("renderSecondaryGraphics");
     return it != metadata.end() && it->second.IsBool() && it->second.GetBool();
 }
+
+// State of the "USD Payload Bounding Boxes" toggle of the viewport Show menu, registered by
+// MayaUsd. On when the destination is not a model panel or the filter is not registered.
+bool unloadedPayloadBoundsDisplayed(const MHWRender::MFrameContext& frameContext)
+{
+#if defined(MAYAUSDAPI_API_VERSION) && MAYAUSDAPI_API_VERSION >= 10100
+    static const MString filterName = MAYAUSDAPI_NS::getPayloadBoundsDisplayFilter();
+#else
+    static const MString filterName("mayaUsdPayloadBoundsDisplayFilter");
+#endif
+
+    MString modelPanel;
+    if (frameContext.renderingDestination(modelPanel) != MHWRender::MFrameContext::k3dViewport) {
+        return true;
+    }
+    M3dView view;
+    if (M3dView::getM3dViewFromModelPanel(modelPanel, view) != MStatus::kSuccess) {
+        return true;
+    }
+    MStatus    status;
+    const bool displayed = view.pluginObjectDisplay(filterName, &status);
+    return status ? displayed : true;
+}
 } // namespace
 
 class MtohRenderOverride::SelectionObserver : public Ufe::Observer
@@ -478,15 +501,32 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
 
     // Tell the Viewport Toolbox where to find its resources.
     std::filesystem::path pluginPath = MtohGetMayaHydraPluginLocation();
-    // Go up 2 folders from plugin path and add /include/hvt/resources
+    // Prefer include/hvt/resources 2 folders up from the plugin folder, else the nearest ancestor
+    // of the plugin folder that has it.
     if (!pluginPath.empty()) {
-        const std::filesystem::path resourcePath = pluginPath.parent_path().parent_path() / "include" / "hvt" / "resources";
-        
-        // Check if the resource path exists and warn if it doesn't
+        const std::filesystem::path resourceSubPath
+            = std::filesystem::path("include") / "hvt" / "resources";
+        std::filesystem::path resourcePath
+            = pluginPath.parent_path().parent_path() / resourceSubPath;
+        for (std::filesystem::path dir = pluginPath;
+             !std::filesystem::exists(resourcePath);
+             dir = dir.parent_path()) {
+            resourcePath = dir / resourceSubPath;
+            if (dir == dir.parent_path()) {
+                break;
+            }
+        }
+
+        // Without the resources, Viewport Toolbox features that load shaders (such as outline
+        // selection highlighting) draw incorrectly.
         if (!std::filesystem::exists(resourcePath)) {
-            TF_WARN(
-                "MayaHydra: Viewport Toolbox resource directory does not exist: %s",
-                resourcePath.string().c_str());
+            MGlobal::displayError(
+                MString(
+                    "MayaHydra: Viewport Toolbox resources (include/hvt/resources) not found at or "
+                    "above the plugin folder: ")
+                + pluginPath.string().c_str()
+                + ". Outline selection highlighting and other Viewport Toolbox features will not "
+                  "work.");
         } else {
             hvt::SetResourceDirectory(resourcePath);
         }
@@ -1104,17 +1144,11 @@ SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
         if (!status || !_mayaHydraSceneIndex) {
             return {};
         }
-        MFnCamera camera(camPath, &status);
-        // TODO: Support orthographic cameras.
-        if (!status || camera.isOrtho()) {
-            return {};
-        }
         return _mayaHydraSceneIndex->GetCameraPrimPath(camPath);
     }
 
     // Only runtimes that registered a path mapper (MayaUSD) publish camera prims. Checking first
-    // keeps the registry's no-mapping warning out of every draw. Orthographic USD cameras are
-    // rejected later, when the camera prim projection is computed.
+    // keeps the registry's no-mapping warning out of every draw.
     if (!Fvp::PathMapperRegistry::Instance().HasMapper(ufePath)) {
         return {};
     }
@@ -1196,9 +1230,6 @@ MStatus MtohRenderOverride::Render(
                 dataProducer->UpdateTransform();
             }
         }
-
-        //Apply any pending update from MayaUsd proxy shape nodes
-        _sceneIndexRegistry->ApplyPendingUpdates();
 
         // Update plugin filtering scene indices
         std::string rendererNamesToUpdate;
@@ -1478,6 +1509,17 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
+    // Apply pending MayaUsd proxy shape updates before the data producer updates in renderFrame:
+    // a rebuilt chain's new data producer starts at identity and visible. A rebuilt chain also
+    // needs the selection replaced: until now the path mapper answered from the previous stage,
+    // so a selection made since the stage change holds wrong paths.
+    if (_sceneIndexRegistry && _sceneIndexRegistry->ApplyPendingUpdates() && _selectionSceneIndex) {
+        _needToReplaceSelection = true;
+        if (_leadObjectPathTracker) {
+            _leadObjectPathTracker->updatePrimSelections();
+        }
+    }
+
     if (_needToReplaceSelection){
         replaceHydraSelection(_selectionSceneIndex, *Ufe::GlobalSelection::get());
         _needToReplaceSelection = false;
@@ -1551,6 +1593,11 @@ MStatus MtohRenderOverride::Render(
             for (const auto& fvpPruningToken : fvpPruningTokens) {
                 _pruningSceneIndex->SetFilterStatus(fvpPruningToken, objectExclusions & mayaFilter);
             }
+        }
+
+        if (_unloadedPayloadBoundsSceneIndex && framecontext) {
+            _unloadedPayloadBoundsSceneIndex->SetEnabled(
+                unloadedPayloadBoundsDisplayed(*framecontext));
         }
     }
 
@@ -1651,6 +1698,10 @@ MStatus MtohRenderOverride::Render(
     const bool dormantColorPrefChanged = _dormantWireframeColorDirty.exchange(false);
     if ((selectionColorPrefChanged || dormantColorPrefChanged) && _wireframeColorInterfaceImp) {
         _wireframeColorInterfaceImp->RefreshColors();
+        // Unloaded payload bounding boxes pull a wireframe color in every display style.
+        if (_unloadedPayloadBoundsSceneIndex) {
+            _unloadedPayloadBoundsSceneIndex->DirtyWireframeColors();
+        }
     }
 
     if (selectionColorPrefChanged && _selection && _dirtySelectionColorsSceneIndex) {
@@ -1690,6 +1741,22 @@ MStatus MtohRenderOverride::Render(
             _dirtySelectionColorsSceneIndex->dirtySelectionRelatedPrims(selectionStateChanged);
         }
         _previouslySelectedPaths = currentlySelected;
+    }
+
+    // Unloaded payload boxes pull a wireframe color in every display style, so they cannot rely on
+    // the lead dirties above, which setColorDirtiesEnabled() may suppress. Dirty only the boxes of
+    // the old and new lead: the global color dirties would walk every prim under the selection.
+    if (_unloadedPayloadBoundsSceneIndex && _leadObjectPathTracker) {
+        SdfPathVector currentLeadPaths;
+        for (const Fvp::PrimSelection& leadSelection :
+             _leadObjectPathTracker->getLeadObjectPrimSelections()) {
+            currentLeadPaths.push_back(leadSelection.primPath);
+        }
+        if (currentLeadPaths != _previousLeadPaths) {
+            _unloadedPayloadBoundsSceneIndex->DirtyWireframeColors(_previousLeadPaths);
+            _unloadedPayloadBoundsSceneIndex->DirtyWireframeColors(currentLeadPaths);
+            _previousLeadPaths = std::move(currentLeadPaths);
+        }
     }
 
     if (reprWillBePushed) {
@@ -1786,8 +1853,13 @@ MStatus MtohRenderOverride::Render(
     renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
 
     // Every delegate renders through the camera prim translated from the Maya or USD camera, so
-    // that it gets the render parameters the free camera lacks. Orthographic cameras still use
-    // the free camera.
+    // that it gets the render parameters the free camera lacks. The free camera is only used when
+    // there is no camera prim to bind.
+    //
+    // For USD orthographic cameras, the solved display window reproduces Maya's projection
+    // matrix, so that Hydra matches VP2 picking. That matrix comes from the Maya proxy camera
+    // shape, which does not pick up the USD camera's orthographic width (EMSUSD-1393), so both
+    // differ from the USD camera's own framing until that is fixed.
     const SdfPath cameraPath = _ResolveCameraPrimPath();
 
     // The camera prim holds the raw camera attributes, shared by every panel looking through that
@@ -1816,7 +1888,8 @@ MStatus MtohRenderOverride::Render(
         }
         auto& params = currentPass->params();
 
-        if (!cameraPrimProjection) {
+        // Free camera path.
+        if (cameraPath.IsEmpty()) {
             params.viewInfo.framing = CameraUtilFraming(displayWindow, renderRegion);
             params.renderParams.camera = SdfPath();
             params.renderParams.overrideWindowPolicy
@@ -1831,13 +1904,21 @@ MStatus MtohRenderOverride::Render(
             = std::optional<CameraUtilConformWindowPolicy>(CameraUtilDontConform);
     }
 
-    if (cameraPrimProjection && !solvedWindow) {
+    if (!cameraPath.IsEmpty() && !solvedWindow) {
         // Warn once per camera. Panels looking through different cameras render in turn.
         if (_unsolvableFramingWarnedCameras.insert(cameraPath).second) {
-            TF_WARN(
-                "The projection of camera %s cannot be reproduced through its camera prim (for "
-                "example because of film roll). The viewport may not match Maya's framing.",
-                cameraPath.GetText());
+            if (cameraPrimProjection) {
+                TF_WARN(
+                    "The projection of camera %s cannot be reproduced through its camera prim "
+                    "(for example because of film roll). The viewport may not match Maya's "
+                    "framing.",
+                    cameraPath.GetText());
+            } else {
+                TF_WARN(
+                    "The projection of camera prim %s cannot be computed (for example because "
+                    "of a zero aperture). The viewport may not match Maya's framing.",
+                    cameraPath.GetText());
+            }
         }
     } else if (solvedWindow) {
         // The display window solves again (i.e., the film roll was removed).
@@ -2259,6 +2340,9 @@ MtohRenderOverride::_ResolveHoverHighlight(const PickHit& hit) const
 {
     HoverHighlight highlight;
 
+    // Pick handlers resolve the hit in this override's render index and scene indices.
+    const PickContextScope pickContextScope(this);
+
     // What a click on the hit would select, resolved by the same pick handler, so that the hover
     // follows the pick modes and the selection kind. A Maya pick handler does not support it:
     // Maya prims are not instanced, so the picked prim itself is hovered, as before.
@@ -2539,10 +2623,6 @@ void MtohRenderOverride::_InitHydraResources(
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex()));
     }
 
-    // We provide the pick context for pick handlers, so set the pick handler
-    // registry accordingly.
-    PickHandlerRegistry::Instance().SetPickContext(this);
-
     // Create internal scene indices chain
     _inputSceneIndexOfFilteringSceneIndicesChain = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
@@ -2555,6 +2635,10 @@ void MtohRenderOverride::_InitHydraResources(
     // as it is not designed around being in a specific place in the chain.
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
+
+    _mayaPickRegistration = PickHandlerRegistry::Instance().Register(
+        _mayaHydraSceneIndex->GetRprimPath(), MayaViewportSceneIndex::CreatePickHandler());
+    TF_VERIFY(_mayaPickRegistration, "Maya pick handler registration failed.");
 
     // Render globals are initialized after this method is called, so
     // included purposes attributes do not yet exist on the
@@ -2616,6 +2700,7 @@ void MtohRenderOverride::_InitHydraResources(
     // At time of writing we have a single selection scene index serving
     // all viewports.
     isolateSelectMgr.SetIsolateSelectSceneIndex(isSi);
+    _isolateSelectSceneIndex = isSi;
     _inputSceneIndexOfFilteringSceneIndicesChain = isSi;
 #endif
 
@@ -2699,8 +2784,30 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         }
     }
 
-    //We don't have any viewport using Hydra any more
-    Fvp::RenderViewDataManager::Get().RemoveAllRenderViewData();
+    // Remove this override's views only: another render override may still be drawing its own,
+    // and removing them would take its filtering chain out of its render index.
+    auto& renderViewDataManager = Fvp::RenderViewDataManager::Get();
+    std::vector<std::string> ownViewIds;
+    for (const auto& viewData : renderViewDataManager.GetAllViewData()) {
+        if (viewData.GetRenderIndex() == renderIndex()) {
+            ownViewIds.push_back(viewData.GetViewDesc()._viewId);
+        }
+    }
+    for (const auto& viewId : ownViewIds) {
+        renderViewDataManager.RemoveRenderViewData(viewId);
+    }
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    // The isolate select manager is process-wide: reset it only if it still holds this
+    // override's isolate select scene index.
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+    if (_isolateSelectSceneIndex
+        && HdSceneIndexBaseRefPtr(isolateSelectMgr.GetIsolateSelectSceneIndex())
+            == _isolateSelectSceneIndex) {
+        isolateSelectMgr.Reset();
+    }
+#endif
+    _isolateSelectSceneIndex = nullptr;
 
     if (fullReset){
         //Remove the data producer scene indices that apply to all views
@@ -2711,6 +2818,9 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _sceneIndexRegistry.reset();
 
     _ClearMayaHydraSceneIndex();
+
+    // Unregisters the Maya pick handler if no other render override uses it.
+    _mayaPickRegistration.reset();
 
     // Tear down explicitly rather than waiting for the destructor: the downstream filtering
     // scene indices still hold this one through their input until the next
@@ -2755,6 +2865,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _appliedReprTreatment.reset();
     _previouslySelectedPaths.clear();
     _previouslySelectedPaths.shrink_to_fit();
+    _previousLeadPaths.clear();
+    _previousLeadPaths.shrink_to_fit();
 
     // Cleanup passes
 
@@ -2803,9 +2915,6 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     
     _initializationSucceeded = false;
     _initializationAttempted = false;
-
-    // Remove the pick context from pick handlers.
-    PickHandlerRegistry::Instance().SetPickContext(nullptr);
 }
 
 HdSceneIndexBaseRefPtr MtohRenderOverride::_CreatePassFilteringSceneIndex(
@@ -2850,7 +2959,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     if (! _wireframeColorInterfaceImp){
         _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
-
     // Insert the bounding box filtering scene index which converts geometries into a bounding box
     // using the extent attribute
     _bboxSceneIndex = Fvp::BboxSceneIndex::New(
@@ -2858,6 +2966,23 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _bboxSceneIndex->AddExcludedSceneRoot(
         MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
     _lastFilteringSceneIndexBeforeCustomFiltering = _bboxSceneIndex;
+
+    // Bounding boxes of unloaded USD payloads. After the bounding box scene index, as they already
+    // are boxes. Only the USD stages that are not fully loaded can have unloaded prims.
+    const std::weak_ptr<MayaHydraSceneIndexRegistry> sceneIndexRegistry = _sceneIndexRegistry;
+    _lastFilteringSceneIndexBeforeCustomFiltering = _unloadedPayloadBoundsSceneIndex
+        = Fvp::UnloadedPayloadBoundsSceneIndex::New(
+            _lastFilteringSceneIndexBeforeCustomFiltering,
+            _wireframeColorInterfaceImp,
+            [sceneIndexRegistry](const SdfPath& primPath) {
+                // Maya native prims never have unloaded payloads.
+                if (primPath.HasPrefix(MAYA_NATIVE_ROOT)) {
+                    return false;
+                }
+                const auto registry = sceneIndexRegistry.lock();
+                return registry && registry->MayHaveUnloadedPrims(primPath);
+            },
+            unloadedPayloadBoundsDisplayed(drawContext));
 
     // Repr selector Scene Index
     _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex =
@@ -3359,7 +3484,11 @@ bool MtohRenderOverride::select(
     bool isOneMayaNodeInComponentsPickingMode = false;
     const unsigned int ufeSnSizeBefore = _ufeSn ? _ufeSn->size() : 0;
     const unsigned int mayaSnLengthBefore = selectionList.length();
-    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    {
+        // Pick handlers resolve the hits in this override's render index and scene indices.
+        const PickContextScope pickContextScope(this);
+        _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    }
     if (isOneMayaNodeInComponentsPickingMode){
         return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
     }
@@ -4079,6 +4208,11 @@ HdRenderIndex* MtohRenderOverride::renderIndex(int passIndex /*= 0*/) const
     return (_framePassesData[passIndex] && _framePassesData[passIndex]->HasRenderIndexProxy())
         ? _framePassesData[passIndex]->GetRenderIndexProxy()->RenderIndex()
         : nullptr;
+}
+
+MAYAHYDRA_NS::MayaViewportSceneIndex* MtohRenderOverride::mayaViewportSceneIndex() const
+{
+    return get_pointer(_mayaViewportSceneIndex);
 }
 
 const hvt::FramePassPtr&

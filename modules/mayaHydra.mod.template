@@ -4,7 +4,7 @@ plug-ins:
 presets: 
 scripts: 
 resources: 
-PYTHONPATH+:=lib/python
+PYTHONPATH+:=${PXR_USD_PYTHON_LOCATION}
 USD_LOCATION:=
 MAYA_USD_VERSION=${USD_VERSION}
 PXR_MTLX_STDLIB_SEARCH_PATHS+:=libraries

@@ -34,7 +34,7 @@ If you want to <B>be able to import usd data in maya through [MayaUSD](https://g
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
->NOTE: Make sure that you don't have any older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
+>NOTE: Make sure that you don't have any older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. The tests and the generated Maya module file point ```PATH``` and ```PYTHONPATH``` to the correct USD location.
 
 #### 3. Download and Build MayaUSD 
 

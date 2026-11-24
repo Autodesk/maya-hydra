@@ -37,6 +37,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testRefinement.py|disabledOn:HdFlash:AGP-1034,AGP-1035|disabledOn:maya2027,lin:HYDRA-1893 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
+    testUsdStageInvalidateNativeInstances.py
     testMayaShadingModes.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
@@ -81,7 +82,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
 	#Disabled tests on OSX
-    testPointInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+    testPointInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127|disabledOn:usd2611:HYDRA-2757 # HYDRA-1127 : refinedWire not working on OSX | HYDRA-2757 : fails on USD 26.11
     testGeomSubsetsWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testNativeInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMeshWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
@@ -103,6 +104,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testDataProducerMergingSceneIndex.py
     cpp/testUsdSelection.py
     cpp/testPathMapperRegistry.py
+    cpp/testRenderDescriptionPathMapper.py # Skips itself without the hydraRender command
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py
@@ -116,6 +118,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdNestedNativeInstancePicking.py
     cpp/testUsdPickKind.py
+    cpp/testPickingTwoRenderOverrides.py # Skips itself unless both Storm and Flash are registered
     cpp/testNurbsSurfaces.py
     cpp/testGeomSubsetsPicking.py|disabledOn:HdFlash:HYDRA-2672 # HYDRA-2672 : Geom subset picking doesn't update UFE selection
     cpp/testSinglePicking.py
@@ -143,6 +146,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testLegacyHighlightPassRouting.py
     cpp/testDeferredHighlightWireInit.py
     cpp/testRenderItemDirtyLocators.py
+    cpp/testUnloadedPayloadBounds.py
 )
 
 # These two test files are identical, except for disabled tests.  See

@@ -67,6 +67,7 @@
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPurposeFilteringSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpUnloadedPayloadBoundsSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -219,6 +220,7 @@ public:
     std::string renderIndexName(int passIndex = 0) const;
 
     HdRenderIndex* renderIndex(int passIndex = 0) const override;
+    MAYAHYDRA_NS::MayaViewportSceneIndex* mayaViewportSceneIndex() const override;
     int            getNumFramePasses() const { return _GetNumFramePasses(); }
 
 private:
@@ -443,6 +445,10 @@ private:
     // too. Kept sorted for std::set_symmetric_difference.
     PXR_NS::SdfPathVector                 _previouslySelectedPaths;
 
+    // Lead object paths at the last unloaded payload box color invalidation, so the boxes of the
+    // previous lead are dirtied too.
+    PXR_NS::SdfPathVector                 _previousLeadPaths;
+
     // A color preference changed: rebuild and push the OutlineManager style.
     std::atomic<bool>                     _outlineStyleDirty = { true };
 
@@ -486,7 +492,7 @@ private:
     Fvp::FramePassDataPtrVector                                _framePassesData;
     
     /// Return the Hydra camera prim the panel renders through, or an empty path when there is
-    /// none (orthographic, unmapped runtime, unexpected mapping). An empty path means the passes
+    /// none (i.e. no UFE camera path). An empty path means the passes
     /// use the free camera, so failure needs no other handling.
     SdfPath _ResolveCameraPrimPath();
 
@@ -511,6 +517,7 @@ private:
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
     Fvp::ReprSelectorSceneIndexRefPtr         _reprSelectorSceneIndex;
     Fvp::BboxSceneIndexRefPtr                 _bboxSceneIndex;
+    Fvp::UnloadedPayloadBoundsSceneIndexRefPtr _unloadedPayloadBoundsSceneIndex;
     Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
@@ -556,6 +563,12 @@ private:
 
     MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
     MAYAHYDRA_NS::MayaViewportSceneIndexRefPtr _mayaViewportSceneIndex;
+    // Shared with the other render overrides: the Maya pick handler is unregistered with the
+    // last one.
+    MAYAHYDRA_NS::PickRegistrationPtr _mayaPickRegistration;
+    // The isolate select scene index this override gave the process-wide isolate select
+    // manager, which ClearHydraResources() resets only if it still holds it.
+    HdSceneIndexBaseRefPtr _isolateSelectSceneIndex;
 
     //Lead object selection and wireframe color for selection highlight
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};

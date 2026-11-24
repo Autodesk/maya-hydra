@@ -122,6 +122,18 @@ auto FindSelfOrFirstChild(const PXR_NS::SdfPath& path, const std::set<PXR_NS::Sd
     return pathSet.cend();
 }
 
+// Erases path and all its descendants in O(log N + erased count), relying on
+// descendants being contiguous after their ancestor in std::set's ordering.
+inline
+void EraseSelfAndDescendants(const PXR_NS::SdfPath& path, std::set<PXR_NS::SdfPath>& pathSet) {
+    const auto itBegin = pathSet.lower_bound(path);
+    auto itEnd = itBegin;
+    while (itEnd != pathSet.end() && itEnd->HasPrefix(path)) {
+        ++itEnd;
+    }
+    pathSet.erase(itBegin, itEnd);
+}
+
 template<typename MapValueType>
 auto FindSelfOrFirstChild(const PXR_NS::SdfPath& path, const std::map<PXR_NS::SdfPath, MapValueType>& pathMap) -> decltype(pathMap.cend()) {
     auto itPath = pathMap.lower_bound(path);

@@ -25,6 +25,34 @@
 
 namespace MAYAHYDRA_NS_DEF {
 
+/// \class PickRegistration
+///
+/// The registration of a pick handler, shared by its clients through
+/// PickRegistrationPtr. The handler is unregistered when the last client
+/// releases its pointer.
+///
+class PickRegistration
+{
+public:
+    MAYAHYDRALIB_API
+    ~PickRegistration();
+
+    const PXR_NS::SdfPath& GetPrefix() const { return _prefix; }
+
+    PickRegistration(const PickRegistration&) = delete;
+    PickRegistration& operator=(const PickRegistration&) = delete;
+
+private:
+    friend class PickHandlerRegistry;
+
+    explicit PickRegistration(const PXR_NS::SdfPath& prefix)
+        : _prefix(prefix)
+    {
+    }
+
+    const PXR_NS::SdfPath _prefix;
+};
+
 /// \class PickHandlerRegistry
 ///
 /// A registry of pick handlers, indexed by scene index path.
@@ -32,6 +60,10 @@ namespace MAYAHYDRA_NS_DEF {
 /// The pick handler registry has the following properties:
 /// - All entries are unique.
 /// - No entry is a prefix (ancestor) of another entry.
+///
+/// Several clients can share a prefix: each instance of the same data producer,
+/// e.g. one per render override, calls Register() and keeps the registration.
+/// Main thread only.
 ///
 class PickHandlerRegistry {
 public:
@@ -41,18 +73,16 @@ public:
 
     //! Register a pick handler to deal with all Hydra scene index prims
     //! under prefix.  An empty prefix, or a prefix that is the absolute
-    //! root, are illegal.
+    //! root, are illegal.  If prefix is already registered with a handler of
+    //! the same type, return that registration and drop pickHandler: handlers
+    //! sharing a prefix must be interchangeable.
     /*!
-      \return False if an ancestor, descendant, or prefix itself is found in the registry, true otherwise.
+      \return Null if prefix is illegal, if an ancestor or descendant of prefix
+      is in the registry, or if prefix is registered with a handler of another
+      type. The registration otherwise.
     */
     MAYAHYDRALIB_API
-    bool Register(const PXR_NS::SdfPath& prefix, const PickHandlerConstPtr& pickHandler);
-    //! Unregister pick handler for prefix.
-    /*!
-      \return False if prefix itself was not found in the registry, true otherwise.
-    */
-    MAYAHYDRALIB_API
-    bool Unregister(const PXR_NS::SdfPath& prefix);
+    PickRegistrationPtr Register(const PXR_NS::SdfPath& prefix, const PickHandlerConstPtr& pickHandler);
 
     //! Query the pick handler registered for that exact Hydra scene index
     //! path.  If no pick handler has been registered, return a nullptr.
@@ -66,13 +96,18 @@ public:
     MAYAHYDRALIB_API
     PickHandlerConstPtr GetHandler(const PXR_NS::SdfPath& path) const;
 
-    //! Set and get the pick context object for pick handlers to use.
+    //! Set and get the pick context object for pick handlers to use. Prefer
+    //! PickContextScope, which restores the previous context.
     MAYAHYDRALIB_API
     void SetPickContext(const PickContextConstPtr& context);
     MAYAHYDRALIB_API
     PickContextConstPtr GetPickContext() const;
 
 private:
+
+    // Called by the last owner of the registration, from ~PickRegistration().
+    bool _Unregister(const PXR_NS::SdfPath& prefix);
+    friend class PickRegistration;
 
     PickHandlerRegistry() = default;
     ~PickHandlerRegistry() = default;
@@ -81,7 +116,30 @@ private:
 
     friend class PXR_NS::TfSingleton<PickHandlerRegistry>;
 };
-    
+
+/// \class PickContextScope
+///
+/// Sets the pick context for the lifetime of the scope, and restores the
+/// previous one on exit. Several render overrides can be live at once, so the
+/// override that picks sets itself as the context for the duration of the pick.
+class PickContextScope
+{
+public:
+    explicit PickContextScope(const PickContextConstPtr& context)
+        : _previous(PickHandlerRegistry::Instance().GetPickContext())
+    {
+        PickHandlerRegistry::Instance().SetPickContext(context);
+    }
+
+    ~PickContextScope() { PickHandlerRegistry::Instance().SetPickContext(_previous); }
+
+    PickContextScope(const PickContextScope&) = delete;
+    PickContextScope& operator=(const PickContextScope&) = delete;
+
+private:
+    const PickContextConstPtr _previous;
+};
+
 }
 
 #endif
