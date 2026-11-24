@@ -329,6 +329,8 @@ private:
 
     SdfPath _pathPrefix;
     Ufe::Path _appPath{};
+    // Releasing it unregisters our pick handler.
+    MayaHydra::PickRegistrationPtr _pickRegistration;
 
     /// Hydra retained scene index holding the 2 foot print primitives.
     /// Teardown: removeDataProducerSceneIndex in removedFromModelCb() and
@@ -1146,7 +1148,8 @@ void MhFootPrint::addedToModelCb()
 
     // Register a pick handler for our prefix with the pick handler registry.
     auto pickHandler = std::make_shared<FootPrintPickHandler>(obj);
-    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Register(_pathPrefix, pickHandler));
+    _pickRegistration = MayaHydra::PickHandlerRegistry::Instance().Register(_pathPrefix, pickHandler);
+    TF_AXIOM(_pickRegistration);
 
     // Register a path mapper to map application UFE paths to scene index paths,
     // for selection highlighting.
@@ -1175,7 +1178,7 @@ void MhFootPrint::removedFromModelCb()
     TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(_appPath));
 
     // Unregister our pick handler.
-    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_pathPrefix));
+    _pickRegistration.reset();
 
     //Remove the data producer scene index.
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();

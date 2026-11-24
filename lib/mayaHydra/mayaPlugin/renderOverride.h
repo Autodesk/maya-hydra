@@ -220,6 +220,7 @@ public:
     std::string renderIndexName(int passIndex = 0) const;
 
     HdRenderIndex* renderIndex(int passIndex = 0) const override;
+    MAYAHYDRA_NS::MayaViewportSceneIndex* mayaViewportSceneIndex() const override;
     int            getNumFramePasses() const { return _GetNumFramePasses(); }
 
 private:
@@ -562,6 +563,12 @@ private:
 
     MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
     MAYAHYDRA_NS::MayaViewportSceneIndexRefPtr _mayaViewportSceneIndex;
+    // Shared with the other render overrides: the Maya pick handler is unregistered with the
+    // last one.
+    MAYAHYDRA_NS::PickRegistrationPtr _mayaPickRegistration;
+    // The isolate select scene index this override gave the process-wide isolate select
+    // manager, which ClearHydraResources() resets only if it still holds it.
+    HdSceneIndexBaseRefPtr _isolateSelectSceneIndex;
 
     //Lead object selection and wireframe color for selection highlight
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
