@@ -34,7 +34,7 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <set>
+#include <deque>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -52,8 +52,11 @@ class MayaHydraAiSkyDomeLightAdapter : public MayaHydraLightAdapter
     /// The 1x1 constant color textures written for this light, which Hydra uses when
     /// nothing is connected to the color, as it ignores the color of a dome light
     /// without a texture. One per color, so that a renderer caching textures by
-    /// path sees a color edit. Deleted with the adapter.
-    std::set<std::string> _constantColorTextures;
+    /// path sees a color edit. The render thread may still load the previous color's
+    /// path from its copy of the scene, so the newest two are kept, most recent
+    /// last; older ones are deleted, and the rest with the adapter.
+    static constexpr size_t _kKeptConstantColorTextures = 2;
+    std::deque<std::string> _constantColorTextures;
 
     static bool _IsConnected(const MPlug& plug)
     {
@@ -90,7 +93,11 @@ class MayaHydraAiSkyDomeLightAdapter : public MayaHydraLightAdapter
         const std::string path = _tmpFolderPath
             + TfStringPrintf("/HydraAiSkyDomeLightTex__%p__%02x%02x%02x__tmp.png",
                              this, texData[0], texData[1], texData[2]);
-        if (_constantColorTextures.count(path)) {
+        const auto known
+            = std::find(_constantColorTextures.begin(), _constantColorTextures.end(), path);
+        if (known != _constantColorTextures.end()) {
+            _constantColorTextures.erase(known);
+            _constantColorTextures.push_back(path);
             return path;
         }
         HioImageSharedPtr image = HioImage::OpenForWriting(path);
@@ -103,7 +110,11 @@ class MayaHydraAiSkyDomeLightAdapter : public MayaHydraLightAdapter
         if (!image || !image->Write(storage)) {
             return {};
         }
-        _constantColorTextures.insert(path);
+        _constantColorTextures.push_back(path);
+        while (_constantColorTextures.size() > _kKeptConstantColorTextures) {
+            std::remove(_constantColorTextures.front().c_str());
+            _constantColorTextures.pop_front();
+        }
         return path;
     }
 
