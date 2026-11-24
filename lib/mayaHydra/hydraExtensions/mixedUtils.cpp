@@ -1100,28 +1100,6 @@ SdfPath sceneIndexPluginPath(const MFnDependencyNode& dependNodeFn)
 
 } // namespace
 
-// Build a unique scene index path prefix for a Maya node.
-SdfPath sceneIndexPathPrefix(
-    const HdSceneIndexBaseRefPtr& sceneIndex,
-    MObject&                      mayaNode
-)
-{
-    MFnDependencyNode dependNodeFn(mayaNode);
-
-    // Create a unique scene index path prefix by starting with the
-    // Maya node name, and checking for uniqueness under the scene
-    // index plugin parent rprim.  If not unique, add an
-    // incrementing numerical suffix until it is.
-    const auto pluginPath = sceneIndexPluginPath(dependNodeFn);
-    const auto newName = uniqueChildName(
-        sceneIndex,
-        pluginPath,
-        SanitizeNameForSdfPath(dependNodeFn.name().asChar())
-    );
-
-    return pluginPath.AppendChild(newName);
-}
-
 SdfPath sceneIndexPathPrefix(
     const SdfPathVector& reservedPrefixes,
     MObject&             mayaNode

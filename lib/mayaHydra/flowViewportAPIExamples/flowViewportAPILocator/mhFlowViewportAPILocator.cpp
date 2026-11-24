@@ -912,16 +912,13 @@ void MhFlowViewportAPILocator::addedToModelCb()
 
     _hydraViewportDataProducerSceneIndexExample.setContainerNode(&obj);
 
-    // Construct our scene below a prefix in the Hydra scene.  Would have liked
-    // to call
+    // Construct our scene below a prefix in the Hydra scene.  A descriptive
+    // prefix would have to be checked for uniqueness against the prefixes
+    // already in the Hydra scene, but during file read the scene indices are
+    // built later, and
     // GetMayaHydraLibInterface().GetTerminalSceneIndices();
-    // to compute a unique, descriptive scene index prefix while accounting for
-    // existing prefixes, using
-    // MayaHydra::sceneIndexPathPrefix()
-    // but during file read this is not possible, as scene indices are built
-    // later, and GetTerminalSceneIndices() returns an empty vector.  Use a
-    // pointer value to make the prefix unique, even if this is not very
-    // readable.
+    // returns an empty vector.  Use a pointer value to make the prefix unique,
+    // even if this is not very readable.
     _pathPrefix = SdfPath(TfStringPrintf("/cube_%p", this));
     _hydraViewportDataProducerSceneIndexExample.addDataProducerSceneIndex(
         _pathPrefix);
