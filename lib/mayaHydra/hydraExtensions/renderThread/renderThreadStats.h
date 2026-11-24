@@ -43,7 +43,7 @@ struct RenderThreadStatsSnapshot
     /// Whether this build can run the render thread on the current Hgi at all:
     /// Vulkan needs threaded submission and frame preparation, Metal needs Metal
     /// frame preparation, OpenGL needs a render thread context for the platform,
-    /// which Linux does not have yet. A thread that is supported but not started
+    /// which macOS does not have. A thread that is supported but not started
     /// failed.
     bool supported = false;
 

@@ -52,9 +52,14 @@ arena per GL context, for the container resources that cannot be shared.
 If the context cannot be made current on the thread, `Start()` returns false,
 the thread is joined immediately, and drawing stays on the main thread.
 
-The GL render-thread context exists only on Windows.  Under an OpenGL Hgi on
-Linux or macOS the thread does not start, and a warning says so.  Vulkan and
-Metal need no context.
+The GL render-thread context exists on Windows, with WGL and a hidden 1x1
+window, and on Linux, with GLX and a 1x1 pbuffer in Maya's framebuffer
+configuration.  On Linux it is created on Maya's X display connection, which
+the render thread then uses alongside the main thread; Qt's xcb platform
+initializes Xlib for threads at startup.  An X error during creation is caught
+and reported rather than ending the process.  Under an OpenGL Hgi on macOS the
+thread does not start, and a warning says so.  Vulkan and Metal need no
+context.
 
 ## Handing frames across
 

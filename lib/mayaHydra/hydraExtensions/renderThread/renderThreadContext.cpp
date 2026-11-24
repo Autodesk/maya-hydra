@@ -28,6 +28,12 @@
 
 #include <pxr/imaging/garch/glApi.h>
 
+// After glApi.h, which must come before any other GL header.
+#if defined(__linux__)
+#include <GL/glx.h>
+#include <GL/glxext.h>
+#endif
+
 #include <cstdio>
 
 #if defined(_WIN32)
@@ -235,6 +241,197 @@ private:
 
 #endif // _WIN32
 
+#if defined(__linux__)
+
+// Xlib's default error handler exits the process, so an X error while creating
+// the pbuffer or the context is caught here instead and reported as a failure.
+// Main thread only.
+int _glxErrorCode = 0;
+
+int _CatchXError(Display*, XErrorEvent* event)
+{
+    _glxErrorCode = event->error_code;
+    return 0;
+}
+
+class _ScopedXErrorCatcher
+{
+public:
+    explicit _ScopedXErrorCatcher(Display* display)
+        : _display(display)
+    {
+        XSync(_display, False);
+        _glxErrorCode = 0;
+        _previous = XSetErrorHandler(_CatchXError);
+    }
+    ~_ScopedXErrorCatcher() { XSetErrorHandler(_previous); }
+
+    _ScopedXErrorCatcher(const _ScopedXErrorCatcher&) = delete;
+    _ScopedXErrorCatcher& operator=(const _ScopedXErrorCatcher&) = delete;
+
+    /// The X error code since construction or the last call, 0 if none.
+    int TakeError()
+    {
+        XSync(_display, False);
+        const int code = _glxErrorCode;
+        _glxErrorCode = 0;
+        return code;
+    }
+
+private:
+    Display* _display;
+    int (*_previous)(Display*, XErrorEvent*) = nullptr;
+};
+
+std::string _GlxError(const char* what, int xErrorCode = 0)
+{
+    char buf[160];
+    if (xErrorCode) {
+        std::snprintf(buf, sizeof(buf), "%s failed, X error %d", what, xErrorCode);
+    } else {
+        std::snprintf(buf, sizeof(buf), "%s failed", what);
+    }
+    return buf;
+}
+
+/// The GL context the render thread owns, drawing to a 1x1 pbuffer of its own
+/// rather than to a Maya viewport window, which Maya may recreate while the
+/// thread has it current. The context is created on Maya's X display
+/// connection, as is the context it shares with, and the render thread then
+/// uses that connection alongside the main thread. That needs Xlib initialized
+/// for threads, which Qt's xcb platform does at startup.
+class GlRenderThreadContext final : public RenderThreadContext
+{
+public:
+    ~GlRenderThreadContext() override
+    {
+        DestroyContext();
+        if (_pbuffer && _display) {
+            glXDestroyPbuffer(_display, _pbuffer);
+            _pbuffer = 0;
+        }
+    }
+
+    bool CreateShared(const RenderThreadHostContext& host) override
+    {
+        if (!host.IsValid()) {
+            _lastError = "the host context is invalid; CaptureCurrentHostContext must be "
+                         "called on the main thread while Maya's GL context is current";
+            return false;
+        }
+        _display = static_cast<Display*>(host.nativeSurface);
+        const auto hostContext = static_cast<GLXContext>(host.nativeContext);
+
+        const auto createContextAttribs = reinterpret_cast<PFNGLXCREATECONTEXTATTRIBSARBPROC>(
+            glXGetProcAddressARB(reinterpret_cast<const GLubyte*>("glXCreateContextAttribsARB")));
+        if (!createContextAttribs) {
+            _lastError = "glXCreateContextAttribsARB is unavailable";
+            return false;
+        }
+
+        // Maya's own framebuffer configuration, so the shared context is
+        // compatible with Maya's.
+        int fbConfigId = 0;
+        int screen = 0;
+        if (glXQueryContext(_display, hostContext, GLX_FBCONFIG_ID, &fbConfigId) != Success
+            || glXQueryContext(_display, hostContext, GLX_SCREEN, &screen) != Success) {
+            _lastError = _GlxError("glXQueryContext on Maya's context");
+            return false;
+        }
+        const int    fbConfigAttribs[] = { GLX_FBCONFIG_ID, fbConfigId, None };
+        int          fbConfigCount = 0;
+        GLXFBConfig* fbConfigs
+            = glXChooseFBConfig(_display, screen, fbConfigAttribs, &fbConfigCount);
+        if (!fbConfigs || fbConfigCount == 0) {
+            if (fbConfigs) {
+                XFree(fbConfigs);
+            }
+            _lastError = _GlxError("glXChooseFBConfig for Maya's configuration");
+            return false;
+        }
+        const GLXFBConfig fbConfig = fbConfigs[0];
+        XFree(fbConfigs);
+
+        _ScopedXErrorCatcher errors(_display);
+
+        const int pbufferAttribs[] = { GLX_PBUFFER_WIDTH, 1, GLX_PBUFFER_HEIGHT, 1, None };
+        _pbuffer = glXCreatePbuffer(_display, fbConfig, pbufferAttribs);
+        if (const int code = errors.TakeError(); !_pbuffer || code) {
+            _lastError = _GlxError("glXCreatePbuffer with Maya's configuration", code);
+            if (_pbuffer) {
+                glXDestroyPbuffer(_display, _pbuffer);
+                _pbuffer = 0;
+            }
+            return false;
+        }
+
+        const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB,
+                                       4,
+                                       GLX_CONTEXT_MINOR_VERSION_ARB,
+                                       5,
+                                       GLX_CONTEXT_PROFILE_MASK_ARB,
+                                       GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+                                       None };
+        _ctx = createContextAttribs(_display, fbConfig, hostContext, True, contextAttribs);
+        if (const int code = errors.TakeError(); !_ctx || code) {
+            _lastError = _GlxError("glXCreateContextAttribsARB(4.5 compat, shared)", code);
+            if (_ctx) {
+                glXDestroyContext(_display, _ctx);
+                _ctx = nullptr;
+            }
+            glXDestroyPbuffer(_display, _pbuffer);
+            _pbuffer = 0;
+            return false;
+        }
+        return true;
+    }
+
+    bool MakeCurrent() override
+    {
+        if (!_ctx || !_pbuffer) {
+            _lastError = "MakeCurrent called before a context was created";
+            return false;
+        }
+        if (!glXMakeContextCurrent(_display, _pbuffer, _pbuffer, _ctx)) {
+            _lastError = _GlxError("glXMakeContextCurrent");
+            return false;
+        }
+        // Entry points are loaded process-wide, but load here too: if the
+        // loader has not run yet, every later GL call is a null dereference.
+        if (!GarchGLApiLoad()) {
+            _lastError = "GarchGLApiLoad failed on the render thread context";
+            glXMakeContextCurrent(_display, None, None, nullptr);
+            return false;
+        }
+        return true;
+    }
+
+    void ReleaseCurrent() override
+    {
+        if (_display) {
+            glXMakeContextCurrent(_display, None, None, nullptr);
+        }
+    }
+
+    void DestroyContext() override
+    {
+        if (_ctx && _display) {
+            glXDestroyContext(_display, _ctx);
+            _ctx = nullptr;
+        }
+    }
+
+    const std::string& LastError() const override { return _lastError; }
+
+private:
+    Display*    _display { nullptr };
+    GLXPbuffer  _pbuffer { 0 };
+    GLXContext  _ctx { nullptr };
+    std::string _lastError;
+};
+
+#endif // __linux__
+
 } // anonymous namespace
 
 RenderThreadHostContext CaptureCurrentHostContext()
@@ -243,13 +440,16 @@ RenderThreadHostContext CaptureCurrentHostContext()
 #if defined(_WIN32)
     host.nativeContext = wglGetCurrentContext();
     host.nativeSurface = wglGetCurrentDC();
+#elif defined(__linux__)
+    host.nativeContext = glXGetCurrentContext();
+    host.nativeSurface = glXGetCurrentDisplay();
 #endif
     return host;
 }
 
 std::unique_ptr<RenderThreadContext> CreateGlRenderThreadContext()
 {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__linux__)
     return std::make_unique<GlRenderThreadContext>();
 #else
     // No implementation yet; null makes the caller fall back to the

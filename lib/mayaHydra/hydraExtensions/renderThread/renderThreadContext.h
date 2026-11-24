@@ -18,9 +18,9 @@
 // thread shares buffers, textures, programs and sync objects with Maya's
 // context, but not container objects such as framebuffers and vertex arrays.
 // A GL context belongs to one thread at a time, so from MakeCurrent until
-// DestroyContext it sits on the render thread. Its drawing surface is a window,
-// which Win32 ties to the thread that created it, so the surface is created and
-// destroyed on the main thread.
+// DestroyContext it sits on the render thread. Its drawing surface, a hidden
+// window on Windows, which Win32 ties to the thread that created it, and a
+// pbuffer on Linux, is created and destroyed on the main thread.
 
 #ifndef MAYAHYDRALIB_RENDER_THREAD_CONTEXT_H
 #define MAYAHYDRALIB_RENDER_THREAD_CONTEXT_H
@@ -34,11 +34,12 @@ namespace MAYAHYDRA_NS_DEF
 {
 
 /// The host (Maya) context to share with. Two handles because WGL cannot create
-/// or make current a context without a device context as well.
+/// or make current a context without a device context, nor GLX without the X
+/// display connection.
 struct RenderThreadHostContext
 {
-    void* nativeContext = nullptr; ///< HGLRC on Windows.
-    void* nativeSurface = nullptr; ///< HDC on Windows.
+    void* nativeContext = nullptr; ///< HGLRC on Windows, GLXContext on Linux.
+    void* nativeSurface = nullptr; ///< HDC on Windows, Display* on Linux.
 
     bool IsValid() const { return nativeContext != nullptr && nativeSurface != nullptr; }
 };

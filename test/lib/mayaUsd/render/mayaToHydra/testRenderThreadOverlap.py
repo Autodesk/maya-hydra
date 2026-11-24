@@ -97,7 +97,7 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             "render override never saw it, so nothing under test ran.")
         if not stats["supported"]:
             # Such as Metal against Pixar's USD, Vulkan without threaded
-            # submission, or OpenGL on Linux: MayaHydra draws on the main thread
+            # submission, or OpenGL on macOS: MayaHydra draws on the main thread
             # by design.
             self.skipTest("The render thread cannot run on the current Hgi here.")
         self.assertEqual(
