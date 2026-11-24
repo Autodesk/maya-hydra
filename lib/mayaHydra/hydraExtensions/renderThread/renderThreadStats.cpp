@@ -29,16 +29,18 @@ RenderThreadStats::Get() const
     RenderThreadStatsSnapshot out;
     out.overlapEnabled          = _overlapEnabled.load(std::memory_order_acquire);
     out.started                 = _started.load(std::memory_order_acquire);
+    out.supported               = _supported.load(std::memory_order_acquire);
     out.framesRenderedOffThread = _framesRenderedOffThread.load(std::memory_order_relaxed);
     out.framesComposited        = _framesComposited.load(std::memory_order_relaxed);
     out.framesRenderedSynchronously
         = _framesRenderedSynchronously.load(std::memory_order_relaxed);
     out.ownFramesComposited  = _ownFramesComposited.load(std::memory_order_relaxed);
-    out.drains               = _drains.load(std::memory_order_relaxed);
+    out.discards             = _discards.load(std::memory_order_relaxed);
     out.idleWaitTimeouts     = _idleWaitTimeouts.load(std::memory_order_relaxed);
     out.fenceSignalFailures  = _fenceSignalFailures.load(std::memory_order_relaxed);
-    out.fenceWaitTimeouts    = _fenceWaitTimeouts.load(std::memory_order_relaxed);
-    out.drainTimeouts        = _drainTimeouts.load(std::memory_order_relaxed);
+    out.unfencedFramesSkipped = _unfencedFramesSkipped.load(std::memory_order_relaxed);
+    out.quiescenceFenceTimeouts = _quiescenceFenceTimeouts.load(std::memory_order_relaxed);
+    out.quiescenceWaitTimeouts = _quiescenceWaitTimeouts.load(std::memory_order_relaxed);
     out.presentsWithoutDepth = _presentsWithoutDepth.load(std::memory_order_relaxed);
     out.presentsSkipped      = _presentsSkipped.load(std::memory_order_relaxed);
     out.aovCopyFailures      = _aovCopyFailures.load(std::memory_order_relaxed);
@@ -61,11 +63,12 @@ RenderThreadStats::Reset()
     _framesComposited.store(0, std::memory_order_relaxed);
     _framesRenderedSynchronously.store(0, std::memory_order_relaxed);
     _ownFramesComposited.store(0, std::memory_order_relaxed);
-    _drains.store(0, std::memory_order_relaxed);
+    _discards.store(0, std::memory_order_relaxed);
     _idleWaitTimeouts.store(0, std::memory_order_relaxed);
     _fenceSignalFailures.store(0, std::memory_order_relaxed);
-    _fenceWaitTimeouts.store(0, std::memory_order_relaxed);
-    _drainTimeouts.store(0, std::memory_order_relaxed);
+    _unfencedFramesSkipped.store(0, std::memory_order_relaxed);
+    _quiescenceFenceTimeouts.store(0, std::memory_order_relaxed);
+    _quiescenceWaitTimeouts.store(0, std::memory_order_relaxed);
     _presentsWithoutDepth.store(0, std::memory_order_relaxed);
     _presentsSkipped.store(0, std::memory_order_relaxed);
     _aovCopyFailures.store(0, std::memory_order_relaxed);

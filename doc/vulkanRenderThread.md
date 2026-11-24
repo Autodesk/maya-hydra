@@ -96,5 +96,6 @@ Those changes make `HgiVulkan` usable from more than one thread:
 - `EndFrame` no longer drains the GPU; it caps the frames in flight at
   `HGIVULKAN_MAX_FRAMES_IN_FLIGHT` (default 2).
 
-A build whose USD lacks them reports a coding error from the render thread
-rather than drawing.
+USD marks them with `HGIVULKAN_HAS_THREADED_SUBMISSION`.  Against a USD
+without it the render thread is not started, and Vulkan frames are drawn on
+the main thread (see Build requirements above).

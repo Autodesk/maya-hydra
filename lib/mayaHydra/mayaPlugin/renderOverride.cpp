@@ -2898,6 +2898,7 @@ void MtohRenderOverride::_InitHydraResources(
             bool contextReady = false;
             if (isVulkan) {
                 contextReady = MAYAHYDRA_NS_DEF::CanRunVulkanRenderThread();
+                MAYAHYDRA_NS_DEF::RenderThreadStats::instance().SetSupported(contextReady);
                 if (!contextReady) {
                     TF_WARN("MayaHydra: this USD's HgiVulkan cannot take submissions from "
                             "a render thread. Falling back to synchronous rendering.");
@@ -2906,11 +2907,13 @@ void MtohRenderOverride::_InitHydraResources(
                 // Without the interop's Metal copy every frame would be dropped, and
                 // HgiMetal, which is not thread-safe, would be driven from both threads.
                 contextReady = MAYAHYDRA_NS_DEF::CanPrepareMetalFrames();
+                MAYAHYDRA_NS_DEF::RenderThreadStats::instance().SetSupported(contextReady);
                 if (!contextReady) {
                     TF_WARN("MayaHydra: this USD's HgiInterop cannot prepare Metal frames "
                             "on the render thread. Falling back to synchronous rendering.");
                 }
-            } else if (!isVulkan) {
+            } else {
+                MAYAHYDRA_NS_DEF::RenderThreadStats::instance().SetSupported(true);
                 context = MAYAHYDRA_NS_DEF::CreateGlRenderThreadContext();
                 if (context) {
                     contextReady
@@ -4314,7 +4317,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
             .Msg("  isolate select disabled for panel=%s\n", viewName.asChar());
         // Set state to Off BEFORE notifying.  DisableIsolateSelection triggers
         // _SendPrimsDirtied, which can synchronously re-enter this callback via
-        // Hydra?Maya observers (more likely with larger dirty sets, i.e. when
+        // Hydra-to-Maya observers (more likely with larger dirty sets, i.e. when
         // numViewSelectedObjects > 1).  If the re-entrant call reads state==On
         // it falls through to the "stay on, notify" branch and rebuilds the
         // isolate set from the still-stale view-selected list, leaving the

@@ -40,13 +40,19 @@ struct RenderThreadStatsSnapshot
     /// Thread running with its context current, not the silent fallback.
     bool started = false;
 
+    /// Whether this USD can run the render thread on the current Hgi at all:
+    /// Vulkan needs threaded submission and frame preparation, Metal needs Metal
+    /// frame preparation. A thread that is supported but not started failed.
+    bool supported = false;
+
     uint64_t framesRenderedOffThread = 0;
 
     /// Frames the main thread composited from the handoff.
     uint64_t framesComposited = 0;
 
-    /// Frames the main thread rendered itself while the thread ran: first-frame
-    /// prime, resize, pick. Expected non-zero, but far below the count above.
+    /// Frames the render op drew on the main thread: every frame when the render
+    /// thread is not running, and under Vulkan or Metal the first and the first
+    /// after a resize, which prime the render thread. Picks are not counted.
     uint64_t framesRenderedSynchronously = 0;
 
     /// Render ops that waited for the frame they submitted and composited it,
@@ -56,7 +62,7 @@ struct RenderThreadStatsSnapshot
 
     /// DiscardInFlight() calls, which discard in-flight work so a frame rendered
     /// before a pick, resize or change of panel cannot be composited after it.
-    uint64_t drains = 0;
+    uint64_t discards = 0;
 
     /// Interlock waits that ran past the reporting point, such as the first
     /// render of a heavy scene. The push still waited, so these are slow
@@ -64,8 +70,9 @@ struct RenderThreadStatsSnapshot
     uint64_t idleWaitTimeouts = 0;
 
     /// Quiescence waits (a render op compositing its own frame, an image
-    /// capture) that ran past the same reporting point. Also still waited out.
-    uint64_t drainTimeouts = 0;
+    /// capture) whose CPU wait ran past the same reporting point. Also still
+    /// waited out.
+    uint64_t quiescenceWaitTimeouts = 0;
 
     // Failure modes. Each still leaves a believable image on screen, so a
     // test asserts these are zero rather than comparing pixels.
@@ -73,9 +80,11 @@ struct RenderThreadStatsSnapshot
     /// Frames whose GPU fence could not be created.
     uint64_t fenceSignalFailures = 0;
 
-    /// Composites whose frame had no usable GPU fence, and quiescence waits
-    /// whose frame's GPU work did not complete within the budget.
-    uint64_t fenceWaitTimeouts = 0;
+    /// Frames not composited because they had no usable GPU fence.
+    uint64_t unfencedFramesSkipped = 0;
+
+    /// Quiescence waits whose frame's GPU work did not complete within the budget.
+    uint64_t quiescenceFenceTimeouts = 0;
 
     /// Composites with no depth AOV, so main-thread overlays sort against
     /// stale depth.
@@ -128,6 +137,7 @@ public:
 
     void SetOverlapEnabled(bool value) { _overlapEnabled.store(value, std::memory_order_release); }
     void SetStarted(bool value) { _started.store(value, std::memory_order_release); }
+    void SetSupported(bool value) { _supported.store(value, std::memory_order_release); }
 
     void RecordFrameRenderedOffThread()
     {
@@ -142,14 +152,24 @@ public:
     {
         _ownFramesComposited.fetch_add(1, std::memory_order_relaxed);
     }
-    void RecordDrain() { _drains.fetch_add(1, std::memory_order_relaxed); }
+    void RecordDiscard() { _discards.fetch_add(1, std::memory_order_relaxed); }
     void RecordIdleWaitTimeout() { _idleWaitTimeouts.fetch_add(1, std::memory_order_relaxed); }
     void RecordFenceSignalFailure()
     {
         _fenceSignalFailures.fetch_add(1, std::memory_order_relaxed);
     }
-    void RecordFenceWaitTimeout() { _fenceWaitTimeouts.fetch_add(1, std::memory_order_relaxed); }
-    void RecordDrainTimeout() { _drainTimeouts.fetch_add(1, std::memory_order_relaxed); }
+    void RecordUnfencedFrameSkipped()
+    {
+        _unfencedFramesSkipped.fetch_add(1, std::memory_order_relaxed);
+    }
+    void RecordQuiescenceFenceTimeout()
+    {
+        _quiescenceFenceTimeouts.fetch_add(1, std::memory_order_relaxed);
+    }
+    void RecordQuiescenceWaitTimeout()
+    {
+        _quiescenceWaitTimeouts.fetch_add(1, std::memory_order_relaxed);
+    }
     void RecordPresentWithoutDepth() { _presentsWithoutDepth.fetch_add(1, std::memory_order_relaxed); }
     void RecordPresentSkipped() { _presentsSkipped.fetch_add(1, std::memory_order_relaxed); }
     void RecordAovCopyFailure() { _aovCopyFailures.fetch_add(1, std::memory_order_relaxed); }
@@ -198,15 +218,17 @@ private:
 
     std::atomic<bool>     _overlapEnabled{false};
     std::atomic<bool>     _started{false};
+    std::atomic<bool>     _supported{false};
     std::atomic<uint64_t> _framesRenderedOffThread{0};
     std::atomic<uint64_t> _framesComposited{0};
     std::atomic<uint64_t> _framesRenderedSynchronously{0};
     std::atomic<uint64_t> _ownFramesComposited{0};
-    std::atomic<uint64_t> _drains{0};
+    std::atomic<uint64_t> _discards{0};
     std::atomic<uint64_t> _idleWaitTimeouts{0};
     std::atomic<uint64_t> _fenceSignalFailures{0};
-    std::atomic<uint64_t> _fenceWaitTimeouts{0};
-    std::atomic<uint64_t> _drainTimeouts{0};
+    std::atomic<uint64_t> _unfencedFramesSkipped{0};
+    std::atomic<uint64_t> _quiescenceFenceTimeouts{0};
+    std::atomic<uint64_t> _quiescenceWaitTimeouts{0};
     std::atomic<uint64_t> _presentsWithoutDepth{0};
     std::atomic<uint64_t> _presentsSkipped{0};
     std::atomic<uint64_t> _aovCopyFailures{0};

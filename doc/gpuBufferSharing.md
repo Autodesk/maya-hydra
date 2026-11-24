@@ -234,9 +234,9 @@ GL fences:
 
 Both waits are GPU-side (`glWaitSync`), so neither thread blocks. A fence that
 cannot be waited on is counted in the render thread's
-`sharedBufferFenceFailures` statistic. After an interlock timeout, the frame
-still in flight has no fence yet, so the copies are unordered against it, in
-the same way the scene push already races it.
+`sharedBufferFenceFailures` statistic. The interlock always waits until the
+render thread is idle, so the last render's fence exists by the time the
+copies are issued.
 
 A stream records which kind of route published it, and a route change
 republishes the stream rather than refreshing it, so a copying bridge never

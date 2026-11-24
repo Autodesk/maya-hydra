@@ -47,7 +47,6 @@
 #endif
 
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
 #include <mutex>
 
@@ -55,7 +54,7 @@ namespace MAYAHYDRA_NS_DEF {
 
 /// A completed frame's AOV handles + frameId + GPU fence.
 /// Published by the render thread, consumed by the main thread through
-/// WaitForCompletedFrame().
+/// TryGetCompletedFrame().
 struct CompletedFrame
 {
     /// The id of the request this frame was rendered for.
@@ -100,8 +99,9 @@ struct CompletedFrame
 /// \class RenderThreadHandoff
 ///
 /// Latest-wins depth-1 handoff from the render thread (producer) to the main
-/// thread (consumer). A mutex guards the completed-frame slot and a condition
-/// variable wakes the consumer. If a new frame is published before the main
+/// thread (consumer). A mutex guards the completed-frame slot; the consumer
+/// never waits on it, as it reads only once the render thread is idle. If a
+/// new frame is published before the main
 /// thread consumes the previous one, the previous frame is dropped and its
 /// AOVs are reclaimed by the next render.
 class MAYAHYDRALIB_API RenderThreadHandoff
@@ -118,36 +118,15 @@ public:
     /// Unconditionally latest-wins: no consumer waits for a specific frame.
     void PublishCompletedFrame(const CompletedFrame& frame)
     {
-        {
-            std::lock_guard<std::mutex> lock(_mutex);
-            _completed       = frame;
-            _completed.valid = true;
-            _hasFrame.store(true, std::memory_order_release);
-        }
-        _cv.notify_one();
-    }
-
-    /// Wait up to \p timeout on the main thread for a completed frame, or
-    /// return an invalid CompletedFrame. Blocks on a condition variable.
-    CompletedFrame WaitForCompletedFrame(std::chrono::milliseconds timeout)
-    {
-        std::unique_lock<std::mutex> lock(_mutex);
-        if (!_hasFrame.load(std::memory_order_acquire))
-        {
-            _cv.wait_for(lock, timeout, [this] {
-                return _hasFrame.load(std::memory_order_acquire);
-            });
-        }
-        if (_hasFrame.load(std::memory_order_acquire))
-        {
-            // The frame stays in the slot: the contract is "latest completed
-            // frame", so it is composited again if no newer frame arrives.
-            return _completed;
-        }
-        return CompletedFrame{};
+        std::lock_guard<std::mutex> lock(_mutex);
+        _completed       = frame;
+        _completed.valid = true;
+        _hasFrame.store(true, std::memory_order_release);
     }
 
     /// The latest completed frame without waiting, or an invalid CompletedFrame.
+    /// The frame stays in the slot, so it is composited again if no newer frame
+    /// arrives.
     CompletedFrame TryGetCompletedFrame() const
     {
         std::lock_guard<std::mutex> lock(_mutex);
@@ -168,10 +147,9 @@ public:
     }
 
 private:
-    mutable std::mutex      _mutex;
-    std::condition_variable _cv;
-    CompletedFrame          _completed;
-    std::atomic<bool>       _hasFrame{false};
+    mutable std::mutex _mutex;
+    CompletedFrame     _completed;
+    std::atomic<bool>  _hasFrame{false};
 };
 
 } // namespace MAYAHYDRA_NS_DEF

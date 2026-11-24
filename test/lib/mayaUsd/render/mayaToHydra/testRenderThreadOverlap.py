@@ -22,15 +22,17 @@ import mtohUtils
 RENDER_THREAD_STAT_NAMES = [
     "overlapEnabled",
     "started",
+    "supported",
     "framesRenderedOffThread",
     "framesComposited",
     "framesRenderedSynchronously",
     "ownFramesComposited",
-    "drains",
+    "discards",
     "idleWaitTimeouts",
     "fenceSignalFailures",
-    "fenceWaitTimeouts",
-    "drainTimeouts",
+    "unfencedFramesSkipped",
+    "quiescenceFenceTimeouts",
+    "quiescenceWaitTimeouts",
     "presentsWithoutDepth",
     "presentsSkipped",
     "aovCopyFailures",
@@ -47,7 +49,8 @@ RENDER_THREAD_STAT_NAMES = [
 # rather than left to a pixel comparison that cannot see them.
 FAILURE_STAT_NAMES = [
     "fenceSignalFailures",
-    "fenceWaitTimeouts",
+    "unfencedFramesSkipped",
+    "quiescenceFenceTimeouts",
     "presentsWithoutDepth",
     "presentsSkipped",
     "aovCopyFailures",
@@ -92,6 +95,10 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             stats["overlapEnabled"], 1,
             "MAYAHYDRA_PIPELINE_OVERLAP is set for this process but the "
             "render override never saw it, so nothing under test ran.")
+        if not stats["supported"]:
+            # Such as Metal against Pixar's USD, or Vulkan without threaded
+            # submission: MayaHydra draws on the main thread by design.
+            self.skipTest("This USD cannot run the render thread on the current Hgi.")
         self.assertEqual(
             stats["started"], 1,
             "Overlap was enabled but the render thread did not start, so "
@@ -311,9 +318,11 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         previousMode = cmds.evaluationManager(query=True, mode=True)[0]
         previousDeformer = cmds.evaluator(name="deformer", query=True, enable=True)
         previousCache = cmds.evaluator(name="cache", query=True, enable=True)
+        previousFillMode = cmds.cacheEvaluator(query=True, cacheFillMode=True)
         self.addCleanup(cmds.evaluationManager, mode=previousMode)
         self.addCleanup(cmds.evaluator, name="deformer", enable=bool(previousDeformer))
         self.addCleanup(cmds.evaluator, name="cache", enable=bool(previousCache))
+        self.addCleanup(cmds.cacheEvaluator, cacheFillMode=previousFillMode)
         cmds.evaluationManager(mode="parallel")
         cmds.evaluator(name="deformer", enable=True)
         cmds.evaluator(name="cache", enable=True)
@@ -325,8 +334,12 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         self.assertJumpLeavesNoGhost("skinned cylinder")
 
     def test_aViewportPickDiscardsInFlightWork(self):
-        """A frame rendered before a pick must not be composited after it, or
-        the viewport shows the scene without the new selection.
+        """A pick made while a frame is in flight selects what is under it and
+        discards the frame in flight.
+
+        That discard is what keeps a frame rendered before the pick from being
+        composited after it, showing the scene without the new selection. This
+        checks that the pick reaches it, not the pixels.
 
         cmds.select does not reach MtohRenderOverride::select at all, so this
         uses the viewportPick hook, which drives Maya's real selection
@@ -366,7 +379,7 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         stats = self.stats()
         self.assertRenderThreadIsLive(stats)
         self.assertGreater(
-            stats["drains"], 0,
+            stats["discards"], 0,
             "The pick selected the cube, but no discard was recorded, so it "
             "did not reach MtohRenderOverride::select and this test does not "
             "cover the pick path. Maya may have satisfied the selection "

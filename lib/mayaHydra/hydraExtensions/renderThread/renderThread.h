@@ -77,9 +77,6 @@ struct RenderThreadRequest
     /// Increases with every request; names the frame in warnings.
     uint64_t frameId{0};
 
-    /// FramePass::GetRenderTasks, owned by the caller and not modified here.
-    pxr::HdTaskSharedPtrVector renderTasks;
-
     pxr::TfToken colorAovToken;
     pxr::TfToken depthAovToken;
 
@@ -141,15 +138,13 @@ public:
     /// signalled a semaphore that only that request's render waits on.
     void SubmitRequest(RenderThreadRequest request);
 
-    /// Composite the latest completed frame into Maya's FBO, on the main thread
-    /// at the start of the render op. \p timeout covers only the wait for a
-    /// frame in the handoff; the GPU fence has its own budget (kFenceBudget),
-    /// and a frame whose fence is not ready falls back to re-compositing the
-    /// last frame that was, because Maya has already cleared its FBO.
+    /// Composite the latest completed frame into Maya's FBO, on the main thread.
+    /// Does not wait for a frame: the caller has already waited for the render
+    /// thread to go idle, so none is coming. Returns false when there is no
+    /// frame, or when the frame has no usable GPU fence and is not shown.
     bool CompositeLatest(
         RenderThreadPresentBridge& presentBridge,
-        pxr::VtValue const&        dstFramebuffer,
-        std::chrono::milliseconds timeout = std::chrono::milliseconds(16));
+        pxr::VtValue const&        dstFramebuffer);
 
     /// For pick, resize and a change of panel: wait for pending and running
     /// renders to finish, then clear the handoff so no frame produced before
@@ -284,12 +279,6 @@ private:
     /// Written by the render thread, read by the main thread.
     RenderThreadFencePtr _lastRenderDone;
     std::mutex           _lastRenderDoneMutex;
-
-    /// The last frame actually composited, standing in for a frame whose fence
-    /// is not ready. Holds a reference to that frame's copy pair, which stops
-    /// the rotation overwriting it.
-    CompletedFrame    _lastComposited;
-
     /// Each frame carries its own fence through the handoff.
     RenderThreadHandoff            _handoff;
 };

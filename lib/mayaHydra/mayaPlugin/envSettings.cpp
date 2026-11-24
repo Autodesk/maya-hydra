@@ -17,15 +17,6 @@
 #include "envSettings.h"
 
 #include <pxr/base/tf/envSetting.h>
-#include <pxr/imaging/hgiInterop/hgiInterop.h>
-
-// Pipeline overlap needs HgiInterop to prepare frames on the render thread.
-// Both are off until overlap is ready to be on by default.
-#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
-#define MAYAHYDRA_PIPELINE_OVERLAP_DEFAULT false
-#else
-#define MAYAHYDRA_PIPELINE_OVERLAP_DEFAULT false
-#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Define the environment setting in the PXR namespace
@@ -53,7 +44,7 @@ TF_DEFINE_ENV_SETTING(
 
 TF_DEFINE_ENV_SETTING(
     MAYAHYDRA_PIPELINE_OVERLAP,
-    MAYAHYDRA_PIPELINE_OVERLAP_DEFAULT,
+    false,
     "Render on a separate thread, overlapping the draw of one frame with the "
     "main thread's work on the next.");
 PXR_NAMESPACE_CLOSE_SCOPE

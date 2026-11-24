@@ -319,7 +319,7 @@ waits for it (`WaitForQuiescence`) and composites it into Maya's framebuffer,
 captured at the start of the op.  The wait has no time limit, like the
 interlock: a frame that compiles shaders can take seconds, giving up would
 show the previous frame, and the next render op would wait for this frame
-anyway.  A wait past the reporting point is counted in `drainTimeouts` and
+anyway.  A wait past the reporting point is counted in `quiescenceWaitTimeouts` and
 reported under `TF_DEBUG=MAYAHYDRALIB_RENDER_THREAD`.  It then releases the capture, so a query
 made after the redraw sees the scene it drew, updates the convergence state
 and writes the requested image, on the render thread under OpenGL.  Such
@@ -336,11 +336,7 @@ render thread idle.
 ## Enabling it
 
 Pipelining is gated behind the `MAYAHYDRA_PIPELINE_OVERLAP` environment
-variable and is off by default.  It is read once per process.  Its default
-comes from `MAYAHYDRA_PIPELINE_OVERLAP_DEFAULT` in `envSettings.cpp`, which
-tests USD for `HGIINTEROP_HAS_PREPARE_TRANSFER`, so that it can be turned on
-for a USD that supports it without being turned on for an older one.  It is
-off for both for now.
+variable and is off by default.  It is read once per process.
 
 Under Vulkan (USD's `HGI_ENABLE_VULKAN`) the thread starts only if USD
 defines `HGIVULKAN_HAS_THREADED_SUBMISSION`, meaning HgiVulkan takes
@@ -356,11 +352,15 @@ synchronous path rather than to a half-enabled one.
 ## Observability
 
 The render thread keeps counters covering frames drawn off the main thread,
-frames composited, frames drawn synchronously, render ops that composited
-their own frame, discards, slow interlock waits, and each distinct failure
-mode: fence signal failures, fence wait timeouts, drain timeouts, presents
-skipped or without depth, AOV copy failures, composite fence failures and
-shared buffer fence failures.
+frames composited, frames drawn on the main thread (every frame when the
+render thread is not running, and under Vulkan or Metal the frames that prime
+it: the first, and the first after a resize),
+render ops that composited their own frame, discards (`DiscardInFlight`), and
+slow interlock and quiescence waits.  It also counts each distinct failure
+mode: fence signal failures, frames skipped for having no usable fence,
+quiescence waits whose GPU work overran its budget, presents skipped or
+without depth, AOV copy failures, composite fence signal failures and shared
+buffer fence failures.
 
 Two more cover the capture: `primsCaptured`, the prims it copied, and
 `mayaReadsOnRenderThread`, the reads MayaHydra guards with `DgAccessLock` that

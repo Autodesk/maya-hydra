@@ -163,7 +163,6 @@ RenderThread::Stop()
     _thread.join();
 
     _handoff.Clear();
-    _lastComposited = CompletedFrame{};
     _presentBridge = nullptr;
 
     // The fences and the GL context were already torn down at the end of
@@ -305,7 +304,6 @@ RenderThread::_ThreadLoop()
     // frame's fence, which is what deletes those sync objects here.
     ScopedAutoreleasePool teardownPool;
     _handoff.Clear();
-    _lastComposited = CompletedFrame{};
     _RecordRenderDone(nullptr);
     _ReleaseCopyTargets();
     _ReleaseContextArena();
@@ -690,18 +688,13 @@ RenderThread::OrderAfterLastRender()
 bool
 RenderThread::CompositeLatest(
     RenderThreadPresentBridge& presentBridge,
-    VtValue const&            dstFramebuffer,
-    std::chrono::milliseconds timeout)
+    VtValue const&            dstFramebuffer)
 {
     // Runs on the main thread at the start of the render op, compositing the
     // latest completed AOV into Maya's FBO and accepting one frame of lag.
     MH_PROFILE_SCOPE("RenderThread_CompositeLatest");
 
-    CompletedFrame frame;
-    {
-        MH_PROFILE_SCOPE("RenderThread_HandoffWait");
-        frame = _handoff.WaitForCompletedFrame(timeout);
-    }
+    const CompletedFrame frame = _handoff.TryGetCompletedFrame();
     if (!frame.valid)
     {
         // Nothing published yet, or the handoff was just cleared by
@@ -724,20 +717,14 @@ RenderThread::CompositeLatest(
     }
     if (!fenceReady)
     {
-        RenderThreadStats::instance().RecordFenceWaitTimeout();
+        // Only when glFenceSync failed on the render thread. Not composited:
+        // an unordered blit could show the frame half drawn.
+        RenderThreadStats::instance().RecordUnfencedFrameSkipped();
         TF_WARN("RenderThread::CompositeLatest: frame %llu has no usable GPU "
                 "fence, so the blit cannot be ordered behind the render that "
-                "produced it.",
+                "produced it, and the frame is not shown.",
                 static_cast<unsigned long long>(frame.frameId));
-
-        // Show the last frame that did complete rather than nothing: Maya has
-        // already cleared its FBO by this point, so returning false reads as a
-        // grey viewport rather than as a repeated frame.
-        if (!_lastComposited.valid)
-        {
-            return false;
-        }
-        frame = _lastComposited;
+        return false;
     }
 
     // Blit both colour AND depth, so main-thread VP2 overlays depth-compose
@@ -789,7 +776,6 @@ RenderThread::CompositeLatest(
         }
     }
 
-    _lastComposited = frame;
     RenderThreadStats::instance().RecordFrameComposited();
     return true;
 }
@@ -869,7 +855,7 @@ void
 RenderThread::DiscardInFlight()
 {
     // Nothing produced before this call may reach the screen afterwards.
-    RenderThreadStats::instance().RecordDrain();
+    RenderThreadStats::instance().RecordDiscard();
 
     // A request the thread has not started is rendered rather than dropped, as
     // SubmitRequest explains, and its frame is discarded with the rest below.
@@ -879,7 +865,6 @@ RenderThread::DiscardInFlight()
     // Also releases the last reference to those frames' fences, deleting the
     // sync objects.
     _handoff.Clear();
-    _lastComposited = CompletedFrame{};
 }
 
 bool
@@ -899,7 +884,7 @@ RenderThread::WaitForQuiescence()
         {
             // Counted, but reported only under a debug flag: a frame that
             // compiles shaders gets here and is not a fault.
-            RenderThreadStats::instance().RecordDrainTimeout();
+            RenderThreadStats::instance().RecordQuiescenceWaitTimeout();
             const auto slowStart = std::chrono::steady_clock::now();
             _idleCv.wait(lock, isIdle);
             TF_DEBUG(MAYAHYDRALIB_RENDER_THREAD)
@@ -918,7 +903,7 @@ RenderThread::WaitForQuiescence()
     const CompletedFrame latest = _handoff.TryGetCompletedFrame();
     if (latest.valid && latest.fence && !latest.fence->Wait(kQuiescenceFenceBudgetNanos))
     {
-        RenderThreadStats::instance().RecordFenceWaitTimeout();
+        RenderThreadStats::instance().RecordQuiescenceFenceTimeout();
         TF_WARN("RenderThread::WaitForQuiescence: the latest frame's GPU work "
                 "did not complete within the budget.");
         return false;

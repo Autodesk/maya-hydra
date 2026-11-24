@@ -26,9 +26,11 @@ used by one thread at a time:
 
 - While the render thread runs, it is the only thread that uses HgiMetal.
   The main thread only issues GL to composite.
-- Everything else that renders on the main thread (the first frame, the frame
-  after a resize or pick, a time change while stopped) waits for the render
-  thread to go idle first, as it must anyway for the scene index.
+- Everything else that renders on the main thread (the first frame, the
+  first after a resize, picks) waits for the render thread to go idle first,
+  as it must anyway for the scene index.  A time change while stopped is
+  rendered on the render thread, like any other frame once it is primed; the
+  render op only waits for it before compositing it.
 
 Code that uses the Hgi from the main thread while the render thread is busy
 breaks this.  GPU buffer sharing and outline selection highlighting would, but
