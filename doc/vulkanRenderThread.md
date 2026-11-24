@@ -55,24 +55,29 @@ If the main thread composites again before a newer frame arrives, the same
 slot is drawn again.  If a newer frame has been prepared in the meantime, the
 newest frame is composited instead.
 
+A frame `PrepareTransfer` fails on is dropped, with a warning and a count in
+`aovCopyFailures`.  Compositing it unprepared would have the main thread submit
+to the render thread's `HgiVulkan`, which `HgiInterop` does not support, and
+publishing a handle to the live AOV would have it read while the next frame
+overwrites it.
+
 Metal frames are prepared the same way; see [Metal on the render
 thread](metalRenderThread.md).  For any other backend, the render thread warns
-and drops the frame rather than publishing a handle to the live AOV, which
-would be read while the next frame overwrites it.
+and drops the frame for the same reason.
 
 ## Build requirements
 
-The fallback Vulkan copy reaches `hgiVulkan` directly, as does the Vulkan
-route of [GPU buffer sharing](gpuBufferSharing.md), and not every USD package
-exports it.  `FindUSD.cmake` sets `USD_HAS_HGI_VULKAN` when the `hgiVulkan`
-target exists; `mayaHydraLib` then links it and defines `USD_HAS_HGI_VULKAN`,
-and the Vulkan copy compiles out otherwise.  A build without it still runs the
-GL path unchanged.
+The Vulkan render thread checks `hgiVulkan` for threaded submission, and the
+Vulkan route of [GPU buffer sharing](gpuBufferSharing.md) reaches it directly,
+but not every USD package exports it.  `FindUSD.cmake` sets
+`USD_HAS_HGI_VULKAN` when the `hgiVulkan` target exists; `mayaHydraLib` then
+links it and defines `USD_HAS_HGI_VULKAN`, and the Vulkan paths compile out
+otherwise.  A build without it still runs the GL path unchanged.
 
 The split interop API is detected from `hgiInterop.h` itself, which defines
-`HGIINTEROP_HAS_PREPARE_TRANSFER`.  Against a USD without it, the render thread
-falls back to its own Vulkan blit into the copy pairs and the main thread uses
-the one-call `TransferToApp`, which submits and waits on the CPU.
+`HGIINTEROP_HAS_PREPARE_TRANSFER`.  Against a USD without it, Vulkan frames are
+drawn on the main thread, as are frames against a USD whose `HgiVulkan` lacks
+threaded submission.
 
 ## Secondary-thread submission in USD
 

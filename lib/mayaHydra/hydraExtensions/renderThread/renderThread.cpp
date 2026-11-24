@@ -25,7 +25,7 @@
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/hgiGL/texture.h>
 #if defined(USD_HAS_HGI_VULKAN)
-#include <pxr/imaging/hgiVulkan/blitCmds.h>
+// For HGIVULKAN_HAS_THREADED_SUBMISSION.
 #include <pxr/imaging/hgiVulkan/hgi.h>
 #endif
 
@@ -405,38 +405,10 @@ CopyGlTexture(const HgiTextureHandle& src, const HgiTextureHandle& dst)
     return true;
 }
 
-#if defined(USD_HAS_HGI_VULKAN)
-// Copy \p src into \p dst on the GPU under Vulkan. Submitted with NoWait, so
-// the frame's fence covers the blit as it does the GL path's copy.
-bool
-CopyVulkanTexture(Hgi* hgi, const HgiTextureHandle& src, const HgiTextureHandle& dst)
-{
-    HgiVulkan* hgiVulkan = dynamic_cast<HgiVulkan*>(hgi);
-    if (!hgiVulkan)
-    {
-        TF_WARN("RenderThread: the Hgi reports Vulkan but is not an HgiVulkan, "
-                "so the AOV copy cannot run.");
-        return false;
-    }
-
-    HgiBlitCmdsUniquePtr blitCmds = hgiVulkan->CreateBlitCmds();
-    HgiVulkanBlitCmds* vkBlitCmds = dynamic_cast<HgiVulkanBlitCmds*>(blitCmds.get());
-    if (!vkBlitCmds)
-    {
-        TF_WARN("RenderThread: could not get HgiVulkanBlitCmds for the AOV copy.");
-        return false;
-    }
-
-    vkBlitCmds->BlitTexture(src, dst);
-    hgiVulkan->SubmitCmds(blitCmds.get(), HgiSubmitWaitTypeNoWait);
-    return true;
-}
-#endif
-
-// Hgi has no backend-neutral texture-to-texture GPU copy, so the copy branches
-// on the API. A backend that is neither GL nor Vulkan needs its own case here.
-// Metal has none: its frames are copied by the present bridge, and one the
-// bridge could not prepare is dropped here.
+// Only OpenGL frames are copied here. Vulkan and Metal frames are copied by the
+// present bridge's Prepare: the main thread may composite only a prepared
+// frame, since an unprepared one would have it submit to the render thread's
+// Hgi. One the bridge could not prepare is dropped here.
 bool
 CopyTexture(Hgi* hgi, const HgiTextureHandle& src, const HgiTextureHandle& dst)
 {
@@ -445,16 +417,10 @@ CopyTexture(Hgi* hgi, const HgiTextureHandle& src, const HgiTextureHandle& dst)
     {
         return CopyGlTexture(src, dst);
     }
-#if defined(USD_HAS_HGI_VULKAN)
-    if (api == HgiTokens->Vulkan)
-    {
-        return CopyVulkanTexture(hgi, src, dst);
-    }
-#endif
 
-    TF_WARN("RenderThread: the AOV copy is not implemented for the %s Hgi, so "
-            "this frame is dropped rather than published as a handle to the "
-            "live AOV.", api.GetText());
+    TF_WARN("RenderThread: the present bridge could not prepare this %s frame "
+            "for the composite, so it is dropped rather than published as a "
+            "handle to the live AOV.", api.GetText());
     return false;
 }
 
