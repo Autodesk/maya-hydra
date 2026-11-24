@@ -102,11 +102,13 @@ public:
     MAYAHYDRALIB_API
     const char *Describe() const;
 
-    /// Whether the OpenGL consumer draws on a GL context other than Maya's,
-    /// which selects the copying OpenGL route for every bridge made after.
-    /// Set it before anything is published and keep it for the life of the
-    /// scene: a stream published under one route is republished, not
-    /// refreshed, under the other.
+    /// Whether the OpenGL consumer behind \p hgi draws on a GL context other
+    /// than Maya's, which selects the copying OpenGL route for every bridge
+    /// made for that Hgi after. Each renderer sets it for its own Hgi only, so
+    /// one renderer's render thread starting or stopping leaves another's
+    /// route alone. Set it before anything is published and keep it for the
+    /// life of the scene: a stream published under one route is republished,
+    /// not refreshed, under the other.
     ///
     /// The copying route orders nothing across contexts itself; the caller
     /// owes both directions, with GL fences:
@@ -119,10 +121,10 @@ public:
     /// A share group makes the buffers visible to both contexts; it does not
     /// order commands between them.
     MAYAHYDRALIB_API
-    static void SetConsumerOnSeparateContext(bool separate);
+    static void SetConsumerOnSeparateContext(Hgi *hgi, bool separate);
 
     MAYAHYDRALIB_API
-    static bool IsConsumerOnSeparateContext();
+    static bool IsConsumerOnSeparateContext(Hgi *hgi);
 
     /// Produce a buffer the consumer can read holding \p mayaGlBuffer's
     /// contents. \p byteSize must cover the whole stream, offset included;

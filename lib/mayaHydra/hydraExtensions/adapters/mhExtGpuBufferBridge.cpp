@@ -37,7 +37,6 @@
 #include <maya/MViewport2Renderer.h>
 
 #include <algorithm>
-#include <atomic>
 #include <mutex>
 #include <vector>
 
@@ -70,8 +69,10 @@ _ProducerIsOpenGL()
     return api == MHWRender::kOpenGL || api == MHWRender::kOpenGLCoreProfile;
 }
 
-// See MhExtGpuBufferBridge::SetConsumerOnSeparateContext.
-std::atomic<bool> _consumerOnSeparateContext{false};
+// The Hgis whose consumer draws on its own context; see
+// MhExtGpuBufferBridge::SetConsumerOnSeparateContext. One per renderer at most.
+std::mutex        _separateContextMutex;
+std::vector<Hgi*> _separateContextHgis;
 
 // Clear the GL error queue so that a later glGetError reports on our own call
 // and not on whatever Maya left behind. Without this a pending error from
@@ -564,9 +565,7 @@ MhExtGpuBufferBridge::ForHgi(Hgi *hgi)
     // this backend cannot consume external buffers at all.
     if (hgi->GetAPIName() == HgiTokens->OpenGL) {
         if (auto arena = hgi->GetExternalBufferArena<HgiGLExternalBufferArena>()) {
-            bridge._kind = _consumerOnSeparateContext.load(std::memory_order_acquire)
-                ? _Kind::OpenGLCopy
-                : _Kind::OpenGL;
+            bridge._kind = IsConsumerOnSeparateContext(hgi) ? _Kind::OpenGLCopy : _Kind::OpenGL;
             bridge._arena = arena.get();
         }
         return bridge;
@@ -597,15 +596,26 @@ MhExtGpuBufferBridge::Describe() const
 }
 
 void
-MhExtGpuBufferBridge::SetConsumerOnSeparateContext(bool separate)
+MhExtGpuBufferBridge::SetConsumerOnSeparateContext(Hgi *hgi, bool separate)
 {
-    _consumerOnSeparateContext.store(separate, std::memory_order_release);
+    if (!hgi) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(_separateContextMutex);
+    const auto it = std::find(_separateContextHgis.begin(), _separateContextHgis.end(), hgi);
+    if (separate && it == _separateContextHgis.end()) {
+        _separateContextHgis.push_back(hgi);
+    } else if (!separate && it != _separateContextHgis.end()) {
+        _separateContextHgis.erase(it);
+    }
 }
 
 bool
-MhExtGpuBufferBridge::IsConsumerOnSeparateContext()
+MhExtGpuBufferBridge::IsConsumerOnSeparateContext(Hgi *hgi)
 {
-    return _consumerOnSeparateContext.load(std::memory_order_acquire);
+    std::lock_guard<std::mutex> lock(_separateContextMutex);
+    return std::find(_separateContextHgis.begin(), _separateContextHgis.end(), hgi)
+        != _separateContextHgis.end();
 }
 
 HgiExternalBufferSharedPtr

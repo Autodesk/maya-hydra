@@ -208,8 +208,10 @@ VP2's buffers is therefore unsafe, and the renderer has to read memory VP2
 never writes.
 
 `MtohRenderOverride` calls `MhExtGpuBufferBridge::SetConsumerOnSeparateContext`
-when the render thread starts on OpenGL, and clears it when the thread stops.
-Every bridge made while it is set is an `OpenGLCopy` bridge:
+for its own Hgi when the render thread starts on OpenGL, and clears it when the
+thread stops. The setting is per Hgi, so each renderer keeps its own route
+whatever another renderer's render thread does. Every bridge made for that Hgi
+while it is set is an `OpenGLCopy` bridge:
 
 - `Create` allocates an immutable GL buffer on Maya's context, hands it to the
   arena with `AdoptBuffer` (which, unlike `AllocateBuffer`, records the vertex

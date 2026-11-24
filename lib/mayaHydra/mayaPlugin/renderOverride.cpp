@@ -1243,7 +1243,7 @@ MStatus MtohRenderOverride::Render(
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
             // The copies below overwrite shared buffers the render thread's last
             // frame drew from, on its own context; queue them behind that draw.
-            if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext() && _renderThread) {
+            if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext(_hgi.get()) && _renderThread) {
                 _renderThread->OrderAfterLastRender();
             }
             // Render items are the only publishers of shared buffers, and the
@@ -1942,7 +1942,7 @@ MStatus MtohRenderOverride::Render(
             }
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
             // Covers the shared buffer copies the push just issued on Maya's context.
-            if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext()) {
+            if (MhExtGpuBufferBridge::IsConsumerOnSeparateContext(_hgi.get())) {
                 request.producerFence
                     = MAYAHYDRA_NS_DEF::RenderThreadFence::CreateAndSignal(_hgi.get());
             }
@@ -2983,7 +2983,7 @@ void MtohRenderOverride::_InitHydraResources(
                 // context cannot read VP2's buffers in place; Vulkan copies anyway, and
                 // Metal does not share them.
                 MhExtGpuBufferBridge::SetConsumerOnSeparateContext(
-                    started && !isVulkan && !isMetal);
+                    _hgi.get(), started && !isVulkan && !isMetal);
 #endif
             } else {
                 // Leaving _renderThreadStarted false keeps every overlap-gated site on
@@ -3037,7 +3037,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
             _mayaHydraSceneIndex->SetDeferCallbackRemovals(false);
         }
 #if defined(USD_HAS_GPU_BUFFER_SHARING)
-        MhExtGpuBufferBridge::SetConsumerOnSeparateContext(false);
+        MhExtGpuBufferBridge::SetConsumerOnSeparateContext(_hgi.get(), false);
 #endif
     }
 
