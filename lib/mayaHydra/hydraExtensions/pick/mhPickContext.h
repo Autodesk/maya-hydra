@@ -30,10 +30,13 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
 
+class MayaViewportSceneIndex;
+
 /// \class PickContext
 ///
 /// Provides an interface that pick handlers can call to obtain information
-/// needed to implement picking.
+/// needed to implement picking. The context is the render override that picks,
+/// set for the duration of the pick by PickContextScope.
 ///
 class PickContext
 {
@@ -45,6 +48,11 @@ public:
 
     MAYAHYDRALIB_API
     virtual PXR_NS::HdRenderIndex* renderIndex(int passIndex = 0) const = 0;
+
+    /// The Maya viewport scene index of the render override that picks, in
+    /// which Maya pick hits are resolved. Null if Hydra resources are cleared.
+    MAYAHYDRALIB_API
+    virtual MayaViewportSceneIndex* mayaViewportSceneIndex() const = 0;
 };
 
 }

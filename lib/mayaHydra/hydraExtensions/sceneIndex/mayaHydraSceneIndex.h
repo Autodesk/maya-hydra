@@ -60,6 +60,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
 class MayaHydraRenderItemOverrideAdapter;
+struct MayaHydraFallbackPathMapperRegistration;
 
 struct MayaHydraInitData
 {
@@ -108,6 +109,11 @@ public:
     }
 
     ~MayaHydraSceneIndex();
+
+    // The delegate ID of every instance, interactive or batch: the root of the Maya data in the
+    // Hydra scene. Each render index has its own Maya data, so they can all use one root, and one
+    // fallback path mapper maps Maya objects for all of them.
+    static const SdfPath& GetMayaNativeRoot();
 
     // ------------------------------------------------------------------------
     // Maya Hydra scene producer implementations
@@ -270,7 +276,8 @@ public:
 
     bool IsHdSt() const { return _isHdSt; }
 
-    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
+    // Maps a Maya object to its prims under GetMayaNativeRoot(). Instance independent.
+    static Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath);
 
     // Common function to return templated sample types
     template <typename T, typename Getter>
@@ -475,7 +482,8 @@ private:
     SdfPath _sprimPath;
     SdfPath _materialPath;
 
-    const Fvp::PathMapperConstPtr _mayaPathMapper {};
+    // Shared by all instances: the fallback path mapper is unset with the last one.
+    std::shared_ptr<MayaHydraFallbackPathMapperRegistration> _fallbackPathMapperRegistration;
 
     bool _interactive{true};
 };

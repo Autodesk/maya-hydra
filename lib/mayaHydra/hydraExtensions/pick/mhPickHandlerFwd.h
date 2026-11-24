@@ -27,6 +27,10 @@ class PickHandler;
 using PickHandlerPtr      = std::shared_ptr<PickHandler>;
 using PickHandlerConstPtr = std::shared_ptr<const PickHandler>;
 
+class PickRegistration;
+
+using PickRegistrationPtr = std::shared_ptr<PickRegistration>;
+
 }
 
 #endif

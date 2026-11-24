@@ -16,9 +16,6 @@
 
 #include "mhMayaUsdProxyShapeSceneIndex.h"
 
-#include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
-#include <mayaHydraLib/pick/mhUsdPickHandler.h>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -33,35 +30,9 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     : ParentClass(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle,
                   sceneIndexPathPrefix, sceneIndexAppPath)
 {
-    // Add our pick handler to the pick handler registry if there is none.
-    auto& phr = MayaHydra::PickHandlerRegistry::Instance();
-    _unregisterPickHandler = (phr.RegisteredHandler(sceneIndexPathPrefix) == nullptr);
-    if (_unregisterPickHandler) {
-        auto pickHandler = std::make_shared<UsdPickHandler>();
-        TF_AXIOM(phr.Register(sceneIndexPathPrefix, pickHandler));
-    }
 }
 
-MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
-{
-    _DestroyDerived(); // Base class will take care of its _Destroy()
-}
-
-void MayaUsdProxyShapeSceneIndex::_Destroy()
-{
-    _DestroyDerived();
-    ParentClass::_Destroy();
-}
-
-void MayaUsdProxyShapeSceneIndex::_DestroyDerived()
-{
-    // Detach() and the destructor both call this: unregister once only, since the
-    // replacement registers its own pick handler for the same prefix.
-    if (_unregisterPickHandler) {
-        TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_sceneIndexPathPrefix));
-        _unregisterPickHandler = false;
-    }
-}
+MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex() = default;
 
 MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(
     const MAYAUSDAPI_NS::ProxyStage&       proxyStage,

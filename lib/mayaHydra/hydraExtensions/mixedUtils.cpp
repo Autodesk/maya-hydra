@@ -1085,33 +1085,38 @@ bool getIndexedColorPreferenceValue(
     return false;
 }
 
-// Build a unique scene index path prefix for a Maya node.
-SdfPath sceneIndexPathPrefix(
-    const HdSceneIndexBaseRefPtr& sceneIndex,
-    MObject&                      mayaNode
-)
+namespace {
+
+// The parent of the scene index path prefixes of the Maya nodes of this type.
+SdfPath sceneIndexPluginPath(const MFnDependencyNode& dependNodeFn)
 {
     constexpr char kSceneIndexPluginSuffix[] = {"_PluginNode"};
-    MFnDependencyNode dependNodeFn(mayaNode);
     // To match plugin TfType registration, name must begin with upper case.
-    const auto sceneIndexPluginName = [&](){
-        std::string name = dependNodeFn.typeName().asChar();
-        name[0] = toupper(name[0]);
-        name += kSceneIndexPluginSuffix;
-        return TfToken(name);}();
+    std::string name = dependNodeFn.typeName().asChar();
+    name[0] = toupper(name[0]);
+    name += kSceneIndexPluginSuffix;
+    return SdfPath::AbsoluteRootPath().AppendChild(TfToken(name));
+}
 
-    // Create a unique scene index path prefix by starting with the
-    // Maya node name, and checking for uniqueness under the scene
-    // index plugin parent rprim.  If not unique, add an
-    // incrementing numerical suffix until it is.
-    const auto sceneIndexPluginPath = SdfPath::AbsoluteRootPath().AppendChild(sceneIndexPluginName);
-    const auto newName = uniqueChildName(
-        sceneIndex,
-        sceneIndexPluginPath,
-        SanitizeNameForSdfPath(dependNodeFn.name().asChar())
-    );
+} // namespace
 
-    return sceneIndexPluginPath.AppendChild(newName);
+SdfPath sceneIndexPathPrefix(
+    const SdfPathVector& reservedPrefixes,
+    MObject&             mayaNode
+)
+{
+    MFnDependencyNode dependNodeFn(mayaNode);
+    const auto pluginPath = sceneIndexPluginPath(dependNodeFn);
+
+    TfToken::HashSet reservedNames;
+    for (const auto& prefix : reservedPrefixes) {
+        if (prefix.GetParentPath() == pluginPath) {
+            reservedNames.insert(prefix.GetNameToken());
+        }
+    }
+
+    return pluginPath.AppendChild(TfToken(
+        uniqueName(reservedNames, SanitizeNameForSdfPath(dependNodeFn.name().asChar()))));
 }
 
 // Read a color preference token into a GfVec4f.
