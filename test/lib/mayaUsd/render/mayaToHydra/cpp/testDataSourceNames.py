@@ -71,6 +71,16 @@ class TestDataSourceNames(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="DataSourceNames.CaptureFindsUnlistedNames")
 
+    # What: the capture's copy of a multisampled value answers a shutter as the live
+    #       source would.
+    # How: run the C++ test on a prim with a sampled transform, through a held capture.
+    # Expect: only the samples the shutter needs are reported, and values in between
+    #         are interpolated.
+    def test_captureAnswersShutterIntervals(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureAnswersShutterIntervals")
+
     # What: no MayaHydra prim serves a name it does not list.
     # How: add a mesh with a material and more light types to the scene, then probe
     #      every prim of MayaHydraSceneIndex.

@@ -46,6 +46,7 @@
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/timeSampleArray.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -120,24 +121,105 @@ struct _TypedCopy
     }
 };
 
+// A multisampled value captured over the whole capture interval, answered the
+// way the live source would answer a narrower one. Unlike
+// HdRetainedTypedMultisampledDataSource, it reports only the samples the
+// requested interval needs, and it interpolates between samples.
+template <class T>
+class _CapturedSamples : public HdTypedSampledDataSource<T>
+{
+public:
+    HD_DECLARE_DATASOURCE(_CapturedSamples<T>);
+
+    _CapturedSamples(
+        std::vector<HdSampledDataSource::Time> times,
+        std::vector<VtValue>                   values,
+        const T&                               frameValue)
+        : _times(std::move(times))
+        , _values(std::move(values))
+        , _frameValue(frameValue)
+    {
+    }
+
+    // The samples inside the interval, plus the nearest one beyond each edge
+    // that has no sample of its own, as UsdImaging reports them. The frame
+    // value is not a sample unless the source reported it as one.
+    bool GetContributingSampleTimesForInterval(
+        HdSampledDataSource::Time               startTime,
+        HdSampledDataSource::Time               endTime,
+        std::vector<HdSampledDataSource::Time>* outSampleTimes) override
+    {
+        const auto first = std::lower_bound(
+            _times.begin(), _times.end(), startTime - kSampleTimeEpsilon);
+        auto last = std::upper_bound(_times.begin(), _times.end(), endTime + kSampleTimeEpsilon);
+        auto begin = first;
+        if (begin != _times.begin()
+            && (begin == _times.end() || std::fabs(*begin - startTime) >= kSampleTimeEpsilon)) {
+            --begin;
+        }
+        if (last != _times.end()
+            && (last == _times.begin() || std::fabs(*(last - 1) - endTime) >= kSampleTimeEpsilon)) {
+            ++last;
+        }
+        if (std::distance(begin, last) < 2) {
+            return false;
+        }
+        if (outSampleTimes) {
+            outSampleTimes->assign(begin, last);
+        }
+        return true;
+    }
+
+    T GetTypedValue(HdSampledDataSource::Time shutterOffset) override
+    {
+        if (std::fabs(shutterOffset) < kSampleTimeEpsilon) {
+            return _frameValue;
+        }
+        const auto next = std::lower_bound(_times.begin(), _times.end(), shutterOffset);
+        if (next == _times.begin()) {
+            return _Typed(_values.front());
+        }
+        if (next == _times.end()) {
+            return _Typed(_values.back());
+        }
+        const size_t i = std::distance(_times.begin(), next);
+        if (std::fabs(_times[i] - shutterOffset) < kSampleTimeEpsilon) {
+            return _Typed(_values[i]);
+        }
+        const float alpha = (shutterOffset - _times[i - 1]) / (_times[i] - _times[i - 1]);
+        return _Typed(HdResampleNeighbors(alpha, _values[i - 1], _values[i]));
+    }
+
+    VtValue GetValue(HdSampledDataSource::Time shutterOffset) override
+    {
+        return VtValue(GetTypedValue(shutterOffset));
+    }
+
+private:
+    T _Typed(const VtValue& v) const
+    {
+        return v.IsHolding<T>() ? v.UncheckedGet<T>() : _frameValue;
+    }
+
+    const std::vector<HdSampledDataSource::Time> _times;
+    const std::vector<VtValue>                   _values;
+    const T                                      _frameValue;
+};
+
 struct _MultisampledCopy
 {
     std::vector<HdSampledDataSource::Time>* times;
-    const std::vector<VtValue>*             values;
+    std::vector<VtValue>*                   values;
 
     template <class T>
-    HdSampledDataSourceHandle operator()(const T&) const
+    HdSampledDataSourceHandle operator()(const T& frameValue) const
     {
-        // Not std::vector, which has no data() for bool.
-        std::unique_ptr<T[]> typed(new T[values->size()]);
-        for (size_t i = 0; i < values->size(); ++i) {
-            if (!(*values)[i].IsHolding<T>()) {
+        for (const VtValue& v : *values) {
+            if (!v.IsHolding<T>()) {
                 return nullptr;
             }
-            typed[i] = (*values)[i].UncheckedGet<T>();
         }
-        return HdRetainedTypedMultisampledDataSource<T>::New(
-            values->size(), times->data(), typed.get());
+        return _CapturedSamples<T>::New(std::move(*times), std::move(*values), frameValue);
     }
 
     HdSampledDataSourceHandle operator()(const VtValue&) const { return nullptr; }
@@ -154,19 +236,12 @@ HdDataSourceBaseHandle _CopySampled(const HdSampledDataSourceHandle& ds)
     if (ds->GetContributingSampleTimesForInterval(kSampleIntervalStart, kSampleIntervalEnd, &times)
         && times.size() > 1) {
         // The value at offset 0 is the frame itself, which some sources answer
-        // with the live value rather than a sample; keep it exact.
-        const auto zero = std::find_if(times.begin(), times.end(), [](HdSampledDataSource::Time t) {
-            return std::fabs(t) < kSampleTimeEpsilon;
-        });
-        if (zero != times.end()) {
-            *zero = 0.0f;
-        } else {
-            times.insert(std::upper_bound(times.begin(), times.end(), 0.0f), 0.0f);
-        }
+        // with the live value rather than a sample, so it is kept apart, exact.
+        std::sort(times.begin(), times.end());
         std::vector<VtValue> values;
         values.reserve(times.size());
         for (const HdSampledDataSource::Time t : times) {
-            values.push_back(t == 0.0f ? value : ds->GetValue(t));
+            values.push_back(std::fabs(t) < kSampleTimeEpsilon ? value : ds->GetValue(t));
         }
         if (HdSampledDataSourceHandle copy
             = VtVisitValue(value, _MultisampledCopy { &times, &values })) {

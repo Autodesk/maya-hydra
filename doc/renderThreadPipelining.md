@@ -171,8 +171,11 @@ happens on the first frame submitted to the render thread.  From then on it:
 - keeps a copy of every prim, built from retained data sources.  A dirtied
   prim is re-copied only under its dirty locators; the rest of the previous
   copy is reused.  Multisampled values, such as transforms and points under
-  motion blur, are copied as samples over the shutter interval [-1, 1] plus
-  the frame itself.  Values of a type Vt does not know, such as `HdTupleType`
+  motion blur, are copied as the samples over the interval [-1, 1] frames,
+  plus the exact value of the frame itself.  The copy answers a renderer's
+  shutter as the live source would: it reports the samples inside the shutter
+  and the nearest one beyond each edge, and interpolates between samples.
+  Values of a type Vt does not know, such as `HdTupleType`
   or external GPU buffer handles, and data sources marked
   `RenderThreadCaptureByReference`, such as the lazy readback of a shared GPU
   buffer, are kept by reference;

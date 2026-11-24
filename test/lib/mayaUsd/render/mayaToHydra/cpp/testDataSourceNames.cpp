@@ -25,6 +25,7 @@
 #include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -104,6 +105,57 @@ TEST(DataSourceNames, CaptureFindsUnlistedNames)
             PartlyListedContainer::New());
     ASSERT_EQ(unlisted.size(), 1u);
     EXPECT_EQ(unlisted.front(), HdXformSchema::GetDefaultLocator());
+}
+
+// What: the capture's copy of a multisampled value answers a renderer's shutter as
+//       the live source would.
+// How: a prim whose transform is sampled at -1, -0.25, 0.25 and 1 frames, with
+//      translate x = 4 * time, read through an active, held capture.
+// Expect: a centered shutter reports its own two samples, with no sample added at
+//         the frame; a shutter starting at the frame also reports the nearest
+//         sample beyond each edge; values between samples are interpolated, and
+//         the frame value is the source's own.
+TEST(DataSourceNames, CaptureAnswersShutterIntervals)
+{
+    HdSampledDataSource::Time times[] = { -1.0f, -0.25f, 0.25f, 1.0f };
+    GfMatrix4d                matrices[4];
+    for (size_t i = 0; i < 4; ++i) {
+        matrices[i].SetTranslate(GfVec3d(4.0 * times[i], 0.0, 0.0));
+    }
+    HdMatrixDataSourceHandle liveMatrix
+        = HdRetainedTypedMultisampledDataSource<GfMatrix4d>::New(4, times, matrices);
+    const SdfPath primPath("/prim");
+
+    HdRetainedSceneIndexRefPtr input = HdRetainedSceneIndex::New();
+    input->AddPrims({ { primPath,
+                        HdPrimTypeTokens->mesh,
+                        HdRetainedContainerDataSource::New(
+                            HdXformSchema::GetSchemaToken(),
+                            HdXformSchema::Builder().SetMatrix(liveMatrix).Build()) } });
+
+    auto capture = MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::New(input);
+    capture->Activate();
+    capture->Hold();
+    const HdMatrixDataSourceHandle matrix
+        = HdXformSchema::GetFromParent(capture->GetPrim(primPath).dataSource).GetMatrix();
+    ASSERT_TRUE(matrix);
+    EXPECT_NE(matrix, liveMatrix) << "the transform was not copied";
+
+    std::vector<HdSampledDataSource::Time> sampleTimes;
+    ASSERT_TRUE(matrix->GetContributingSampleTimesForInterval(-0.25f, 0.25f, &sampleTimes));
+    EXPECT_EQ(sampleTimes, (std::vector<HdSampledDataSource::Time> { -0.25f, 0.25f }));
+
+    ASSERT_TRUE(matrix->GetContributingSampleTimesForInterval(0.0f, 0.5f, &sampleTimes));
+    EXPECT_EQ(sampleTimes, (std::vector<HdSampledDataSource::Time> { -0.25f, 0.25f, 1.0f }));
+
+    // Interpolated with a float weight.
+    EXPECT_NEAR(matrix->GetTypedValue(0.5f).ExtractTranslation()[0], 2.0, 1e-5);
+    EXPECT_DOUBLE_EQ(
+        matrix->GetTypedValue(0.0f).ExtractTranslation()[0],
+        liveMatrix->GetTypedValue(0.0f).ExtractTranslation()[0]);
+    EXPECT_DOUBLE_EQ(matrix->GetTypedValue(1.0f).ExtractTranslation()[0], 4.0);
+
+    capture->Release();
 }
 
 // What: every prim MayaHydraSceneIndex produces lists every name it serves, so the
