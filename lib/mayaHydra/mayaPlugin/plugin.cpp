@@ -101,10 +101,11 @@ namespace {
 void initialize()
 {
     Fvp::InitializationParams fvpInitParams;
-    if (MGlobal::mayaState() == MGlobal::kInteractive) {
-        // MayaColorPreferencesTranslator ctor will throw an exception outside
-        // interactive mode (batch, mayapy), as MayaHydra::getRGBAColorPreferenceValue()
-        // fails because the Maya displayRGBColor command is unavailable there.
+    if (MGlobal::mayaState() != MGlobal::kBatch) {
+        // MayaColorPreferencesTranslator ctor will throw an exception
+        // on construction in batch mode, as 
+        // MayaHydra::getRGBAColorPreferenceValue() fails because
+        // the Maya displayRGBColor command is unavailable in batch mode.
         fvpInitParams.colorPreferencesNotificationProvider
             = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
         fvpInitParams.colorPreferencesTranslator
@@ -116,7 +117,7 @@ void initialize()
 void finalize()
 {
     Fvp::InitializationParams fvpInitParams;
-    if (MGlobal::mayaState() == MGlobal::kInteractive) {
+    if (MGlobal::mayaState() != MGlobal::kBatch) {
         fvpInitParams.colorPreferencesNotificationProvider
             = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
         fvpInitParams.colorPreferencesTranslator

@@ -47,7 +47,7 @@
     <sep/>
     <!-- ______________________________________________________________ -->
     <sep desc="Render description options"/>
-    <mel n="activeRenderDescription" p="1" s='mayaHydraSetActiveRenderDescription("%1")' t="name" h="UFE path of the UsdRenderSettings or UsdRenderPass prim to render, overriding\n\tthe scene's active render description. Must precede other render settings flags.\n\tThose flags do not see prims defined only in the -sessionLayer file"/>
+    <mel n="activeRenderDescription" p="1" s='mayaHydraSetActiveRenderDescription("%1")' t="name" h="UFE path of the UsdRenderSettings or UsdRenderPass prim to render, overriding\n\tthe scene's active render description."/>
     <sep/>
     <!-- ______________________________________________________________ -->
     <sep desc="Resolution options"/>
