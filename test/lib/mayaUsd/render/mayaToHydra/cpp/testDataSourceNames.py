@@ -81,6 +81,11 @@ class TestDataSourceNames(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="DataSourceNames.CaptureAnswersShutterIntervals")
 
+    def test_captureHoldsReleasesAndRecopies(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureHoldsReleasesAndRecopies")
+
     # What: no MayaHydra prim serves a name it does not list.
     # How: add a mesh with a material and more light types to the scene, then probe
     #      every prim of MayaHydraSceneIndex.

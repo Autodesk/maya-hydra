@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -80,6 +81,54 @@ public:
         return nullptr;
     }
 };
+
+// A value the test changes in place, as a live Maya-backed data source would.
+template <typename T> class SettableDataSource : public HdTypedSampledDataSource<T>
+{
+public:
+    HD_DECLARE_DATASOURCE(SettableDataSource<T>);
+
+    void Set(const T& value) { _value = value; }
+
+    VtValue GetValue(HdSampledDataSource::Time) override { return VtValue(_value); }
+    T       GetTypedValue(HdSampledDataSource::Time) override { return _value; }
+    bool    GetContributingSampleTimesForInterval(
+           HdSampledDataSource::Time,
+           HdSampledDataSource::Time,
+           std::vector<HdSampledDataSource::Time>*) override
+    {
+        return false;
+    }
+
+private:
+    explicit SettableDataSource(const T& value)
+        : _value(value)
+    {
+    }
+
+    T _value;
+};
+
+class DirtyCounter : public HdSceneIndexObserver
+{
+public:
+    void PrimsAdded(const HdSceneIndexBase&, const AddedPrimEntries&) override { }
+    void PrimsRemoved(const HdSceneIndexBase&, const RemovedPrimEntries&) override { }
+    void PrimsDirtied(const HdSceneIndexBase&, const DirtiedPrimEntries& entries) override
+    {
+        dirtied += entries.size();
+    }
+    void PrimsRenamed(const HdSceneIndexBase&, const RenamedPrimEntries&) override { }
+
+    size_t dirtied = 0;
+};
+
+GfMatrix4d Translation(double x)
+{
+    GfMatrix4d matrix(1.0);
+    matrix.SetTranslate(GfVec3d(x, 0.0, 0.0));
+    return matrix;
+}
 
 void CollectPrimPaths(
     const HdSceneIndexBaseRefPtr& sceneIndex,
@@ -156,6 +205,97 @@ TEST(DataSourceNames, CaptureAnswersShutterIntervals)
     EXPECT_DOUBLE_EQ(matrix->GetTypedValue(1.0f).ExtractTranslation()[0], 4.0);
 
     capture->Release();
+}
+
+// What: the capture holds its copy fixed, then recopies only what changed.
+// How: a mesh whose transform and a light whose intensity change in place, each
+//      dirtied while the capture is held, then released.
+// Expect: while held, the copy keeps the old values and no notice is forwarded;
+//         after release both notices are forwarded and the copy shows the new
+//         values, while what was not dirtied is the same copy as before.
+TEST(DataSourceNames, CaptureHoldsReleasesAndRecopies)
+{
+    const SdfPath meshPath("/mesh");
+    const SdfPath lightPath("/light");
+    auto          meshMatrix = SettableDataSource<GfMatrix4d>::New(Translation(1.0));
+    auto          intensity = SettableDataSource<float>::New(1.0f);
+
+    HdRetainedSceneIndexRefPtr input = HdRetainedSceneIndex::New();
+    input->AddPrims(
+        { { meshPath,
+            HdPrimTypeTokens->mesh,
+            HdRetainedContainerDataSource::New(
+                HdXformSchema::GetSchemaToken(),
+                HdXformSchema::Builder().SetMatrix(meshMatrix).Build(),
+                HdVisibilitySchema::GetSchemaToken(),
+                HdVisibilitySchema::Builder()
+                    .SetVisibility(HdRetainedTypedSampledDataSource<bool>::New(true))
+                    .Build()) },
+          { lightPath,
+            HdPrimTypeTokens->sphereLight,
+            HdRetainedContainerDataSource::New(
+                HdXformSchema::GetSchemaToken(),
+                HdXformSchema::Builder()
+                    .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(Translation(3.0)))
+                    .Build(),
+                HdLightSchema::GetSchemaToken(),
+                HdRetainedContainerDataSource::New(
+                    HdLightTokens->intensity,
+                    intensity,
+                    HdLightTokens->color,
+                    HdRetainedTypedSampledDataSource<GfVec3f>::New(GfVec3f(1.0f)))) } });
+
+    auto capture = MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::New(input);
+    DirtyCounter observer;
+    capture->AddObserver(HdSceneIndexObserverPtr(&observer));
+    capture->Activate();
+    capture->Hold();
+
+    auto meshX = [&] {
+        return HdXformSchema::GetFromParent(capture->GetPrim(meshPath).dataSource)
+            .GetMatrix()
+            ->GetTypedValue(0.0f)
+            .ExtractTranslation()[0];
+    };
+    auto lightContainer = [&] {
+        return GetChildContainer(
+            capture->GetPrim(lightPath).dataSource, HdLightSchema::GetSchemaToken());
+    };
+    auto lightIntensity = [&] {
+        return HdFloatDataSource::Cast(lightContainer()->Get(HdLightTokens->intensity))
+            ->GetTypedValue(0.0f);
+    };
+    const HdDataSourceBaseHandle meshVisibility
+        = capture->GetPrim(meshPath).dataSource->Get(HdVisibilitySchema::GetSchemaToken());
+    const HdDataSourceBaseHandle lightXform
+        = capture->GetPrim(lightPath).dataSource->Get(HdXformSchema::GetSchemaToken());
+    ASSERT_DOUBLE_EQ(meshX(), 1.0);
+    ASSERT_FLOAT_EQ(lightIntensity(), 1.0f);
+
+    meshMatrix->Set(Translation(2.0));
+    intensity->Set(5.0f);
+    input->DirtyPrims(
+        { { meshPath, HdXformSchema::GetDefaultLocator() },
+          { lightPath, HdLightSchema::GetDefaultLocator().Append(HdLightTokens->intensity) } });
+
+    EXPECT_EQ(observer.dirtied, 0u) << "a notice was forwarded while held";
+    EXPECT_DOUBLE_EQ(meshX(), 1.0) << "the held copy changed";
+    EXPECT_FLOAT_EQ(lightIntensity(), 1.0f) << "the held copy changed";
+
+    capture->Release();
+    EXPECT_EQ(observer.dirtied, 2u) << "the held notices were not forwarded on release";
+    EXPECT_DOUBLE_EQ(meshX(), 2.0) << "the transform was not recopied";
+    EXPECT_FLOAT_EQ(lightIntensity(), 5.0f) << "the light was not recopied";
+    EXPECT_TRUE(lightContainer()->Get(HdLightTokens->color)) << "the light recopy lost a param";
+    EXPECT_EQ(
+        capture->GetPrim(meshPath).dataSource->Get(HdVisibilitySchema::GetSchemaToken()),
+        meshVisibility)
+        << "visibility was not dirtied but was copied again";
+    EXPECT_EQ(
+        capture->GetPrim(lightPath).dataSource->Get(HdXformSchema::GetSchemaToken()), lightXform)
+        << "the light's transform was not dirtied but was copied again";
+
+    capture->RemoveObserver(HdSceneIndexObserverPtr(&observer));
 }
 
 // What: every prim MayaHydraSceneIndex produces lists every name it serves, so the

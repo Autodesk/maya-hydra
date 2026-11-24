@@ -16,6 +16,8 @@
 
 #include "renderThreadStats.h"
 
+#include <mayaHydraLib/debugCodes.h>
+
 // VtVisitValue dispatches every Vt value type, so all of them must be complete.
 #include <pxr/base/arch/demangle.h>
 #include <pxr/base/vt/typeHeaders.h>
@@ -431,33 +433,42 @@ HdContainerDataSourceHandle _CopyLight(const HdContainerDataSourceHandle& light)
     return HdRetainedContainerDataSource::New(names.size(), names.data(), values.data());
 }
 
-// \p copy of \p live with its light container copied by _CopyLight.
+// Copy of a light prim's \p live top level, its light container copied by _CopyLight
+// and the rest taken from \p copy, or copied from \p live when \p copy is null.
 HdContainerDataSourceHandle
-_WithLightCopied(const HdContainerDataSourceHandle& copy, const HdContainerDataSourceHandle& live)
+_CopyLightPrim(const HdContainerDataSourceHandle& copy, const HdContainerDataSourceHandle& live)
 {
-    const TfToken& lightName = HdLightSchema::GetSchemaToken();
-    const HdContainerDataSourceHandle liveLight
-        = live ? HdContainerDataSource::Cast(live->Get(lightName)) : nullptr;
-    if (!copy || !liveLight) {
+    if (!live) {
         return copy;
     }
-    TfTokenVector                       names = copy->GetNames();
+    const TfToken&                    lightName = HdLightSchema::GetSchemaToken();
+    const HdContainerDataSourceHandle liveLight = HdContainerDataSource::Cast(live->Get(lightName));
+    TfTokenVector                     names = copy ? copy->GetNames() : live->GetNames();
+    if (liveLight && std::find(names.begin(), names.end(), lightName) == names.end()) {
+        names.push_back(lightName);
+    }
     std::vector<HdDataSourceBaseHandle> values;
-    values.reserve(names.size() + 1);
-    bool hasLight = false;
+    values.reserve(names.size());
     for (const TfToken& name : names) {
-        if (name == lightName) {
-            hasLight = true;
+        if (name == lightName && liveLight) {
             values.push_back(_CopyLight(liveLight));
         } else {
-            values.push_back(copy->Get(name));
+            values.push_back(copy ? copy->Get(name) : _CopyDataSource(live->Get(name)));
         }
     }
-    if (!hasLight) {
-        names.push_back(lightName);
-        values.push_back(_CopyLight(liveLight));
-    }
     return HdRetainedContainerDataSource::New(names.size(), names.data(), values.data());
+}
+
+// \p dirty without what is below the light schema, which _CopyLightPrim recopies.
+HdDataSourceLocatorSet _WithoutLight(const HdDataSourceLocatorSet& dirty)
+{
+    HdDataSourceLocatorSet rest;
+    for (const HdDataSourceLocator& locator : dirty) {
+        if (!locator.HasPrefix(HdLightSchema::GetDefaultLocator())) {
+            rest.insert(locator);
+        }
+    }
+    return rest;
 }
 
 void _FindUnlisted(
@@ -481,6 +492,9 @@ void _FindUnlisted(
 
 void _WarnUnlistedNames(const SdfPath& primPath, const HdSceneIndexPrim& prim)
 {
+    if (!TfDebug::IsEnabled(MAYAHYDRALIB_RENDER_THREAD_CAPTURE)) {
+        return;
+    }
     const std::vector<HdDataSourceLocator> unlisted
         = MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::FindUnlistedNames(prim.dataSource);
     if (unlisted.empty()) {
@@ -957,18 +971,22 @@ void RenderThreadCaptureSceneIndex::_Copy(const SdfPath& path, _Entry& entry) co
     if (!entry.selections) {
         entry.selections = std::make_shared<_Selections>();
     }
+    const bool isLight = HdPrimTypeIsLight(live.primType);
     if (!entry.copied || entry.prim.primType != live.primType) {
-        entry.copy = _CopyContainer(live.dataSource);
-        if (HdPrimTypeIsLight(live.primType)) {
-            entry.copy = _WithLightCopied(entry.copy, live.dataSource);
-        }
+        entry.copy = isLight ? _CopyLightPrim(nullptr, live.dataSource)
+                             : _CopyContainer(live.dataSource);
         entry.selections->Set(_CopySelections(live.dataSource));
         _WarnUnlistedNames(path, live);
     } else if (!entry.dirty.IsEmpty()) {
-        entry.copy = _Recopy(entry.copy, live.dataSource, entry.dirty);
-        if (HdPrimTypeIsLight(live.primType)
-            && entry.dirty.Intersects(HdLightSchema::GetDefaultLocator())) {
-            entry.copy = _WithLightCopied(entry.copy, live.dataSource);
+        if (isLight && entry.dirty.Contains(HdDataSourceLocator::EmptyLocator())) {
+            entry.copy = _CopyLightPrim(nullptr, live.dataSource);
+        } else if (isLight && entry.dirty.Intersects(HdLightSchema::GetDefaultLocator())) {
+            const HdDataSourceLocatorSet rest = _WithoutLight(entry.dirty);
+            entry.copy = _CopyLightPrim(
+                rest.IsEmpty() ? entry.copy : _Recopy(entry.copy, live.dataSource, rest),
+                live.dataSource);
+        } else {
+            entry.copy = _Recopy(entry.copy, live.dataSource, entry.dirty);
         }
     }
     entry.prim.primType = live.primType;

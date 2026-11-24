@@ -251,8 +251,11 @@ served without being listed.  `MayaHydraDataSource` keeps one list of names per
 prim type, which `GetNames()` returns and `Get()` checks first, and the camera
 data source serves only the parameters the camera adapter answers.
 
-To catch this at the source, the capture probes each prim it copies in full
-(`RenderThreadCaptureSceneIndex::FindUnlistedNames()`): the prim's top level for
+To catch this at the source, under `TF_DEBUG=MAYAHYDRALIB_RENDER_THREAD_CAPTURE`
+the capture probes each prim it copies in full
+(`RenderThreadCaptureSceneIndex::FindUnlistedNames()`).  The probe is off
+otherwise, because it asks every container for each name it might serve.  It
+checks the prim's top level for
 the common prim-level schemas, and the containers of the schemas with fixed
 members (xform, mesh, basis curves, camera, light, visibility, purpose, extent,
 instancer topology, display style) for those members.  Each name served with a
