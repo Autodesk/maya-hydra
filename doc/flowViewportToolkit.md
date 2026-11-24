@@ -43,7 +43,7 @@ The *[FilteringSceneIndexClient](../lib/flowViewport/API/fvpFilteringSceneIndexC
 
 It contains a :
 - display name which is a name  associated with your filtering scene index, it is only used as an information and can be anything.
-- category which is a container in which you want your filtering scene index (or scene index chain) to go to. Note : the filtering scene indices inside a Category don't have any specific priority when they are called.
+- category which is a container in which you want your filtering scene index (or scene index chain) to go to. The only category is *kSceneFiltering*, which applies your filtering scene index to the primitives from the scene. Note : the filtering scene indices inside a Category don't have any specific priority when they are called.
 -   The renderer names to which your filtering scene index applies. Say "GL, Arnold" for applying this filter to Storm and the Arnold render delegates. Note : using *FvpViewportAPITokens->allRenderers* means applies to all render delegates.
 -   A DCC node as a *void** , dccNode is specific to a DCC (like Maya). For Maya it is a *MObject** DAG node. If you provide a non null pointer, we automatically track some events from the DCC node such as node deleted/undeleted or the visibility attribute updates.  When the node is present and visible, we automatically apply the filtering scene index. And when it  is deleted or not visible, we remove the filtering scene index, so no filtering is happening in that case.  It is a convenient way for you to control the filtering through a Maya node. If it is a *nullptr*, we always apply the filtering scene index until you unregister it.
 

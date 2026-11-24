@@ -385,14 +385,6 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
             rendererNamesToUpdate += sceneFilteringSceneIndexData->GetClient()->getRendererNames();
         }
     }
-    for (auto& selectionHighlightFilteringSceneIndexData :
-         Fvp::FilteringSceneIndexInterfaceImp::get()
-             .getSelectionHighlightFilteringSceneIndicesData()) {
-        if (selectionHighlightFilteringSceneIndexData->UpdateVisibility()) {
-            rendererNamesToUpdate
-                += selectionHighlightFilteringSceneIndexData->GetClient()->getRendererNames();
-        }
-    }
     if (!rendererNamesToUpdate.empty()) {
         Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(
             rendererNamesToUpdate);

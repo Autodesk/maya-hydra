@@ -49,15 +49,11 @@ public:
     //Called by Flow viewport and the DCC
     FVP_API
     const std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr>&           getSceneFilteringSceneIndicesData() const;
-    FVP_API
-    const std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr>&           getSelectionHighlightFilteringSceneIndicesData() const;
 
 private :
     bool _CreateSceneFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
-    bool _CreateSelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
     void _DestroySceneFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
-    void _DestroySelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
-    
+
 };
 
 } //end of namespace FVP_NS_DEF
