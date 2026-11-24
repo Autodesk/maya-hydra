@@ -238,6 +238,16 @@ TBB workers while it handles the notice, so those reads take the table lock
 shared and only serialize per prim, through a small array of copy locks keyed
 by path.  Notices take the table lock exclusively.
 
+A copy can itself make upstream send a notice: reading a Maya transform through
+`MDagPath` evaluates it lazily and fires its world matrix callbacks, which dirty
+prims there and then, on the reading thread.  That notice cannot wait for the
+table lock, which its own reader holds, or which the main thread holds while it
+waits for the worker copying in `Hold()`.  So while a copy reads upstream, a
+notice from a reading thread, or one that does not get the lock at once, is
+deferred.  It is received like any other once the read is over, at the end of
+the next notice that does take the lock or of `Hold()` or `Release()`; one
+deferred by `Hold()` itself joins the held queue.
+
 The copy is taken on the main thread, so the main thread now does the data
 reads that sync used to do on the render thread, for every dirtied prim
 whether or not the renderer pulls it.

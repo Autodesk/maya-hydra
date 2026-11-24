@@ -34,6 +34,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -107,6 +108,74 @@ private:
     }
 
     T _value;
+};
+
+// A transform that, when next read, runs a callback first, as a Maya transform
+// read through MDagPath evaluates lazily and fires its matrix callbacks.
+class LazyMatrixDataSource : public HdMatrixDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(LazyMatrixDataSource);
+
+    void OnNextRead(std::function<void()> callback) { _onNextRead = std::move(callback); }
+
+    VtValue GetValue(HdSampledDataSource::Time time) override
+    {
+        return VtValue(GetTypedValue(time));
+    }
+    GfMatrix4d GetTypedValue(HdSampledDataSource::Time) override
+    {
+        if (_onNextRead) {
+            std::function<void()> callback = std::move(_onNextRead);
+            _onNextRead = nullptr;
+            callback();
+        }
+        return GfMatrix4d(1.0);
+    }
+    bool GetContributingSampleTimesForInterval(
+        HdSampledDataSource::Time,
+        HdSampledDataSource::Time,
+        std::vector<HdSampledDataSource::Time>*) override
+    {
+        return false;
+    }
+
+private:
+    LazyMatrixDataSource() = default;
+
+    std::function<void()> _onNextRead;
+};
+
+// Reads each dirtied prim while handling the notice, as Flash's observer does.
+class ReadingObserver : public HdSceneIndexObserver
+{
+public:
+    explicit ReadingObserver(HdSceneIndexBase& sceneIndex)
+        : _sceneIndex(sceneIndex)
+    {
+    }
+
+    void PrimsAdded(const HdSceneIndexBase&, const AddedPrimEntries&) override { }
+    void PrimsRemoved(const HdSceneIndexBase&, const RemovedPrimEntries&) override { }
+    void PrimsDirtied(const HdSceneIndexBase&, const DirtiedPrimEntries& entries) override
+    {
+        dirtied += entries.size();
+        if (!reading) {
+            return;
+        }
+        for (const auto& entry : entries) {
+            HdXformSchema::GetFromParent(_sceneIndex.GetPrim(entry.primPath).dataSource)
+                .GetMatrix()
+                ->GetTypedValue(0.0f);
+        }
+    }
+    void PrimsRenamed(const HdSceneIndexBase&, const RenamedPrimEntries&) override { }
+
+    size_t dirtied = 0;
+    bool   reading = true;
+
+private:
+    HdSceneIndexBase& _sceneIndex;
 };
 
 class DirtyCounter : public HdSceneIndexObserver
@@ -294,6 +363,52 @@ TEST(DataSourceNames, CaptureHoldsReleasesAndRecopies)
     EXPECT_EQ(
         capture->GetPrim(lightPath).dataSource->Get(HdXformSchema::GetSchemaToken()), lightXform)
         << "the light's transform was not dirtied but was copied again";
+
+    capture->RemoveObserver(HdSceneIndexObserverPtr(&observer));
+}
+
+// What: a notice sent while the capture copies a prim, by the copy's own read of
+//       upstream, neither deadlocks nor is lost.
+// How: a transform that dirties its prim when read. First an observer reads the
+//      prim while handling its dirty notice, so the capture copies it then; then
+//      the capture copies it in Hold().
+// Expect: each notice the reads send is forwarded once the copy is done, after
+//         release if it came while held.
+TEST(DataSourceNames, CaptureDefersNoticesSentByItsReads)
+{
+    const SdfPath primPath("/prim");
+    auto          matrix = LazyMatrixDataSource::New();
+
+    HdRetainedSceneIndexRefPtr input = HdRetainedSceneIndex::New();
+    input->AddPrims({ { primPath,
+                        HdPrimTypeTokens->mesh,
+                        HdRetainedContainerDataSource::New(
+                            HdXformSchema::GetSchemaToken(),
+                            HdXformSchema::Builder().SetMatrix(matrix).Build()) } });
+    HdRetainedSceneIndex* const inputPtr = input.operator->();
+    auto dirtyOnRead = [inputPtr, &primPath] {
+        inputPtr->DirtyPrims({ { primPath, HdXformSchema::GetDefaultLocator() } });
+    };
+
+    auto            capture = MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::New(input);
+    ReadingObserver observer(*capture);
+    capture->AddObserver(HdSceneIndexObserverPtr(&observer));
+    capture->Activate();
+    capture->Hold();
+    capture->Release();
+
+    matrix->OnNextRead(dirtyOnRead);
+    input->DirtyPrims({ { primPath, HdXformSchema::GetDefaultLocator() } });
+    EXPECT_EQ(observer.dirtied, 2u) << "the notice sent by a lazy copy was not forwarded";
+
+    observer.reading = false;
+    input->DirtyPrims({ { primPath, HdXformSchema::GetDefaultLocator() } });
+    EXPECT_EQ(observer.dirtied, 3u);
+    matrix->OnNextRead(dirtyOnRead);
+    capture->Hold();
+    EXPECT_EQ(observer.dirtied, 3u) << "a notice was forwarded while held";
+    capture->Release();
+    EXPECT_EQ(observer.dirtied, 4u) << "the notice sent by Hold's copy was not forwarded";
 
     capture->RemoveObserver(HdSceneIndexObserverPtr(&observer));
 }

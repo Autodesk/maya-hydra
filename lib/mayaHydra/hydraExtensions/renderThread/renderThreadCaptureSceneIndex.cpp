@@ -682,6 +682,36 @@ RenderThreadCaptureSceneIndex::FindUnlistedNames(const HdContainerDataSourceHand
     return unlisted;
 }
 
+namespace {
+
+// Reads on this thread that call upstream under a capture's lock.
+thread_local int _upstreamReadsOnThisThread = 0;
+
+// Counts a read that calls upstream under the capture's lock.
+class _UpstreamRead
+{
+public:
+    explicit _UpstreamRead(std::atomic<int>& count)
+        : _count(count)
+    {
+        _count.fetch_add(1, std::memory_order_acq_rel);
+        ++_upstreamReadsOnThisThread;
+    }
+    ~_UpstreamRead()
+    {
+        --_upstreamReadsOnThisThread;
+        _count.fetch_sub(1, std::memory_order_acq_rel);
+    }
+
+    _UpstreamRead(const _UpstreamRead&) = delete;
+    _UpstreamRead& operator=(const _UpstreamRead&) = delete;
+
+private:
+    std::atomic<int>& _count;
+};
+
+} // namespace
+
 void RenderThreadCaptureSceneIndex::Activate()
 {
     std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -712,11 +742,17 @@ void RenderThreadCaptureSceneIndex::Hold()
     if (!IsActive()) {
         return;
     }
+    _ReceiveDeferred();
     const auto start = std::chrono::steady_clock::now();
-    std::unique_lock<std::shared_mutex> lock(_mutex);
-    _CopyPending();
-    _holding.store(true, std::memory_order_release);
+    {
+        _UpstreamRead                       read(_upstreamReads);
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        _CopyPending();
+        _holding.store(true, std::memory_order_release);
+    }
     RenderThreadStats::instance().RecordCaptureHold(_MicrosSince(start));
+    // Those the copy caused join the held queue.
+    _ReceiveDeferred();
 }
 
 void RenderThreadCaptureSceneIndex::Release()
@@ -741,6 +777,7 @@ void RenderThreadCaptureSceneIndex::Release()
         _Forward(notice);
     }
     RenderThreadStats::instance().RecordCaptureRelease(_MicrosSince(start));
+    _ReceiveDeferred();
 }
 
 HdSceneIndexPrim RenderThreadCaptureSceneIndex::GetPrim(const SdfPath& primPath) const
@@ -760,6 +797,7 @@ HdSceneIndexPrim RenderThreadCaptureSceneIndex::GetPrim(const SdfPath& primPath)
     }
     std::lock_guard<std::mutex> copyLock(_CopyLock(primPath));
     if (it->second.pending) {
+        _UpstreamRead read(_upstreamReads);
         _Copy(primPath, it->second);
     }
     return it->second.prim;
@@ -803,8 +841,20 @@ void RenderThreadCaptureSceneIndex::_Receive(
     bool    anyRenderer = false;
     bool    held = false;
     {
-        std::unique_lock<std::shared_mutex> lock(_mutex);
+        // A thread reading under the lock may already own it, and must not try
+        // to take it again.
+        std::unique_lock<std::shared_mutex> lock(_mutex, std::defer_lock);
+        if (_upstreamReadsOnThisThread > 0 || !lock.try_lock()) {
+            if (_upstreamReadsOnThisThread > 0
+                || _upstreamReads.load(std::memory_order_acquire) > 0) {
+                std::lock_guard<std::mutex> deferredLock(_deferredMutex);
+                _deferred.emplace_back(entries);
+                return;
+            }
+            lock.lock();
+        }
         if constexpr (std::is_same_v<Entries, HdSceneIndexObserver::DirtiedPrimEntries>) {
+            _UpstreamRead read(_upstreamReads);
             _UpdateSelections(entries);
         }
         anyRenderer = std::any_of(entries.begin(), entries.end(), [this](const auto& entry) {
@@ -832,6 +882,30 @@ void RenderThreadCaptureSceneIndex::_Receive(
     }
     if (!rest.empty() && !held) {
         send(rest);
+    }
+    _ReceiveDeferred();
+}
+
+void RenderThreadCaptureSceneIndex::_ReceiveDeferred()
+{
+    for (;;) {
+        std::vector<_Notice> deferred;
+        {
+            std::lock_guard<std::mutex> deferredLock(_deferredMutex);
+            if (_deferred.empty()) {
+                return;
+            }
+            deferred.swap(_deferred);
+        }
+        for (const _Notice& notice : deferred) {
+            if (const auto* added = std::get_if<HdSceneIndexObserver::AddedPrimEntries>(&notice)) {
+                _PrimsAdded(*this, *added);
+            } else if (const auto* removed = std::get_if<HdSceneIndexObserver::RemovedPrimEntries>(&notice)) {
+                _PrimsRemoved(*this, *removed);
+            } else if (const auto* dirtied = std::get_if<HdSceneIndexObserver::DirtiedPrimEntries>(&notice)) {
+                _PrimsDirtied(*this, *dirtied);
+            }
+        }
     }
 }
 

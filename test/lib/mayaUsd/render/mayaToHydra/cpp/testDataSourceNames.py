@@ -86,6 +86,15 @@ class TestDataSourceNames(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="DataSourceNames.CaptureHoldsReleasesAndRecopies")
 
+    # What: a notice the capture's own copy causes upstream to send is neither a
+    #       deadlock nor lost, as when copying a Maya transform evaluates it lazily.
+    # How: run the C++ test on a transform that dirties its prim when read.
+    # Expect: each such notice is forwarded once the copy is done.
+    def test_captureDefersNoticesSentByItsReads(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureDefersNoticesSentByItsReads")
+
     # What: no MayaHydra prim serves a name it does not list.
     # How: add a mesh with a material and more light types to the scene, then probe
     #      every prim of MayaHydraSceneIndex.

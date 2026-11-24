@@ -168,6 +168,10 @@ private:
 
     void _Forward(const _Notice& notice);
 
+    // Receive the notices deferred while a read was in progress, in order. Not
+    // under the lock.
+    void _ReceiveDeferred();
+
     // Under an exclusive lock, on the main thread: give copied prims their new
     // selections at once, even while holding.
     void _UpdateSelections(const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries);
@@ -213,6 +217,15 @@ private:
     mutable _Table            _table;
     std::vector<PXR_NS::SdfPath> _pending;
     std::vector<_Notice>         _held;
+
+    // Reads in progress that call upstream under _mutex. Such a read can make
+    // upstream send a notice on the reading thread, or on a worker the reader
+    // waits for, as when reading a Maya transform evaluates it lazily and fires a
+    // matrix callback. That notice cannot wait for _mutex, so while this is
+    // non-zero a notice that does not get the lock at once is deferred instead.
+    mutable std::atomic<int> _upstreamReads { 0 };
+    std::mutex           _deferredMutex;
+    std::vector<_Notice> _deferred;
 };
 
 /// Register the capture scene index for every renderer. Main thread, before any
