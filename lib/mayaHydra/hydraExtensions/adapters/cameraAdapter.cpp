@@ -353,13 +353,9 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         // No motion samples, instantaneous shutter
         if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled())
             return VtValue(double(0));
-        const auto shutterAngle = camera.shutterAngle(&status);
-        if (hadError(status))
-            return {};
-        auto constexpr maxRadians = M_PI * 2.0;
-        auto shutterClose = std::min(std::max(0.0, shutterAngle), maxRadians) / maxRadians;
-        auto interval = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
-        return VtValue(double(interval.GetMin() + interval.GetSize() * shutterClose));
+        // The shutter is the user's motion sample offsets; the camera's
+        // shutterAngle does not shorten it.
+        return VtValue(double(GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval().GetMax()));
     }
 
     if (paramName == HdCameraTokens->projection) {
