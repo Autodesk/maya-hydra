@@ -23,7 +23,6 @@
 
 namespace
 {
-    std::mutex selectionHighlightFilteringClient_mutex;
     std::mutex sceneFilteringClient_mutex;
 
     //Set of scene Filtering scene index data, they belong to the Fpv::FilteringSceneIndexClient::Category::kSceneFiltering
@@ -40,9 +39,6 @@ namespace
         return data;
 #endif
     }
-
-    //Set of selection highlighting Filtering scene index data, they belong to the Fpv::FilteringSceneIndexClient::Category::kSelectionHighlighting
-    std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr> selectionHighlightFilteringSceneIndicesData;
 
     // Abstract factory to create the scene index data, an implementation is provided by the DCC
     FVP_NS::FilteringSceneIndexDataAbstractFactory* sceneIndexDataFactory{nullptr};
@@ -72,10 +68,6 @@ bool FilteringSceneIndexInterfaceImp::registerFilteringSceneIndexClient(const st
     switch(client->getCategory()){
         case Fvp::FilteringSceneIndexClient::Category::kSceneFiltering:{
             return _CreateSceneFilteringSceneIndicesData(client);
-        }
-        break;
-        case Fvp::FilteringSceneIndexClient::Category::kSelectionHighlighting:{
-            return _CreateSelectionHighlightFilteringSceneIndicesData(client);
         }
         break;
         default:{
@@ -115,30 +107,6 @@ bool FilteringSceneIndexInterfaceImp::_CreateSceneFilteringSceneIndicesData(cons
     return true;
 }
 
-bool FilteringSceneIndexInterfaceImp::_CreateSelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client)
-{ 
-    TF_AXIOM(sceneIndexDataFactory);
-
-    //Block for the lock lifetime
-    {
-        std::lock_guard<std::mutex> lock(selectionHighlightFilteringClient_mutex);
-
-        auto findResult = std::find_if(selectionHighlightFilteringSceneIndicesData.cbegin(), selectionHighlightFilteringSceneIndicesData.cend(),
-                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->GetClient() == client;});
-        if (findResult != selectionHighlightFilteringSceneIndicesData.cend()){
-            return false;
-        }
-
-        //Call the abstract scene index data factory to create a subclass of FilteringSceneIndexDataBase
-        PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr data = sceneIndexDataFactory->createFilteringSceneIndexDataBase(client);
-        selectionHighlightFilteringSceneIndicesData.insert(data);
-    }
-
-    //TODO add it somewhere in selection highlight
-
-    return true;
-}
-
 void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client)
 {
     
@@ -169,29 +137,11 @@ void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(con
     }
 }
 
-void FilteringSceneIndexInterfaceImp::_DestroySelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client)
-{
-    //Block for the lock lifetime
-    {
-        std::lock_guard<std::mutex> lock(selectionHighlightFilteringClient_mutex);
-
-        auto findResult = std::find_if(selectionHighlightFilteringSceneIndicesData.cbegin(), selectionHighlightFilteringSceneIndicesData.cend(),
-                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->GetClient() == client;});
-        if (findResult != selectionHighlightFilteringSceneIndicesData.cend()){
-            selectionHighlightFilteringSceneIndicesData.erase(findResult);//Also decreases ref count
-        }
-    }
-}
-
 void FilteringSceneIndexInterfaceImp::unregisterFilteringSceneIndexClient(const std::shared_ptr<FilteringSceneIndexClient>& client)
 {
     switch(client->getCategory()){
         case Fvp::FilteringSceneIndexClient::Category::kSceneFiltering:{
             _DestroySceneFilteringSceneIndicesData(client);
-        }
-        break;
-        case Fvp::FilteringSceneIndexClient::Category::kSelectionHighlighting:{
-            _DestroySelectionHighlightFilteringSceneIndicesData(client);
         }
         break;
         default:{
@@ -204,12 +154,6 @@ const std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr>& Filtering
 {
     std::lock_guard<std::mutex> lock(sceneFilteringClient_mutex);
     return sceneFilteringSceneIndicesData();
-}
-
-const std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr>& FilteringSceneIndexInterfaceImp::getSelectionHighlightFilteringSceneIndicesData() const
-{
-    std::lock_guard<std::mutex> lock(selectionHighlightFilteringClient_mutex);
-    return selectionHighlightFilteringSceneIndicesData;
 }
 
 void FilteringSceneIndexInterfaceImp::setSceneIndexDataFactory(FilteringSceneIndexDataAbstractFactory& factory) 
