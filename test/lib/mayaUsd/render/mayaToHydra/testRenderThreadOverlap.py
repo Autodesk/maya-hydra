@@ -186,7 +186,39 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
             "MayaHydra read Maya %d times while a frame rendered off the main "
             "thread. Stats: %s" % (stats["mayaReadsOnRenderThread"], dict(stats)))
 
-    def assertJumpLeavesNoGhost(self, what, fromFrame=1, toFrame=10, beforeJump=None):
+    def describeMayaPlacement(self, node, frames):
+        """Where Maya itself has `node` at each frame, and what it says now.
+
+        The timed queries evaluate in a context of their own, so they do not
+        move the scene the viewport is showing.
+        """
+        def rounded(values):
+            return tuple(round(v, 2) for v in values)
+
+        parts = []
+        for frame in frames:
+            bboxMin = cmds.getAttr(node + ".boundingBoxMin", time=frame)[0]
+            bboxMax = cmds.getAttr(node + ".boundingBoxMax", time=frame)[0]
+            parts.append("frame %d %s-%s" % (frame, rounded(bboxMin), rounded(bboxMax)))
+        shapes = cmds.listRelatives(node, shapes=True, noIntermediate=True) or [node]
+        current = cmds.exactWorldBoundingBox(shapes[0])
+        parts.append("now (frame %g) %s-%s" % (
+            cmds.currentTime(query=True), rounded(current[:3]), rounded(current[3:])))
+        evaluators = []
+        for name in ("deformer", "cache"):
+            try:
+                enabled = cmds.evaluator(name=name, query=True, enable=True)
+                clusters = cmds.evaluator(name=name, query=True, clusters=True) or []
+                evaluators.append("%s %s, %d clusters" % (
+                    name, "on" if enabled else "off", len(clusters)))
+            except (RuntimeError, TypeError) as error:
+                evaluators.append("%s unknown (%s)" % (name, error))
+        parts.append("evaluation %s: %s" % (
+            cmds.evaluationManager(query=True, mode=True)[0], "; ".join(evaluators)))
+        return "Maya has the %s at %s." % (node, ", ".join(parts))
+
+    def assertJumpLeavesNoGhost(
+            self, what, fromFrame=1, toFrame=10, beforeJump=None, node=None):
         """Jump between frames 1 and 10, where `what` is at x=-2.5 and x=2.5.
 
         Maya follows a time change outside playback with exactly one redraw,
@@ -194,7 +226,8 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         nothing else. Reads Maya's colour buffer straight after that redraw,
         rather than through a playblast, which would refresh again and hide
         the state a user sees. `beforeJump` runs after the view has settled on
-        `fromFrame` and must leave the time there.
+        `fromFrame` and must leave the time there. `node`, if given, is
+        described from Maya's side when the probe cannot see it move.
         """
         import ctypes
         import maya.api.OpenMaya as om
@@ -256,13 +289,14 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         def differs(a, b):
             return max(abs(int(p) - int(q)) for p, q in zip(a, b)) > 8
 
-        self.assertTrue(
-            differs(frame1Old, settledOld),
-            "The probe at %s does not see the %s move away (frame %d %s, "
-            "frame %d %s), so this test cannot detect a ghost. At %s the "
-            "frames show %s and %s. Stats: %s"
-            % ((oldX, oldY), what, fromFrame, frame1Old, toFrame, settledOld,
-               (newX, newY), frame1New, settledNew, dict(stats)))
+        if not differs(frame1Old, settledOld):
+            placement = self.describeMayaPlacement(node, (fromFrame, toFrame)) if node else ""
+            self.fail(
+                "The probe at %s does not see the %s move away (frame %d %s, "
+                "frame %d %s), so this test cannot detect a ghost. At %s the "
+                "frames show %s and %s. %s Stats: %s"
+                % ((oldX, oldY), what, fromFrame, frame1Old, toFrame, settledOld,
+                   (newX, newY), frame1New, settledNew, placement, dict(stats)))
         self.assertFalse(
             differs(atNew, settledNew),
             "After one refresh the frame-%d position %s shows %s, but the "
@@ -334,7 +368,7 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         # Fill the cache by evaluating every frame once.
         for frame in range(1, 11):
             cmds.currentTime(frame)
-        self.assertJumpLeavesNoGhost("skinned cylinder")
+        self.assertJumpLeavesNoGhost("skinned cylinder", node=cylinder)
 
     def test_aViewportPickDiscardsInFlightWork(self):
         """A pick made while a frame is in flight selects what is under it and

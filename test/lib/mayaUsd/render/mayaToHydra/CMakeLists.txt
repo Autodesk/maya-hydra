@@ -35,6 +35,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testSelectNonDagNodes.py
     testStageAddPrim.py
     testTransforms.py
+    testSkinnedMeshCachedPlayback.py
     testRefinement.py|disabledOn:HdFlash:AGP-1034,AGP-1035|disabledOn:maya2027,lin:HYDRA-1893 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
     testUsdStageInvalidateNativeInstances.py
