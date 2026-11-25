@@ -29,10 +29,12 @@ class TestSmoothCage(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     # idiff thresholds: a pixel fails when a channel moves by more than 0.1
-    # (about 25/255), and the image fails when more than 0.1% of its pixels do.
-    # The cage covers more than 0.2% of the image, so a missing cage fails.
+    # (about 25/255), and the image fails when more than 0.5% of its pixels do.
+    # A missing cage changes about 1.2% of the image, so it fails. The cage's
+    # lines are antialiased differently on macOS, which changes about 0.16% of
+    # it (mostly their alpha), so that passes.
     IMAGEDIFF_FAIL_THRESHOLD = 0.1
-    IMAGEDIFF_FAIL_PERCENT = 0.1
+    IMAGEDIFF_FAIL_PERCENT = 0.5
 
     def setUp(self):
         # Only with Maya's Global Hydra mode.

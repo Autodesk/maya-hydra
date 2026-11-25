@@ -36,11 +36,13 @@ class TestMapBorder(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     # idiff thresholds: a pixel fails when a channel moves by more than 0.1
-    # (about 25/255), and the image fails when more than 0.03% of its pixels do.
-    # The border - the seam and the two poles, one pixel wide - is about 0.1% of
-    # the image, so a missing or extra border fails.
+    # (about 25/255), and the image fails when more than 0.3% of its pixels do.
+    # A missing or extra border - the seam and the two poles, one pixel wide -
+    # changes about 0.55% of the image, so it fails. Lines are antialiased
+    # differently on macOS, which changes a fraction of their pixels (mostly
+    # their alpha): the limit leaves room for that.
     IMAGEDIFF_FAIL_THRESHOLD = 0.1
-    IMAGEDIFF_FAIL_PERCENT = 0.03
+    IMAGEDIFF_FAIL_PERCENT = 0.3
 
     def setUp(self):
         # Only with Maya's Global Hydra mode.
