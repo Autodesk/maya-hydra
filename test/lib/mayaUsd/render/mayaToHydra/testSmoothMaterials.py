@@ -24,6 +24,7 @@
 # Reference images per renderer in SmoothMaterialsTest/<renderer>/.
 import maya.cmds as cmds
 import fixturesUtils
+import mayaUtils
 import mtohUtils
 
 
@@ -53,7 +54,9 @@ class TestSmoothMaterials(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         super(TestSmoothMaterials, self).setUp()
         self.setTestRenderer()
-        cmds.file(new=True, force=True)
+        # A new scene with the test settings: grid off, as the plane lies in the
+        # grid's plane and the two would tie on depth.
+        mayaUtils.openNewScene()
         # 4 x 2 faces: faces 0-1 and 4-5 are the left half, 2-3 and 6-7 the right.
         self.plane = cmds.polyPlane(width=12, height=6, subdivisionsX=4, subdivisionsY=2,
                                     name="smoothPlane")[0]

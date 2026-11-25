@@ -40,7 +40,9 @@ class TestSmoothCage(mtohUtils.MayaHydraBaseTestCase):
             self.skipTest("needs Maya's Global Hydra mode")
         super(TestSmoothCage, self).setUp()
         self.setTestRenderer()
-        cmds.file(new=True, force=True)
+        # A new scene with the test settings: grid off, so only the sphere and
+        # its cage are in the image.
+        mayaUtils.openNewScene()
         self.sphere = cmds.polySphere(subdivisionsX=8, subdivisionsY=6, name="cageSphere")[0]
         self.shape = cmds.listRelatives(self.sphere, shapes=True)[0]
         cmds.setAttr(self.shape + ".smoothLevel", 2)

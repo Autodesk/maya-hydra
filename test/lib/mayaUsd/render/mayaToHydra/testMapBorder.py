@@ -51,7 +51,9 @@ class TestMapBorder(mtohUtils.MayaHydraBaseTestCase):
         if self.selectionHighlightMode() != mtohUtils.SELECTION_HIGHLIGHT_MODE_OUTLINE:
             self.skipTest("the selection highlight is a wire, drawn over the map border")
         self.setTestRenderer()
-        cmds.file(new=True, force=True)
+        # A new scene with the test settings: grid off, so only the sphere and
+        # its border are in the image.
+        mayaUtils.openNewScene()
         # polySphere's UVs have a seam and two poles: it has a UV border.
         self.sphere = cmds.polySphere(subdivisionsX=12, subdivisionsY=8, name="borderSphere")[0]
         self.shape = cmds.listRelatives(self.sphere, shapes=True)[0]

@@ -25,6 +25,7 @@
 # Reference images per renderer in CullingTest/<renderer>/.
 import maya.cmds as cmds
 import fixturesUtils
+import mayaUtils
 import mtohUtils
 import rendererUtils
 
@@ -48,7 +49,9 @@ class TestCulling(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         super(TestCulling, self).setUp()
         self.setTestRenderer()
-        cmds.file(new=True, force=True)
+        # A new scene with the test settings: grid off, as the plane lies in the
+        # grid's plane and the two would tie on depth.
+        mayaUtils.openNewScene()
         # A plane facing +Y, seen from above: the camera sees its front faces.
         self.plane = cmds.polyPlane(width=10, height=10, subdivisionsX=1, subdivisionsY=1,
                                     name="cullPlane")[0]
