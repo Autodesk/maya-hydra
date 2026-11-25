@@ -548,6 +548,23 @@ if(NOT IS_MACOSX)
         PROPERTIES WILL_FAIL TRUE)
 endif()
 
+# -activeRenderDescription selects the render settings prim to render.
+# twoRenderSettings.usda has MainRender (1920, 1080), the scene's active render
+# description, and OverrideRender (720, 480).
+set(scene activeRenderDescription/twoRenderSettings.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+foreach(folder arnold)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER ${renderer}
+        TEST_NAME_SUFFIX ${suffix}
+        RENDERER_ARGS "-activeRenderDescription \"|renderSettings|renderSettingsShape,/Render/OverrideRender\" -im ${sceneFileNameNoExt}"
+    )
+endforeach()
+
 # PRMan production rendering tests (Windows only).  Hydra V2 render settings and
 # isolated RenderMan config are applied automatically in cmake/test.cmake when
 # RENDERER is HdPrmanLoaderRendererPlugin.
@@ -766,6 +783,7 @@ apply_labels_to_test("${parsed_labels}" registeredRenderRenderers)
 set(MAYABATCH_TEST_SCRIPT_FILES
     testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
     testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
+    testActiveRenderDescriptionFlag.py|depOnPlugins:mtoa
     testCurrentRendererSelection.py|depOnPlugins:mtoa
 )
 
@@ -788,7 +806,7 @@ foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})
     list(APPEND all_labels "cmdLineRender")
     mayaUsd_get_unittest_target(target ${test_filename})
 
-    set(test_env "DISPLAY=:0")
+    set(test_env "DISPLAY=:0" "PYTHONPATH=${MAYA_HYDRA_DIR}/scripts")
     if(test_filename IN_LIST MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE)
         list(APPEND test_env "MAYA_HYDRA_BATCH_RENDER_TEST_MODE=1")
     endif()

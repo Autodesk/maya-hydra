@@ -46,6 +46,10 @@
     <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "HdPrmanLoaderRendererPlugin", $opt); '/>
     <sep/>
     <!-- ______________________________________________________________ -->
+    <sep desc="Render description options"/>
+    <mel n="activeRenderDescription" p="1" s='mayaHydraSetActiveRenderDescription("%1")' t="name" h="UFE path of the UsdRenderSettings or UsdRenderPass prim to render, overriding\n\tthe scene's active render description. Must precede other render settings flags."/>
+    <sep/>
+    <!-- ______________________________________________________________ -->
     <sep desc="Resolution options"/>
     <mel n="x" s="mayaHydraSetRenderWidth(%1)" t="int" p="1" h="Set X resolution of the final image"/>
     <mel n="y" s="mayaHydraSetRenderHeight(%1)" t="int" p="1" h="Set Y resolution of the final image"/>
