@@ -706,6 +706,23 @@ function(_mayaHydra_add_relpath_variant folder)
 endfunction()
 
 _mayaHydra_add_relpath_variant(arnold)
+
+# Same relative path resolution as above, but for the texture of an
+# aiSkyDomeLight rendered with HdStorm.  The aiSkyDomeLight node type comes from
+# MtoA, hence the mtoa dependency label.
+set(_domeRelPath_stem domeLightStormRelativePath)
+set(_domeRelPath_proj "${TEST_OUTPUT_ROOT}/${_domeRelPath_stem}/projects/default")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/scenes/texturing/storm/UVChecker.png"
+    "${_domeRelPath_proj}/sourceimages/UVChecker.png"
+    COPYONLY
+)
+mayaHydra_add_cmd_line_render_test(relativePathTest/storm/${_domeRelPath_stem}.ma|depOnPlugins:mtoa
+    RENDERER HdStormRendererPlugin
+    ${_hdStorm_fail_arg}
+    RENDERER_ARGS "-x 160 -y 120 -proj \"${_domeRelPath_proj}\" -im ${_domeRelPath_stem}"
+)
+
 if(IS_WINDOWS)
     _mayaHydra_add_relpath_variant(prman)
 
