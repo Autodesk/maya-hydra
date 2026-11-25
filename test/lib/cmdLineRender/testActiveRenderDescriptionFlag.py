@@ -57,12 +57,20 @@ class TestActiveRenderDescriptionFlag(mtohUtils.MayaHydraBaseTestCase):
         self.assertEqual(cmds.getAttr(_ATTR), _OVERRIDE)
         self.assertEqual(str(getRenderSettingsPrim().GetPath()), "/Render/OverrideRender")
 
-    def test_QuotesAndBackslashesReachPythonVerbatim(self):
+    def test_NonExistentPath(self):
         cmds.file(_SCENE, open=True, force=True)
-        value = 'a"b\\c\\'
-        melLiteral = value.replace('\\', '\\\\').replace('"', '\\"')
-        mel.eval('mayaHydraSetActiveRenderDescription("%s")' % melLiteral)
-        self.assertEqual(cmds.getAttr(_ATTR), value)
+        with self.assertRaisesRegex(RuntimeError, "No render description prim found at path"):
+            setActiveRenderDescription(
+                "|renderSettings|renderSettingsShape,/Render/DoesNotExist")
+        self.assertEqual(cmds.getAttr(_ATTR), _MAIN)
+
+    def test_NotARenderDescriptionPrim(self):
+        cmds.file(_SCENE, open=True, force=True)
+        # MainProduct exists, but is a RenderProduct, not a RenderSettings or RenderPass.
+        with self.assertRaisesRegex(RuntimeError, "No render description prim found at path"):
+            setActiveRenderDescription(
+                "|renderSettings|renderSettingsShape,/Render/MainProduct")
+        self.assertEqual(cmds.getAttr(_ATTR), _MAIN)
 
     def test_NoDefaultRenderDescriptionNode(self):
         cmds.file(new=True, force=True)

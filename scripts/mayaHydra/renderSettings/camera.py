@@ -15,8 +15,6 @@
 
 from .utils import getRenderSettingsPrim
 
-import mayaUsd.ufe as mayaUsdUfe
-
 from pxr import Sdf, UsdRender
 
 def setCamera(cameraPath):

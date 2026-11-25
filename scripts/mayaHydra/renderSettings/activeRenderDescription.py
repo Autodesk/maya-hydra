@@ -15,6 +15,9 @@
 
 import maya.cmds as cmds
 
+import mayaUsd.ufe as mayaUsdUfe
+from pxr import UsdRender
+
 _NODE = 'UsdDefaultRenderDescription'
 
 
@@ -25,5 +28,13 @@ def setActiveRenderDescription(ufePath):
         raise RuntimeError(
             "Cannot set activeRenderDescriptionPath: node %s not found in the scene."
             % _NODE)
+
+    errorMsg = "No render description prim found at path %s" % ufePath
+    try:
+        prim = mayaUsdUfe.ufePathToPrim(ufePath)
+    except RuntimeError:
+        raise RuntimeError(errorMsg)
+    if not prim or not (prim.IsA(UsdRender.Settings) or prim.IsA(UsdRender.Pass)):
+        raise RuntimeError(errorMsg)
 
     cmds.setAttr('%s.activeRenderDescriptionPath' % _NODE, ufePath, type='string')
