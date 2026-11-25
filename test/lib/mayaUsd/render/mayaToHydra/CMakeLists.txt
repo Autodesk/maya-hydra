@@ -64,6 +64,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCurveTools.py
     testPolygonPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testFootPrintNode.py
+    testExternalShapeAdapter.py
     testBackgroundColor.py
     testGrid.py
     testUsdTextureToggle.py
@@ -284,6 +285,8 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineRefinement.py
     testOutlinePointInstances.py
     testOutlineNativeInstances.py
+    # Mode-independent: nothing is selected, so there is no highlight to differ.
+    testExternalShapeAdapter.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to

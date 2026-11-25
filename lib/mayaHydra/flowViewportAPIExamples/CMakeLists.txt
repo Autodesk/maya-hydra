@@ -2,6 +2,7 @@ add_subdirectory(flowViewportAPILocator)
 add_subdirectory(footPrintNode)
 add_subdirectory(customShadersNode)
 add_subdirectory(simpleHydraGenerativeProceduralPlugin)
+add_subdirectory(externalShapeAdapter)
 
 # The custom-node translation sample is retained as documentation, but is not
 # built or installed. Its Arnold implementation now lives in arnold-usd's

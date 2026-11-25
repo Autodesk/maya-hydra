@@ -1,0 +1,18 @@
+{
+    "Plugins": [
+        {
+            "Info": {
+                "Types": {
+                    "MhExternalShapeAdapterExample" : {
+                        "bases": ["MayaHydraShapeAdapter"],
+                        "displayName": "Example of a shape adapter in a library other than mayaHydraLib."
+                    }
+                }
+            },
+            "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
+            "Name": "@TARGET_NAME@",
+            "Root": "..",
+            "Type": "library"
+        }
+    ]
+}

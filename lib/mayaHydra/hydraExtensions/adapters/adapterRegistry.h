@@ -81,7 +81,23 @@ public:
     MAYAHYDRALIB_API
     static CameraAdapterCreator GetCameraAdapterCreator(const MDagPath& dag);
 
-    /// Find all MayaHydraAdapter plug-ins, and load them all
+    /// Register the adapters of the libraries that are loaded, and load the
+    /// libraries of the adapters declared in a plugInfo.json.
+    ///
+    /// The adapters of this library need no plugInfo.json: the library is
+    /// loaded, so their TF_REGISTRY_FUNCTIONs run from here.
+    ///
+    /// An adapter in another library needs one, unless something else loads
+    /// that library (a Maya plug-in the user loads, say). It declares the
+    /// adapter's type with one of the adapter types as base, and names the
+    /// library:
+    ///
+    ///     "Types": { "MyAdapter": { "bases": ["MayaHydraShapeAdapter"] } }
+    ///
+    /// That is how the library is found and loaded here. Without it, nothing
+    /// knows of the library: its adapter is never registered and its nodes are
+    /// not translated, without any error. See the example in
+    /// flowViewportAPIExamples/externalShapeAdapter.
     MAYAHYDRALIB_API
     static void LoadAllPlugin();
 

@@ -1,0 +1,65 @@
+Example of a MayaHydra adapter in a library other than mayaHydraLib.
+
+An adapter translates a Maya node to Hydra prims. The adapters of mayaHydraLib
+(meshes, lights, cameras...) are registered when MayaHydra starts, as their
+library is loaded. An adapter in another library is only registered once that
+library is loaded, and nothing loads it unless it says where it is: that is
+what its plugInfo.json is for.
+
+What is here:
+
+- mhExternalShapeAdapterExample.cpp: the adapter, a MayaHydraShapeAdapter that
+  draws a blue square for a MhExternalShapeAdapterExample node. It is built as
+  its own library, mayaHydraExternalShapeAdapterExample, which links with
+  mayaHydraLib and is installed in lib/usd/externalShapeAdapterExample.
+- plugInfo.json: declares the adapter's type, with MayaHydraShapeAdapter as
+  base, and names the library. Installed in the library's resources folder,
+  under lib/usd, which is on USD's plug-in path.
+- mhExternalShapeAdapterExampleNode.py: a Maya plug-in with the node, a locator
+  that draws nothing. It is only there to give the adapter a node to translate,
+  and does not load the adapter's library.
+
+How the adapter gets loaded:
+
+1. USD reads plugInfo.json and learns of a type MhExternalShapeAdapterExample,
+   derived from MayaHydraShapeAdapter, in this library.
+2. MayaHydraAdapterRegistry::LoadAllPlugin() goes over the types derived from
+   MayaHydraAdapter, finds this one's plug-in and loads the library.
+3. Loading the library runs its TF_REGISTRY_FUNCTIONs: the adapter's creator is
+   registered for the node type.
+4. The scene index creates the adapter for each node of that type.
+
+Without the plugInfo.json, step 1 never happens. There is no error: the nodes
+are just not translated. An adapter library that something else loads first (a
+Maya plug-in, for example) does not need one.
+
+To try it:
+
+    cmds.loadPlugin("mhExternalShapeAdapterExampleNode.py")
+    cmds.createNode("MhExternalShapeAdapterExample")
+
+then switch the viewport to a Hydra renderer.
+
+What registering a shape adapter for a plug-in node changes:
+
+- It replaces MayaHydra's generic translation of that node type. A plug-in DAG
+  node with no adapter of its own gets a MayaHydraCustomDagAdapter, which
+  publishes a mayaCustomDagNode prim with the node's attributes
+  (mayaNode.mayaAttributes); render delegates read it to translate the node
+  themselves, as Arnold does for its nodes. A node type with a registered shape
+  adapter gets that adapter instead, and no mayaCustomDagNode prim.
+- A node that publishes through the Flow Viewport data producer API is skipped
+  by the generic translation, but not by a registered shape adapter: do not
+  register one for such a node, or it is in Hydra twice.
+- It applies to the nodes created after the adapter is registered. Loaded
+  through its plugInfo.json, the library is loaded before the scene is
+  translated, so every node gets the adapter. Loaded later (by a Maya plug-in
+  loaded during the session, say), the nodes that exist keep the generic
+  translation until the scene is translated again.
+- It does not replace an adapter of mayaHydraLib: for a node type that has one,
+  the first adapter registered is kept.
+- A node that also draws in Viewport 2.0 has its render items in Hydra as
+  prims below the shape's prim. Removing the shape's prim removes them too, so
+  the adapter's RemovePrim() has to keep a placeholder while there are any: see
+  MayaHydraAiGaussianSplatAdapter. This example's node draws nothing, so it
+  uses the default.
