@@ -247,6 +247,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
     testMayaComponentsPicking.py|disabledOn:osx:HYDRA-1882 # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
     testUnneededHighlightWire.py # A render item override carrier's wire is always translated, then hidden
+    testCustomMaterial.py # Covers the custom vertex buffer to primvar translation of the stock render item path
 )
 
 # Every interactive test runs in both selection highlighting modes: the primary

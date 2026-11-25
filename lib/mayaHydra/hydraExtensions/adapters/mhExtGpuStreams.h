@@ -31,6 +31,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -80,7 +81,8 @@ struct MhExtGpuSource
  * adapter decides which VP2 buffer feeds which primvar; this class decides whether it can be
  * shared, (re)publishes it, and reports when the renderer has to re-pull it.
  *
- * Covers the points, normals, st and tangents primvars.
+ * Covers the points, normals, st and tangents primvars, plus custom texcoord primvars: kTexture
+ * streams published under their own semantic name, as float2 to float4.
  */
 class MhExtGpuStreams
 {
@@ -236,12 +238,15 @@ private:
     void _AfterPublish(_PublishResult res, _Stream& stream, const TfToken& key, bool alwaysDirty,
                        bool& dirty);
 
-    /// The stream for the points, normals, st or tangents primvar, or null.
+    /// The stream for the points, normals, st, tangents, or for a custom texcoord
+    /// primvar already created before, otherwise null.
     _Stream*       _StreamFor(const TfToken& key);
     const _Stream* _StreamFor(const TfToken& key) const;
 
-    bool _LazyCpuBufferTriggered(const TfToken& key) const;
-    void _SetLazyCpuBufferTriggered(const TfToken& key) const;
+    /// The bit of \p key in _lazyCpuBufferTriggeredMask, or 0 when it has none.
+    uint64_t _LazyCpuBit(const TfToken& key) const;
+    bool     _LazyCpuBufferTriggered(const TfToken& key) const;
+    void     _SetLazyCpuBufferTriggered(const TfToken& key) const;
 
     const MayaHydraAdapter& _owner;
 
@@ -249,8 +254,11 @@ private:
     _Stream _normals;
     _Stream _uvs;
     _Stream _tangents;
+    std::unordered_map<TfToken, _Stream, TfToken::HashFunctor> _customStreams;
 
-    mutable std::atomic<uint8_t> _lazyCpuBufferTriggeredMask { 0 };
+    mutable std::atomic<uint64_t> _lazyCpuBufferTriggeredMask { 0 };
+    // Custom texcoord primvar -> its lazy CPU bit, assigned in the order Share first saw them.
+    std::unordered_map<TfToken, uint64_t, TfToken::HashFunctor> _lazyCpuCustomKeys;
 
     // Hybrid-mode classifier. Starts false so the mesh runs in batch mode
     // (allowDirectBind=false, GPU-to-GPU blit). Flips to true (sticky) on the

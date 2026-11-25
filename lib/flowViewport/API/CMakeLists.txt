@@ -8,6 +8,7 @@ set(HEADERS
     fvpFilteringSceneIndexClient.h
     fvpFilteringSceneIndexClientFwd.h
     fvpFilteringSceneIndexInterface.h
+    fvpMaterialCreationInterface.h
     fvpViewportAPITokens.h
 )
 

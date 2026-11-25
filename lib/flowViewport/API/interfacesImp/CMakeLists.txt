@@ -8,6 +8,7 @@ target_sources(${TARGET_NAME}
     fvpInformationInterfaceImp.cpp
     fvpDataProducerSceneIndexInterfaceImp.cpp
     fvpFilteringSceneIndexInterfaceImp.cpp
+    fvpMaterialCreationInterfaceImp.cpp
 )
 
 set(HEADERS
@@ -16,6 +17,7 @@ set(HEADERS
     fvpInformationInterfaceImp.h
     fvpDataProducerSceneIndexInterfaceImp.h
     fvpFilteringSceneIndexInterfaceImp.h
+    fvpMaterialCreationInterfaceImp.h
 )
 
 # -----------------------------------------------------------------------------

@@ -26,7 +26,10 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/API/fvpMaterialCreationInterface.h>
+
 #include <pxr/base/tf/stl.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/material.h>
@@ -82,6 +85,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (mtlx)
     ((mtlxSurface, "mtlx:surface"))
     (surface)
+    (GLSLShader)
     (MaterialXSurfaceShader)
     // LookdevX MaterialXSurfaceShader attributes: the MaterialX stack shape it reads its
     // document from, and the UFE path of its surface material in that stack.
@@ -533,6 +537,27 @@ private:
         }
     }
 
+    VtValue _GetCustomMaterialResource() const
+    {
+        // Support only GLSLShader mapping for now. This can be extended on a customer request.
+        if (_surfaceShader.isNull() || _surfaceShaderType != _tokens->GLSLShader) {
+            return {};
+        }
+
+        static const MString shaderStr("shader");
+        MFnDependencyNode    surfaceNode(_surfaceShader);
+        MPlug                shaderPlug = surfaceNode.findPlug(shaderStr, true);
+        if (shaderPlug.isNull()) {
+            return {};
+        }
+
+        // Get the shader file name without extension and use the Flow Viewport API 
+        // to create a custom material.   
+        const std::string shaderName
+            = TfStringGetBeforeSuffix(TfGetBaseName(shaderPlug.asString().asChar()));
+        return Fvp::MaterialCreationInterface::Get().CreateMaterial(shaderName, GetID());
+    }
+
     bool PopulateMaterialXNetworkMap(HdMaterialNetworkMap& networkMap)
     {
 #ifdef WANT_MATERIALX_BUILD
@@ -721,6 +746,11 @@ private:
             .Msg("MayaHydraShadingEngineAdapter::GetMaterialResource(): %s\n", GetID().GetText());
         
         MayaHydra::DgAccessLock dgLock;
+
+        VtValue customMaterial = _GetCustomMaterialResource();
+        if (!customMaterial.IsEmpty()) {
+            return customMaterial;
+        }
 
         HdMaterialNetworkMap materialXNetworkMap;
         if (PopulateMaterialXNetworkMap(materialXNetworkMap)) {
