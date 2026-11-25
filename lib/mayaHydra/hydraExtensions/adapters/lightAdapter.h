@@ -19,6 +19,7 @@
 #include <mayaHydraLib/adapters/dagAdapter.h>
 
 #include <pxr/base/gf/frustum.h>
+#include <pxr/base/gf/range3f.h>
 #include <pxr/imaging/glf/simpleLight.h>
 #include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hdx/simpleLightTask.h>
@@ -155,6 +156,15 @@ protected:
     GfMatrix4d _CalculateShadowProjectionMatrix();
 
     bool _isLightingOn = true;
+
+    // The last shadow matrix computation and what it was made from, reused while
+    // those are unchanged: HdxShadowParams compares the computation by pointer,
+    // so a new one on every read reads as a change. Under the DG access lock.
+    HdxShadowMatrixComputationSharedPtr _shadowMatrix;
+    bool                                _shadowMatrixIsPoint = false;
+    GfMatrix4d                          _shadowProjection;
+    GfRange3f                           _shadowWorldRange;
+    GlfSimpleLight                      _shadowLight;
 };
 
 using MayaHydraLightAdapterPtr = std::shared_ptr<MayaHydraLightAdapter>;
