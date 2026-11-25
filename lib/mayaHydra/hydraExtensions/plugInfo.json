@@ -97,6 +97,12 @@
                       ],
                       "displayName": "arnold area lights in Hydra for Maya."
                     },
+                    "MayaHydraAiGaussianSplatAdapter": {
+                        "bases": [
+                            "MayaHydraShapeAdapter"
+                        ],
+                        "displayName": "Arnold aiGaussianSplat in Hydra for Maya."
+                    },
                     "MayaHydraCustomDagAdapter": {
                         "bases": [
                             "MayaHydraDagAdapter"
