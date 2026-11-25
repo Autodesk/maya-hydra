@@ -185,16 +185,9 @@ mayaUsd_promoteHeaderList(
 # -----------------------------------------------------------------------------
 # install
 # -----------------------------------------------------------------------------
-set(LIBFILENAME ${CMAKE_SHARED_LIBRARY_PREFIX}${TARGET_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX})
-set(PLUG_INFO_PATH "plugInfo.json")
-set(SHADER_DEFS_PATH 
+set(SHADER_DEFS_PATH
 "shaderDefs.usda"
 )
-
-set(PLUG_INFO_LIBRARY_PATH "../../../${LIBFILENAME}")
-set(PLUG_INFO_RESOURCE_PATH "resources")
-
-configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH})
 
 # configure shader files
 foreach(X ${SHADER_DEFS_PATH})
@@ -207,12 +200,6 @@ install(TARGETS ${TARGET_NAME}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
         RUNTIME
         DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-)
-
-install(FILES 
-            ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH}
-        DESTINATION 
-            ${CMAKE_INSTALL_PREFIX}/lib/usd/mayaHydraLib/resources
 )
 
 # install shaders
