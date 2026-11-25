@@ -101,11 +101,11 @@ namespace {
 void initialize()
 {
     Fvp::InitializationParams fvpInitParams;
-    if (MGlobal::mayaState() != MGlobal::kBatch) {
-        // MayaColorPreferencesTranslator ctor will throw an exception
-        // on construction in batch mode, as 
-        // MayaHydra::getRGBAColorPreferenceValue() fails because
-        // the Maya displayRGBColor command is unavailable in batch mode.
+    // MayaColorPreferencesTranslator ctor will throw an exception outside
+    // interactive mode, as MayaHydra::getRGBAColorPreferenceValue() fails
+    // because the Maya displayRGBColor command is unavailable there.
+    // In standalone mayapy, mayaState() returns kLibraryApp, not kBatch.
+    if (MGlobal::mayaState() == MGlobal::kInteractive) {
         fvpInitParams.colorPreferencesNotificationProvider
             = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
         fvpInitParams.colorPreferencesTranslator
@@ -117,7 +117,7 @@ void initialize()
 void finalize()
 {
     Fvp::InitializationParams fvpInitParams;
-    if (MGlobal::mayaState() != MGlobal::kBatch) {
+    if (MGlobal::mayaState() == MGlobal::kInteractive) {
         fvpInitParams.colorPreferencesNotificationProvider
             = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
         fvpInitParams.colorPreferencesTranslator
@@ -379,6 +379,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    PXR_NS::MtohRenderGlobals::RegisterAttributeEditorCallback();
+    PXR_NS::MtohRenderGlobals::RegisterSceneCallbacks();
+
 #if MAYA_API_VERSION >= 20270000
     // Register Hydra renderers as Maya production renderers.
     for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
@@ -449,6 +452,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     for (const auto& callbackId : _pluginLoadingCallbackIds) {
         MSceneMessage::removeCallback(callbackId);
     }
+    PXR_NS::MtohRenderGlobals::DeregisterSceneCallbacks();
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
     MStatus   ret = MS::kSuccess;

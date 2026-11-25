@@ -24,16 +24,11 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/profilingUtils.h>
 
-#include <pxr/base/plug/plugin.h>
-#include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/registryManager.h>
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hdx/renderTask.h>
-#include <pxr/usd/sdr/registry.h>
 #include <pxr/usd/usdGeom/tokens.h>
-#include <pxr/usdImaging/usdImaging/tokens.h>
 
 #include <maya/MAnimControl.h>
 #include <maya/MDGContextGuard.h>
@@ -41,7 +36,8 @@
 #include <maya/MFnDagNode.h>
 #include <maya/MNodeMessage.h>
 
-#include <functional>
+#include <algorithm>
+#include <cstring>
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
@@ -50,9 +46,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 // from within the pxr namespace as if we were in the MayaHydra namespace.
 // Remove this once the code has been moved to the MayaHydra namespace.
 using namespace MayaHydra;
-
-#define PLUG_THIS_PLUGIN \
-    PlugRegistry::GetInstance().GetPluginWithName(TF_PP_STRINGIZE(MFB_PACKAGE_NAME))
 
 namespace {
 
@@ -543,16 +536,22 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     const bool isMesh = GetPrimitive() == MGeometry::Primitive::kTriangles
         || GetPrimitive() == MGeometry::Primitive::kTriangleStrip;
 
-    // VP2 only supplies the streams the current shader requests, and a shader change can arrive
-    // as a topology-only update: read the streams then too when one appeared, otherwise it stays
-    // unadvertised until the next geometry change. Not on every topology-only update, which face
-    // component selection also raises, as nothing else needs re-reading there.
+    // Presence is only known when the geometry was fetched: on any other update "present" is
+    // empty, and must neither count as every stream disappearing nor reset what the last fetch saw.
+    bool texcoordStreamsAppeared = false;
+    bool texcoordStreamsDisappeared = false;
+    if (geom) {
+        texcoordStreamsAppeared = (present.texcoordStreams & ~_texcoordStreamBits) != 0;
+        texcoordStreamsDisappeared = (_texcoordStreamBits & ~present.texcoordStreams) != 0;
+        _texcoordStreamBits = present.texcoordStreams;
+    }
+
     // Synthesized normals were not read from VP2, so for this purpose the real normals have not
     // been read yet and a real stream replacing them is picked up.
     const bool normalsStreamWasRead
         = _StoredStreamCount(UsdGeomTokens->normals) > 0 && !_normalsSynthesized;
     const bool streamAppeared
-        = (isMesh && present.uvs && _StoredStreamCount(MayaHydraAdapterTokens->st) == 0)
+        = (isMesh && texcoordStreamsAppeared)
         || (isMesh && present.tangents
             && _StoredStreamCount(MayaHydraAdapterTokens->tangents) == 0)
         || (useMayaNormals && present.normals && !normalsStreamWasRead);
@@ -566,7 +565,10 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         published.normals = true;
     }
 
-    // Vertices
+    // VP2 only supplies the streams the current shader requests, and a shader change can arrive
+    // as a topology-only update: read the streams then too when one appeared, otherwise it stays
+    // unadvertised until the next geometry change. Not on every topology-only update, which face
+    // component selection also raises, as nothing else needs re-reading there.
     if ((geomChanged || (topoChanged && streamAppeared)) && vertexBuffercount) {
         //vertexBuffercount > 0 means geom is non null
         for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
@@ -608,8 +610,11 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             }
         };
         clearAbsent(published.normals, _normals, dirty.normals);
-        clearAbsent(published.uvs, _uvs, dirty.uvs);
         clearAbsent(published.tangents, _tangents, dirty.tangents);
+        if (texcoordStreamsDisappeared)
+        {
+            _ClearAbsentTexcoordStreams(geom, vertexBuffercount, dirty);
+        }
     }
 
     _EndGeometryUpdate(present, geomChanged, topoChanged, useMayaNormals, dirty);
@@ -625,6 +630,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
     if (dirty.normals) {
         notifier.dirtyNormals();
+    }
+    for (const TfToken& name : dirty.customPrimvars) {
+        notifier.dirtyPrimvar(name);
     }
 
     // Indices
@@ -669,6 +677,16 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             const size_t numTangents = _tangents.size();
             if (numTangents > 0 && (maxIndex < (int64_t)numTangents - 1)) {
                 _tangents.resize(maxIndex + 1);
+            }
+            for (auto& entry : _customStreams) {
+                std::visit(
+                    [maxIndex](auto& values) {
+                        const size_t numValues = values.size();
+                        if (numValues > 0 && (maxIndex < (int64_t)numValues - 1)) {
+                            values.resize(maxIndex + 1);
+                        }
+                    },
+                    entry.second);
             }
 
             switch (GetPrimitive()) {
@@ -876,13 +894,15 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
             // Textures:
             if (_primitive == MGeometry::Primitive::kTriangles
                 || _primitive == MGeometry::Primitive::kTriangleStrip) {
+                const TfToken primvarName = _GetTexcoordPrimvarName(desc);
+
                 int uvsCount = 0;
                 const unsigned int originalUvsCount = mvb->vertexCount();
                 if (topoChanged) {
                     uvsCount = originalUvsCount;
                 } else {
                     // Keep the previously-determined uvs count in case it was truncated.
-                    const size_t uvSize = _uvs.size();
+                    const size_t uvSize = _StoredTexcoordCount(primvarName);
                     if (uvSize > 0 && uvSize <= originalUvsCount) {
                         uvsCount = uvSize;
                     } else {
@@ -890,8 +910,19 @@ void MayaHydraRenderItemAdapter::_ReadVertexStream(
                     }
                 }
 
-                _CopyFloatStream(mvb, uvsCount, _uvs);
-                dirty.uvs = true;
+                if (primvarName == MayaHydraAdapterTokens->st) {
+                    _CopyFloatStream(mvb, uvsCount, _uvs);
+                    dirty.uvs = true;
+                } else {
+                    _CustomStream& stream = _customStreams[primvarName];
+                    switch (desc.dimension()) {
+                    case 2: _CopyFloatStream(mvb, uvsCount, stream.emplace<VtVec2fArray>()); break;
+                    case 3: _CopyFloatStream(mvb, uvsCount, stream.emplace<VtVec3fArray>()); break;
+                    case 4: _CopyFloatStream(mvb, uvsCount, stream.emplace<VtVec4fArray>()); break;
+                    default: stream.emplace<VtVec2fArray>(); break;
+                    }
+                    dirty.customPrimvars.insert(primvarName);
+                }
             }
         }
         break;
@@ -941,12 +972,66 @@ MayaHydraRenderItemAdapter::_GetStreamPresence(MGeometry* geom, int vertexBuffer
         switch (mvb->descriptor().semantic()) {
         case MGeometry::Semantic::kPosition: present.positions = true; break;
         case MGeometry::Semantic::kNormal: present.normals = true; break;
-        case MGeometry::Semantic::kTexture: present.uvs = true; break;
+        case MGeometry::Semantic::kTexture: {
+            present.texcoordStreams |= (uint64_t{1} << vbIdx);
+        } break;
         case MGeometry::Semantic::kTangent: present.tangents = true; break;
         default: break;
         }
     }
     return present;
+}
+
+TfToken MayaHydraRenderItemAdapter::_GetTexcoordPrimvarName(const MVertexBufferDescriptor& desc)
+{
+    // This code should run as fast as possible as it can be executed within the animation update
+    const MString name = desc.semanticName();
+    const char* s = name.asChar();
+    if (!s || s[0] == '\0' || std::strncmp(s, "uv", 2) == 0 || std::strncmp(s, "mayauv", 6) == 0) {
+        return MayaHydraAdapterTokens->st;
+    }
+    return TfToken(s);
+}
+
+void MayaHydraRenderItemAdapter::_ClearAbsentTexcoordStreams(
+    MGeometry*            geom,
+    int                   vertexBufferCount,
+    _StreamDirty&         dirty)
+{
+    // Collect present texcoord primvars
+    TfTokenVector presentPrimvars;
+    for (int vbIdx = 0; vbIdx < vertexBufferCount; vbIdx++) {
+        const MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
+        if (!mvb || mvb->descriptor().semantic() != MGeometry::Semantic::kTexture) {
+            continue;
+        }
+        presentPrimvars.push_back(_GetTexcoordPrimvarName(mvb->descriptor()));
+    }
+
+    const auto isSupplied = [&presentPrimvars](const TfToken& name) {
+        return std::find(presentPrimvars.begin(), presentPrimvars.end(), name)
+            != presentPrimvars.end();
+    };
+    
+    // Verify st
+    if (!isSupplied(MayaHydraAdapterTokens->st)) {
+        const bool withdrawn = _WithdrawStream(MayaHydraAdapterTokens->st);
+        if (withdrawn || !_uvs.empty()) {
+            _uvs.clear();
+            dirty.uvs = true;
+        }
+    }
+
+    // Verify custom streams
+    for (auto it = _customStreams.begin(); it != _customStreams.end();) {
+        if (!isSupplied(it->first)) {
+            _WithdrawStream(it->first);
+            dirty.customPrimvars.insert(it->first);
+            it = _customStreams.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void MayaHydraRenderItemAdapter::_EndGeometryUpdate(
@@ -962,6 +1047,9 @@ void MayaHydraRenderItemAdapter::_EndGeometryUpdate(
         dirty.uvs = true;
         dirty.tangents = true;
         dirty.normals = useMayaNormals;
+        for (const auto& entry : _customStreams) {
+            dirty.customPrimvars.insert(entry.first);
+        }
     }
 }
 
@@ -994,6 +1082,10 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
     if (key == HdTokens->displayColor) {
         return VtValue(GfVec4f(
             _wireframeColor[0], _wireframeColor[1], _wireframeColor[2], _wireframeColor[3]));
+    }
+    const auto customStream = _customStreams.find(key);
+    if (customStream != _customStreams.end()) {
+        return std::visit([](const auto& values) { return VtValue(values); }, customStream->second);
     }
 
     // Let base class handle other keys
@@ -1043,6 +1135,19 @@ size_t MayaHydraRenderItemAdapter::_StoredStreamCount(const TfToken& primvar) co
     return 0;
 }
 
+size_t MayaHydraRenderItemAdapter::_StoredTexcoordCount(const TfToken& primvar) const
+{
+    if (primvar == MayaHydraAdapterTokens->st) {
+        return _uvs.size();
+    }
+    const auto customStream = _customStreams.find(primvar);
+    if (customStream != _customStreams.end()) {
+        return std::visit(
+            [](const auto& values) { return values.size(); }, customStream->second);
+    }
+    return 0;
+}
+
 HdPrimvarDescriptorVector
 MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
 {
@@ -1084,6 +1189,11 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
             if (hasStreamData(MayaHydraAdapterTokens->tangents)) {
                 localDescs.push_back(
                     {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //tangents
+            }
+            if (hasPoints) {
+                for (const auto& entry : _customStreams) {
+                    localDescs.push_back({ entry.first, interpolation, HdPrimvarRoleTokens->none });
+                }
             }
         }
     } else if (interpolation == HdInterpolationConstant) {

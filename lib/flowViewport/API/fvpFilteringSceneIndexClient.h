@@ -36,8 +36,6 @@ namespace FVP_NS_DEF
          */
         enum class Category
         {
-            /// kSelectionHighlighting is to register a filtering scene index to do custom selection highlighting (still a WIP)
-            kSelectionHighlighting,
             /** kSceneFiltering is to register a filtering scene index applied to the primitives from the scene, 
             *   including usd stages, DCC native objects and custom data producer scene indices primitives.
             */

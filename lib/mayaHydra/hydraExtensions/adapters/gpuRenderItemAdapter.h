@@ -72,6 +72,7 @@ protected:
         bool                   topoChanged,
         bool                   useMayaNormals,
         _StreamDirty&          dirty) override;
+    bool _WithdrawStream(const TfToken& primvar) override;
     bool _TopologyNeedsRebuild(bool emitTopologyLocators, bool hasCachedTopology) const override;
 
 private:

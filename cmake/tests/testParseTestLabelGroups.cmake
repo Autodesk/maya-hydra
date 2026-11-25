@@ -53,6 +53,7 @@ function(expect_rejected tag_groups marker)
         "cmake_minimum_required(VERSION 3.21)\n"
         "include(\"${_labels_module}\")\n"
         "set(MAYA_APP_VERSION 2027)\n"
+        "set(PXR_VERSION 2611)\n"
         "set(IS_WINDOWS TRUE)\n"
         "set(MAYAHYDRA_TEST_RENDERER HdStorm)\n"
         "mayaHydra_parse_test_label_groups(_labels \"${tag_groups}\")\n")
@@ -75,6 +76,7 @@ function(expect_rejected tag_groups marker)
 endfunction()
 
 set(MAYA_APP_VERSION 2027)
+set(PXR_VERSION 2611)
 set(IS_WINDOWS TRUE)
 set(MAYAHYDRA_TEST_RENDERER HdStorm)
 
@@ -97,10 +99,12 @@ expect_rejected("disabled:" "disabled:")
 expect_labels("disabledOn:maya2027,win:HYDRA-1940" "disabledOnCurrentConfig;HYDRA-1940")
 expect_labels("disabledOn:maya2027,osx:HYDRA-1940" "")
 expect_labels("disabled:AGP-1034,AGP-1035" "disabled;AGP-1034;AGP-1035")
+expect_labels("disabledOn:usdGe2611:HYDRA-1940" "disabledOnCurrentConfig;HYDRA-1940")
+expect_labels("disabledOn:usdLt2611:HYDRA-1940" "")
 
 # Conditions decide whether a group disables, and never become labels.
-foreach(_condition maya2027 win HdStorm)
-    expect_no_label("disabledOn:maya2027,win,HdStorm:HYDRA-1940" ${_condition})
+foreach(_condition maya2027 usdGe2611 win HdStorm)
+    expect_no_label("disabledOn:maya2027,usdGe2611,win,HdStorm:HYDRA-1940" ${_condition})
 endforeach()
 
 # Every other group goes to find_labels, and a group yielding nothing must not

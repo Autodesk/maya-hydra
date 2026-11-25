@@ -482,24 +482,49 @@ std::mutex _adaptersToRebuildMutex;
 class MayaPathMapper : public Fvp::PathMapper
 {
 public:
-    MayaPathMapper(const MayaHydraSceneIndex& piSi)
-        : _piSi(piSi)
-    {
-    }
-
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override
     {
-        return _piSi.UfePathToPrimSelections(appPath);
+        return MayaHydraSceneIndex::UfePathToPrimSelections(appPath);
     }
 
     std::string Name() const override { return "MayaPathMapper"; }
-
-private:
-    // Non-owning reference to prevent ownership cycle.
-    const MayaHydraSceneIndex& _piSi;
 };
 
+// Not owning: the live instances own the registration. Main thread only.
+std::weak_ptr<MayaHydraFallbackPathMapperRegistration> fallbackPathMapperRegistration;
+
 } // namespace
+
+// Sets the Maya fallback path mapper for the lifetime of the registration. Non-Maya data models
+// have a Maya path segment prefix in their UFE path; Maya data does not, and is picked up by the
+// fallback mapper. The mapper is stateless, so all the live instances share one registration.
+struct MayaHydraFallbackPathMapperRegistration
+{
+    MayaHydraFallbackPathMapperRegistration()
+    {
+        Fvp::PathMapperRegistry::Instance().SetFallbackMapper(_mapper);
+    }
+
+    ~MayaHydraFallbackPathMapperRegistration()
+    {
+        auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
+        if (pathMapperRegistry.GetFallbackMapper() == _mapper) {
+            pathMapperRegistry.SetFallbackMapper(nullptr);
+        }
+    }
+
+    MayaHydraFallbackPathMapperRegistration(const MayaHydraFallbackPathMapperRegistration&) = delete;
+    MayaHydraFallbackPathMapperRegistration& operator=(const MayaHydraFallbackPathMapperRegistration&) = delete;
+
+private:
+    const Fvp::PathMapperConstPtr _mapper { std::make_shared<MayaPathMapper>() };
+};
+
+const SdfPath& MayaHydraSceneIndex::GetMayaNativeRoot()
+{
+    static const SdfPath root("/MayaHydraViewportRenderer");
+    return root;
+}
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(const MayaHydraInitData& initData, bool interactive)
     : _ID(initData.delegateID.AppendChild(
@@ -510,7 +535,6 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(const MayaHydraInitData& initData, bool
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
-    , _mayaPathMapper(std::make_shared<MayaPathMapper>(*this))
     , _interactive(interactive)
 {
     static std::once_flag once;
@@ -518,10 +542,17 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(const MayaHydraInitData& initData, bool
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
 
-    // Register a fallback path mapper in the path mapper registry.  Non-Maya
-    // data models will have a Maya path segment prefix in their UFE path.
-    // Maya data will not, and will be picked up by the fallback mapper.
-    Fvp::PathMapperRegistry::Instance().SetFallbackMapper(_mayaPathMapper);
+    // The shared fallback path mapper maps Maya objects under the Maya native root.
+    TF_VERIFY(
+        initData.delegateID == GetMayaNativeRoot(),
+        "Maya scene index delegate ID %s is not the Maya native root.",
+        initData.delegateID.GetText());
+
+    _fallbackPathMapperRegistration = fallbackPathMapperRegistration.lock();
+    if (!_fallbackPathMapperRegistration) {
+        _fallbackPathMapperRegistration = std::make_shared<MayaHydraFallbackPathMapperRegistration>();
+        fallbackPathMapperRegistration = _fallbackPathMapperRegistration;
+    }
 }
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex() { _Destroy(); }
@@ -570,12 +601,8 @@ void MayaHydraSceneIndex::_Destroy()
     // Render item override carriers need no teardown of their own: they are
     // MayaHydraRenderItemOverrideAdapters living in _renderItemsAdapters, cleared above.
 
-    // Unregister the fallback path mapper, but only if it is still ours: a replacement
-    // scene index may already have registered its own.
-    auto& pathMapperRegistry = Fvp::PathMapperRegistry::Instance();
-    if (pathMapperRegistry.GetFallbackMapper() == _mayaPathMapper) {
-        pathMapperRegistry.SetFallbackMapper(nullptr);
-    }
+    // Unsets the fallback path mapper if no other instance uses it.
+    _fallbackPathMapperRegistration.reset();
 }
 
 void MayaHydraSceneIndex::UpdateRenderItems(
@@ -696,11 +723,27 @@ void MayaHydraSceneIndex::UpdateRenderItems(
                 }
             }
         }
+        // A candidate wire that VP2 does not draw is not needed either while no panel draws
+        // wireframes: in a shaded panel, that is the dormant wire of a shape that is not selected.
+        // Without this, a wire skipped while its shape was selected stops being a highlight on the
+        // deselection and is translated then, hidden: a new prim with the shape's full topology for
+        // every deselected shape. A delta that enables the wire later, e.g. templating the shape,
+        // carries MVS_changedVisibility, so the wire is reconsidered then.
+        //
+        // Drawn means the delta's visibility, which is what the adapter would use: VP2 keeps the
+        // dormant wire of a deselected shape enabled, but sends it as not visible in a shaded panel.
+        // MRenderItem::isEnabled() is only the fallback for a delta without visibility bits.
+        const bool vp2DrawsItem = (flags & MVS::MVS_changedVisibility)
+            ? (flags & MVS::MVS_visible) != 0
+            : ri.isEnabled();
+        const bool isUndrawnCandidateWire = classifyHighlightWire && isNewRenderitem && !customData
+            && !isHighlightWire && isSelectionHighlightWireName(riName.asChar()) && !vp2DrawsItem;
+
         // A carrier wire is always translated, then hidden through the adapter: its payload's
         // geometry arrives only with a delta, so one skipped here and translated later by the
         // reconsider pass would be created without points.
-        const bool neededByAnyPanel
-            = !isHighlightWire || options.anyViewportDrawsWireframes || customData != nullptr;
+        const bool neededByAnyPanel = (!isHighlightWire && !isUndrawnCandidateWire)
+            || options.anyViewportDrawsWireframes || customData != nullptr;
         const bool visibleInThisPanel = !isHighlightWire || options.viewportDrawsWireframes;
 
         // Storm still syncs invisible rprims, so skip translating an unneeded wire instead of
@@ -718,9 +761,9 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             _skippedHighlightWires.erase(fastId);
 
             // A new adapter must be fully initialized, whatever the delta carried. A previously
-            // skipped wire is first translated on a later delta (a deselection, or the reconsider
-            // pass), which may omit the matrix and effect bits; without them the wire would draw
-            // at the origin.
+            // skipped wire is first translated on a later delta (one that makes it needed, or the
+            // reconsider pass), which may omit the matrix and effect bits; without them the wire
+            // would draw at the origin.
             flags |= MDataServerOperation::MViewportScene::MVS_changedMatrix
                 | MDataServerOperation::MViewportScene::MVS_changedEffect;
 
@@ -1136,8 +1179,12 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
-Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
+/* static */
+Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath)
 {
+    static const SdfPath rprimPath = GetMayaNativeRoot().AppendPath(SdfPath(std::string("rprims")));
+    static const SdfPath sprimPath = GetMayaNativeRoot().AppendPath(SdfPath(std::string("sprims")));
+
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg(
             "MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n",
@@ -1179,7 +1226,9 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
         }
     }
 
-    const SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
+    // Same paths as GetPrimPath(), with the Maya native root as delegate ID.
+    const SdfPath primPath
+        = _GetPrimPath(isSprim ? sprimPath : rprimPath, (extendToShape) ? shapeDagPath : dagPath);
 
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
@@ -1319,6 +1368,12 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
                 continue;
             }
             if (dag.isInstanced() && dag.instanceNumber() > 0) {
+                continue;
+            }
+            // Plugin shapes with a registered shape adapter (e.g. aiGaussianSplat) are translated
+            // by it.
+            // Built-in shapes must not get one here: their render items already represent them.
+            if (MNodeClass(dagNode.typeName()).pluginName().length() > 0 && CreateShapeAdapter(dag)) {
                 continue;
             }
             CreateCustomAdapter(dag);
@@ -1833,8 +1888,8 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         return;
     }
 
-    if (useMeshAdapter()
-        && _RemoveAdapter<MayaHydraAdapter>(
+    // Without the mesh adapter, _shapeAdapters only holds plugin shape adapters (e.g. aiGaussianSplat).
+    if (_RemoveAdapter<MayaHydraAdapter>(
             id,
             [](MayaHydraAdapter* a) {
                 a->RemoveCallbacks();

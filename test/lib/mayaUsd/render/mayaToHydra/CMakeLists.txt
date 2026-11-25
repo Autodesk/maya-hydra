@@ -30,12 +30,14 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py|disabledOn:HdFlash:HYDRA-2669 # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
     testRendererSwitching.py
+    testViewportRenderSettings.py
     testSelectPrimWithoutDataSource.py
     testSelectNonDagNodes.py
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py|disabledOn:HdFlash:AGP-1034,AGP-1035|disabledOn:maya2027,lin:HYDRA-1893 # AGP-1034 & AGP-1035 : Cubic basisCurves and refinement not working in Flash
 	testNewSceneWithStage.py
+    testUsdStageInvalidateNativeInstances.py
     testMayaShadingModes.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
@@ -75,13 +77,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testSceneModified.py
 	testIsolateSelectWithGeomSubset.py
     testMayaReference.py
-    testTexturedMode.py
+    testTexturedMode.py|disabledOn:maya2026,osx:HYDRA-2699 # HYDRA-2699 : occasional rendering artifacts on OSX build machines
     testSelectionColorPreferences.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testUsdDeleteCamera.py
     testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
 	#Disabled tests on OSX
-    testPointInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
+    testPointInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127|disabledOn:usd2611:HYDRA-2757 # HYDRA-1127 : refinedWire not working on OSX | HYDRA-2757 : fails on USD 26.11
     testGeomSubsetsWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testNativeInstancingWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testMeshWireframeHighlight.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
@@ -103,6 +105,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testDataProducerMergingSceneIndex.py
     cpp/testUsdSelection.py
     cpp/testPathMapperRegistry.py
+    cpp/testRenderDescriptionPathMapper.py # Skips itself without the hydraRender command
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py
@@ -116,6 +119,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdNestedNativeInstancePicking.py
     cpp/testUsdPickKind.py
+    cpp/testPickingTwoRenderOverrides.py # Skips itself unless both Storm and Flash are registered
     cpp/testNurbsSurfaces.py
     cpp/testGeomSubsetsPicking.py|disabledOn:HdFlash:HYDRA-2672 # HYDRA-2672 : Geom subset picking doesn't update UFE selection
     cpp/testSinglePicking.py
@@ -143,6 +147,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testLegacyHighlightPassRouting.py
     cpp/testDeferredHighlightWireInit.py
     cpp/testRenderItemDirtyLocators.py
+    cpp/testUnloadedPayloadBounds.py
 )
 
 # These two test files are identical, except for disabled tests.  See
@@ -231,6 +236,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # (MAYAHYDRA_RENDER_ITEM_OVERRIDE=0), on the stock render item path.
 set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_RENDER_ITEM_OVERRIDE
     testMayaComponentsPicking.py|disabledOn:osx:HYDRA-1882 # HYDRA-1882 : Crash in HdxOitResolveTask on OSX | HYDRA-2605 : Component overlays are not carried by the render item override
+    testUnneededHighlightWire.py # A render item override carrier's wire is always translated, then hidden
+    testCustomMaterial.py # Covers the custom vertex buffer to primvar translation of the stock render item path
 )
 
 # Every interactive test runs in both selection highlighting modes: the primary
@@ -287,6 +294,9 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     testOutlineNativeInstances.py
     # Mode-independent: nothing is selected, so there is no highlight to differ.
     testExternalShapeAdapter.py
+    # Mode-independent: it only reads a render setting, nothing is drawn selected.
+    testViewportRenderSettings.py
+    testUnneededHighlightWire.py
 )
 
 # These scripts cannot run in outline mode, so their primary run is forced to

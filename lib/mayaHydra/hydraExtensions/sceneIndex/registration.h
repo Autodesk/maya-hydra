@@ -18,6 +18,7 @@
 #define MAYAHYDRALIB_SCENE_INDEX_REGISTRATION_H
 
 #include <mayaHydraLib/api.h>
+#include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 
 #include <flowViewport/flowViewport.h>
 #include <flowViewport/API/renderViewData/fvpDataProducerSceneIndexDataBase.h>
@@ -47,6 +48,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using MayaHydraSelectionObserverPtr = std::shared_ptr<class MayaHydraSelectionObserver>;
 using MayaHydraSceneIndexRegistrationPtr = std::shared_ptr<struct MayaHydraSceneIndexRegistration>;
+// The scene index path prefix of a Maya node, shared by all the registries that have a scene
+// index for that node, so that they all use the same prefix.
+using MayaHydraNodePrefixReservationPtr
+    = std::shared_ptr<const struct MayaHydraNodePrefixReservation>;
+// The path mapper registration of the default render description node, shared by all the
+// registries.
+using MayaHydraRenderDescriptionPathMapperRegistrationPtr
+    = std::shared_ptr<const struct MayaHydraRenderDescriptionPathMapperRegistration>;
 typedef Ufe::Path (*MayaHydraInterpretRprimPath)(const HdSceneIndexBaseRefPtr&, const SdfPath&);
 
 struct MayaHydraSceneIndexRegistration
@@ -56,8 +65,15 @@ struct MayaHydraSceneIndexRegistration
     SdfPath                     sceneIndexPathPrefix;
     MObjectHandle               dagNode;
     MayaHydraInterpretRprimPath interpretRprimPathFn = nullptr;
+    // Shared with the other render overrides' registries, which use the same prefix for the
+    // node: the pick handler is unregistered with the last one. Null in batch renders.
+    MAYAHYDRA_NS::PickRegistrationPtr pickRegistration;
+    // Holds sceneIndexPathPrefix for the node.
+    MayaHydraNodePrefixReservationPtr prefixReservation;
 
     virtual void Update() = 0;
+    // Whether the scene index may have unloaded prims.
+    virtual bool MayHaveUnloadedPrims() const = 0;
 #ifdef CODE_COVERAGE_WORKAROUND
     virtual void Destroy() = 0;
 #endif
@@ -98,18 +114,26 @@ public:
     MAYAHYDRALIB_API
     const Registrations& GetRegistrations() const;
 
+    // Whether the prim at primPath, or any of its descendants, may be an unloaded prim of a
+    // registered scene index.
+    MAYAHYDRALIB_API
+    bool MayHaveUnloadedPrims(const SdfPath& primPath) const;
+
     // When in a MayaUsd proxy shape node, some stages become invalid, we need to apply the updates.
     // it's not automatic as we are called from a compute function of a node and we may have recursion which are not allowed
+    // Returns true if a proxy shape's scene index chain was replaced: the caller must then
+    // replace the Hydra selection, as its paths were mapped against the previous stage.
     MAYAHYDRALIB_API
-    void ApplyPendingUpdates();
-
-    MAYAHYDRALIB_API
-    static PXR_NS::SdfPath GetUsdDefaultRenderDescriptionPathPrefix();
+    bool ApplyPendingUpdates();
 
 private:
-    void
-    _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration
+    // dagNode is non-const because of callback registration. The prefix is the node's
+    // reservation (MayaHydraNodePrefixReservation), shared with the other registries.
+    void _AddSceneIndexForNode(MObject& dagNode);
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
+    // Replaces a proxy shape's chain by one built from its current stage (see
+    // MayaUsdProxyShapeSceneIndexBase::NeedsRebuild()).
+    void        _RebuildSceneIndexForNode(MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);
     static void _AfterOpenCallback (void *clientData);
@@ -142,7 +166,8 @@ private:
     void _UnregisterDefaultRenderDescriptionNode();
 
     FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _defaultRenderDescriptionDataProducer;
-    static SdfPath _usdDefaultRenderDescriptionPathPrefix;
+    MayaHydraNodePrefixReservationPtr                 _defaultRenderDescriptionPrefixReservation;
+    MayaHydraRenderDescriptionPathMapperRegistrationPtr _defaultRenderDescriptionPathMapperRegistration;
 
     // Is rendering being done in an interactive or batch context?
     bool _interactive{true};

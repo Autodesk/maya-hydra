@@ -16,6 +16,7 @@
 #include "testUtils.h"
 
 #include <mayaHydraLib/mayaHydra.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 
@@ -115,4 +116,11 @@ TEST(TestPathMapperRegistry, testRegistry)
     for (const auto& h : registered) {
         ASSERT_TRUE(r.Unregister(h));
     }
+}
+
+// The default render description node is mapped while any registry has its scene index: a
+// render override, or a batch render. The registries share the path mapper registration.
+TEST(TestPathMapperRegistry, renderDescriptionMapperRegistered)
+{
+    ASSERT_TRUE(Fvp::PathMapperRegistry::Instance().HasMapper(UsdDefaultRenderDescriptionNodePath()));
 }

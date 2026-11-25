@@ -31,6 +31,9 @@
 #include <ufe/scene.h>
 #include <ufe/sceneNotification.h>
 
+#include <algorithm>
+#include <memory>
+#include <unordered_map>
 #include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -59,25 +62,170 @@ Fvp::PrimSelections addPrefix(const SdfPath& sceneIndexPathPrefix, const Fvp::Pr
     return dst;
 }
 
+// Maps the UFE paths of one mayaUsdProxyShape node through one of the node's
+// MayaUsdProxyShapeSceneIndexBase instances. Each scene index registry (one per render override,
+// one per batch render) creates its own instance for the node. All of them image the same stage
+// at the node's prefix (MayaHydraNodePrefixReservation), and are in every view, so any of them
+// gives the same Hydra paths. Not a plain Fvp::PrefixPathMapper: native instances are resolved
+// through the prims of the instance.
 class UsdPathMapper : public Fvp::PathMapper
 {
 public:
-    UsdPathMapper(const MayaHydra::MayaUsdProxyShapeSceneIndexBase& psSi)
-        : _psSi(psSi)
+    using SceneIndexWeakPtr = TfWeakPtr<MayaHydra::MayaUsdProxyShapeSceneIndexBase>;
+
+    void Attach(const SceneIndexWeakPtr& sceneIndex) { _sceneIndices.push_back(sceneIndex); }
+
+    void Detach(const MayaHydra::MayaUsdProxyShapeSceneIndexBase* sceneIndex)
     {
+        _sceneIndices.erase(
+            std::remove_if(
+                _sceneIndices.begin(),
+                _sceneIndices.end(),
+                [sceneIndex](const SceneIndexWeakPtr& attached) {
+                    return !attached || get_pointer(attached) == sceneIndex;
+                }),
+            _sceneIndices.end());
     }
 
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override
     {
-        return _psSi.UfePathToPrimSelections(appPath);
+        const auto sceneIndex = _GetSceneIndex();
+        return sceneIndex ? sceneIndex->UfePathToPrimSelections(appPath) : Fvp::PrimSelections {};
     }
 
     std::string Name() const override { return "UsdPathMapper"; }
 
 private:
-    // Non-owning reference to prevent ownership cycle.
-    const MayaHydra::MayaUsdProxyShapeSceneIndexBase& _psSi;
+    // The newest instance not waiting for a rebuild (NeedsRebuild()): one waiting maps against
+    // the previous stage, while a rebuilt one maps against the current one. If all of them wait,
+    // the newest, whose data producer still draws the previous stage until its rebuild.
+    SceneIndexWeakPtr _GetSceneIndex() const
+    {
+        SceneIndexWeakPtr newest;
+        for (auto it = _sceneIndices.rbegin(); it != _sceneIndices.rend(); ++it) {
+            if (!*it) {
+                continue;
+            }
+            if (!(*it)->NeedsRebuild()) {
+                return *it;
+            }
+            if (!newest) {
+                newest = *it;
+            }
+        }
+        return newest;
+    }
+
+    // The node's MayaUsdProxyShapeSceneIndexBase instances, oldest first. Weak: the instances
+    // detach themselves in _Destroy().
+    std::vector<SceneIndexWeakPtr> _sceneIndices;
 };
+
+struct HashObjectHandle
+{
+    size_t operator()(const MObjectHandle& handle) const { return handle.hashCode(); }
+};
+
+} // namespace
+
+namespace MAYAHYDRA_NS_DEF {
+
+// The path mapper registration of one mayaUsdProxyShape node, shared by the node's
+// MayaUsdProxyShapeSceneIndexBase instances, as the path mapper registry takes one mapper per UFE
+// path. The node's first instance registers the mapper, and the last one to release the
+// registration unregisters it, as for PickRegistration. Main thread only.
+class MayaUsdProxyShapeSceneIndexBase::_PathMapperRegistration
+{
+public:
+    using Ptr = std::shared_ptr<_PathMapperRegistration>;
+
+    // The registration for the node held by another of its instances, or a new one.
+    static Ptr Acquire(const MObjectHandle& node, const Ufe::Path& appPath);
+
+    _PathMapperRegistration(const MObjectHandle& node, const Ufe::Path& appPath)
+        : _node(node)
+        , _appPath(appPath)
+        , _mapper(std::make_shared<UsdPathMapper>())
+        // False if another client maps the UFE path: then there is nothing of ours to move or
+        // unregister.
+        , _registered(Fvp::PathMapperRegistry::Instance().Register(appPath, _mapper))
+    {
+    }
+
+    ~_PathMapperRegistration();
+
+    _PathMapperRegistration(const _PathMapperRegistration&) = delete;
+    _PathMapperRegistration& operator=(const _PathMapperRegistration&) = delete;
+
+    void Attach(const UsdPathMapper::SceneIndexWeakPtr& sceneIndex) { _mapper->Attach(sceneIndex); }
+    void Detach(const MayaUsdProxyShapeSceneIndexBase* sceneIndex) { _mapper->Detach(sceneIndex); }
+
+    // Every instance for the node observes a rename of the node and reports it: the first
+    // report moves the registration, the others find it moved.
+    void Rename(const Ufe::Path& oldPath, const Ufe::Path& newPath)
+    {
+        if (_appPath != oldPath) {
+            return;
+        }
+        _appPath = newPath;
+        if (_registered) {
+            TF_AXIOM(Fvp::PathMapperRegistry::Instance().Update(oldPath, newPath));
+        }
+    }
+
+private:
+    // Not owning: the instances own the registrations.
+    using Registrations = std::
+        unordered_map<MObjectHandle, std::weak_ptr<_PathMapperRegistration>, HashObjectHandle>;
+    static Registrations _registrations;
+
+    const MObjectHandle                  _node;
+    Ufe::Path                            _appPath;
+    const std::shared_ptr<UsdPathMapper> _mapper;
+    const bool                           _registered;
+};
+
+MayaUsdProxyShapeSceneIndexBase::_PathMapperRegistration::Registrations
+    MayaUsdProxyShapeSceneIndexBase::_PathMapperRegistration::_registrations;
+
+MayaUsdProxyShapeSceneIndexBase::_PathMapperRegistration::Ptr
+MayaUsdProxyShapeSceneIndexBase::_PathMapperRegistration::Acquire(
+    const MObjectHandle& node,
+    const Ufe::Path&     appPath)
+{
+    auto found = _registrations.find(node);
+    if (found != _registrations.end()) {
+        if (auto registration = found->second.lock()) {
+            TF_VERIFY(
+                registration->_appPath == appPath,
+                "Proxy shape path %s differs from the registered %s.",
+                appPath.string().c_str(),
+                registration->_appPath.string().c_str());
+            return registration;
+        }
+    }
+
+    auto registration = std::make_shared<_PathMapperRegistration>(node, appPath);
+    _registrations[node] = registration;
+    return registration;
+}
+
+MayaUsdProxyShapeSceneIndexBase::_PathMapperRegistration::~_PathMapperRegistration()
+{
+    if (_registered) {
+        Fvp::PathMapperRegistry::Instance().Unregister(_appPath);
+    }
+
+    // The entry may already point to a replacement registration for the node.
+    auto found = _registrations.find(_node);
+    if (found != _registrations.end() && found->second.expired()) {
+        _registrations.erase(found);
+    }
+}
+
+} // namespace MAYAHYDRA_NS_DEF
+
+namespace {
 
 using namespace Ufe;
 using namespace MayaHydra;
@@ -128,10 +276,8 @@ private:
             if (siPath.startsWith(op.path)) {
                 const auto oldPath = siPath;
                 auto       newPath = oldPath.reparent(op.path, op.item->path());
+                // Also moves the node's entry in the path mapper registry.
                 _psSi.SetSceneIndexAppPath(newPath);
-
-                // Update our entry in the path mapper registry.
-                TF_AXIOM(Fvp::PathMapperRegistry::Instance().Update(oldPath, newPath));
             }
         }
     }
@@ -142,6 +288,8 @@ private:
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
+
+long int MayaUsdProxyShapeSceneIndexBase::_nbPopulateCalls = 0;
 
 MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
     const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
@@ -158,7 +306,6 @@ MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
     , _proxyStage(proxyStage)
     , _dagNodeHandle(dagNodeHandle)
     , _sceneIndexAppPath(sceneIndexAppPath)
-    , _usdPathMapper(std::make_shared<UsdPathMapper>(*this))
     , _appSceneObserver(std::make_shared<UsdPathMapperSceneObserver>(*this))
 {
     // The gateway node (proxy shape) is a Maya node, so the scene index
@@ -174,10 +321,10 @@ MayaUsdProxyShapeSceneIndexBase::MayaUsdProxyShapeSceneIndexBase(
     // (proxy shape) that corresponds to our scene index data producer.
     Scene::instance().addObserver(_appSceneObserver);
 
-    // Register a mapper in the path mapper registry, if there is none
-    // for this path.
-    _unregisterPathMapper = Fvp::PathMapperRegistry::Instance().Register(
-        _sceneIndexAppPath, _usdPathMapper);
+    // Map the node's UFE paths, through the path mapper shared with the node's instances in the
+    // other scene index registries, if any.
+    _pathMapperRegistration = _PathMapperRegistration::Acquire(dagNodeHandle, _sceneIndexAppPath);
+    _pathMapperRegistration->Attach(ptr);
 
     Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
 }
@@ -187,10 +334,29 @@ MayaUsdProxyShapeSceneIndexBase::~MayaUsdProxyShapeSceneIndexBase()
     _Destroy();                 // In a destructor calls are not virtual
 }
 
+void MayaUsdProxyShapeSceneIndexBase::SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
+{
+    const Ufe::Path oldPath = _sceneIndexAppPath;
+    _sceneIndexAppPath = sceneIndexAppPath;
+
+    if (_pathMapperRegistration) {
+        _pathMapperRegistration->Rename(oldPath, sceneIndexAppPath);
+    }
+}
+
 void MayaUsdProxyShapeSceneIndexBase::_Destroy()
 {
-    if (_unregisterPathMapper) {
-        Fvp::PathMapperRegistry::Instance().Unregister(_sceneIndexAppPath);
+    // Detach() and the destructor both call this.
+    if (_destroyed) {
+        return;
+    }
+    _destroyed = true;
+
+    // The path mapper stops mapping through this instance, and is unregistered if no other
+    // instance for the node uses it.
+    if (_pathMapperRegistration) {
+        _pathMapperRegistration->Detach(this);
+        _pathMapperRegistration.reset();
     }
 
     // Ufe::Subject has automatic cleanup of stale observers, but this can
@@ -254,7 +420,16 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
         return;
     }
 
+    if (_rebuildOnStageChange && _stage) {
+        // No SetStage() once populated (see SetRebuildOnStageChange()): the owner replaces
+        // this scene index at the next render.
+        _needsRebuild = true;
+        return;
+    }
+
     _usdImagingStageSceneIndex->SetStage(nullptr);
+    _stage = nullptr;
+    _InvalidateMayHaveUnloadedPrims();
     _populated = false;
     // Simply mark populate as dirty and do not call
     // Populate();
@@ -283,23 +458,63 @@ void MayaUsdProxyShapeSceneIndexBase::_ObjectsChanged(
 void MayaUsdProxyShapeSceneIndexBase::PopulateAndApplyPendingChanges() 
 { 
     Populate();
+    if (_needsRebuild) {
+        // Populate() can set it too. The replacement is built from the current stage, edits
+        // included.
+        return;
+    }
     _usdImagingStageSceneIndex->ApplyPendingUpdates();
 }
 
 void MayaUsdProxyShapeSceneIndexBase::Populate()
 {
+    if (_needsRebuild) {
+        return;
+    }
     if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
+        if (_rebuildOnStageChange && _stage && _stage != stage) {
+            // A new stage after the first population, even an empty or null one: see
+            // SetRebuildOnStageChange().
+            _needsRebuild = true;
+            return;
+        }
         // Check whether the pseudo-root has children
-        if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+        if (HasRootPrims(stage)) {
             ++_nbPopulateCalls;
             Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
+            // Set _stage before calling SetStage(), as the latter's PrimsAdded handlers call MayHaveUnloadedPrims().
+            _stage = stage;
+            _InvalidateMayHaveUnloadedPrims();
             _usdImagingStageSceneIndex->SetStage(stage);
             // Set the initial time
             UpdateTime();
             _populated = true;
         }
     }
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::HasRootPrims(const UsdStageRefPtr& stage)
+{
+    // Unlike GetChildren(), which uses UsdPrimDefaultPredicate, don't skip unloaded prims.
+    return stage
+        && !stage->GetPseudoRoot()
+                .GetFilteredChildren(UsdPrimIsActive && UsdPrimIsDefined && !UsdPrimIsAbstract)
+                .empty();
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::MayHaveUnloadedPrims() const
+{
+    // UsdPrim::IsLoaded follows the load rules, so a stage whose rules load the pseudo-root with
+    // all its descendants has no unloaded prims.
+    if (!_stage) {
+        return false;
+    }
+    if (!_mayHaveUnloadedPrimsCache.has_value()) {
+        _mayHaveUnloadedPrimsCache
+            = !_stage->GetLoadRules().IsLoadedWithAllDescendants(SdfPath::AbsoluteRootPath());
+    }
+    return _mayHaveUnloadedPrimsCache.value();
 }
 
 Ufe::Path MayaUsdProxyShapeSceneIndexBase::InterpretRprimPath(
@@ -333,8 +548,8 @@ SdfPathVector MayaUsdProxyShapeSceneIndexBase::GetChildPrimPaths(const SdfPath& 
 bool MayaUsdProxyShapeSceneIndexBase::HasPendingUpdates() const
 {
     //When we receive a stage invalidate we remove the stage and set populate to false
-    //We need to re-populate to see the changes
-    return (false == _populated);
+    //We need to re-populate to see the changes, or be replaced (NeedsRebuild())
+    return (false == _populated) || _needsRebuild;
 }
 
 Fvp::PrimSelections

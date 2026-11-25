@@ -141,7 +141,9 @@ std::string getOCIOConfigFilePath()
 // scene index, depending on the Hydra renderer.  A dummy panel name is
 // used to connect the scene index chain for batch rendering.
 
-const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaData");
+// The same root as interactive render overrides: each render index has its own Maya data, and
+// the Maya fallback path mapper, shared by all, maps Maya objects under this root.
+const SdfPath MAYA_NATIVE_ROOT = MayaHydraSceneIndex::GetMayaNativeRoot();
 
 } // namespace
 
@@ -381,14 +383,6 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
          Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
         if (sceneFilteringSceneIndexData->UpdateVisibility()) {
             rendererNamesToUpdate += sceneFilteringSceneIndexData->GetClient()->getRendererNames();
-        }
-    }
-    for (auto& selectionHighlightFilteringSceneIndexData :
-         Fvp::FilteringSceneIndexInterfaceImp::get()
-             .getSelectionHighlightFilteringSceneIndicesData()) {
-        if (selectionHighlightFilteringSceneIndexData->UpdateVisibility()) {
-            rendererNamesToUpdate
-                += selectionHighlightFilteringSceneIndexData->GetClient()->getRendererNames();
         }
     }
     if (!rendererNamesToUpdate.empty()) {

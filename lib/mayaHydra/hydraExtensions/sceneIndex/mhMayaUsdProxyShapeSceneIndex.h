@@ -58,11 +58,6 @@ private:
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
         const Ufe::Path&                       sceneIndexAppPath);
-
-    void _Destroy() override;
-    void _DestroyDerived();
-
-    bool _unregisterPickHandler{false};
 };
 
 } // namespace MAYAHYDRA_NS_DEF

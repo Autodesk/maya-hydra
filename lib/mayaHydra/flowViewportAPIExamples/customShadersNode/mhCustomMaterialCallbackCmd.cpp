@@ -1,0 +1,125 @@
+//
+// Copyright 2026 Autodesk, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+//maya headers
+// MFnPlugin.h defines the plugin version and entry point symbols, which must only be defined once per plugin
+#define MNoVersionString
+#define MNoPluginEntry
+#include <maya/MFnPlugin.h>
+#include <maya/MArgDatabase.h>
+#include <maya/MPxCommand.h>
+#include <maya/MSyntax.h>
+
+//Flow viewport headers
+#include <flowViewport/API/fvpMaterialCreationInterface.h>
+
+//Hydra headers
+#include <pxr/imaging/hd/material.h>
+#include <pxr/imaging/hd/tokens.h>
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace {
+
+TF_DEFINE_PRIVATE_TOKENS(_tokens,
+    (FVP_CustomBufferShader) //Name of the shader loaded by Hydra
+);
+
+const char* const kUnregisterFlag     = "-u";
+const char* const kUnregisterFlagLong = "-unregister";
+
+//Shader file name, without directory and extension, of the Maya GLSLShader "shader" attribute the callback is registered for.
+const char* const kGLSLShaderName = "myCustomShader";
+
+//Material creation callback registered in the flow viewport MaterialCreationInterface under kGLSLShaderName.
+//MayaHydra calls it for the Maya GLSLShader materials whose shader file name matches kGLSLShaderName,
+//which are replaced by the FVP_CustomBufferShader glslfx shader, their parameters are not translated.
+VtValue _CreateGLSLShaderReplacementMaterial(const SdfPath& materialId)
+{
+    HdMaterialNetworkMap networkMap;
+    HdMaterialNetwork&   network = networkMap.map[HdMaterialTerminalTokens->surface];
+
+    HdMaterialNode terminal;
+    terminal.identifier = _tokens->FVP_CustomBufferShader;
+    terminal.path = materialId.AppendChild(_tokens->FVP_CustomBufferShader);
+
+    networkMap.terminals.push_back(terminal.path);
+    network.nodes.emplace_back(std::move(terminal));
+
+    return VtValue(networkMap);
+}
+
+/// Command to register / unregister in the flow viewport MaterialCreationInterface a callback
+/// which replaces the Maya GLSLShader materials whose shader file name matches kGLSLShaderName by the
+/// FVP_CustomBufferShader glslfx shader.
+/// Python usage :
+///   cmds.mhRegisterCustomMaterialCallback()
+///   cmds.mhRegisterCustomMaterialCallback(unregister=True)
+class MhRegisterCustomMaterialCallbackCmd : public MPxCommand
+{
+public:
+    static void*   creator() { return new MhRegisterCustomMaterialCallbackCmd(); }
+    static MSyntax createSyntax();
+
+    static const MString commandName;
+
+    MStatus doIt(const MArgList& args) override;
+};
+
+const MString MhRegisterCustomMaterialCallbackCmd::commandName("mhRegisterCustomMaterialCallback");
+
+MSyntax MhRegisterCustomMaterialCallbackCmd::createSyntax()
+{
+    MSyntax syntax;
+    syntax.addFlag(kUnregisterFlag, kUnregisterFlagLong);
+    return syntax;
+}
+
+MStatus MhRegisterCustomMaterialCallbackCmd::doIt(const MArgList& args)
+{
+    MStatus      status;
+    MArgDatabase argDb(syntax(), args, &status);
+    if (!status) {
+        return status;
+    }
+
+    auto& materialCreationInterface = Fvp::MaterialCreationInterface::Get();
+    if (argDb.isFlagSet(kUnregisterFlag)) {
+        materialCreationInterface.UnregisterMaterialCreationCallback(kGLSLShaderName);
+    } else {
+        materialCreationInterface.RegisterMaterialCreationCallback(
+            kGLSLShaderName, _CreateGLSLShaderReplacementMaterial);
+    }
+    return MS::kSuccess;
+}
+
+} // namespace
+
+MStatus registerCustomMaterialCallbackCmd(MFnPlugin& plugin)
+{
+    return plugin.registerCommand(
+        MhRegisterCustomMaterialCallbackCmd::commandName,
+        MhRegisterCustomMaterialCallbackCmd::creator,
+        MhRegisterCustomMaterialCallbackCmd::createSyntax);
+}
+
+MStatus deregisterCustomMaterialCallbackCmd(MFnPlugin& plugin)
+{
+    // The callback lives in this plugin, it must not be called once the plugin is unloaded.
+    Fvp::MaterialCreationInterface::Get().UnregisterMaterialCreationCallback(kGLSLShaderName);
+
+    return plugin.deregisterCommand(MhRegisterCustomMaterialCallbackCmd::commandName);
+}

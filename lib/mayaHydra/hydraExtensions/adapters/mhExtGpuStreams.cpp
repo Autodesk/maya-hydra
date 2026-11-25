@@ -26,6 +26,7 @@
 
 #include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec3f.h>
+#include <pxr/base/gf/vec4f.h>
 #include <pxr/base/tf/envSetting.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/imaging/garch/glApi.h>
@@ -66,10 +67,11 @@ TF_DEFINE_ENV_SETTING(MAYAHYDRA_GPU_BUFFER_SHARING_MODE, "hybrid",
     "ever fires MVS_changedGeometry / MVS_changedTopo to direct mode "
     "permanently for zero per-frame copy cost on animating meshes).");
 
-constexpr uint8_t kLazyCpuPointsBit = 1u << 0;
-constexpr uint8_t kLazyCpuNormalsBit = 1u << 1;
-constexpr uint8_t kLazyCpuTangentsBit = 1u << 2;
-constexpr uint8_t kLazyCpuUvsBit = 1u << 3;
+constexpr uint64_t kLazyCpuPointsBit = uint64_t{1} << 0;
+constexpr uint64_t kLazyCpuNormalsBit = uint64_t{1} << 1;
+constexpr uint64_t kLazyCpuTangentsBit = uint64_t{1} << 2;
+constexpr uint64_t kLazyCpuUvsBit = uint64_t{1} << 3;
+constexpr size_t kLazyCpuFirstCustomBit = 4;
 
 #define TF_DEBUG_GPU_BUFFER_SHARING(fmt, ...)                      \
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING)      \
@@ -227,15 +229,16 @@ _HydraCpuType(const TfToken& primvar)
     return HdTypeInvalid;
 }
 
-// Call \p fn with a value of the C++ element type matching _HydraCpuType(primvar); the value
+// Call \p fn with a value of the C++ element type matching hydraType; the value
 // only selects the type. Returns R() for a primvar that is never shared.
 template <typename R, typename Fn>
 static R
-_WithHydraCpuElement(const TfToken& primvar, Fn&& fn)
+_WithHydraCpuElement(HdType hydraType, Fn&& fn)
 {
-    switch (_HydraCpuType(primvar)) {
+    switch (hydraType) {
     case HdTypeFloatVec2: return fn(GfVec2f());
     case HdTypeFloatVec3: return fn(GfVec3f());
+    case HdTypeFloatVec4: return fn(GfVec4f());
     default: return R();
     }
 }
@@ -471,10 +474,12 @@ static const char* _ExtStreamNameForKey(const TfToken& key)
     if (key == UsdGeomTokens->normals)           { return "normal"; }
     if (key == MayaHydraAdapterTokens->st)       { return "texture"; }
     if (key == MayaHydraAdapterTokens->tangents) { return "tangent"; }
-    return "<unknown>";
+    return "custom";
 }
 
-uint8_t _LazyCpuBit(const TfToken& key)
+} // namespace
+
+uint64_t MhExtGpuStreams::_LazyCpuBit(const TfToken& key) const
 {
     if (key == HdTokens->points) {
         return kLazyCpuPointsBit;
@@ -488,10 +493,9 @@ uint8_t _LazyCpuBit(const TfToken& key)
     if (key == MayaHydraAdapterTokens->st) {
         return kLazyCpuUvsBit;
     }
-    return 0;
+    const auto it = _lazyCpuCustomKeys.find(key);
+    return it != _lazyCpuCustomKeys.end() ? it->second : 0;
 }
-
-} // namespace
 
 MhExtGpuSource MhExtGpuSource::FromDescriptor(
     const MHWRender::MVertexBufferDescriptor& descriptor,
@@ -594,9 +598,18 @@ bool MhExtGpuStreams::Share(
 {
     MH_PROFILE_FUNCTION();
 
+    if (key.IsEmpty()) {
+        return false;
+    }
+    
     _Stream* stream = _StreamFor(key);
     if (!stream) {
-        return false;
+        // A custom texcoord primvar not seen before gets its stream here.
+        stream = &_customStreams[key];
+        if (_LazyCpuBit(key) == 0) {
+            _lazyCpuCustomKeys.emplace(
+                key, uint64_t{1} << (kLazyCpuFirstCustomBit + _lazyCpuCustomKeys.size()));
+        }
     }
 
     const char* const id = _owner.GetID().GetText();
@@ -710,7 +723,7 @@ void MhExtGpuStreams::_AfterPublish(
     // the producer frame's fence, instead of paying a GPU round trip per
     // stream at pull time. The element types match GetLazyValue.
     if (lazyCpuConsumer) {
-        _WithHydraCpuElement<void>(key, [&stream](auto elementType) {
+        _WithHydraCpuElement<void>(stream.tupleType.type, [&stream](auto elementType) {
             _PrefetchStream<decltype(elementType)>(stream);
         });
     }
@@ -719,15 +732,23 @@ void MhExtGpuStreams::_AfterPublish(
 bool MhExtGpuStreams::Withdraw(const TfToken& key)
 {
     _Stream* stream = _StreamFor(key);
-    if (!stream || !*stream) {
+    if (!stream) {
         return false;
     }
-    TF_DEBUG_GPU_BUFFER_SHARING(
-        "[%s] %s WITHDRAWN: gl=%" PRIu64 " is no longer in the "
-        "render item's geometry\n",
-        _owner.GetID().GetText(), _ExtStreamNameForKey(key), stream->rawHandle);
-    *stream = {};
-    return true;
+    const bool wasShared = static_cast<bool>(*stream);
+    if (wasShared) {
+        TF_DEBUG_GPU_BUFFER_SHARING(
+            "[%s] key=%s WITHDRAWN: gl=%" PRIu64 " is no longer in the "
+            "render item's geometry\n",
+            _owner.GetID().GetText(), key.GetText(), stream->rawHandle);
+    }
+    const auto customStream = _customStreams.find(key);
+    if (customStream != _customStreams.end()) {
+        _customStreams.erase(customStream);
+    } else {
+        *stream = {};
+    }
+    return wasShared;
 }
 
 size_t MhExtGpuStreams::SharedElementCount(const TfToken& key) const
@@ -754,11 +775,16 @@ MhExtGpuStreams::_Publish(
     // Shared only when Hydra can read the stream as-is: a consumer binds it with Hydra's
     // element type, and the lazy CPU readback decodes it as that type. Anything else (e.g.
     // 4-component tangents) is read on the CPU, which keeps only the components Hydra expects.
-    const HdType hydraType = _HydraCpuType(key);
-    if (layout.elementType.type != hydraType) {
+    const HdType sourceType = layout.elementType.type;
+    HdType hydraType = _HydraCpuType(key);
+    if (hydraType == HdTypeInvalid) {
+        _WithHydraCpuElement<void>(sourceType, [&](auto) { hydraType = sourceType; });
+    }
+
+    if (sourceType != hydraType) {
         TF_DEBUG_GPU_BUFFER_SHARING(
             "[%s] %s -> CPU: VP2 element type %d does not match Hydra's %d for %s\n",
-            id, name, int(layout.elementType.type),
+            id, name, int(sourceType),
             int(hydraType), key.GetText());
         return _PublishResult::NoGpu;
     }
@@ -944,9 +970,9 @@ MhExtGpuStreams::_Publish(
     // reported by Maya and getting it too small is the one failure that
     // silently disables sharing for an otherwise healthy stream.
     TF_DEBUG_GPU_BUFFER_SHARING(
-        "[%s] %s SHARED via %s%s: gl=%" PRIu64 " elements=%zu "
+        "[%s] key=%s SHARED via %s%s: gl=%" PRIu64 " elements=%zu "
         "offset=%zu stride=%zu byteSize=%zu allowDirectBind=%s\n",
-        id, name, bridge.Describe(),
+        id, key.GetText(), bridge.Describe(),
         bridge.IsZeroCopy() ? "" : " (copied)", rawHandle,
         layout.numElements, layout.byteOffset, layout.byteStride,
         layout.byteSize, allowDirectBind ? "yes" : "no");
@@ -972,7 +998,8 @@ const MhExtGpuStreams::_Stream* MhExtGpuStreams::_StreamFor(const TfToken& key) 
     if (key == HdTokens->normals)                { return &_normals; }
     if (key == MayaHydraAdapterTokens->tangents) { return &_tangents; }
     if (key == MayaHydraAdapterTokens->st)       { return &_uvs; }
-    return nullptr;
+    const auto customStream = _customStreams.find(key);
+    return customStream != _customStreams.end() ? &customStream->second : nullptr;
 }
 
 void MhExtGpuStreams::ResetLazyCpuConsumers()
@@ -982,7 +1009,7 @@ void MhExtGpuStreams::ResetLazyCpuConsumers()
 
 bool MhExtGpuStreams::_LazyCpuBufferTriggered(const TfToken& key) const
 {
-    const uint8_t bit = _LazyCpuBit(key);
+    const uint64_t bit = _LazyCpuBit(key);
     return bit != 0
         && (_lazyCpuBufferTriggeredMask.load(std::memory_order_relaxed) & bit)
             != 0;
@@ -990,9 +1017,9 @@ bool MhExtGpuStreams::_LazyCpuBufferTriggered(const TfToken& key) const
 
 void MhExtGpuStreams::_SetLazyCpuBufferTriggered(const TfToken& key) const
 {
-    const uint8_t bit = _LazyCpuBit(key);
+    const uint64_t bit = _LazyCpuBit(key);
     if (bit != 0) {
-        const uint8_t prev = _lazyCpuBufferTriggeredMask.fetch_or(
+        const uint64_t prev = _lazyCpuBufferTriggeredMask.fetch_or(
             bit, std::memory_order_relaxed);
         if ((prev & bit) == 0) {
             TF_DEBUG_GPU_BUFFER_SHARING(
@@ -1048,7 +1075,7 @@ VtValue MhExtGpuStreams::GetLazyValue(const TfToken& key) const
     if (!stream) {
         return {};
     }
-    return _WithHydraCpuElement<VtValue>(key, [&readStream, stream](auto elementType) {
+    return _WithHydraCpuElement<VtValue>(stream->tupleType.type, [&readStream, stream](auto elementType) {
         return readStream(*stream, elementType);
     });
 }

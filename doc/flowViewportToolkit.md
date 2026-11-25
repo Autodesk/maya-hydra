@@ -10,6 +10,7 @@ The Flow viewport toolkit is an API for clients to customize the Hydra viewport.
 
  - Add  Hydra primitives which are neither related to a usd stage nor are DCC native data through what we call a **data producer scene index**.
  - Apply a **filtering scene index** to all primitives. Even if they are from another scene index including DCC native data, USD stages or a custom data producer scene index. 
+ - Replace the Hydra material of a DCC material by **your own Hydra material network**, for example to draw Maya GLSLShader materials with a custom GLSLFX shader for Hydra Storm, fed by custom vertex buffers.
  - Get information about the Hydra viewports and which render delegate they use
  - Get the version of the API
  
@@ -43,7 +44,7 @@ The *[FilteringSceneIndexClient](../lib/flowViewport/API/fvpFilteringSceneIndexC
 
 It contains a :
 - display name which is a name  associated with your filtering scene index, it is only used as an information and can be anything.
-- category which is a container in which you want your filtering scene index (or scene index chain) to go to. Note : the filtering scene indices inside a Category don't have any specific priority when they are called.
+- category which is a container in which you want your filtering scene index (or scene index chain) to go to. The only category is *kSceneFiltering*, which applies your filtering scene index to the primitives from the scene. Note : the filtering scene indices inside a Category don't have any specific priority when they are called.
 -   The renderer names to which your filtering scene index applies. Say "GL, Arnold" for applying this filter to Storm and the Arnold render delegates. Note : using *FvpViewportAPITokens->allRenderers* means applies to all render delegates.
 -   A DCC node as a *void** , dccNode is specific to a DCC (like Maya). For Maya it is a *MObject** DAG node. If you provide a non null pointer, we automatically track some events from the DCC node such as node deleted/undeleted or the visibility attribute updates.  When the node is present and visible, we automatically apply the filtering scene index. And when it  is deleted or not visible, we remove the filtering scene index, so no filtering is happening in that case.  It is a convenient way for you to control the filtering through a Maya node. If it is a *nullptr*, we always apply the filtering scene index until you unregister it.
 
@@ -127,7 +128,7 @@ The API contains examples which are Maya projects on how to filter and add primi
 | Location      | Description                                                                                   |
 |-------------  |---------------------------------------------------------------------------------------------  |
 | [lib/flowViewport/usdPlugins/shadersDiscoveryPlugin](https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport/usdPlugins/shadersDiscoveryPlugin) | Is an example on how to develop a custom GLSL shader for Hydra Storm which you can apply later on USD / Hydra primitives |
-| [lib/mayaHydra/flowViewportAPIExamples/customShadersNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/customShadersNode) | Is a Maya node which creates an Hydra primitive and applies the custom GLSL shader for Hydra Storm |
+| [lib/mayaHydra/flowViewportAPIExamples/customShadersNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/customShadersNode) | Is a Maya node which creates an Hydra primitive and applies the custom GLSL shader for Hydra Storm.<BR>It also shows how to replace Maya GLSLShader materials by a custom Hydra material reading a custom vertex buffer, see [its README](../lib/mayaHydra/flowViewportAPIExamples/customShadersNode/README) |
 | [lib/mayaHydra/flowViewportAPIExamples/flowViewportAPILocator](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/flowViewportAPILocator) | Is a Maya node which creates Hydra primitives to display a grid of cubes and applies a filtering scene index to remove primitives with more than a certain number of vertices.<BR>This example shows how to create a Hydra mesh primitive, how to use Hydra instancing and deal with selection picking from MayaHydra|
 | [lib/mayaHydra/flowViewportAPIExamples/footPrintNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/footPrintNode) | Is a Maya node showing how to convert the Maya FootPrint node which is part of the samples from the Maya devkit. It shows how to create Hydra mesh primitives and deal with selection picking from MayaHydra|
 

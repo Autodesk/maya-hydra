@@ -41,6 +41,7 @@
 #include <ufe/path.h>
 
 #include <memory>
+#include <optional>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -81,28 +82,50 @@ public:
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    void             SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
-    {
-        _sceneIndexAppPath = sceneIndexAppPath;
-    }
+    // Also moves the node's path mapper registration to the new path.
+    void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath);
 
     virtual ~MayaUsdProxyShapeSceneIndexBase();
 
     // When we receive a stage invalidate we remove the stage and set populate to false
     // We need to re-populate to see the changes
-    //HasPendingUpdates() is true when this is the case
+    //HasPendingUpdates() is true when this is the case, or when NeedsRebuild() is true.
     bool HasPendingUpdates() const;
     void PopulateAndApplyPendingChanges();
+
+    // When enabled, a stage invalidate or a new stage after population sets NeedsRebuild()
+    // instead of calling SetStage() again; the owner then replaces this scene index and its
+    // UsdImaging chain (MayaHydraSceneIndexRegistry::ApplyPendingUpdates()). Re-staging a
+    // populated stage scene index leaves stale native instancing prims (OpenUSD #3967).
+    void SetRebuildOnStageChange(bool rebuildOnStageChange)
+    {
+        _rebuildOnStageChange = rebuildOnStageChange;
+    }
+    bool NeedsRebuild() const { return _needsRebuild; }
+
+    // Stops mapping paths and observing stage notices, so that a replacement takes over even if
+    // this one stays alive. Idempotent.
+    void Detach() { _Destroy(); }
 
     void Populate();
     void UpdateTime();
     static Ufe::Path InterpretRprimPath(const HdSceneIndexBaseRefPtr& sceneIndex,const SdfPath& path);
 
+    // Whether the stage has prims to image. Unloaded root prims count, as they are imaged as
+    // bounding boxes, so a stage opened without loading its payloads is not considered empty.
+    static bool HasRootPrims(const UsdStageRefPtr& stage);
+
+    // Whether the imaged stage may have unloaded prims, i.e. its load rules do not load all of it.
+    bool MayHaveUnloadedPrims() const;
+
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const HdSceneIndexBase& sender, const HdSceneIndexObserver::AddedPrimEntries& entries) override{
+        // Loading or unloading payloads resyncs prims, so this is where the load rules may change.
+        _InvalidateMayHaveUnloadedPrims();
         _SendPrimsAdded(entries);
     }
     void _PrimsRemoved(const HdSceneIndexBase& sender, const HdSceneIndexObserver::RemovedPrimEntries& entries)override{
+        _InvalidateMayHaveUnloadedPrims();
         _SendPrimsRemoved(entries);
     }
     void _PrimsDirtied(const HdSceneIndexBase& sender, const HdSceneIndexObserver::DirtiedPrimEntries& entries)override{
@@ -128,23 +151,36 @@ protected:
     const SdfPath                   _sceneIndexPathPrefix;
 
 private:
+    // The path mapper registration of the mayaUsdProxyShape node, shared with the node's
+    // instances in the other scene index registries (render overrides and batch renders).
+    class _PathMapperRegistration;
 
     void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
     void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
     void _StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice);
 
     UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
+    // The stage set on _usdImagingStageSceneIndex, which does not give access to it. Null until
+    // the first population: SetStage() then sends no removal.
+    UsdStageRefPtr                  _stage;
+    // Querying the load rules can walk all of them, so the answer is cached until the imaged prims change.
+    void _InvalidateMayHaveUnloadedPrims() { _mayHaveUnloadedPrimsCache.reset(); }
+    mutable std::optional<bool>     _mayHaveUnloadedPrimsCache;
     MAYAUSDAPI_NS::ProxyStage       _proxyStage;
     std::atomic<bool>               _populated { false };
+    bool                            _rebuildOnStageChange{false};
+    std::atomic<bool>               _needsRebuild { false };
+    bool                            _destroyed{false};
     MObjectHandle                   _dagNodeHandle;
     Ufe::Path                       _sceneIndexAppPath;
-    const Fvp::PathMapperConstPtr   _usdPathMapper{};
     const Ufe::Observer::Ptr        _appSceneObserver{};
-    bool                            _unregisterPathMapper{false};
+    // Null once detached (Detach()).
+    std::shared_ptr<_PathMapperRegistration> _pathMapperRegistration;
     TfNotice::Key                   _stageSetNoticeKey;
     TfNotice::Key                   _stageInvalidateNoticeKey;
     TfNotice::Key                   _objectsChangedNoticeKey;
-    long int                        _nbPopulateCalls{0};
+    // Shared by all instances, so the count survives a rebuild.
+    static long int                 _nbPopulateCalls;
 };
 
 } // namespace MAYAHYDRA_NS_DEF
