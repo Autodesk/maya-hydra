@@ -124,11 +124,14 @@ public:
     // source. Kept up to date by updateRenderItem across renames/reparents.
     MDagPath dagPath;
 
-    // kWireframe only: the colour Maya draws this wire in when the DAG path's
-    // wireframe colour is not it (MRenderItemOverrideGeometry::
-    // wireframeColorOverride) - smooth mesh preview's "cage + smooth" mode
-    // draws the smooth wire in the smooth-preview palette. Refreshed on every
-    // update; when unset, the colour is MGeometryUtilities::wireframeColor.
+    // The colour Maya draws this line item in when the DAG path's wireframe
+    // colour is not it (MRenderItemOverrideGeometry::wireframeColorOverride).
+    // Maya only reports one for kWireframe, kUVBorder and kCageUVBorder: smooth
+    // mesh preview's "cage + smooth" mode draws the smooth wire in the
+    // smooth-preview palette, and a UV border can take the custom UV border
+    // colour or the UV Editor's. Copied for every kind and never set for the
+    // others. Refreshed on every update; when unset, the colour is
+    // MGeometryUtilities::wireframeColor.
     bool   hasWireColorOverride = false;
     MColor wireColorOverride;
 
