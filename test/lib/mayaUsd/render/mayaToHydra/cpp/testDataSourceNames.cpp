@@ -18,6 +18,10 @@
 #include <mayaHydraLib/renderThread/renderThreadCaptureSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
+
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/cameraSchema.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
@@ -210,6 +214,21 @@ void CollectPrimPaths(
     }
 }
 
+// The Windows clang code coverage build crashes destroying an HdRetainedSceneIndex,
+// so there a test's scene indices are leaked instead.
+void LeakUnderCoverage(
+    const HdSceneIndexBaseRefPtr& input,
+    const HdSceneIndexBaseRefPtr& capture)
+{
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(input);
+    Fvp::leakSceneIndex(capture);
+#else
+    (void)input;
+    (void)capture;
+#endif
+}
+
 } // namespace
 
 // What: the capture's probe for names a container serves but does not list.
@@ -274,6 +293,7 @@ TEST(DataSourceNames, CaptureAnswersShutterIntervals)
     EXPECT_DOUBLE_EQ(matrix->GetTypedValue(1.0f).ExtractTranslation()[0], 4.0);
 
     capture->Release();
+    LeakUnderCoverage(input, capture);
 }
 
 // What: the capture holds its copy fixed, then recopies only what changed.
@@ -365,6 +385,7 @@ TEST(DataSourceNames, CaptureHoldsReleasesAndRecopies)
         << "the light's transform was not dirtied but was copied again";
 
     capture->RemoveObserver(HdSceneIndexObserverPtr(&observer));
+    LeakUnderCoverage(input, capture);
 }
 
 // What: a notice sent while the capture copies a prim, by the copy's own read of
@@ -411,6 +432,7 @@ TEST(DataSourceNames, CaptureDefersNoticesSentByItsReads)
     EXPECT_EQ(observer.dirtied, 4u) << "the notice sent by Hold's copy was not forwarded";
 
     capture->RemoveObserver(HdSceneIndexObserverPtr(&observer));
+    LeakUnderCoverage(input, capture);
 }
 
 // What: every prim MayaHydraSceneIndex produces lists every name it serves, so the

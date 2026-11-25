@@ -259,8 +259,10 @@ class TestRenderThreadOverlap(mtohUtils.MayaHydraBaseTestCase):
         self.assertTrue(
             differs(frame1Old, settledOld),
             "The probe at %s does not see the %s move away (frame %d %s, "
-            "frame %d %s), so this test cannot detect a ghost."
-            % ((oldX, oldY), what, fromFrame, frame1Old, toFrame, settledOld))
+            "frame %d %s), so this test cannot detect a ghost. At %s the "
+            "frames show %s and %s. Stats: %s"
+            % ((oldX, oldY), what, fromFrame, frame1Old, toFrame, settledOld,
+               (newX, newY), frame1New, settledNew, dict(stats)))
         self.assertFalse(
             differs(atNew, settledNew),
             "After one refresh the frame-%d position %s shows %s, but the "
