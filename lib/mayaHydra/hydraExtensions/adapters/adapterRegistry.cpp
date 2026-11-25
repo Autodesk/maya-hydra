@@ -135,7 +135,7 @@ void MayaHydraAdapterRegistry::LoadAllPlugin()
         for (auto& subType : adapterTypes) {
             const PlugPluginPtr pluginForType = plugReg.GetPluginForType(subType);
             if (!pluginForType) {
-                continue;
+                continue; // Do not block other adapters
             }
             pluginForType->Load();
         }
