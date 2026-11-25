@@ -129,6 +129,10 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
 private:
+    // Read instead of _GetInputSceneIndex(), which crashes the Windows clang code
+    // coverage build (see Fvp::InputSceneIndexUtils).
+    const PXR_NS::HdSceneIndexBaseRefPtr _input;
+
     // The prim's selections, changed in place, and the copy that serves them.
     struct _Selections;
     class _PrimSource;

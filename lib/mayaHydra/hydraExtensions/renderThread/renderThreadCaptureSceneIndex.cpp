@@ -631,6 +631,7 @@ RenderThreadCaptureSceneIndex::New(const HdSceneIndexBaseRefPtr& input)
 
 RenderThreadCaptureSceneIndex::RenderThreadCaptureSceneIndex(const HdSceneIndexBaseRefPtr& input)
     : HdSingleInputFilteringSceneIndexBase(input)
+    , _input(input)
 {
 }
 
@@ -735,7 +736,7 @@ void RenderThreadCaptureSceneIndex::Activate()
         } else {
             _Insert(path);
         }
-        for (const SdfPath& child : _GetInputSceneIndex()->GetChildPrimPaths(path)) {
+        for (const SdfPath& child : _input->GetChildPrimPaths(path)) {
             toVisit.push_back(child);
         }
     }
@@ -788,7 +789,7 @@ void RenderThreadCaptureSceneIndex::Release()
 HdSceneIndexPrim RenderThreadCaptureSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     if (!IsActive()) {
-        return _GetInputSceneIndex()->GetPrim(primPath);
+        return _input->GetPrim(primPath);
     }
     if (_holding.load(std::memory_order_acquire)) {
         // Hold() copied everything pending and nothing writes until Release().
@@ -811,7 +812,7 @@ HdSceneIndexPrim RenderThreadCaptureSceneIndex::GetPrim(const SdfPath& primPath)
 SdfPathVector RenderThreadCaptureSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
     if (!IsActive()) {
-        return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+        return _input->GetChildPrimPaths(primPath);
     }
     std::shared_lock<std::shared_mutex> lock(_mutex, std::defer_lock);
     if (!_holding.load(std::memory_order_acquire)) {
@@ -1012,7 +1013,7 @@ void RenderThreadCaptureSceneIndex::_UpdateSelections(
             continue;
         }
         it->second.selections->Set(
-            _CopySelections(_GetInputSceneIndex()->GetPrim(entry.primPath).dataSource));
+            _CopySelections(_input->GetPrim(entry.primPath).dataSource));
     }
 }
 
@@ -1046,7 +1047,7 @@ void RenderThreadCaptureSceneIndex::_MarkPending(_Entry& entry, const SdfPath& p
 
 void RenderThreadCaptureSceneIndex::_Copy(const SdfPath& path, _Entry& entry) const
 {
-    const HdSceneIndexPrim live = _GetInputSceneIndex()->GetPrim(path);
+    const HdSceneIndexPrim live = _input->GetPrim(path);
     if (!entry.selections) {
         entry.selections = std::make_shared<_Selections>();
     }
@@ -1155,7 +1156,7 @@ void RenderThreadCaptureSceneIndex::_FindRendererSources()
 {
     _rendererSources.clear();
     _rendererRoots.clear();
-    std::vector<HdSceneIndexBaseRefPtr> toVisit { _GetInputSceneIndex() };
+    std::vector<HdSceneIndexBaseRefPtr> toVisit { _input };
     while (!toVisit.empty()) {
         HdSceneIndexBaseRefPtr sceneIndex = toVisit.back();
         toVisit.pop_back();
