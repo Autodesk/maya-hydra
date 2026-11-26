@@ -343,23 +343,22 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         const double cameraFar = camera.farClippingPlane();
         return VtValue(GfRange1f(float(cameraNear), float(cameraFar)));
     }
-    if (paramName == HdCameraTokens->shutterOpen) {
+    if (paramName == HdCameraTokens->shutterOpen || paramName == HdCameraTokens->shutterClose) {
         // No motion samples, instantaneous shutter
         if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled())
             return VtValue(double(0));
-        return VtValue(double(GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval().GetMin()));
-    }
-    if (paramName == HdCameraTokens->shutterClose) {
-        // No motion samples, instantaneous shutter
-        if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled())
-            return VtValue(double(0));
+        // The shutter angle shortens the motion sample offsets toward the
+        // current frame, so the shutter keeps their placement around it:
+        // [-1, 1] at 180 degrees is [-0.5, 0.5], and [0, 1] is [0, 0.5].
         const auto shutterAngle = camera.shutterAngle(&status);
         if (hadError(status))
             return {};
         auto constexpr maxRadians = M_PI * 2.0;
-        auto shutterClose = std::min(std::max(0.0, shutterAngle), maxRadians) / maxRadians;
-        auto interval = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
-        return VtValue(double(interval.GetMin() + interval.GetSize() * shutterClose));
+        const double openFraction = std::min(std::max(0.0, shutterAngle), maxRadians) / maxRadians;
+        const GfInterval interval = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
+        const double offset = paramName == HdCameraTokens->shutterOpen ? interval.GetMin()
+                                                                       : interval.GetMax();
+        return VtValue(offset * openFraction);
     }
 
     if (paramName == HdCameraTokens->projection) {
