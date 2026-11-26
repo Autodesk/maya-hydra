@@ -120,6 +120,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdNestedNativeInstancePicking.py
     cpp/testUsdPickKind.py
     cpp/testPickingTwoRenderOverrides.py # Skips itself unless both Storm and Flash are registered
+    cpp/testPickingSharedFramePasses.py
     cpp/testNurbsSurfaces.py
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
