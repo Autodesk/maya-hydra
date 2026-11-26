@@ -21,6 +21,7 @@
 #include <mayaHydraLib/adapters/mhExtGpuStreams.h>
 #endif
 
+#include <maya/MColor.h>
 #include <maya/MDagPath.h>
 #include <maya/MUserData.h>
 
@@ -85,13 +86,33 @@ public:
         // bounding-box level of detail): eight corners and twelve edges, the
         // carrier counterpart of VP2's BoundingBoxItem. Drawn like a wireframe;
         // while it is drawn the producer hides the object's other carriers.
-        kBoundingBox = 3
+        kBoundingBox = 3,
+
+        // Smooth mesh preview's cage: the base mesh's edges at the base
+        // positions, the carrier counterpart of VP2's CageDormantWire. Drawn
+        // like a wireframe, but in shaded panels too and whether or not the
+        // object is selected - so, unlike kWireframe, never a selection-highlight
+        // wire that the outline replaces.
+        kCage = 4,
+
+        // Display Map Border: the mesh's edges on a border of the current UV set,
+        // the carrier counterpart of VP2's PolyUVBorderEdges. The same points as
+        // the mesh's wireframe and its own edge list. Drawn in wireframe panels,
+        // and in shaded ones while the object is selected or templated; never a
+        // selection-highlight wire.
+        kUVBorder = 5,
+
+        // The smooth mesh preview cage's UV border edges (VP2's
+        // CagePolyUVBorderEdges), over the cage's base points. Drawn wherever
+        // kCage is.
+        kCageUVBorder = 6
     };
 
     //! The kinds whose geometry is a line list rather than a surface.
     bool isLineList() const
     {
-        return kind == kWireframe || kind == kCurve || kind == kBoundingBox;
+        return kind == kWireframe || kind == kCurve || kind == kBoundingBox || kind == kCage
+            || kind == kUVBorder || kind == kCageUVBorder;
     }
 
     Kind kind = kShadedMesh;
@@ -102,6 +123,23 @@ public:
     // render item has no MRenderItem::sourceDagPath(), so this is the only
     // source. Kept up to date by updateRenderItem across renames/reparents.
     MDagPath dagPath;
+
+    // The colour Maya draws this line item in when the DAG path's wireframe
+    // colour is not it (MRenderItemOverrideGeometry::wireframeColorOverride).
+    // Maya only reports one for kWireframe, kUVBorder and kCageUVBorder: smooth
+    // mesh preview's "cage + smooth" mode draws the smooth wire in the
+    // smooth-preview palette, and a UV border can take the custom UV border
+    // colour or the UV Editor's. Copied for every kind and never set for the
+    // others. Refreshed on every update; when unset, the colour is
+    // MGeometryUtilities::wireframeColor.
+    bool   hasWireColorOverride = false;
+    MColor wireColorOverride;
+
+    // Line width relative to the viewport's (MRenderItemOverrideGeometry::
+    // lineWidthScale): VP2 draws a UV border at the mesh's border width. 1 for
+    // every other kind. Carried for a renderer that can draw wide lines; Storm and
+    // Flash draw line lists one pixel wide.
+    float lineWidthScale = 1.0f;
 
     // Geometry, in VP2's "render vertex" layout: points and normals are
     // both VERTEX interpolated over the same array and the index arrays index
@@ -134,7 +172,7 @@ public:
     float        shutterOpenOffset  = 0.0f;
     float        shutterCloseOffset = 0.0f;
 
-    // Line-list kinds only (isLineList: kWireframe, kCurve, kBoundingBox): vertex
+    // Line-list kinds only (isLineList: kWireframe, kCurve, kBoundingBox, kCage): vertex
     // pairs indexing the same dedup points, produced by
     // VP2's own edge list so hard/soft and shared-edge behaviour
     // matches what VP2 draws.

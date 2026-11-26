@@ -451,7 +451,8 @@ bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
 
 bool UpdateRenderItemWireframeColor(
     const MRenderItem&                   ri,
-    const MayaHydraRenderItemAdapterPtr& ria)
+    const MayaHydraRenderItemAdapterPtr& ria,
+    const MayaHydraRenderItemPayload*    customData)
 {
     MColor wireframeColor;
     // Prefer the LIVE sourceDagPath, exactly as before, and fall back to the
@@ -464,7 +465,11 @@ bool UpdateRenderItemWireframeColor(
     if (!dagPath.isValid()) {
         dagPath = ria->GetDagPath();
     }
-    if (dagPath.isValid()) {
+    // A carrier wire whose colour Maya resolved itself: the smooth-preview palette
+    // of "cage + smooth" mode, which the DAG path's colour does not know about.
+    if (customData && customData->hasWireColorOverride) {
+        wireframeColor = customData->wireColorOverride;
+    } else if (dagPath.isValid()) {
         // This is a color managed VP2 color, it will need to be unmanaged at some point
         wireframeColor = MGeometryUtilities::wireframeColor(dagPath);
     }
@@ -983,7 +988,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         }
 
         if (wireframeColorDirty) {
-            wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria);
+            wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria, customData);
         }
 
         // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
@@ -1013,6 +1018,9 @@ void MayaHydraSceneIndex::UpdateRenderItems(
             // to emit the notification for it.
             MH_PROFILE_SCOPE("UpdateRenderItems: UpdateFromRenderItemOverride");
             carrier->UpdateFromRenderItemOverride(*customData, effFlags, wireframeColorDirty);
+            // Face culling rides any update (the producer sends no flag for it),
+            // so it is compared here, not in the flag-gated update above.
+            carrier->UpdateRenderItemOverrideCullMode(ri);
 
             // PER-MATERIAL SUBSETS. One carrier prim per shape, where VP2 made
             // one render item per shading group - so without these every face
@@ -2302,8 +2310,10 @@ void MayaHydraSceneIndex::_UpdateRenderItemOverrideGeomSubsets(
     }
     carrier.SetGeomSubsetCount(0);
 
-    // No mapping (smooth mesh preview), or no shape: the prim's single
-    // material binding stays in charge, exactly as before subsets existed.
+    // No mapping (the producer could not map the faces back to the base
+    // polygons), or no shape: the prim's single material binding stays in
+    // charge, exactly as before subsets existed. Under smooth mesh preview the
+    // mapping addresses the subdivided faces from the base polygons.
     if (customData.polygonFaceOffsets.empty() || !customData.dagPath.isValid()) {
         return;
     }

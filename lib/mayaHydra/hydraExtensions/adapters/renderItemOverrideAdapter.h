@@ -92,6 +92,11 @@ public:
     // transform comes from the DAG path the payload carries.
     void UpdateRenderItemOverrideTransform();
 
+    // The shell's face culling (MRenderItem::cullMode), read as the base reads a
+    // VP2 item's in UpdateFromDelta. Called on every carrier update: the
+    // producer changes it with a presentation flush, under no flag of its own.
+    void UpdateRenderItemOverrideCullMode(const MRenderItem& ri);
+
     // Take the payload's DAG path. The producer republishes an instanced shape's
     // carriers under the SAME ids when an instance is added or removed, so this
     // adapter outlives the path it was built with - and removing an instance
