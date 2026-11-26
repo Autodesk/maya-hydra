@@ -128,11 +128,14 @@ void MayaHydraAdapterRegistry::LoadAllPlugin()
 
         PlugRegistry& plugReg = PlugRegistry::GetInstance();
 
+        // Load the libraries of the adapters declared in a plugInfo.json: adapters
+        // from other libraries, which nothing else loads. A type with no plugin
+        // is defined by a library that is already loaded (this one's adapters
+        // are), so there is nothing to load for it.
         for (auto& subType : adapterTypes) {
             const PlugPluginPtr pluginForType = plugReg.GetPluginForType(subType);
             if (!pluginForType) {
-                TF_CODING_ERROR("Could not find plugin for '%s'", subType.GetTypeName().c_str());
-                return;
+                continue; // Do not block other adapters
             }
             pluginForType->Load();
         }

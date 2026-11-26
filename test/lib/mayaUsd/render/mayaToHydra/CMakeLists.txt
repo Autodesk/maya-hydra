@@ -66,6 +66,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCurveTools.py
     testPolygonPrimitives.py|disabledOn:osx:HYDRA-1127 # HYDRA-1127 : refinedWire not working on OSX
     testFootPrintNode.py
+    testExternalShapeAdapter.py
     testBackgroundColor.py
     testGrid.py
     testUsdTextureToggle.py
@@ -309,6 +310,7 @@ set(NO_LEGACY_COUNTERPART_TEST_SCRIPT_FILES
     # Mode-independent: nothing is selected, so there is no highlight to differ.
     testCulling.py
     testSmoothMaterials.py
+    testExternalShapeAdapter.py
     # Mode-independent: it only reads a render setting, nothing is drawn selected.
     testViewportRenderSettings.py
     testUnneededHighlightWire.py
