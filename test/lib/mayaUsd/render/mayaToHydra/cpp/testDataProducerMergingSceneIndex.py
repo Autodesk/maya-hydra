@@ -34,6 +34,7 @@ class TestMergingSceneIndex(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="FlowViewport.dataProducerMergingSceneIndex")
             cmds.mayaHydraCppTest(f="FlowViewport.dataProducerMergingSceneIndexAddRemove")
+            cmds.mayaHydraCppTest(f="FlowViewport.dataProducerMergingSceneIndexProxyInsertionCount")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

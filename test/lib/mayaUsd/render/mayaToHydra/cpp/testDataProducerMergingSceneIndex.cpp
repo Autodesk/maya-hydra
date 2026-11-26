@@ -18,10 +18,17 @@
 #include <mayaHydraLib/mayaHydra.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
+#include <pxr/base/tf/errorMark.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/retainedSceneIndex.h>
+#include <pxr/imaging/hd/tokens.h>
+
+#include <algorithm>
 
 #include <ufe/pathString.h>
 
@@ -166,4 +173,53 @@ TEST(FlowViewport, dataProducerMergingSceneIndexRemove)
     const auto afterSize = mergingSi->GetInputScenes().size();
 
     ASSERT_EQ(afterSize + 1, beforeSize);
+}
+
+TEST(FlowViewport, dataProducerMergingSceneIndexProxyInsertionCount)
+{
+    // Two views of one render override insert the same data producer into its proxy: it must be
+    // merged once, and stay merged until the last view removes it.
+    Fvp::DataProducerMergingSceneIndexProxy proxy;
+    const auto merging = TfDynamic_cast<HdMergingSceneIndexRefPtr>(proxy.GetMergingSceneIndex());
+    ASSERT_TRUE(merging);
+
+    const SdfPath root("/insertionCountProducer");
+    const SdfPath primPath = root.AppendChild(TfToken("prim"));
+    const HdRetainedSceneIndexRefPtr input = HdRetainedSceneIndex::New();
+    input->AddPrims({ { primPath, HdPrimTypeTokens->mesh, HdRetainedContainerDataSource::New() } });
+    const HdSceneIndexBaseRefPtr inputBase = input;
+
+    auto inputCount = [&]() {
+        const auto inputs = merging->GetInputScenes();
+        return std::count(inputs.begin(), inputs.end(), inputBase);
+    };
+    auto hasPrim = [&]() { return bool(merging->GetPrim(primPath).dataSource); };
+    auto hasRoot = [&]() { return proxy.GetSceneRoots().count(root) == 1u; };
+
+    {
+        TfErrorMark errorMark;
+        proxy.InsertSceneIndex(inputBase, root); // First view.
+        proxy.InsertSceneIndex(inputBase, root); // Second view: no second merge, no error.
+        EXPECT_TRUE(errorMark.IsClean());
+    }
+    EXPECT_EQ(inputCount(), 1);
+    EXPECT_TRUE(hasPrim());
+    EXPECT_TRUE(hasRoot());
+
+    // First view removed: the second view still uses the input.
+    proxy.RemoveSceneIndex(inputBase);
+    EXPECT_EQ(inputCount(), 1);
+    EXPECT_TRUE(hasPrim());
+    EXPECT_TRUE(hasRoot());
+
+    // Last view removed.
+    proxy.RemoveSceneIndex(inputBase);
+    EXPECT_EQ(inputCount(), 0);
+    EXPECT_FALSE(hasPrim());
+    EXPECT_FALSE(hasRoot());
+
+    // Extra removal: no-op.
+    proxy.RemoveSceneIndex(inputBase);
+    EXPECT_EQ(inputCount(), 0);
+    EXPECT_FALSE(hasPrim());
 }
