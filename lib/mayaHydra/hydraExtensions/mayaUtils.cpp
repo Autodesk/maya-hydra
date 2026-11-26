@@ -17,6 +17,7 @@
 #include "mayaUtils.h"
 
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/mixedUtils.h>
 
 #include <pxr/base/tf/diagnostic.h>
 
@@ -223,10 +224,7 @@ std::string GetDomeLightTexture(const MFnDependencyNode& lightNode)
         return "";
     }
 
-    const char* fileTextureName
-        = file.findPlug(PXR_NS::MayaAttrs::file::fileTextureName, true).asString().asChar();
-
-    return fileTextureName;
+    return GetFileTexturePath(file).GetString();
 }
 
 bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type)
