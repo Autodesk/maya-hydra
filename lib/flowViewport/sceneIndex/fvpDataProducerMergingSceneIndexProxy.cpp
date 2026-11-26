@@ -32,9 +32,20 @@ void DataProducerMergingSceneIndexProxy::InsertSceneIndex(
     const PXR_NS::HdSceneIndexBaseRefPtr& inputScene,
     const PXR_NS::SdfPath&                activeInputSceneRoot)
 {
-    // Add the scene root before adding the scene index to enable filtering 
+    if (!inputScene) {
+        return;
+    }
+
+    _Input& input = _inputs[inputScene];
+    if (input.insertionCount++ > 0) {
+        // Already merged, for example by another view of the same render override: adding it
+        // again would merge its prims twice and fail to register its observer twice.
+        return;
+    }
+
+    // Add the scene root before adding the scene index to enable filtering
     // based on latest scene root during adding the scene index.
-    _sceneRoots[inputScene] = activeInputSceneRoot;
+    input.sceneRoot = activeInputSceneRoot;
 
     _mergingSceneIndex->AddInputScene(inputScene, SdfPath::AbsoluteRootPath());
 }
@@ -43,12 +54,18 @@ void DataProducerMergingSceneIndexProxy::RemoveSceneIndex(
     const HdSceneIndexBaseRefPtr &inputScene
 )
 {
-    _mergingSceneIndex->RemoveInputScene(inputScene);
-
-    const auto& it = _sceneRoots.find(inputScene);
-    if (it != _sceneRoots.cend()) {
-        _sceneRoots.erase(it);
+    const auto it = _inputs.find(inputScene);
+    if (it == _inputs.end()) {
+        return;
     }
+
+    if (--it->second.insertionCount > 0) {
+        // Still inserted for another view.
+        return;
+    }
+
+    _mergingSceneIndex->RemoveInputScene(inputScene);
+    _inputs.erase(it);
 }
 
 HdSceneIndexBaseRefPtr DataProducerMergingSceneIndexProxy::GetMergingSceneIndex() const
@@ -59,8 +76,8 @@ HdSceneIndexBaseRefPtr DataProducerMergingSceneIndexProxy::GetMergingSceneIndex(
 std::set<PXR_NS::SdfPath> DataProducerMergingSceneIndexProxy::GetSceneRoots() const
 {
     std::set<PXR_NS::SdfPath> sceneRoot;
-    for (auto it = _sceneRoots.cbegin(); it != _sceneRoots.cend(); it++) {
-        sceneRoot.emplace(it->second);
+    for (auto it = _inputs.cbegin(); it != _inputs.cend(); it++) {
+        sceneRoot.emplace(it->second.sceneRoot);
     }
     return sceneRoot;
 }

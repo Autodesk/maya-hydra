@@ -46,6 +46,7 @@
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
 
 #include <hvt/tasks/outline/outlineManager.h>
+#include <hvt/tasks/pickViewParams.h>
 
 #include <flowViewport/fvpFramePassData.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
@@ -69,6 +70,7 @@
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpUnloadedPayloadBoundsSceneIndex.h>
 
+#include <pxr/base/gf/range2f.h>
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
 #include <pxr/imaging/hd/engine.h>
@@ -337,7 +339,8 @@ private:
         unsigned int      sel_x,
         unsigned int      sel_y,
         unsigned int      sel_w,
-        unsigned int      sel_h);
+        unsigned int      sel_h,
+        const std::optional<HVT_NS::PickViewParams>& pickView);
 
     inline PanelCallbacksList::iterator _FindPanelCallbacks(MString panelName)
     {
@@ -491,10 +494,27 @@ private:
     // This ensures they stay synchronized and eliminates index-based access issues
     Fvp::FramePassDataPtrVector                                _framePassesData;
     
-    /// Return the Hydra camera prim the panel renders through, or an empty path when there is
-    /// none (i.e. no UFE camera path). An empty path means the passes
+    /// Return the Hydra camera prim the panel of \p frameContext renders through, or an empty path
+    /// when there is none (i.e. no UFE camera path). An empty path means the passes
     /// use the free camera, so failure needs no other handling.
-    SdfPath _ResolveCameraPrimPath();
+    SdfPath _ResolveCameraPrimPath(const MHWRender::MFrameContext& frameContext);
+
+    /// The camera prim a panel is drawn through and the display window that reproduces Maya's
+    /// projection matrix through it. Shared by Render() and select(), so that picking uses
+    /// exactly the camera and framing the panel was drawn with.
+    struct PanelCameraFraming
+    {
+        /// Empty when the panel has no camera prim: the passes then use the free camera.
+        SdfPath                   cameraPath;
+        /// Unset when the camera prim projection cannot be computed.
+        std::optional<GfMatrix4d> cameraPrimProjection;
+        /// Unset when Maya's projection cannot be reproduced through the camera prim.
+        std::optional<GfRange2f>  solvedWindow;
+    };
+    PanelCameraFraming _ComputePanelCameraFraming(
+        const MHWRender::MFrameContext& frameContext,
+        const GfMatrix4d&               projectionMatrix,
+        const GfVec2i&                  panelSize);
 
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;

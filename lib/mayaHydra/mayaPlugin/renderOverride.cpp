@@ -1129,10 +1129,10 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
     }
 }
 
-SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
+SdfPath MtohRenderOverride::_ResolveCameraPrimPath(const MHWRender::MFrameContext& frameContext)
 {
     MStatus       status;
-    const MString ufePathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+    const MString ufePathString = frameContext.getCurrentUfeCameraPath(&status);
     if (!status || ufePathString.length() == 0) {
         return {};
     }
@@ -1140,7 +1140,7 @@ SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
     const Ufe::Path ufePath = Ufe::PathString::path(ufePathString.asChar());
 
     if (ufePath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-        const MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+        const MDagPath camPath = frameContext.getCurrentCameraPath(&status);
         if (!status || !_mayaHydraSceneIndex) {
             return {};
         }
@@ -1159,6 +1159,40 @@ SdfPath MtohRenderOverride::_ResolveCameraPrimPath()
         return {};
     }
     return selections.front().primPath;
+}
+
+MtohRenderOverride::PanelCameraFraming MtohRenderOverride::_ComputePanelCameraFraming(
+    const MHWRender::MFrameContext& frameContext,
+    const GfMatrix4d&               projectionMatrix,
+    const GfVec2i&                  panelSize)
+{
+    // Every delegate renders through the camera prim translated from the Maya or USD camera, so
+    // that it gets the render parameters the free camera lacks. The free camera is only used when
+    // there is no camera prim to bind.
+    //
+    // For USD orthographic cameras, the solved display window reproduces Maya's projection
+    // matrix, so that Hydra matches VP2 picking. That matrix comes from the Maya proxy camera
+    // shape, which does not pick up the USD camera's orthographic width (EMSUSD-1393), so both
+    // differ from the USD camera's own framing until that is fixed.
+    PanelCameraFraming result;
+    result.cameraPath = _ResolveCameraPrimPath(frameContext);
+
+    // The camera prim holds the raw camera attributes, shared by every panel looking through that
+    // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
+    // disabling window conforming and solving the display window so that the framed prim
+    // projection equals Maya's projection matrix.
+    // Every pass uses the same Maya projection matrix.
+    // The display window is solved once, from the main pass.
+    if (!result.cameraPath.IsEmpty() && _GetNumFramePasses() > 0 && _GetFramePass(0)) {
+        // Compute the base projection matrix of the camera prim.
+        result.cameraPrimProjection = Fvp::computeCameraPrimProjection(
+            _GetFramePass(0)->GetRenderIndex()->GetTerminalSceneIndex(), result.cameraPath);
+        if (result.cameraPrimProjection) {
+            result.solvedWindow = Fvp::solveDisplayWindow(
+                projectionMatrix, *result.cameraPrimProjection, panelSize);
+        }
+    }
+    return result;
 }
 
 MStatus MtohRenderOverride::Render(
@@ -1844,34 +1878,11 @@ MStatus MtohRenderOverride::Render(
     const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
     renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
 
-    // Every delegate renders through the camera prim translated from the Maya or USD camera, so
-    // that it gets the render parameters the free camera lacks. The free camera is only used when
-    // there is no camera prim to bind.
-    //
-    // For USD orthographic cameras, the solved display window reproduces Maya's projection
-    // matrix, so that Hydra matches VP2 picking. That matrix comes from the Maya proxy camera
-    // shape, which does not pick up the USD camera's orthographic width (EMSUSD-1393), so both
-    // differ from the USD camera's own framing until that is fixed.
-    const SdfPath cameraPath = _ResolveCameraPrimPath();
-
-    // The camera prim holds the raw camera attributes, shared by every panel looking through that
-    // camera. Each panel's overscan, 2D pan/zoom, film transforms, etc. are reproduced by
-    // disabling window conforming and solving the display window so that the framed prim
-    // projection equals Maya's projection matrix.
-    // Every pass uses the same Maya projection matrix.
-    // The display window is solved once, from the main pass.
-    const GfVec2i             panelSize(width, height);
-    std::optional<GfMatrix4d> cameraPrimProjection;
-    std::optional<GfRange2f>  solvedWindow;
-    if (!cameraPath.IsEmpty() && numFramePasses > 0 && _GetFramePass(0)) {
-        // Compute the base projection matrix of the camera prim.
-        cameraPrimProjection = Fvp::computeCameraPrimProjection(
-            _GetFramePass(0)->GetRenderIndex()->GetTerminalSceneIndex(), cameraPath);
-        if (cameraPrimProjection) {
-            solvedWindow
-                = Fvp::solveDisplayWindow(projectionMatrix, *cameraPrimProjection, panelSize);
-        }
-    }
+    const PanelCameraFraming panelCamera
+        = _ComputePanelCameraFraming(*getFrameContext(), projectionMatrix, GfVec2i(width, height));
+    const SdfPath&                   cameraPath           = panelCamera.cameraPath;
+    const std::optional<GfMatrix4d>& cameraPrimProjection = panelCamera.cameraPrimProjection;
+    const std::optional<GfRange2f>&  solvedWindow         = panelCamera.solvedWindow;
 
     for (int i = 0; i < numFramePasses; ++i) {
         const hvt::FramePassPtr& currentPass = _GetFramePass(i);
@@ -3322,7 +3333,8 @@ void MtohRenderOverride::_PickByRegion(
     unsigned int sel_x,
     unsigned int sel_y,
     unsigned int sel_w,
-    unsigned int sel_h)
+    unsigned int sel_h,
+    const std::optional<HVT_NS::PickViewParams>& pickView)
 {
     const MMatrix adjustedProjMatrix = pickProjectionMatrix(
         projMatrix, view_x, view_y, view_w, view_h, sel_x, sel_y, sel_w, sel_h);
@@ -3365,8 +3377,21 @@ void MtohRenderOverride::_PickByRegion(
         // in order to accumulate the pick hits from multiple passes.
         HdxPickHitVector tempHits;
         pickParams.outHits = &tempHits;
-        pass->Pick(pickParams);
-    
+        if (pickView) {
+            // The panels of this override share the frame passes, which hold the camera and
+            // framing of the last panel drawn: give the picked panel's.
+            HVT_NS::PickViewParams view = *pickView;
+            // Maya's selection rectangle is y-up in the window, the pick region y-down in the
+            // panel.
+            view.pickRegion = GfRect2i(
+                GfVec2i(int(sel_x) - view_x, view_h - (int(sel_y) - view_y) - int(sel_h)),
+                int(sel_w),
+                int(sel_h));
+            pass->Pick(pickParams, view);
+        } else {
+            pass->Pick(pickParams);
+        }
+
         //Combine the 2 PickHitVector
         if (!tempHits.empty()) {
             // Reserve memory for efficiency
@@ -3417,6 +3442,25 @@ bool MtohRenderOverride::select(
     if (status != MStatus::kSuccess)
         return false;
 
+    // The camera prim and framing this panel is drawn with, as in Render(). The frame passes hold
+    // those of the last panel drawn, which can be another panel of this override.
+    // A panel without a camera prim is drawn with the free camera: the frame passes then pick
+    // with it, as before.
+    std::optional<HVT_NS::PickViewParams> pickView;
+    const PanelCameraFraming panelCamera = _ComputePanelCameraFraming(
+        frameContext, GetGfMatrixFromMaya(projMatrix), GfVec2i(view_w, view_h));
+    if (!panelCamera.cameraPath.IsEmpty()) {
+        const GfRange2f panelWindow(GfVec2f(0.0f), GfVec2f(view_w, view_h));
+        HVT_NS::PickViewParams view;
+        view.cameraId = panelCamera.cameraPath;
+        // The render region does not limit picking: the data window is the whole panel.
+        view.framing = CameraUtilFraming(
+            panelCamera.solvedWindow.value_or(panelWindow),
+            GfRect2i(GfVec2i(0, 0), view_w, view_h));
+        view.overrideWindowPolicy = CameraUtilDontConform;
+        pickView = view;
+    }
+
     PickHitVector outHits;
     const bool singlePick = selectInfo.singleSelection();
     const TfToken geomSubsetsPickMode = GetGeomSubsetsPickMode();
@@ -3441,7 +3485,7 @@ bool MtohRenderOverride::select(
             unsigned int curr_sel_y = cursor_y > (int)curr_sel_h / 2 ? cursor_y - (int)curr_sel_h / 2 : 0;
 
             _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, geomSubsetsPickMode, pointSnappingActive,
-                view_x, view_y, view_w, view_h, curr_sel_x, curr_sel_y, curr_sel_w, curr_sel_h);
+                view_x, view_y, view_w, view_h, curr_sel_x, curr_sel_y, curr_sel_w, curr_sel_h, pickView);
 
             // Increase the size of picking region.
             curr_sel_w *= 2;
@@ -3452,7 +3496,7 @@ bool MtohRenderOverride::select(
     if (outHits.empty())
     {
         _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, geomSubsetsPickMode, pointSnappingActive,
-            view_x, view_y, view_w, view_h, sel_x, sel_y, sel_w, sel_h);
+            view_x, view_y, view_w, view_h, sel_x, sel_y, sel_w, sel_h, pickView);
     }
 
     if (pointSnappingActive) {

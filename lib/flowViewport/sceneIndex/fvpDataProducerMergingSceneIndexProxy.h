@@ -35,6 +35,10 @@ using DataProducerMergingSceneIndexProxyPtr = std::shared_ptr<DataProducerMergin
 /// downstream filtering scene indices.  This merging scene index proxy provides its
 /// own merging scene index, after which we can easily insert downstream
 /// filtering scene indices.
+///
+/// Inputs are reference counted: all the views of one render override share its proxy, and each
+/// view inserts and removes the data producers it shows. An input is added to the merging scene
+/// index by its first insertion and removed by the matching last removal.
 
 class DataProducerMergingSceneIndexProxy
 {
@@ -42,11 +46,15 @@ public:
     FVP_API
     DataProducerMergingSceneIndexProxy();
 
+    /// Adds \p inputScene to the merging scene index, or counts one more insertion if it is
+    /// already there. Every insertion must be matched by a RemoveSceneIndex().
     FVP_API
     void InsertSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr& inputScene,
         const PXR_NS::SdfPath&                activeInputSceneRoot);
 
+    /// Counts one less insertion of \p inputScene, and removes it from the merging scene index
+    /// when none is left.
     FVP_API
     void RemoveSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputScene);
 
@@ -60,7 +68,12 @@ private:
     // The underlying merging scene index that will be used to merge the data producer scene indices
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
 
-    std::map<PXR_NS::HdSceneIndexBaseRefPtr, PXR_NS::SdfPath> _sceneRoots;
+    struct _Input
+    {
+        PXR_NS::SdfPath sceneRoot;
+        size_t          insertionCount { 0 };
+    };
+    std::map<PXR_NS::HdSceneIndexBaseRefPtr, _Input> _inputs;
 };
 
 }//End of namespace FVP_NS_DEF
