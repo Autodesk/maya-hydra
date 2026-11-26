@@ -464,6 +464,10 @@ public:
             customData->dagPath = path;
         }
 
+        // A presentation field, current on every update: copied whatever the
+        // flags say, before the geometry gate below.
+        copyWireColorOverride(*customData, geometry);
+
         // Refresh geometry ONLY when the delta actually touched it. A
         // presentation-only update (selection, display style) arrives with
         // NO geometry and must not clobber the arrays - which is exactly why this
@@ -492,6 +496,23 @@ public:
     }
 
 private:
+    // The wire's colour when it is not the DAG path's (smooth mesh preview's
+    // "cage + smooth" mode). The scene index prefers it to
+    // MGeometryUtilities::wireframeColor (UpdateRenderItemWireframeColor).
+    static void copyWireColorOverride(
+        MhBridgeRenderItemPayload&         customData,
+        const MRenderItemOverrideGeometry& geometry)
+    {
+        MColor     color;
+        const bool has = geometry.wireframeColorOverride(color);
+        if (has != customData.hasWireColorOverride
+            || (has && !(color == customData.wireColorOverride))) {
+            customData.hasWireColorOverride = has;
+            customData.wireColorOverride    = has ? color : MColor();
+        }
+        customData.lineWidthScale = geometry.lineWidthScale();
+    }
+
     // The first call for an item: build its payload and attach it to the item.
     // Attaching nothing declines the item, and Maya asks again later.
     void createPayload(
@@ -509,7 +530,10 @@ private:
         const MRenderItemOverrideGeometry::Kind gk = geometry.kind();
         const bool isLineList = (gk == MRenderItemOverrideGeometry::kWireframe)
                              || (gk == MRenderItemOverrideGeometry::kCurve)
-                             || (gk == MRenderItemOverrideGeometry::kBoundingBox);
+                             || (gk == MRenderItemOverrideGeometry::kBoundingBox)
+                             || (gk == MRenderItemOverrideGeometry::kCage)
+                             || (gk == MRenderItemOverrideGeometry::kUVBorder)
+                             || (gk == MRenderItemOverrideGeometry::kCageUVBorder);
 
         // A line item is only worth a payload if there are edges to draw. For a
         // wireframe that means "nothing to overlay"; for a curve it means the
@@ -530,8 +554,18 @@ private:
         case MRenderItemOverrideGeometry::kBoundingBox:
             customData->kind = MayaHydraRenderItemPayload::kBoundingBox;
             break;
+        case MRenderItemOverrideGeometry::kCage:
+            customData->kind = MayaHydraRenderItemPayload::kCage;
+            break;
+        case MRenderItemOverrideGeometry::kUVBorder:
+            customData->kind = MayaHydraRenderItemPayload::kUVBorder;
+            break;
+        case MRenderItemOverrideGeometry::kCageUVBorder:
+            customData->kind = MayaHydraRenderItemPayload::kCageUVBorder;
+            break;
         default: customData->kind = MayaHydraRenderItemPayload::kShadedMesh; break;
         }
+        copyWireColorOverride(*customData, geometry);
         fillRenderItemOverrideGeometry(*customData, geometry, /*withTopology*/ true, _memos);
         item.setCustomData(customData);
     }
