@@ -98,6 +98,14 @@ void _ApplyRenderSettingDefaultOverrides(HdRenderSettingDescriptorList& descript
     }
 }
 
+std::string _MayaRendererDisplayName(const TfToken& rendererId)
+{
+    if (rendererId == MayaHydraRendererTokens->HdFlashRendererPlugin) {
+        return "Viewport";
+    }
+    return UsdImagingGLEngine::GetRendererDisplayName(rendererId);
+}
+
 std::pair<
     const MayaHydra::MtohRendererDescriptionVector&,
     const MayaHydra::MtohRendererSettings&>
@@ -159,7 +167,7 @@ MtohInitializeRenderPlugins()
                 TfToken(TfStringPrintf(
                     "%sHydra %s",
                     TECHNOLOGY_PREVIEW_PREFIX,
-                    PXR_NS::UsdImagingGLEngine::GetRendererDisplayName(pluginDesc.id).c_str())));
+                    _MayaRendererDisplayName(pluginDesc.id).c_str())));
             MtohRenderGlobals::BuildOptionsMenu(store.first.back(), settingDescriptors);
         }
 
@@ -192,7 +200,7 @@ std::string MtohGetRendererPluginDisplayName(const TfToken& id)
         return {};
     }
 
-    return pluginDesc.displayName;
+    return _MayaRendererDisplayName(id);
 }
 
 const MtohRendererDescriptionVector& MtohGetRendererDescriptions()
