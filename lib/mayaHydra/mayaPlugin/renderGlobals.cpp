@@ -549,6 +549,21 @@ void _CreateFloatAttribute(
         MGlobal::optionVarDoubleValue);
 }
 
+void _CreateDoubleAttribute(
+    MFnDependencyNode& node,
+    const MString&     attrName,
+    double             defValue,
+    bool               useUserOptions)
+{
+    _CreateNumericAttribute<double>(
+        node,
+        attrName,
+        MFnNumericData::kDouble,
+        defValue,
+        useUserOptions,
+        MGlobal::optionVarDoubleValue);
+}
+
 template <typename T> void _GetFromPlug(const MPlug& plug, T& out) { assert(false); }
 
 template <> void _GetFromPlug<bool>(const MPlug& plug, bool& out) { out = plug.asBool(); }
@@ -562,6 +577,8 @@ template <> void _GetFromPlug<unsigned int>(const MPlug& plug, unsigned int& out
 }
 
 template <> void _GetFromPlug<float>(const MPlug& plug, float& out) { out = plug.asFloat(); }
+
+template <> void _GetFromPlug<double>(const MPlug& plug, double& out) { out = plug.asDouble(); }
 
 template <> void _GetFromPlug<std::string>(const MPlug& plug, std::string& out)
 {
@@ -739,9 +756,9 @@ void _GetColorAttribute(
 bool _IsSupportedAttribute(const VtValue& v)
 {
     return v.IsHolding<bool>() || v.IsHolding<int>() || v.IsHolding<unsigned int>()
-        || v.IsHolding<float>() || v.IsHolding<GfVec3f>() || v.IsHolding<GfVec4f>()
-        || v.IsHolding<TfToken>() || v.IsHolding<std::string>() || v.IsHolding<TfEnum>()
-        || v.IsHolding<SdfAssetPath>();
+        || v.IsHolding<float>() || v.IsHolding<double>() || v.IsHolding<GfVec3f>()
+        || v.IsHolding<GfVec4f>() || v.IsHolding<TfToken>() || v.IsHolding<std::string>()
+        || v.IsHolding<TfEnum>() || v.IsHolding<SdfAssetPath>();
 }
 
 TfToken _MangleString(
@@ -1317,6 +1334,12 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
                     filter.mayaString(),
                     attr.defaultValue.UncheckedGet<float>(),
                     userDefaults);
+            } else if (attr.defaultValue.IsHolding<double>()) {
+                _CreateDoubleAttribute(
+                    node,
+                    filter.mayaString(),
+                    attr.defaultValue.UncheckedGet<double>(),
+                    userDefaults);
             } else if (attr.defaultValue.IsHolding<GfVec3f>()) {
                 _CreateColorAttribute(
                     node,
@@ -1600,6 +1623,10 @@ const MtohRenderGlobals& MtohRenderGlobals::GetInstance(
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<float>()) {
                 auto v = _CurrentSetting<float>(settings, filter.attrName(), attr.defaultValue);
+                _GetAttribute(node, filter.mayaString(), v, store);
+                settings[filter.attrName()] = v;
+            } else if (attr.defaultValue.IsHolding<double>()) {
+                auto v = _CurrentSetting<double>(settings, filter.attrName(), attr.defaultValue);
                 _GetAttribute(node, filter.mayaString(), v, store);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<GfVec3f>()) {
