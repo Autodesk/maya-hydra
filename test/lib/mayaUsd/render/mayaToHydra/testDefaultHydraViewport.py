@@ -29,21 +29,12 @@ FLASH_OVERRIDE = rendererUtils.getRendererOverrideName(rendererUtils.TEST_RENDER
 STORM_OVERRIDE = rendererUtils.getRendererOverrideName(rendererUtils.TEST_RENDERER_STORM)
 
 
-#@unittest.skipUnless(mayaUtils.hydraFixLevel() >= 7, "Requires Maya Hydra fix level 7 or later.")
+@unittest.skipUnless(mayaUtils.hydraFixLevel() >= 7, "Requires Maya Hydra fix level 7 or later (HdFlash as default renderer).")
 class TestDefaultHydraViewport(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     # Do not let MayaHydraBaseTestCase.setUp() force MAYAHYDRA_TEST_RENDERER
     # (e.g. HdStorm), so these tests observe Maya's own default renderer logic.
     _setTestRenderer = False
-
-    def setUp(self):
-        super().setUp()
-        if not mtohUtils.mayaHasHydraMode():
-            self.skipTest("Requires Maya with Global Hydra support (mayaUseHydra).")
-        #if not mel.eval("exists applyDefaultHydraToModelPanels"):
-        #    self.skipTest("Requires Maya with default Hydra viewport enforcement.")
-        if FLASH_PLUGIN not in (cmds.mayaHydra(listRenderers=True) or []):
-            self.skipTest("Requires HdFlashRendererPlugin.")
 
     @staticmethod
     def _nonStereoModelEditors():
