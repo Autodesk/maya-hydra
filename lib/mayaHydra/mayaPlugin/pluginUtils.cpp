@@ -40,6 +40,7 @@
 #include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <maya/MGlobal.h>
+#include <algorithm>
 #include <filesystem>
 #include <unordered_map>
 
@@ -98,6 +99,14 @@ void _ApplyRenderSettingDefaultOverrides(HdRenderSettingDescriptorList& descript
     }
 }
 
+std::string _MayaRendererDisplayName(const TfToken& rendererId)
+{
+    if (rendererId == MayaHydraRendererTokens->HdFlashRendererPlugin) {
+        return "Viewport";
+    }
+    return UsdImagingGLEngine::GetRendererDisplayName(rendererId);
+}
+
 std::pair<
     const MayaHydra::MtohRendererDescriptionVector&,
     const MayaHydra::MtohRendererSettings&>
@@ -110,6 +119,16 @@ MtohInitializeRenderPlugins()
         HdRendererPluginRegistry& pluginRegistry = HdRendererPluginRegistry::GetInstance();
         HfPluginDescVector        pluginDescs;
         pluginRegistry.GetPluginDescs(&pluginDescs);
+
+        // Place HdFlash ("Viewport") first regardless of third-party plugin
+        // priorities in plugInfo.json, so it is the default Hydra viewport
+        // renderer and appears first in the Renderer menu.
+        std::stable_partition(
+            pluginDescs.begin(),
+            pluginDescs.end(),
+            [](const HfPluginDesc& desc) {
+                return desc.id == MayaHydraRendererTokens->HdFlashRendererPlugin;
+            });
 
         Storage store;
         store.first.reserve(pluginDescs.size());
@@ -159,7 +178,7 @@ MtohInitializeRenderPlugins()
                 TfToken(TfStringPrintf(
                     "%sHydra %s",
                     TECHNOLOGY_PREVIEW_PREFIX,
-                    PXR_NS::UsdImagingGLEngine::GetRendererDisplayName(pluginDesc.id).c_str())));
+                    _MayaRendererDisplayName(pluginDesc.id).c_str())));
             MtohRenderGlobals::BuildOptionsMenu(store.first.back(), settingDescriptors);
         }
 
@@ -192,7 +211,7 @@ std::string MtohGetRendererPluginDisplayName(const TfToken& id)
         return {};
     }
 
-    return pluginDesc.displayName;
+    return _MayaRendererDisplayName(id);
 }
 
 const MtohRendererDescriptionVector& MtohGetRendererDescriptions()

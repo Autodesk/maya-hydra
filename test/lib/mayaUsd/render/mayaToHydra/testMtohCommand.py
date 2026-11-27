@@ -90,7 +90,7 @@ class TestCommand(unittest.TestCase):
         displayName = cmds.mayaHydra(renderer=STORM_RENDERER,
                                 getRendererDisplayName=True)
         self.assertEqual(displayName, cmds.mayaHydra(r=STORM_RENDERER, gn=True))
-        self.assertEqual(displayName, "GL")
+        self.assertEqual(displayName, "Storm")
 
         if self.has_embree():
             displayName = cmds.mayaHydra(renderer="HdEmbreeRendererPlugin",
