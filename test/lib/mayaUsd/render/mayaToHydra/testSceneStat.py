@@ -26,6 +26,7 @@ class TestSceneStatistics(mtohUtils.MayaHydraBaseTestCase):
     def test_sceneStatistics(self):
         # empty scene, no primitives
         cmds.file(new=True, force=True)
+        self.setTestRenderer()
         cmds.refresh()
         empty_stats = cmds.mayaHydra(sceneStats=True)
         empty_info = {empty_stats[i]: int(empty_stats[i + 1]) for i in range(0, len(empty_stats), 2)}

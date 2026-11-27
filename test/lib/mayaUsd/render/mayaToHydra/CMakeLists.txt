@@ -30,6 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py|disabledOn:HdFlash:HYDRA-2669 # HYDRA-2669 : Namespaced Maya object rprim count 2 != 1
     testVisibility.py
     testRendererSwitching.py
+    testDefaultHydraViewport.py
     testViewportRenderSettings.py
     testSelectPrimWithoutDataSource.py
     testSelectNonDagNodes.py

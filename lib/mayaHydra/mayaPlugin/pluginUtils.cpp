@@ -40,6 +40,7 @@
 #include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <maya/MGlobal.h>
+#include <algorithm>
 #include <filesystem>
 #include <unordered_map>
 
@@ -118,6 +119,16 @@ MtohInitializeRenderPlugins()
         HdRendererPluginRegistry& pluginRegistry = HdRendererPluginRegistry::GetInstance();
         HfPluginDescVector        pluginDescs;
         pluginRegistry.GetPluginDescs(&pluginDescs);
+
+        // Place HdFlash ("Viewport") first regardless of third-party plugin
+        // priorities in plugInfo.json, so it is the default Hydra viewport
+        // renderer and appears first in the Renderer menu.
+        std::stable_partition(
+            pluginDescs.begin(),
+            pluginDescs.end(),
+            [](const HfPluginDesc& desc) {
+                return desc.id == MayaHydraRendererTokens->HdFlashRendererPlugin;
+            });
 
         Storage store;
         store.first.reserve(pluginDescs.size());
