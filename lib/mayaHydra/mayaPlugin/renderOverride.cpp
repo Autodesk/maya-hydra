@@ -4563,6 +4563,21 @@ void MtohRenderOverride::_HoldRenderThreadCapture(bool activate)
             ? MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::Find(pass->GetRenderIndex())
             : nullptr;
         if (!capture) {
+            static bool warned = false;
+            if (pass && !warned) {
+                warned = true;
+                HdRenderIndex* const renderIndex = pass->GetRenderIndex();
+                TF_WARN(
+                    "The render thread capture is not in the scene index chain of "
+                    "renderer \"%s\", so the render thread will read the live scene. "
+                    "Capture scene indices created so far: %d. The chain:\n%s",
+                    renderIndex && renderIndex->GetRenderDelegate()
+                        ? renderIndex->GetRenderDelegate()->GetRendererDisplayName().c_str()
+                        : "",
+                    MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::InstancesCreated(),
+                    MAYAHYDRA_NS_DEF::RenderThreadCaptureSceneIndex::DescribeChain(renderIndex)
+                        .c_str());
+            }
             continue;
         }
         if (activate) {

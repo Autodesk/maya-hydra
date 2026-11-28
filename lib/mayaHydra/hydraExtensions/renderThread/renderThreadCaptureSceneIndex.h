@@ -56,6 +56,7 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -89,6 +90,13 @@ public:
 
     /// The capture scene index in \p renderIndex's chain, or null.
     static RenderThreadCaptureSceneIndex* Find(PXR_NS::HdRenderIndex* renderIndex);
+
+    /// The scene indices Find() walks in \p renderIndex's chain, one per line, for
+    /// diagnosing a capture it does not find.
+    static std::string DescribeChain(PXR_NS::HdRenderIndex* renderIndex);
+
+    /// How many capture scene indices this process has created.
+    static int InstancesCreated();
 
     /// The names \p primSource serves but does not list in GetNames(), relative to
     /// the prim. The copy takes a container's names from GetNames(), so it would

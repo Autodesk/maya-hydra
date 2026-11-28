@@ -623,10 +623,20 @@ private:
 
 RenderThreadCaptureByReference::~RenderThreadCaptureByReference() = default;
 
+namespace {
+std::atomic<int> _instancesCreated { 0 };
+} // namespace
+
 RenderThreadCaptureSceneIndexRefPtr
 RenderThreadCaptureSceneIndex::New(const HdSceneIndexBaseRefPtr& input)
 {
+    _instancesCreated.fetch_add(1, std::memory_order_relaxed);
     return TfCreateRefPtr(new RenderThreadCaptureSceneIndex(input));
+}
+
+int RenderThreadCaptureSceneIndex::InstancesCreated()
+{
+    return _instancesCreated.load(std::memory_order_relaxed);
 }
 
 RenderThreadCaptureSceneIndex::RenderThreadCaptureSceneIndex(const HdSceneIndexBaseRefPtr& input)
@@ -658,6 +668,41 @@ RenderThreadCaptureSceneIndex* RenderThreadCaptureSceneIndex::Find(HdRenderIndex
         }
     }
     return nullptr;
+}
+
+std::string RenderThreadCaptureSceneIndex::DescribeChain(HdRenderIndex* renderIndex)
+{
+    if (!renderIndex) {
+        return "no render index";
+    }
+    std::string description;
+    std::vector<std::pair<HdSceneIndexBaseRefPtr, int>> toVisit {
+        { renderIndex->GetTerminalSceneIndex(), 0 }
+    };
+    std::unordered_set<HdSceneIndexBase*> visited;
+    while (!toVisit.empty()) {
+        const auto [sceneIndex, depth] = toVisit.back();
+        toVisit.pop_back();
+        description += std::string(2 * depth, ' ');
+        if (!sceneIndex) {
+            description += "null\n";
+            continue;
+        }
+        HdSceneIndexBase* const ptr = get_pointer(sceneIndex);
+        description += ArchGetDemangled(typeid(*ptr)) + " \"" + ptr->GetDisplayName() + "\"";
+        if (!visited.insert(ptr).second) {
+            description += " (seen)\n";
+            continue;
+        }
+        auto* const filtering = dynamic_cast<HdFilteringSceneIndexBase*>(ptr);
+        description += filtering ? "\n" : " (not filtering, so not walked)\n";
+        if (filtering) {
+            for (const HdSceneIndexBaseRefPtr& input : filtering->GetInputScenes()) {
+                toVisit.emplace_back(input, depth + 1);
+            }
+        }
+    }
+    return description;
 }
 
 std::vector<HdDataSourceLocator>
