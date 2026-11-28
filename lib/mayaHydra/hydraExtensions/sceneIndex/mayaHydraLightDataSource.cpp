@@ -35,19 +35,17 @@ MayaHydraLightDataSource::MayaHydraLightDataSource(
 
 TfTokenVector MayaHydraLightDataSource::GetNames()
 {
+    // Everything Get() answers: a consumer copying the light copies only these.
     TfTokenVector result = {
-        HdLightTokens->color,
-        HdLightTokens->intensity,
-        HdLightTokens->exposure,
-        HdLightTokens->diffuse,
-        HdLightTokens->specular,
-        HdLightTokens->normalize,
-        HdLightTokens->shadowColor,
-        HdLightTokens->shadowEnable,
-        HdLightTokens->enableColorTemperature,
-        HdLightTokens->colorTemperature,
+        HdLightTokens->params,
+        HdLightTokens->shadowParams,
+        HdTokens->transform,
+        HdLightTokens->shadowCollection,
     };
-
+    if (auto* lightAdapter = dynamic_cast<MayaHydraLightAdapter*>(_adapter)) {
+        const TfTokenVector params = lightAdapter->GetLightParamNames();
+        result.insert(result.end(), params.begin(), params.end());
+    }
     return result;
 }
 

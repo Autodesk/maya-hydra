@@ -16,12 +16,20 @@
 
 #include "mhDgAccessLock.h"
 
+#include <mayaHydraLib/renderThread/renderThreadStats.h>
+
 namespace MAYAHYDRA_NS_DEF {
 
 DgAccessMutexType& GetDgAccessMutex()
 {
     static DgAccessMutexType mutex;
     return mutex;
+}
+
+DgAccessLock::DgAccessLock()
+    : _lock(GetDgAccessMutex())
+{
+    RenderThreadStats::instance().RecordMayaRead();
 }
 
 } // namespace MAYAHYDRA_NS_DEF

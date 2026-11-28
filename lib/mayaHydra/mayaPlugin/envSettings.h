@@ -21,6 +21,10 @@
 
 namespace MAYAHYDRA_NS_DEF {
     bool useSingleFramePass();
+
+    /// Returns true when MAYAHYDRA_PIPELINE_OVERLAP is set, in which case the render
+    /// override draws each frame on a render thread.
+    bool usePipelineOverlap();
     bool hdArnoldUseV2RenderSettings();
     bool secondaryGraphicsUseActiveRenderer();
     bool useRenderItemOverride();

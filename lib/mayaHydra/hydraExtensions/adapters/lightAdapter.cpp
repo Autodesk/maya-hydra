@@ -600,6 +600,40 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
     return {};
 }
 
+TfTokenVector MayaHydraLightAdapter::GetLightParamNames() const
+{
+    return {
+        HdLightTokens->color,
+        HdTokens->displayColor,
+        UsdLuxTokens->inputsColor,
+        HdLightTokens->intensity,
+        UsdLuxTokens->inputsIntensity,
+        HdLightTokens->exposure,
+        UsdLuxTokens->inputsExposure,
+        HdLightTokens->normalize,
+        UsdLuxTokens->inputsNormalize,
+        HdLightTokens->enableColorTemperature,
+        UsdLuxTokens->inputsEnableColorTemperature,
+        HdLightTokens->diffuse,
+        UsdLuxTokens->inputsDiffuse,
+        HdLightTokens->specular,
+        UsdLuxTokens->inputsSpecular,
+        HdLightTokens->colorTemperature,
+        UsdLuxTokens->inputsColorTemperature,
+        HdLightTokens->shadowColor,
+        UsdLuxTokens->inputsShadowColor,
+        HdLightTokens->shadowEnable,
+        HdLightTokens->hasShadow,
+        UsdLuxTokens->inputsShadowEnable,
+        kShadowResolutionToken,
+        kShadowResolutionInputToken,
+        kShadowBiasToken,
+        kShadowBiasInputToken,
+        kShadowBlurToken,
+        kShadowBlurInputToken,
+    };
+}
+
 // Is for PRMan and potentially other renderers that use material networks for lights.
 VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
 {
@@ -1031,11 +1065,22 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
         const GfBBox3d  bbox = GetMayaHydraSceneIndex()->GetBoundingBox(); // Only get the Maya data
         const GfBBox3d  aabb = bbox.ComputeAlignedBox();
         const GfRange3f r = GfRange3f(aabb.GetRange());
-        params.shadowMatrix = std::make_shared<MayaHydraShadowMatrixComputation>(r, simpleLight);
+        if (!_shadowMatrix || !_shadowMatrixIsPoint || r != _shadowWorldRange
+            || simpleLight != _shadowLight) {
+            _shadowMatrix = std::make_shared<MayaHydraShadowMatrixComputation>(r, simpleLight);
+            _shadowMatrixIsPoint = true;
+            _shadowWorldRange = r;
+            _shadowLight = simpleLight;
+        }
     } else {
-        params.shadowMatrix
-            = std::make_shared<MayaHydraConstantShadowMatrix>(_CalculateShadowProjectionMatrix());
+        const GfMatrix4d projection = _CalculateShadowProjectionMatrix();
+        if (!_shadowMatrix || _shadowMatrixIsPoint || projection != _shadowProjection) {
+            _shadowMatrix = std::make_shared<MayaHydraConstantShadowMatrix>(projection);
+            _shadowMatrixIsPoint = false;
+            _shadowProjection = projection;
+        }
     }
+    params.shadowMatrix = _shadowMatrix;
 
     params.bias = dmapBiasPlug.isNull() ? -0.001 : -dmapBiasPlug.asFloat();
     params.blur = dmapFilterSizePlug.isNull() ? 0.0

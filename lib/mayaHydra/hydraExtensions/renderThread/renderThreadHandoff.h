@@ -1,0 +1,157 @@
+// Copyright 2026 Autodesk, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef MAYAHYDRA_RENDER_THREAD_HANDOFF_H
+#define MAYAHYDRA_RENDER_THREAD_HANDOFF_H
+
+// Handoff protocol.
+//
+// The render thread publishes "frame(frameId) complete" with the color and
+// depth AOV handles and a GPU fence the main thread waits on before blitting.
+// frameId is the id the render override gave the request.
+
+#include "renderThreadFence.h"
+
+#include <mayaHydraLib/api.h>
+
+// clang-format off
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#endif
+// clang-format on
+
+#include <pxr/base/gf/vec4i.h>
+#include <pxr/imaging/hgi/hgi.h>
+#include <pxr/imaging/hgi/texture.h>
+#include <pxr/imaging/hgi/types.h>
+#include <pxr/imaging/hgiInterop/hgiInterop.h>
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+#include <atomic>
+#include <cstdint>
+#include <mutex>
+
+namespace MAYAHYDRA_NS_DEF {
+
+/// A completed frame's AOV handles + frameId + GPU fence.
+/// Published by the render thread, consumed by the main thread through
+/// TryGetCompletedFrame().
+struct CompletedFrame
+{
+    /// The id of the request this frame was rendered for.
+    uint64_t frameId{0};
+
+    /// The color AOV texture handle.
+    pxr::HgiTextureHandle srcColor;
+
+    /// The depth AOV texture handle (may be empty if no depth AOV).
+    pxr::HgiTextureHandle srcDepth;
+
+    /// The Hgi that produced the textures. Used by the present bridge to
+    /// select the composite path (GL->GL or VK->GL).
+    pxr::Hgi* srcHgi{nullptr};
+
+    /// The render region (left, bottom, width, height) for the composite.
+    pxr::GfVec4i dstRegion{0, 0, 0, 0};
+
+    /// THIS frame's GPU fence, carried with the frame rather than read from a
+    /// shared slot, so the main thread waits for the work that produced the
+    /// handles above and not for whatever the render thread has since started.
+    /// shared_ptr: the render thread may publish a newer frame and drop its
+    /// reference while the main thread is still inside the wait.
+    RenderThreadFencePtr fence;
+
+    /// Which of the render thread's copy pairs these textures live in, or -1
+    /// when the present bridge prepared the frame instead. The main thread
+    /// hands the index back so the write-after-read fence has a slot to go to.
+    int copyIndex{-1};
+
+#if defined(HGIINTEROP_HAS_PREPARE_TRANSFER)
+    /// Set when the present bridge prepared this frame on the render thread
+    /// (Vulkan, Metal). The interop then owns the copy and its ordering, so
+    /// srcColor and srcDepth are the live AOV, kept only for diagnostics, and
+    /// copyIndex is -1.
+    pxr::HgiInteropFrame interopFrame;
+#endif
+
+    bool valid{false};
+};
+
+/// \class RenderThreadHandoff
+///
+/// Latest-wins depth-1 handoff from the render thread (producer) to the main
+/// thread (consumer). A mutex guards the completed-frame slot; the consumer
+/// never waits on it, as it reads only once the render thread is idle. If a
+/// new frame is published before the main
+/// thread consumes the previous one, the previous frame is dropped and its
+/// AOVs are reclaimed by the next render.
+class MAYAHYDRALIB_API RenderThreadHandoff
+{
+public:
+    RenderThreadHandoff() = default;
+    ~RenderThreadHandoff() = default;
+
+    RenderThreadHandoff(const RenderThreadHandoff&)            = delete;
+    RenderThreadHandoff& operator=(const RenderThreadHandoff&) = delete;
+
+    /// Publish a completed frame. Called on the render thread once
+    /// FramePass::Render completes and the frame's GPU fence is signalled.
+    /// Unconditionally latest-wins: no consumer waits for a specific frame.
+    void PublishCompletedFrame(const CompletedFrame& frame)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        _completed       = frame;
+        _completed.valid = true;
+        _hasFrame.store(true, std::memory_order_release);
+    }
+
+    /// The latest completed frame without waiting, or an invalid CompletedFrame.
+    /// The frame stays in the slot, so it is composited again if no newer frame
+    /// arrives.
+    CompletedFrame TryGetCompletedFrame() const
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_hasFrame.load(std::memory_order_acquire))
+        {
+            return _completed;
+        }
+        return CompletedFrame{};
+    }
+
+    /// Drop the completed frame. Called by DiscardInFlight() so a frame
+    /// rendered before a pick or resize cannot be composited after it.
+    void Clear()
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        _completed = CompletedFrame{};
+        _hasFrame.store(false, std::memory_order_release);
+    }
+
+private:
+    mutable std::mutex _mutex;
+    CompletedFrame     _completed;
+    std::atomic<bool>  _hasFrame{false};
+};
+
+} // namespace MAYAHYDRA_NS_DEF
+
+#endif // MAYAHYDRA_RENDER_THREAD_HANDOFF_H

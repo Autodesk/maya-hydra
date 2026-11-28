@@ -229,4 +229,5 @@ endif()
 # -----------------------------------------------------------------------------
 add_subdirectory(adapters)
 add_subdirectory(pick)
+add_subdirectory(renderThread)
 add_subdirectory(sceneIndex)

@@ -43,8 +43,14 @@ public:
 
     TfTokenVector GetNames() override
     {
+        // Everything Get() answers: a consumer copying the light copies only these.
         TfTokenVector result = {
+            HdLightTokens->params,
+            HdTokens->transform,
+            HdLightTokens->shadowCollection,
+            HdLightTokens->shadowParams,
             HdLightTokens->color,
+            HdTokens->displayColor,
             HdLightTokens->intensity,
             HdLightTokens->exposure,
             HdLightTokens->diffuse,

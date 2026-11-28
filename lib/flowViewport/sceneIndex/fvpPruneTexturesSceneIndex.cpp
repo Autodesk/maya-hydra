@@ -87,7 +87,7 @@ PruneTexturesSceneIndex::MarkTexturesDirty(bool pruneTextures)
     _pruneTextures = pruneTextures;
 
     const HdDataSourceLocatorSet locators {
-        HdMaterialSchema::GetDefaultLocator().Append(HdMaterialSchemaTokens->material)
+        HdMaterialSchema::GetDefaultLocator()
 #if PXR_VERSION <= 2411
         // A material dirty alone does not make Storm re-resolve a mesh's primvar requirements
         // with USD 24.11 and older. The primvars locator is enough for UsdPreviewSurface, but a

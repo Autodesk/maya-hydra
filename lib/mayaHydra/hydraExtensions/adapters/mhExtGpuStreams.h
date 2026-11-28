@@ -210,6 +210,12 @@ private:
         HdTupleType tupleType = { HdTypeInvalid, 1 };
         bool        allowDirectBind = false;
 
+        /// Whether `buffer` is Maya's own, registered by a zero-copy bridge,
+        /// rather than an allocation a copying bridge owns. A copying bridge
+        /// must never refresh into Maya's buffer, so a route change
+        /// republishes.
+        bool        zeroCopy = false;
+
         /// Published with no schema: the renderer cannot take the buffer, and the stream has no
         /// CPU copy, so the lazy readback is the only way to its values.
         bool readbackOnly = false;

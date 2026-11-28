@@ -69,7 +69,10 @@ _ProducerIsOpenGL()
     return api == MHWRender::kOpenGL || api == MHWRender::kOpenGLCoreProfile;
 }
 
-#if defined(USD_HAS_HGI_VULKAN)
+// The Hgis whose consumer draws on its own context; see
+// MhExtGpuBufferBridge::SetConsumerOnSeparateContext. One per renderer at most.
+std::mutex        _separateContextMutex;
+std::vector<Hgi*> _separateContextHgis;
 
 // Clear the GL error queue so that a later glGetError reports on our own call
 // and not on whatever Maya left behind. Without this a pending error from
@@ -81,6 +84,61 @@ _DrainGlErrors()
     while (glGetError() != GL_NO_ERROR) {
     }
 }
+
+// Copy the first \p copyByteSize bytes of Maya's buffer into one the bridge
+// owns, on Maya's context, so the copy lands after VP2's writes in the same
+// command stream.
+//
+// A refresh is unchecked unless debugging: on a threaded driver glGetError
+// waits for the driver thread to drain, and a deforming scene refreshes every
+// stream every frame, so two checks per copy stalled the main thread for
+// longer than the render. A refresh the driver rejects then leaves the stream
+// a frame stale instead of falling back to the CPU path. The first copy into a
+// new buffer is always checked, so a buffer is never published unwritten.
+enum class _CopyCheck { Always, WhenDebugging };
+
+bool
+_CopyFromMaya(
+    GLuint mayaGlBuffer, GLuint ownedBuffer, size_t copyByteSize, _CopyCheck check)
+{
+    if (!glCopyNamedBufferSubData || !ownedBuffer || copyByteSize == 0) {
+        return false;
+    }
+    const bool checkCopy = check == _CopyCheck::Always
+        || TfDebug::IsEnabled(MAYAHYDRALIB_ADAPTER_GPU_BUFFER_SHARING);
+    if (checkCopy) {
+        _DrainGlErrors();
+    }
+    glCopyNamedBufferSubData(
+        mayaGlBuffer, ownedBuffer, 0, 0,
+        static_cast<GLsizeiptr>(copyByteSize));
+    if (!checkCopy) {
+        return true;
+    }
+    const GLenum err = glGetError();
+    if (err != GL_NO_ERROR) {
+        static std::once_flag warned;
+        std::call_once(warned, [err, copyByteSize]() {
+            TF_WARN("[mayaHydra] Copying a VP2 vertex buffer into a shared "
+                    "buffer failed with GL error 0x%x (%zu bytes); GPU buffer "
+                    "sharing is falling back to the CPU path.",
+                    unsigned(err), copyByteSize);
+        });
+        return false;
+    }
+    return true;
+}
+
+// The GL name behind a buffer the copying OpenGL route published. Only valid
+// for that route's buffers, which the arena adopted: a registered buffer's
+// name is Maya's, and copying into it would write VP2's memory.
+GLuint
+_OwnedGlBufferOf(const HgiExternalBufferSharedPtr &buffer)
+{
+    return static_cast<const HgiGLExternalBuffer *>(buffer.get())->GetBufferId();
+}
+
+#if defined(USD_HAS_HGI_VULKAN)
 
 // The GL objects aliasing one Hgi-owned allocation: the imported memory, and
 // the buffer bound over it that Maya's data is copied into. The memory object
@@ -391,30 +449,6 @@ _ImportIntoGl(
     return true;
 }
 
-bool
-_CopyIntoAlias(GLuint mayaGlBuffer, const _GlAlias &alias, size_t copyByteSize)
-{
-    if (!glCopyNamedBufferSubData || !alias.buffer || copyByteSize == 0) {
-        return false;
-    }
-    _DrainGlErrors();
-    glCopyNamedBufferSubData(
-        mayaGlBuffer, alias.buffer, 0, 0,
-        static_cast<GLsizeiptr>(copyByteSize));
-    const GLenum err = glGetError();
-    if (err != GL_NO_ERROR) {
-        static std::once_flag warned;
-        std::call_once(warned, [err, copyByteSize]() {
-            TF_WARN("[mayaHydra] Copying a VP2 vertex buffer into shared "
-                    "memory failed with GL error 0x%x (%zu bytes); GPU buffer "
-                    "sharing is falling back to the CPU path.",
-                    unsigned(err), copyByteSize);
-        });
-        return false;
-    }
-    return true;
-}
-
 const _GlAlias *
 _AliasOf(const HgiExternalBufferSharedPtr &buffer)
 {
@@ -531,7 +565,7 @@ MhExtGpuBufferBridge::ForHgi(Hgi *hgi)
     // this backend cannot consume external buffers at all.
     if (hgi->GetAPIName() == HgiTokens->OpenGL) {
         if (auto arena = hgi->GetExternalBufferArena<HgiGLExternalBufferArena>()) {
-            bridge._kind = _Kind::OpenGL;
+            bridge._kind = IsConsumerOnSeparateContext(hgi) ? _Kind::OpenGLCopy : _Kind::OpenGL;
             bridge._arena = arena.get();
         }
         return bridge;
@@ -554,10 +588,34 @@ MhExtGpuBufferBridge::Describe() const
 {
     switch (_kind) {
     case _Kind::OpenGL: return "OpenGL";
+    case _Kind::OpenGLCopy: return "OpenGL copy";
     case _Kind::Vulkan: return "Vulkan";
     case _Kind::None:   break;
     }
     return "none";
+}
+
+void
+MhExtGpuBufferBridge::SetConsumerOnSeparateContext(Hgi *hgi, bool separate)
+{
+    if (!hgi) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(_separateContextMutex);
+    const auto it = std::find(_separateContextHgis.begin(), _separateContextHgis.end(), hgi);
+    if (separate && it == _separateContextHgis.end()) {
+        _separateContextHgis.push_back(hgi);
+    } else if (!separate && it != _separateContextHgis.end()) {
+        _separateContextHgis.erase(it);
+    }
+}
+
+bool
+MhExtGpuBufferBridge::IsConsumerOnSeparateContext(Hgi *hgi)
+{
+    std::lock_guard<std::mutex> lock(_separateContextMutex);
+    return std::find(_separateContextHgis.begin(), _separateContextHgis.end(), hgi)
+        != _separateContextHgis.end();
 }
 
 HgiExternalBufferSharedPtr
@@ -577,12 +635,53 @@ MhExtGpuBufferBridge::Create(
         // Registration is the weaker of the two contracts -- the producer
         // promises the buffer outlives the renderer's use of it and nothing
         // enforces that promise. What makes it sound here is that VP2 and
-        // Storm share a single GL context: commands on one context execute in
+        // Storm share a single GL context -- this route is chosen only when
+        // they do; see OpenGLCopy -- and commands on one context execute in
         // issue order, so a recycle VP2 issues after the draw that read the
         // buffer is ordered after that read, and glDeleteBuffers is deferred
         // by the driver until the GPU is finished.
         return static_cast<HgiGLExternalBufferArena *>(_arena)
             ->RegisterBuffer(mayaGlBuffer, byteSize, kExtBufferUsage, vertexStride);
+    }
+
+    if (_kind == _Kind::OpenGLCopy) {
+        // Allocated here and adopted rather than taken from AllocateBuffer,
+        // which records no vertex stride: HgiGL binds vertex input with the
+        // descriptor's stride, where 0 does not mean tightly packed, so a
+        // direct-bound stream would read garbage.
+        if (byteSize == 0 || !glCreateBuffers || !glNamedBufferStorage) {
+            return nullptr;
+        }
+        _DrainGlErrors();
+        GLuint owned = 0;
+        glCreateBuffers(1, &owned);
+        if (!owned) {
+            return nullptr;
+        }
+        // Immutable and GPU-only: nothing maps it, and a copy may write to
+        // storage created without GL_DYNAMIC_STORAGE_BIT.
+        glNamedBufferStorage(owned, static_cast<GLsizeiptr>(byteSize), nullptr, 0);
+        if (glGetError() != GL_NO_ERROR) {
+            glDeleteBuffers(1, &owned);
+            return nullptr;
+        }
+        if (debugName && glObjectLabel) {
+            glObjectLabel(GL_BUFFER, owned, -1, debugName);
+        }
+
+        // The arena deletes it once nothing references it and the consumer's
+        // work that named it has retired, on whichever context collects.
+        HgiExternalBufferSharedPtr buffer =
+            static_cast<HgiGLExternalBufferArena *>(_arena)->AdoptBuffer(
+                owned, byteSize, kExtBufferUsage, vertexStride);
+        if (!buffer) {
+            glDeleteBuffers(1, &owned);
+            return nullptr;
+        }
+        if (!_CopyFromMaya(mayaGlBuffer, owned, copyByteSize, _CopyCheck::Always)) {
+            return nullptr;
+        }
+        return buffer;
     }
 
 #if defined(USD_HAS_HGI_VULKAN)
@@ -644,7 +743,7 @@ MhExtGpuBufferBridge::Create(
             }));
         _RegisterLiveAlias(alias);
 
-        if (!_CopyIntoAlias(mayaGlBuffer, alias, copyByteSize)) {
+        if (!_CopyFromMaya(mayaGlBuffer, alias.buffer, copyByteSize, _CopyCheck::Always)) {
             return nullptr;
         }
         return buffer;
@@ -673,13 +772,19 @@ MhExtGpuBufferBridge::Refresh(
         return true;
     }
 
+    if (_kind == _Kind::OpenGLCopy) {
+        return _CopyFromMaya(
+            mayaGlBuffer, _OwnedGlBufferOf(buffer), copyByteSize, _CopyCheck::WhenDebugging);
+    }
+
 #if defined(USD_HAS_HGI_VULKAN)
     if (_kind == _Kind::Vulkan) {
         const _GlAlias *alias = _AliasOf(buffer);
         if (!alias) {
             return false;
         }
-        return _CopyIntoAlias(mayaGlBuffer, *alias, copyByteSize);
+        return _CopyFromMaya(
+            mayaGlBuffer, alias->buffer, copyByteSize, _CopyCheck::WhenDebugging);
     }
 #endif
 

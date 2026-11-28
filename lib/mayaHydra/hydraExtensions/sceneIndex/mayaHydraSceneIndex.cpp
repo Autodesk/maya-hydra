@@ -621,6 +621,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(
     // Main thread: the one place the frame is read. Hydra sync reads this copy.
     _currentFrame = MAnimControl::currentTime().value();
 
+    _ApplyDeferredRenderItemRemovals();
+
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;
     for (size_t i = 0; i < scene.mRemovalCount; i++) {
@@ -1503,7 +1505,10 @@ void MayaHydraSceneIndex::RemovePrim(const SdfPath& id)
 
 void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
 {
-    const auto& oldParams = GetParams();
+    // Set before dirtying: a consumer may read the prims while handling the
+    // notices, and must see them with the new parameters.
+    const MayaHydraParams oldParams = _params;
+    _params = params;
     if (oldParams.displaySmoothMeshes != params.displaySmoothMeshes) {
         // I couldn't find any other way to turn this on / off.
         // I can't convert HdRprim to HdMesh easily and no simple way
@@ -1574,8 +1579,6 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
             },
             _lightAdapters);
     }
-
-    _params = params;
 }
 
 SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
@@ -2122,6 +2125,11 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 // removal of the same ids then finds nothing and is a no-op, and a carrier
 // still harvested once more is skipped: its payload path is empty for a
 // node outside the DAG.
+//
+// Except under SetDeferCallbackRemovals: this runs from a Maya callback, and with a
+// render thread inside Hydra sync, removing a prim now would invalidate the index under
+// it. The carriers are found now, while the shape is still resolvable, and dropped by the
+// next UpdateRenderItems.
 void MayaHydraSceneIndex::_RemoveCarriersOf(const MObject& obj)
 {
     if (!_RenderItemOverrideEnabled() || obj.isNull() || !obj.hasFn(MFn::kShape)) {
@@ -2144,6 +2152,30 @@ void MayaHydraSceneIndex::_RemoveCarriersOf(const MObject& obj)
             fastIds.push_back(entry.first);
         }
     }
+    if (_deferCallbackRemovals) {
+        _deferredRenderItemRemovals.insert(
+            _deferredRenderItemRemovals.end(), fastIds.begin(), fastIds.end());
+        return;
+    }
+    for (const int fastId : fastIds) {
+        _RemoveRenderItem(fastId);
+    }
+}
+
+void MayaHydraSceneIndex::SetDeferCallbackRemovals(bool defer)
+{
+    _deferCallbackRemovals = defer;
+    if (!defer) {
+        _ApplyDeferredRenderItemRemovals();
+    }
+}
+
+void MayaHydraSceneIndex::_ApplyDeferredRenderItemRemovals()
+{
+    // Swapped out first: a removal can destroy an adapter, and nothing here should see the
+    // list change under it.
+    std::vector<int> fastIds;
+    fastIds.swap(_deferredRenderItemRemovals);
     for (const int fastId : fastIds) {
         _RemoveRenderItem(fastId);
     }

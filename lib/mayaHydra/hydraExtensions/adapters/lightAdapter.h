@@ -19,6 +19,7 @@
 #include <mayaHydraLib/adapters/dagAdapter.h>
 
 #include <pxr/base/gf/frustum.h>
+#include <pxr/base/gf/range3f.h>
 #include <pxr/imaging/glf/simpleLight.h>
 #include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hdx/simpleLightTask.h>
@@ -75,6 +76,11 @@ public:
     MAYAHYDRALIB_API
     /// Return a specific Hydra light parameter value.
     virtual VtValue GetLightParamValue(const TfToken& paramName);
+    MAYAHYDRALIB_API
+    /// Every name GetLightParamValue serves, in each spelling it accepts. The light's
+    /// data source lists these, and a consumer that copies the light (such as the render
+    /// thread capture) copies only what is listed. Overrides serving more append theirs.
+    virtual TfTokenVector GetLightParamNames() const;
     MAYAHYDRALIB_API
     /// Return a value for the requested Hydra data source key.
     VtValue Get(const TfToken& key) override;
@@ -150,6 +156,15 @@ protected:
     GfMatrix4d _CalculateShadowProjectionMatrix();
 
     bool _isLightingOn = true;
+
+    // The last shadow matrix computation and what it was made from, reused while
+    // those are unchanged: HdxShadowParams compares the computation by pointer,
+    // so a new one on every read reads as a change. Under the DG access lock.
+    HdxShadowMatrixComputationSharedPtr _shadowMatrix;
+    bool                                _shadowMatrixIsPoint = false;
+    GfMatrix4d                          _shadowProjection;
+    GfRange3f                           _shadowWorldRange;
+    GlfSimpleLight                      _shadowLight;
 };
 
 using MayaHydraLightAdapterPtr = std::shared_ptr<MayaHydraLightAdapter>;

@@ -39,8 +39,18 @@ class HgiExternalBufferArena;
 ///
 /// | consumer | route | copies |
 /// | -------- | ----- | ------ |
-/// | OpenGL | register Maya's buffer with the GL arena | none |
+/// | OpenGL, on Maya's context | register Maya's buffer with the GL arena | none |
+/// | OpenGL, on another context | allocate a GL buffer the arena adopts, copy into it | one, GPU-side |
 /// | Vulkan | allocate exportable, import into GL, copy into it | one, GPU-side |
+///
+/// The two OpenGL routes differ only in where the consumer draws. Registering
+/// Maya's buffer is sound only while the consumer shares Maya's context,
+/// because command order on one context is what keeps VP2's next write behind
+/// the consumer's read; see Create. A consumer on its own context -- the
+/// render thread -- reads concurrently with VP2's evaluation of the next
+/// frame, which rewrites and recycles those buffers before the consumer is
+/// done with them. No fence can order a write VP2 has not issued yet, so that
+/// consumer gets memory VP2 never writes. See SetConsumerOnSeparateContext.
 ///
 /// The asymmetry is not a gap in this class, it is the shape of GL/Vulkan
 /// interop. Memory sharing between the two exists and the Vulkan route uses
@@ -88,9 +98,33 @@ public:
     /// rewrites them, even though nothing about the layout changed.
     bool IsZeroCopy() const { return _kind == _Kind::OpenGL; }
 
-    /// For diagnostics: "OpenGL", "Vulkan" or "none".
+    /// For diagnostics: "OpenGL", "OpenGL copy", "Vulkan" or "none".
     MAYAHYDRALIB_API
     const char *Describe() const;
+
+    /// Whether the OpenGL consumer behind \p hgi draws on a GL context other
+    /// than Maya's, which selects the copying OpenGL route for every bridge
+    /// made for that Hgi after. Each renderer sets it for its own Hgi only, so
+    /// one renderer's render thread starting or stopping leaves another's
+    /// route alone. Set it before anything is published and keep it for the
+    /// life of the scene: a stream published under one route is republished,
+    /// not refreshed, under the other.
+    ///
+    /// The copying route orders nothing across contexts itself; the caller
+    /// owes both directions, with GL fences:
+    ///
+    /// * Before a producer frame, Maya's context waits for the consumer's
+    ///   last draws, which read the buffers this frame's copies overwrite.
+    /// * After a producer frame, the consumer's context waits for Maya's
+    ///   copies before it draws.
+    ///
+    /// A share group makes the buffers visible to both contexts; it does not
+    /// order commands between them.
+    MAYAHYDRALIB_API
+    static void SetConsumerOnSeparateContext(Hgi *hgi, bool separate);
+
+    MAYAHYDRALIB_API
+    static bool IsConsumerOnSeparateContext(Hgi *hgi);
 
     /// Produce a buffer the consumer can read holding \p mayaGlBuffer's
     /// contents. \p byteSize must cover the whole stream, offset included;
@@ -164,8 +198,10 @@ private:
     /// reading what was published last frame, so this frame's copies may
     /// overwrite it.
     ///
-    /// A no-op for a zero-copy bridge, which overwrites nothing, and on the
-    /// first frame, when nothing has been published yet.
+    /// A no-op for a zero-copy bridge, which overwrites nothing, on the first
+    /// frame, when nothing has been published yet, and for the OpenGL copy
+    /// route, whose caller orders both directions with fences (see
+    /// SetConsumerOnSeparateContext).
     MAYAHYDRALIB_API
     static void BeginProducerFrame();
 
@@ -178,6 +214,7 @@ private:
     {
         None,
         OpenGL,
+        OpenGLCopy,
         Vulkan,
     };
 

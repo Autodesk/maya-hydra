@@ -143,7 +143,8 @@ if (TARGET hgiVulkan)
     set(USD_HAS_HGI_VULKAN TRUE CACHE INTERNAL "USD.Hgi.Vulkan")
     message(STATUS "USD has the Vulkan Hgi backend")
 else()
-    message(STATUS "USD has no Vulkan Hgi backend: external GPU buffers won't be shared with a Vulkan consumer")
+    message(STATUS "USD has no Vulkan Hgi backend: external GPU buffers won't be shared "
+                   "with a Vulkan consumer, and the Vulkan render-thread paths are disabled")
 endif()
 
 message(STATUS "USD include dir: ${USD_INCLUDE_DIR}")

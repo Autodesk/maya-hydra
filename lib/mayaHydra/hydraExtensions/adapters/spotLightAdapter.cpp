@@ -126,6 +126,20 @@ protected:
         return MayaHydraLightAdapter::Get(key);
     }
 
+    TfTokenVector GetLightParamNames() const override
+    {
+        TfTokenVector names = MayaHydraLightAdapter::GetLightParamNames();
+        names.insert(
+            names.end(),
+            { HdLightTokens->radius,
+              UsdLuxTokens->inputsRadius,
+              UsdLuxTokens->treatAsPoint,
+              UsdLuxTokens->inputsShapingConeAngle,
+              UsdLuxTokens->inputsShapingConeSoftness,
+              UsdLuxTokens->inputsShapingFocus });
+        return names;
+    }
+
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET_LIGHT_PARAM_VALUE)

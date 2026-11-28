@@ -840,6 +840,7 @@ MhExtGpuStreams::_Publish(
     // which exhausts the device's allocation count and takes the geometry
     // with it once the allocator starts refusing.
     const bool sourceIdentityMatters = bridge.IsZeroCopy();
+    const bool routeMatches = !stream.buffer || stream.zeroCopy == bridge.IsZeroCopy();
     const bool layoutMatches = stream.numElements == layout.numElements
         && stream.byteOffset == layout.byteOffset
         && stream.byteStride == layout.byteStride
@@ -856,6 +857,7 @@ MhExtGpuStreams::_Publish(
     // has to be carried across -- but the layout is unchanged either way, so
     // this still republishes nothing.
     if (stream.schema
+        && routeMatches
         && layoutMatches
         && stream.allowDirectBind == allowDirectBind
         && (!sourceIdentityMatters || stream.rawHandle == rawHandle)) {
@@ -887,6 +889,7 @@ MhExtGpuStreams::_Publish(
     // buffer identity.
     HgiExternalBufferSharedPtr buffer = stream.buffer;
     const bool needsNewBuffer = !buffer
+        || !routeMatches
         || (sourceIdentityMatters
                 ? (stream.rawHandle != rawHandle
                   || stream.numElements != layout.numElements
@@ -963,6 +966,7 @@ MhExtGpuStreams::_Publish(
     stream.byteStride = layout.byteStride;
     stream.tupleType = layout.elementType;
     stream.allowDirectBind = allowDirectBind;
+    stream.zeroCopy = bridge.IsZeroCopy();
     stream.readbackOnly = false;
 
     // Logs the numbers the consumer bounds checks (byteOffset + numElements

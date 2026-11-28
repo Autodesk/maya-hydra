@@ -63,6 +63,56 @@ class TestDataSourceNames(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(
                 f="DataSourceNames.CameraContainerAdvertisesAndServesParams")
 
+    # What: the capture's probe reports a name served but not listed.
+    # How: run the C++ test on a hand-made container.
+    # Expect: the unlisted name is reported, an empty value is not.
+    def test_captureFindsUnlistedNames(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureFindsUnlistedNames")
+
+    # What: the capture's copy of a multisampled value answers a shutter as the live
+    #       source would.
+    # How: run the C++ test on a prim with a sampled transform, through a held capture.
+    # Expect: only the samples the shutter needs are reported, and values in between
+    #         are interpolated.
+    def test_captureAnswersShutterIntervals(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureAnswersShutterIntervals")
+
+    def test_captureHoldsReleasesAndRecopies(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureHoldsReleasesAndRecopies")
+
+    # What: a notice the capture's own copy causes upstream to send is neither a
+    #       deadlock nor lost, as when copying a Maya transform evaluates it lazily.
+    # How: run the C++ test on a transform that dirties its prim when read.
+    # Expect: each such notice is forwarded once the copy is done.
+    def test_captureDefersNoticesSentByItsReads(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.CaptureDefersNoticesSentByItsReads")
+
+    # What: no MayaHydra prim serves a name it does not list.
+    # How: add a mesh with a material and more light types to the scene, then probe
+    #      every prim of MayaHydraSceneIndex.
+    # Expect: nothing reported.
+    def test_mayaHydraPrimsListEveryName(self):
+        self.setupScene()
+        cube = cmds.polyCube()[0]
+        material = cmds.shadingNode("lambert", asShader=True)
+        cmds.select(cube)
+        cmds.hyperShade(assign=material)
+        cmds.select(clear=True)
+        cmds.pointLight()
+        cmds.spotLight()
+        cmds.shadingNode("areaLight", asLight=True)
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="DataSourceNames.MayaHydraPrimsListEveryName")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

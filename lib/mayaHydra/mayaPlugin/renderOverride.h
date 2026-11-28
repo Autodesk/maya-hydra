@@ -44,6 +44,8 @@
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
+#include <mayaHydraLib/renderThread/renderThread.h>
+#include <mayaHydraLib/renderThread/renderThreadPresentBridge.h>
 
 #include <hvt/tasks/outline/outlineManager.h>
 
@@ -88,9 +90,11 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 #include <map>
@@ -106,6 +110,7 @@ class Selection;
 
 namespace MAYAHYDRA_NS_DEF {
 class HoverEventFilter;
+class MouseReleaseEventFilter;
 class NativeInstancerCache;
 }
 
@@ -196,6 +201,14 @@ public:
 
     MStatus setup(const MString& destination) override;
     MStatus cleanup() override;
+
+    /// Waits until every running render thread has published the frame it is working on,
+    /// and returns how many were waited for. A barrier, not a cancellation: the in-flight
+    /// frame is kept, since callers are about to read the viewport.
+    static int DrainAllRenderThreads();
+
+    /// Render target size of the first initialized override, or {0, 0} if none is.
+    static std::pair<int, int> LastRenderTargetSize();
 
     // Utility function to get GPU memory usage stats
     static int GetUsedGPUMemory();
@@ -312,6 +325,13 @@ private:
     // Called by the hover event filter (UI thread). Records the cursor position and schedules a
     // viewport refresh.
     void _SetHoverPosition(const std::string& panelName, int deviceX, int deviceY, bool active);
+    // Redraws \p panelName once the mouse buttons are released, so that the frame it rendered
+    // while they were held gets composited.
+    void _RedrawOnMouseRelease(const std::string& panelName);
+    // Waits for the render thread to finish its frame, then applies what changed upstream while
+    // it rendered. Required before anything writes to the render index, the render delegate or
+    // the frame passes.
+    void _WaitForRenderThreadIdle();
     // Hover resolution, in two steps, so that the way the prim under the cursor is found can
     // change without changing what the hover highlights:
     // - _PickHoverHit() finds the prim under the cursor pixel (HdxPickTask via the outline frame
@@ -496,6 +516,60 @@ private:
     /// use the free camera, so failure needs no other handling.
     SdfPath _ResolveCameraPrimPath();
 
+    /// Draws the given passes, in order, sharing AOVs from one to the next. Takes the
+    /// pass list rather than recomputing it, so the caller controls when each half runs.
+    ///
+    /// Runs on the render thread when overlap is enabled, so it must not call into Maya.
+    void _DrawPasses(const std::vector<int>& orderedPassIndices);
+
+    /// Runs FramePass::GetRenderTasks for each of the given passes without drawing.
+    /// Before the capture is held, because it changes the scene the draw reads (render
+    /// buffers, camera, task parameters), and the capture holds back changes made once
+    /// it is held. It can issue GPU copies, so when the render thread draws everything
+    /// it runs there, with the main thread waiting.
+    void _PrepareRenderTasks(const std::vector<int>& orderedPassIndices);
+
+    /// FramePass::GetRenderTasks for the pass at \p idx in \p orderedPassIndices, with
+    /// the AOVs of the pass before it. Returns false if there is nothing to draw.
+    bool _GetPassRenderTasks(
+        const std::vector<int>&         orderedPassIndices,
+        int                             idx,
+        PXR_NS::HdTaskSharedPtrVector&  outTasks);
+
+    /// Hold every frame pass's render thread capture (see
+    /// RenderThreadCaptureSceneIndex), first activating it if \p activate.
+    /// Main thread, after the scene push and before the draw.
+    void _HoldRenderThreadCapture(bool activate);
+
+    /// Release what _HoldRenderThreadCapture held. Main thread, and only while
+    /// no frame is rendering on the render thread.
+    void _ReleaseRenderThreadCapture();
+
+    /// Under OpenGL, once the render thread runs, it draws everything, picks
+    /// and the first frame included. HgiGLGraphicsPipeline deletes and
+    /// recreates its vertex array object on whichever context binds it, and
+    /// vertex array objects are not shared between contexts. A draw on Maya's
+    /// context with a pipeline the render thread used last would delete a
+    /// name that, on Maya's context, may belong to Maya or another plug-in.
+    bool _RenderThreadDrawsAll() const;
+
+    /// Whether this frame goes to the render thread rather than being drawn here.
+    bool _SubmitsToRenderThread() const;
+
+    /// Defers the prim removals Maya callbacks ask for while a frame submitted to the
+    /// render thread may be inside Hydra sync. Turned off, with the queued removals
+    /// applied, wherever the render thread is known to be idle, so a query after a
+    /// redraw does not find deleted prims.
+    void _SetDeferCallbackRemovals(bool defer);
+
+    /// Sets _isConverged from the passes \p orderedPassIndices last drew. Reads their
+    /// tasks and render buffers, so the render thread must be idle.
+    void _UpdateConvergence(const std::vector<int>& orderedPassIndices);
+
+    /// Runs \p pick on the render thread when _RenderThreadDrawsAll(), holding
+    /// the capture around it as for a frame, and here otherwise.
+    void _RunPick(const std::function<void()>& pick);
+
     int                      _GetNumVisibleFramePasses() const;
     int                      _GetNumFramePasses() const;
     const hvt::FramePassPtr& _GetFramePass(int passIndex)const;
@@ -586,6 +660,12 @@ private:
     // One hover event filter per model panel, keyed by panel name.
     std::map<std::string, std::unique_ptr<MAYAHYDRA_NS_DEF::HoverEventFilter>>
         _hoverEventFilters;
+
+    // Panels whose last redraw composited the previous frame because a mouse button was held.
+    // Declared before _mouseReleaseEventFilter, whose callback reads it.
+    std::set<std::string> _panelsToRedrawOnMouseRelease;
+    // Installed on the first such redraw.
+    std::unique_ptr<MAYAHYDRA_NS_DEF::MouseReleaseEventFilter> _mouseReleaseEventFilter;
 #endif
 
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC
@@ -610,6 +690,28 @@ private:
     const bool _isUsingHdFlash = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
+
+    // Null/false unless MAYAHYDRA_PIPELINE_OVERLAP is set. _renderThreadStarted is the
+    // single condition every overlap-gated site tests, and is false both when the flag
+    // is off and when the thread declined to start.
+    std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThread>              _renderThread;
+    std::unique_ptr<MAYAHYDRA_NS_DEF::RenderThreadPresentBridge> _presentBridge;
+    bool _renderThreadStarted = false;
+    // The first frame is drawn synchronously so a render op always leaves an image
+    // behind, or under OpenGL, composited as its own frame; overlap starts once
+    // this is true.
+    bool _firstFramePrimed = false;
+    // Set when a pick or a resize discarded the frame in flight, leaving nothing to composite:
+    // the next render op composites its own frame instead.
+    bool _compositeOwnFrameNext = false;
+    // The panel the render thread's frames are drawn for.
+    std::string _renderThreadPanel;
+    // The passes of the last frame submitted to the render thread.
+    std::vector<int> _renderThreadPassIndices;
+    uint64_t    _renderThreadFrameId = 0;
+
+    // Set by Maya's time-change callback, so a scrub composites its own frame.
+    bool       _timeChangedSinceRender = false;
     bool       _hasDefaultLighting = false;
     bool       _currentlyTextured = false;
 

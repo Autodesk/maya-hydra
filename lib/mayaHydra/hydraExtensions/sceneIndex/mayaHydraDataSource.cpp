@@ -29,7 +29,9 @@
 #include <mayaHydraLib/adapters/renderItemAdapter.h>
 #include <mayaHydraLib/adapters/tokens.h>
 
+#include <algorithm>
 #include <cmath>
+#include <initializer_list>
 #include <limits>
 
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -173,6 +175,91 @@ private:
     GfMatrix4d           _samples[kMotionKeys] {};
 };
 
+TfTokenVector _GprimNames(std::initializer_list<TfToken> typeSchemas)
+{
+    TfTokenVector names(typeSchemas);
+    names.insert(
+        names.end(),
+        { HdExtentSchemaTokens->extent, // also for the bounding box display style
+          HdPrimvarsSchemaTokens->primvars,
+          HdMaterialBindingsSchema::GetSchemaToken(),
+          HdLegacyDisplayStyleSchemaTokens->displayStyle,
+          HdVisibilitySchemaTokens->visibility,
+          HdXformSchemaTokens->xform,
+          HdPurposeSchemaTokens->purpose });
+    return names;
+}
+
+// The names a prim of \p type has. Get() answers only these: a schema answered
+// for a prim type it does not apply to is defined there for every consumer
+// (HdLightSchema on a mesh made the isolate select scene index spare meshes), and
+// the render thread's copy of the scene would drop it.
+const TfTokenVector& _NamesForType(const TfToken& type)
+{
+    static const TfTokenVector mesh = _GprimNames({ HdMeshSchemaTokens->mesh });
+    static const TfTokenVector basisCurves
+        = _GprimNames({ HdBasisCurvesSchemaTokens->basisCurves });
+    static const TfTokenVector gprim = _GprimNames({});
+    static const TfTokenVector light = {
+        HdPrimvarsSchemaTokens->primvars, HdMaterialSchemaTokens->material,
+        HdXformSchemaTokens->xform,       HdLightSchemaTokens->light,
+        HdPurposeSchemaTokens->purpose,
+    };
+    static const TfTokenVector material
+        = { HdPrimvarsSchemaTokens->primvars, HdMaterialSchemaTokens->material };
+    static const TfTokenVector camera = {
+        HdPrimvarsSchemaTokens->primvars,
+        HdCameraSchemaTokens->camera,
+        HdXformSchemaTokens->xform,
+        HdPurposeSchemaTokens->purpose,
+    };
+    static const TfTokenVector customDagNode = {
+        HdPrimvarsSchemaTokens->primvars,  HdXformSchemaTokens->xform,
+        HdVisibilitySchemaTokens->visibility, MayaHydraAdapterTokens->mayaNode,
+        HdPurposeSchemaTokens->purpose,
+    };
+#if PXR_VERSION >= 2605
+    static const TfTokenVector particleField = {
+        HdPrimvarsSchemaTokens->primvars,
+        HdVisibilitySchemaTokens->visibility,
+        HdXformSchemaTokens->xform,
+        HdPurposeSchemaTokens->purpose,
+    };
+#endif
+    static const TfTokenVector other = { HdPrimvarsSchemaTokens->primvars };
+
+    if (type == HdPrimTypeTokens->mesh) {
+        return mesh;
+    }
+    if (type == HdPrimTypeTokens->basisCurves) {
+        return basisCurves;
+    }
+    // Meshes, basis curves, points and volumes, as per
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/d3991f70df7d70ad7b7d2485c23a90ef8d05342b/pxr/imaging/hd/tokens.cpp#L68
+    if (HdPrimTypeIsGprim(type)) {
+        return gprim;
+    }
+#if PXR_VERSION >= 2605
+    // Not a gprim to HdPrimTypeIsGprim(), but drawn like one.
+    if (type == HdPrimTypeTokens->particleField) {
+        return particleField;
+    }
+#endif
+    if (HdPrimTypeIsLight(type)) {
+        return light;
+    }
+    if (type == HdPrimTypeTokens->material) {
+        return material;
+    }
+    if (type == HdPrimTypeTokens->camera) {
+        return camera;
+    }
+    if (type == MayaHydraAdapterTokens->mayaCustomDagNode) {
+        return customDagNode;
+    }
+    return other;
+}
+
 }
 
 MayaHydraDataSource::MayaHydraDataSource(
@@ -190,70 +277,17 @@ MayaHydraDataSource::MayaHydraDataSource(
 TfTokenVector
 MayaHydraDataSource::GetNames()
 {
-    TfTokenVector result;
-    
-
-    if (_type == HdPrimTypeTokens->mesh) {
-        result.push_back(HdMeshSchemaTokens->mesh);
-        result.push_back(HdExtentSchemaTokens->extent); //Add an extent attribute to support the bounding box display style
-    }
-
-    if (_type == HdPrimTypeTokens->basisCurves) {
-        result.push_back(HdBasisCurvesSchemaTokens->basisCurves);
-    }
-
-    result.push_back(HdPrimvarsSchemaTokens->primvars);
-
-    // As per
-    // https://github.com/PixarAnimationStudios/OpenUSD/blob/d3991f70df7d70ad7b7d2485c23a90ef8d05342b/pxr/imaging/hd/tokens.cpp#L68
-    // the following covers meshes, basis curves, points, and volumes.
-    if (HdPrimTypeIsGprim(_type)) {
-        result.push_back(HdMaterialBindingsSchema::GetSchemaToken());
-        result.push_back(HdLegacyDisplayStyleSchemaTokens->displayStyle);
-        result.push_back(HdVisibilitySchemaTokens->visibility);
-        result.push_back(HdXformSchemaTokens->xform);
-        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
-    }
-
-#if PXR_VERSION >= 2605
-    // Not a gprim to HdPrimTypeIsGprim(), but drawn like one.
-    if (_type == HdPrimTypeTokens->particleField) {
-        result.push_back(HdVisibilitySchemaTokens->visibility);
-        result.push_back(HdXformSchemaTokens->xform);
-        result.push_back(HdPurposeSchemaTokens->purpose);
-    }
-#endif
-
-    if (HdPrimTypeIsLight(_type)) {
-        result.push_back(HdMaterialSchemaTokens->material);
-        result.push_back(HdXformSchemaTokens->xform);
-        result.push_back(HdLightSchemaTokens->light);
-        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
-    }
-
-    if (_type == HdPrimTypeTokens->material) {
-        result.push_back(HdMaterialSchemaTokens->material);
-    }
-
-    if (_type == HdPrimTypeTokens->camera) {
-        result.push_back(HdCameraSchemaTokens->camera);
-        result.push_back(HdXformSchemaTokens->xform);
-        result.push_back(HdPurposeSchemaTokens->purpose);
-    }
-
-    if (_type == MayaHydraAdapterTokens->mayaCustomDagNode) {
-        result.push_back(HdXformSchemaTokens->xform);
-        result.push_back(HdVisibilitySchemaTokens->visibility);
-        result.push_back(MayaHydraAdapterTokens->mayaNode);
-        result.push_back(HdPurposeSchemaTokens->purpose);
-    }
-
-    return result;
+    return _NamesForType(_type);
 }
 
 HdDataSourceBaseHandle
 MayaHydraDataSource::Get(const TfToken& name)
 {
+    const TfTokenVector& names = _NamesForType(_type);
+    if (std::find(names.begin(), names.end(), name) == names.end()) {
+        return nullptr;
+    }
+
     if (name == HdMeshSchemaTokens->mesh) {
         if (_type == HdPrimTypeTokens->mesh) {
             auto topology = _adapter->GetMeshTopology();
@@ -364,30 +398,22 @@ MayaHydraDataSource::Get(const TfToken& name)
     else if (name == HdCameraSchemaTokens->camera) {
         return MayaHydraCameraDataSource::New(_id, _type, _adapter);
     }
-    // Lights only, as GetNames() says. Answering for every prim made
-    // HdLightSchema::IsDefined() true on meshes, and consumers that spare lights
-    // - the isolate select scene index keeps them visible when excluded - then
-    // spared every mesh. VP2 hid the render items anyway; render item override carriers rely
-    // on the isolate select scene index alone.
-    else if (name == HdLightSchemaTokens->light && HdPrimTypeIsLight(_type)) {
+    else if (name == HdLightSchemaTokens->light) {
         return MayaHydraLightDataSource::New(_id, _type, _adapter);
     }
-    else if (name == HdExtentSchemaTokens->extent) {//Extent attribute to support the bounding box display style
+    else if (name == HdExtentSchemaTokens->extent) {
         GfBBox3d bbox = _adapter->GetBoundingBox();
         return HdExtentSchema::Builder()
             .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(bbox.GetRange().GetMin()))
             .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(bbox.GetRange().GetMax()))
             .Build();
     }
-    else if (name == HdTokens->displayColor) {//Is not part of a schema so using HdTokens->displayColor
-        return _GetDisplayColorDataSource();
-    } else if (name == HdPurposeSchemaTokens->purpose && ! (_adapter->GetRenderTag().IsEmpty()) ) { 
+    else if (name == HdPurposeSchemaTokens->purpose && ! (_adapter->GetRenderTag().IsEmpty()) ) { 
         return HdPurposeSchema::Builder()
                     .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
                         _adapter->GetRenderTag()))
                     .Build();
-    } else if (name == MayaHydraAdapterTokens->mayaNode
-               && _type == MayaHydraAdapterTokens->mayaCustomDagNode) {
+    } else if (name == MayaHydraAdapterTokens->mayaNode) {
         auto* customAdapter = dynamic_cast<MayaHydraCustomDagAdapter*>(_adapter);
         if (customAdapter) {
             return MayaHydraCustomNodeDataSource::New(customAdapter);
@@ -412,11 +438,6 @@ HdDataSourceBaseHandle MayaHydraDataSource::_GetVisibilityDataSource()
                 HdRetainedTypedSampledDataSource<bool>::New(false));
         return visOff;
     }
-}
-
-HdDataSourceBaseHandle MayaHydraDataSource::_GetDisplayColorDataSource()
-{
-    return HdRetainedTypedSampledDataSource<GfVec4f>::New(_adapter->GetDisplayColor());
 }
 
 HdDataSourceBaseHandle MayaHydraDataSource::_GetPrimvarsDataSource()

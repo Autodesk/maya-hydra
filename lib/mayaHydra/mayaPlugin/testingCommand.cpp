@@ -21,8 +21,13 @@
 #include "batchRenderer.h"
 #endif
 
+#include <mayaHydraLib/renderThread/renderThreadStats.h>
+
 #include <maya/MArgList.h>
 #include <maya/MArgParser.h>
+#include <maya/MGlobal.h>
+#include <maya/MIntArray.h>
+#include <maya/MSelectionList.h>
 #include <maya/MSyntax.h>
 
 #include <pxr/pxr.h>
@@ -46,6 +51,19 @@
     // Release the batch renderer retained for unit tests
     MEL : mayaHydraTesting -rbr
     Python : maya.cmds.mayaHydraTesting(releaseBatchRenderer=True)
+
+    // Render thread state. Inert unless MAYAHYDRA_PIPELINE_OVERLAP=1.
+    Python : maya.cmds.mayaHydraTesting(renderThreadStats=True)
+    Python : maya.cmds.mayaHydraTesting(resetRenderThreadStats=True)
+
+    // Wait for every render thread to publish its frame. Call before capturing an image.
+    Python : maya.cmds.mayaHydraTesting(drainRenderThread=True)
+
+    // The viewport's render target size, as [width, height].
+    Python : maya.cmds.mayaHydraTesting(renderTargetSize=True)
+
+    // A viewport pick over a screen rectangle (x1, y1, x2, y2). Returns objects selected.
+    Python : maya.cmds.mayaHydraTesting(viewportPick=(100, 100, 200, 200))
 */
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -66,6 +84,16 @@ constexpr auto kRendererNameLong = "-rendererName";
 constexpr auto kReleaseBatchRenderer = "-rbr";
 constexpr auto kReleaseBatchRendererLong = "-releaseBatchRenderer";
 #endif
+constexpr auto kDrainRenderThread = "-drt";
+constexpr auto kDrainRenderThreadLong = "-drainRenderThread";
+constexpr auto kRenderThreadStats = "-rts";
+constexpr auto kRenderThreadStatsLong = "-renderThreadStats";
+constexpr auto kResetRenderThreadStats = "-rrt";
+constexpr auto kResetRenderThreadStatsLong = "-resetRenderThreadStats";
+constexpr auto kRenderTargetSize = "-rtz";
+constexpr auto kRenderTargetSizeLong = "-renderTargetSize";
+constexpr auto kViewportPick = "-vpk";
+constexpr auto kViewportPickLong = "-viewportPick";
 
 } // namespace
 
@@ -81,6 +109,18 @@ MSyntax MayaHydraTestingCommand::createSyntax()
 #if MAYA_API_VERSION >= 20270000
     syntax.addFlag(kReleaseBatchRenderer, kReleaseBatchRendererLong);
 #endif
+
+    syntax.addFlag(kDrainRenderThread, kDrainRenderThreadLong);
+    syntax.addFlag(kRenderThreadStats, kRenderThreadStatsLong);
+    syntax.addFlag(kResetRenderThreadStats, kResetRenderThreadStatsLong);
+    syntax.addFlag(kRenderTargetSize, kRenderTargetSizeLong);
+    syntax.addFlag(
+        kViewportPick,
+        kViewportPickLong,
+        MSyntax::kLong,
+        MSyntax::kLong,
+        MSyntax::kLong,
+        MSyntax::kLong);
 
     return syntax;
 }
@@ -126,6 +166,84 @@ MStatus MayaHydraTestingCommand::doIt(const MArgList& args)
         BatchRenderer::ReleaseRetainedForTest();
     }
 #endif
+
+    if (argData.isFlagSet(kResetRenderThreadStats)) {
+        MAYAHYDRA_NS_DEF::RenderThreadStats::instance().Reset();
+    }
+
+    if (argData.isFlagSet(kDrainRenderThread)) {
+        setResult(MtohRenderOverride::DrainAllRenderThreads());
+    }
+
+    if (argData.isFlagSet(kRenderTargetSize)) {
+        const auto size = MtohRenderOverride::LastRenderTargetSize();
+        MIntArray  result;
+        result.append(size.first);
+        result.append(size.second);
+        setResult(result);
+    }
+
+    if (argData.isFlagSet(kViewportPick)) {
+        // The only route to MtohRenderOverride::select. There is no scripted equivalent:
+        // cmds.select bypasses the viewport, and selectFromScreen is C++ only.
+        int coords[4] = { 0, 0, 0, 0 };
+        for (unsigned int i = 0; i < 4; ++i) {
+            coords[i] = argData.flagArgumentInt(kViewportPick, i, &st);
+            if (!st) { return st; }
+        }
+
+        // Deliberately kReplaceList: a test that adds to the selection cannot
+        // assert what it picked.
+        st = MGlobal::selectFromScreen(
+            static_cast<short>(coords[0]), static_cast<short>(coords[1]),
+            static_cast<short>(coords[2]), static_cast<short>(coords[3]),
+            MGlobal::kReplaceList,
+            MGlobal::kSurfaceSelectMethod);
+        if (!st) {
+            displayError(
+                "mayaHydraTesting -viewportPick: MGlobal::selectFromScreen "
+                "failed. It acts on the active 3d view, so this usually means "
+                "no model panel is active.",
+                true);
+            return st;
+        }
+
+        MSelectionList picked;
+        MGlobal::getActiveSelectionList(picked);
+        setResult(static_cast<int>(picked.length()));
+    }
+
+    if (argData.isFlagSet(kRenderThreadStats)) {
+        // Fixed order, mirrored by RENDER_THREAD_STAT_NAMES in the test. The first two
+        // exist so a passing overlap test cannot be a silent fallback: the fallback
+        // renders correctly, so a working viewport proves nothing on its own.
+        const auto stats = MAYAHYDRA_NS_DEF::RenderThreadStats::instance().Get();
+        MIntArray  result;
+        result.append(stats.overlapEnabled ? 1 : 0);
+        result.append(stats.started ? 1 : 0);
+        result.append(stats.supported ? 1 : 0);
+        result.append(static_cast<int>(stats.framesRenderedOffThread));
+        result.append(static_cast<int>(stats.framesComposited));
+        result.append(static_cast<int>(stats.framesRenderedSynchronously));
+        result.append(static_cast<int>(stats.ownFramesComposited));
+        result.append(static_cast<int>(stats.discards));
+        result.append(static_cast<int>(stats.idleWaitTimeouts));
+        result.append(static_cast<int>(stats.fenceSignalFailures));
+        result.append(static_cast<int>(stats.unfencedFramesSkipped));
+        result.append(static_cast<int>(stats.quiescenceFenceTimeouts));
+        result.append(static_cast<int>(stats.quiescenceWaitTimeouts));
+        result.append(static_cast<int>(stats.presentsWithoutDepth));
+        result.append(static_cast<int>(stats.presentsSkipped));
+        result.append(static_cast<int>(stats.aovCopyFailures));
+        result.append(static_cast<int>(stats.compositeFenceSignalFailures));
+        result.append(static_cast<int>(stats.sharedBufferFenceFailures));
+        result.append(static_cast<int>(stats.primsCaptured));
+        result.append(static_cast<int>(stats.mayaReadsOnRenderThread));
+        result.append(static_cast<int>(stats.captureHolds));
+        result.append(static_cast<int>(stats.captureHoldMicros));
+        result.append(static_cast<int>(stats.captureReleaseMicros));
+        setResult(result);
+    }
 
     return MS::kSuccess;
 }

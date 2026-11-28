@@ -15,6 +15,7 @@
 //
 
 #include "envSettings.h"
+
 #include <pxr/base/tf/envSetting.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -41,6 +42,11 @@ TF_DEFINE_ENV_SETTING(
     "Have Maya carry translated geometry straight to MayaHydra (MPxRenderItemOverride "
     "carriers) instead of the stock render-item path. Set to 0 to run the stock path.");
 
+TF_DEFINE_ENV_SETTING(
+    MAYAHYDRA_PIPELINE_OVERLAP,
+    false,
+    "Render on a separate thread, overlapping the draw of one frame with the "
+    "main thread's work on the next.");
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -50,6 +56,13 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
+    }
+
+    bool usePipelineOverlap()
+    {
+        static const bool _usePipelineOverlap
+            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYAHYDRA_PIPELINE_OVERLAP);
+        return _usePipelineOverlap;
     }
 
     bool hdArnoldUseV2RenderSettings()

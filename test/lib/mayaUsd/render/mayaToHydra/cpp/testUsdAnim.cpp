@@ -44,8 +44,7 @@ TEST(TestUsdAnim, timeVaryingTransform)
     ASSERT_FALSE(cubeSiPath.IsEmpty());
 
     // Get cube scene index prim.
-    const auto cubePrim = siRoot->GetPrim(cubeSiPath);
-    ASSERT_TRUE(cubePrim.dataSource);
+    ASSERT_TRUE(siRoot->GetPrim(cubeSiPath).dataSource);
 
     // Extract the Hydra xform matrix from the cube prim
     // Loop over time, and check translation, from frames [0..10].  The z value
@@ -53,6 +52,9 @@ TEST(TestUsdAnim, timeVaryingTransform)
     for (double t=0; t < 11.0; t+=1.0) {
         ASSERT_EQ(MGlobal::viewFrame(t), MS::kSuccess);
 
+        // Read again at each frame: a prim's data source is not guaranteed to serve
+        // later changes (the render thread's capture serves a copy).
+        const auto cubePrim = siRoot->GetPrim(cubeSiPath);
         GfMatrix4d cubeHydraMatrix;
         ASSERT_TRUE(GetXformMatrixFromPrim(cubePrim, cubeHydraMatrix));
         ASSERT_TRUE(GfIsClose(cubeHydraMatrix.ExtractTranslation()[2], t, std::numeric_limits<double>::epsilon()));

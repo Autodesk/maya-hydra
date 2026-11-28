@@ -25,12 +25,16 @@
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
+#include <pxr/imaging/hio/image.h>
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/usdLux/tokens.h>
 #include <pxr/base/tf/getenv.h>
 
 #include <maya/MPlugArray.h>
-#include <maya/MTextureManager.h>
+
+#include <algorithm>
+#include <cstdio>
+#include <deque>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -42,33 +46,82 @@ class MayaHydraSceneIndex;
  */
 class MayaHydraAiSkyDomeLightAdapter : public MayaHydraLightAdapter
 {
-    /// To be able to create a dummy texture (see _dummyTexturePath)
-    static MHWRender::MTextureManager* _pTextureManager;
-
     /// Temp folder path from the OS
     static std::string _tmpFolderPath;
 
-    /**_dummyTexturePath is the fullpath filename for a dummy 1x1 texture file used when there
-     * is no texture connected to the color of the Arnold sky dome light
-     * as Hydra always wants a texture and ignores the color if no texture is present.
-     */
-    std::string _dummyTextureFullPathFilename;
-    /// This is only the filename of the dummy texture to be saved
-    std::string _dummyTextureFilenameOnly;
+    /// The 1x1 constant color textures written for this light, which Hydra uses when
+    /// nothing is connected to the color, as it ignores the color of a dome light
+    /// without a texture. One per color, so that a renderer caching textures by
+    /// path sees a color edit. The render thread may still load the previous color's
+    /// path from its copy of the scene, so the newest two are kept, most recent
+    /// last; older ones are deleted, and the rest with the adapter.
+    static constexpr size_t _kKeptConstantColorTextures = 2;
+    std::deque<std::string> _constantColorTextures;
 
-    /// Is the color attribute of the sky dome light connected to something ?
-    bool _colorIsConnected = false;
+    static bool _IsConnected(const MPlug& plug)
+    {
+        MPlugArray conns;
+        plug.connectedTo(conns, true, false);
+        return conns.length() > 0;
+    }
+
+    static GfVec3f _GetColor(const MPlug& plug)
+    {
+        GfVec3f color(0.5f, 0.5f, 0.5f);
+        if (!plug.isNull()) {
+            plug.child(0).getValue(color[0]);
+            plug.child(1).getValue(color[1]);
+            plug.child(2).getValue(color[2]);
+        }
+        return color;
+    }
+
+    // Writes with Hio rather than VP2's texture manager: Hydra reads light parameters
+    // on any thread, and the texture manager makes GL calls on whatever context is
+    // current.
+    std::string _GetConstantColorTexture(const GfVec3f& color)
+    {
+        if (_tmpFolderPath.empty()) {
+            return {};
+        }
+        unsigned char texData[4];
+        for (int i = 0; i < 3; ++i) {
+            texData[i] = static_cast<unsigned char>(255 * std::clamp(color[i], 0.0f, 1.0f));
+        }
+        texData[3] = 255;
+
+        const std::string path = _tmpFolderPath
+            + TfStringPrintf("/HydraAiSkyDomeLightTex__%p__%02x%02x%02x__tmp.png",
+                             this, texData[0], texData[1], texData[2]);
+        const auto known
+            = std::find(_constantColorTextures.begin(), _constantColorTextures.end(), path);
+        if (known != _constantColorTextures.end()) {
+            _constantColorTextures.erase(known);
+            _constantColorTextures.push_back(path);
+            return path;
+        }
+        HioImageSharedPtr image = HioImage::OpenForWriting(path);
+        HioImage::StorageSpec storage;
+        storage.width = 1;
+        storage.height = 1;
+        storage.depth = 1;
+        storage.format = HioFormatUNorm8Vec4;
+        storage.data = texData;
+        if (!image || !image->Write(storage)) {
+            return {};
+        }
+        _constantColorTextures.push_back(path);
+        while (_constantColorTextures.size() > _kKeptConstantColorTextures) {
+            std::remove(_constantColorTextures.front().c_str());
+            _constantColorTextures.pop_front();
+        }
+        return path;
+    }
 
 public:
     MayaHydraAiSkyDomeLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
         : MayaHydraLightAdapter(mayaHydraSceneIndex, dag)
     {
-        // Init static variables if needed
-        if (!_pTextureManager) {
-            MHWRender::MRenderer* const renderer = MHWRender::MRenderer::theRenderer();
-            _pTextureManager = renderer ? renderer->getTextureManager() : nullptr;
-        }
-
         if (_tmpFolderPath.empty()) {
             std::string tmpDir = TfGetenv("TMPDIR");
             if (!tmpDir.empty()) {
@@ -82,20 +135,28 @@ public:
                 }
             }
         }
-
-        _dummyTextureFilenameOnly = TfStringPrintf("/HydraAiSkyDomeLightTex__%p__tmp.png", this);
     }
 
     virtual ~MayaHydraAiSkyDomeLightAdapter()
     {
-        // Delete the dummy texture files if they exist
-        if (!_dummyTextureFullPathFilename.empty()) {
-            auto dummyTextureFullPathFilename1 = _tmpFolderPath + _dummyTextureFilenameOnly;
-            std::remove(dummyTextureFullPathFilename1.c_str());
+        for (const std::string& path : _constantColorTextures) {
+            std::remove(path.c_str());
         }
     }
 
     const TfToken& LightType() const override { return HdPrimTypeTokens->domeLight; }
+
+    TfTokenVector GetLightParamNames() const override
+    {
+        TfTokenVector names = MayaHydraLightAdapter::GetLightParamNames();
+        names.insert(
+            names.end(),
+            { HdLightTokens->textureFormat,
+              UsdLuxTokens->inputsTextureFormat,
+              HdLightTokens->textureFile,
+              UsdLuxTokens->inputsTextureFile });
+        return names;
+    }
 
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
@@ -110,53 +171,12 @@ public:
         // We are not using precomputed attributes here, because we don't have
         // a guarantee that mtoa will be loaded before mayaHydra.
         if (paramName == HdLightTokens->color || paramName == UsdLuxTokens->inputsColor) {
-            const auto plug = light.findPlug("color", true);
-            MPlugArray conns;
-            plug.connectedTo(conns, true, false);
-            _colorIsConnected = (conns.length() > 0);
-            if (_colorIsConnected) {
+            const MPlug plug = light.findPlug("color", true);
+            if (_IsConnected(plug)) {
                 return VtValue(
                     GfVec3f(1.0f, 1.0f, 1.0f)); // When there is a connection, return a white color.
             }
-
-            // If no texture is found then get unconnected plug value and make a 1x1 texture of
-            // constant color using it.
-            float r = 0.5f;
-            float g = 0.5f;
-            float b = 0.5f;
-            if (!plug.isNull()) {
-                plug.child(0).getValue(r);
-                plug.child(1).getValue(g);
-                plug.child(2).getValue(b);
-            }
-
-            const float rClamped = (r <= 1.f) ? r : 1.0f;
-            const float gClamped = (g <= 1.f) ? g : 1.0f;
-            const float bClamped = (b <= 1.f) ? b : 1.0f;
-
-            unsigned char texData[4];
-            texData[0] = (unsigned char)(255 * rClamped);
-            texData[1] = (unsigned char)(255 * gClamped);
-            texData[2] = (unsigned char)(255 * bClamped);
-            texData[3] = 255;
-
-            // Create a 1 x 1 constant color texture
-            MHWRender::MTextureDescription desc;
-            desc.setToDefault2DTexture();
-            desc.fWidth = 1;
-            desc.fHeight = 1;
-            desc.fFormat = MHWRender::kR8G8B8A8_UNORM;
-            if (_pTextureManager) {
-                auto pTexture = _pTextureManager->acquireTexture("", desc, texData); // In memory
-                if (pTexture && (!_tmpFolderPath.empty()) && (!_dummyTextureFilenameOnly.empty())) {
-                    pTexture->setHasAlpha(true);
-                    _dummyTextureFullPathFilename = _tmpFolderPath + _dummyTextureFilenameOnly;
-                    // This texture will be used in the HdLightTokens->textureFile parameter
-                    _pTextureManager->saveTexture(
-                        pTexture, MString(_dummyTextureFullPathFilename.c_str()));
-                }
-            }
-            return VtValue(GfVec3f(r, g, b));
+            return VtValue(_GetColor(plug));
         } else if (
             paramName == HdLightTokens->textureFormat
             || paramName == UsdLuxTokens->inputsTextureFormat) {
@@ -177,20 +197,12 @@ public:
             // Be aware that dome lights in HdStorm always need a texture to work correctly,
             // the color is not used if no texture is present.
 
-            if (!_colorIsConnected) {
-                if (!_dummyTextureFullPathFilename.empty()) {
-                    // Update Hydra texture resource everytime Domelight color is tweaked.
-                    auto resourceReg = GetMayaHydraSceneIndex()->GetResourceRegistry();
-                    if (TF_VERIFY(resourceReg, "Unable to update AikSkyDomelights constant color"))
-                        resourceReg->ReloadResource(
-                            TfToken("texture"), _dummyTextureFullPathFilename);
-                    // SdfAssetPath requires both "path" and "resolvedPath"
-                    return VtValue(
-                        SdfAssetPath(_dummyTextureFullPathFilename, _dummyTextureFullPathFilename));
-                }
-                // this will produce a warning but hopefully is an edge case as
-                // it means we were not able to create a dummy texture
-                return VtValue(SdfAssetPath());
+            const MPlug colorPlug = light.findPlug("color", true);
+            if (!_IsConnected(colorPlug)) {
+                const std::string path = _GetConstantColorTexture(_GetColor(colorPlug));
+                // SdfAssetPath requires both "path" and "resolvedPath". An empty one
+                // produces a warning, but means the texture could not be written.
+                return VtValue(path.empty() ? SdfAssetPath() : SdfAssetPath(path, path));
             }
 
             const std::string domeLightTexturePath = MAYAHYDRA_NS::GetDomeLightTexture(
@@ -211,8 +223,7 @@ public:
 };
 
 // Static variables from MayaHydraAiSkyDomeLightAdapter
-MHWRender::MTextureManager* MayaHydraAiSkyDomeLightAdapter::_pTextureManager = nullptr;
-std::string                 MayaHydraAiSkyDomeLightAdapter::_tmpFolderPath;
+std::string MayaHydraAiSkyDomeLightAdapter::_tmpFolderPath;
 
 TF_REGISTRY_FUNCTION(TfType)
 {
